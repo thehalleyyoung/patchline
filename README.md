@@ -24,6 +24,7 @@ make artifact-benchmark-compare
 make artifact-benchmark-public
 make artifact-benchmark-public-incidents
 make artifact-benchmark-public-repairs
+make artifact-benchmark-public-archive
 make artifact-negative-cases
 ```
 
@@ -42,6 +43,8 @@ The offline benchmark compare path now includes focused repair and regression da
 `make artifact-benchmark-public-incidents` is the offline public-incident counterpart: it runs GitLab 2017 and GitHub 2018 source-observation fixtures plus a too-thin public-summary boundary through the same phase-aware manifest protocol and compares the result to `benchmarks/expected/public-incidents-report.json`.
 
 `make artifact-benchmark-public-repairs` adds the first public-derived repair benchmark case. It checks a Patchline-authored counterfactual repair manifest derived from the GitLab 2017 public postmortem and follow-up issues, and verifies that Patchline returns `cannot_prove` rather than certifying a repair plan with no snapshot rollback evidence. This is intentionally a one-case public-derived benchmark, not a full public repair corpus.
+
+`make artifact-benchmark-public-archive` adds the first paired public-postmortem-derived archive case. It uses GitLab 2017 and GitHub 2018 public source observations with Patchline-authored migration, repair, and replay-store reconstructions; the archive distinguishes GitLab's no-snapshot repair as `cannot_prove`, verifies the scoped GitHub reconciliation, and flags the later broad `issues` transition as a shared high-risk-table recurrence.
 
 If a semantic change intentionally updates expected benchmark outputs, run `make artifact-benchmark-refresh`. If it intentionally updates study report hashes, run `make artifact-studies-refresh`. Refresh targets rewrite committed expected files and immediately rerun compare targets, keeping the default reviewer path drift-detecting rather than self-updating.
 
@@ -62,7 +65,7 @@ Evidence -> Trace -> Transition -> Repair -> Proof -> Replay -> Archive -> Regre
 | Archive | `archive-index`, `archive-query` | deterministic incident index | turns incidents into queryable memory |
 | Regression | `semantic-regressions` | recurrence relations and invariants | detects repeated semantic failure shapes |
 | Artifact studies | `artifact-baselines`, `artifact-ablations`, `artifact-scale`, `artifact-study compare` | baseline, ablation, scale, and expected-hash reports | shows and drift-checks what each semantic layer contributes right now |
-| Artifact benchmark | `artifact-benchmark validate/run/compare` | phase-aware migration, incident, public-derived repair, and regression reports with golden comparisons | verifies current usefulness against committed and pinned-public ground truth without label leakage |
+| Artifact benchmark | `artifact-benchmark validate/run/compare` | phase-aware migration, incident, public-derived repair, paired public-archive, and regression reports with golden comparisons | verifies current usefulness against committed and pinned-public ground truth without label leakage |
 
 ## Verify the current usefulness claim
 

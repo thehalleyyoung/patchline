@@ -1,0 +1,11 @@
+{
+  "tables": {
+    "projects": {
+      "project-1": {
+        "id": "project-1",
+        "source": "primary-db",
+        "status": "removed"
+      }
+    }
+  }
+}

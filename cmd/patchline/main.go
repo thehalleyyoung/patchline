@@ -1004,16 +1004,30 @@ func buildArchiveEntry(baseDir string, input archive.InputSpec) (archive.Entry, 
 	if err != nil {
 		return archive.Entry{}, err
 	}
-	dryRun, err := replay.DryRun(manifest, graph, demo.BillingStore())
+	store := demo.BillingStore()
+	if input.Store != "" {
+		store, err = readStore(resolvePath(baseDir, input.Store))
+		if err != nil {
+			return archive.Entry{}, err
+		}
+	}
+	dryRun, err := replay.DryRun(manifest, graph, store)
 	if err != nil {
 		return archive.Entry{}, err
 	}
-	sqlPlan, err := repair.GenerateSQL(manifest)
-	if err != nil {
-		return archive.Entry{}, err
+	lint := repair.Lint(manifest)
+	sqlHash := ""
+	verificationReason := "repair-manifest-lint:" + archiveRepairLintReason(lint)
+	if lint.OK {
+		sqlPlan, err := repair.GenerateSQL(manifest)
+		if err != nil {
+			return archive.Entry{}, err
+		}
+		sqlHash = sqlPlan.Hash
+		verificationReason = ""
 	}
 	effectSummary := abstractEffectSummary(manifest, dryRun)
-	policyEvaluation, err := buildPolicyEvaluation(policyPath, repairPath, migrationPath)
+	policyEvaluation, err := buildPolicyEvaluation(policyPath, repairPath, migrationPath, graph, store)
 	if err != nil {
 		return archive.Entry{}, err
 	}
@@ -1025,12 +1039,33 @@ func buildArchiveEntry(baseDir string, input archive.InputSpec) (archive.Entry, 
 	if err != nil {
 		return archive.Entry{}, err
 	}
+	rollbackOK := manifest.Rollback.Strategy == "snapshot" && manifest.Rollback.SnapshotRequired
+	verificationResult := "cannot_prove"
+	verificationHash := ""
+	if lint.OK && sqlHash != "" && rollbackOK {
+		verificationResult = repairVerificationResult(dryRun, policyEvaluation.OK, benchmarkResult.OK)
+		if verificationResult == "verified" {
+			verificationHash = canonical.Hash(struct {
+				DryRunHash    string `json:"dry_run_hash"`
+				PolicyHash    string `json:"policy_hash"`
+				PolicyOK      bool   `json:"policy_ok"`
+				BenchmarkHash string `json:"benchmark_hash"`
+				BenchmarkOK   bool   `json:"benchmark_ok"`
+				RollbackOK    bool   `json:"rollback_ok"`
+			}{dryRun.Hash(), policyEvaluation.PolicyHash, policyEvaluation.OK, benchmarkResult.SuiteHash, benchmarkResult.OK, true})
+		} else {
+			verificationReason = verificationResult
+		}
+	} else if verificationReason == "" {
+		verificationReason = "rollback-not-available"
+	}
 
 	entry := archive.Entry{
 		ID:                       input.ID,
 		EvidencePath:             input.Evidence,
 		MigrationPath:            input.Migration,
 		RepairPath:               input.Repair,
+		ReplayStorePath:          input.Store,
 		PolicyPath:               input.Policy,
 		BenchmarkPath:            input.Benchmark,
 		EvidenceHash:             evidenceResult.InputHash,
@@ -1042,29 +1077,40 @@ func buildArchiveEntry(baseDir string, input archive.InputSpec) (archive.Entry, 
 		RepairHash:               canonical.Hash(manifest),
 		RepairEffect:             string(effectSummary.Join),
 		RepairDryRunHash:         dryRun.Hash(),
-		RepairAppliedSQLHash:     sqlPlan.Hash,
-		RepairRollbackAvailable:  manifest.Rollback.Strategy == "snapshot" && manifest.Rollback.SnapshotRequired,
-		RepairVerificationResult: repairVerificationResult(dryRun, policyEvaluation.OK, benchmarkResult.OK),
-		RepairVerificationHash: canonical.Hash(struct {
-			DryRunHash    string `json:"dry_run_hash"`
-			PolicyHash    string `json:"policy_hash"`
-			PolicyOK      bool   `json:"policy_ok"`
-			BenchmarkHash string `json:"benchmark_hash"`
-			BenchmarkOK   bool   `json:"benchmark_ok"`
-			RollbackOK    bool   `json:"rollback_ok"`
-		}{dryRun.Hash(), policyEvaluation.PolicyHash, policyEvaluation.OK, benchmarkResult.SuiteHash, benchmarkResult.OK, manifest.Rollback.Strategy == "snapshot" && manifest.Rollback.SnapshotRequired}),
-		PolicyAllowed:    policyEvaluation.OK,
-		PolicyFailures:   collectPolicyFailures(policyEvaluation),
-		PolicyHash:       policyEvaluation.PolicyHash,
-		BenchmarkOK:      benchmarkResult.OK,
-		BenchmarkHash:    benchmarkResult.SuiteHash,
-		DamagedEntities:  len(evidenceResult.DamagedEntities),
-		DamagedEntityIDs: sortedStrings(evidenceResult.DamagedEntities),
-		DerivedReports:   countEntitiesByKind(graph, provenance.KindReport),
-		DerivedReportIDs: derivedReportsFromDamaged(graph, evidenceResult.DamagedEntities),
-		ProofBundleReady: dryRun.Hash() != "" && policyEvaluation.PolicyHash != "" && benchmarkResult.SuiteHash != "",
+		RepairAppliedSQLHash:     sqlHash,
+		RepairRollbackAvailable:  rollbackOK,
+		RepairVerificationResult: verificationResult,
+		RepairVerificationHash:   verificationHash,
+		RepairVerificationReason: verificationReason,
+		PolicyAllowed:            policyEvaluation.OK,
+		PolicyFailures:           collectPolicyFailures(policyEvaluation),
+		PolicyHash:               policyEvaluation.PolicyHash,
+		BenchmarkOK:              benchmarkResult.OK,
+		BenchmarkHash:            benchmarkResult.SuiteHash,
+		DamagedEntities:          len(evidenceResult.DamagedEntities),
+		DamagedEntityIDs:         sortedStrings(evidenceResult.DamagedEntities),
+		DerivedReports:           countEntitiesByKind(graph, provenance.KindReport),
+		DerivedReportIDs:         derivedReportsFromDamaged(graph, evidenceResult.DamagedEntities),
+		ProofBundleReady:         dryRun.Hash() != "" && policyEvaluation.PolicyHash != "" && benchmarkResult.SuiteHash != "" && verificationResult == "verified",
 	}
 	return entry, nil
+}
+
+func archiveRepairLintReason(lint repair.LintResult) string {
+	if lint.OK {
+		return "ok"
+	}
+	var codes []string
+	for _, finding := range lint.Findings {
+		if finding.Level == "error" {
+			codes = append(codes, finding.Code)
+		}
+	}
+	if len(codes) == 0 {
+		return "not-ok"
+	}
+	sort.Strings(codes)
+	return strings.Join(codes, ",")
 }
 
 func repairVerificationResult(dryRun replay.Report, policyOK, benchmarkOK bool) string {
@@ -2042,7 +2088,7 @@ func semanticArtifacts(opts semanticAuditOptions) ([]semantics.ArtifactEvidence,
 
 	policyFailures := []string{}
 	if opts.Policy != "" {
-		policyEval, err := buildPolicyEvaluation(opts.Policy, opts.Repair, opts.Migration)
+		policyEval, err := buildPolicyEvaluation(opts.Policy, opts.Repair, opts.Migration, demo.Graph(), demo.BillingStore())
 		if err != nil {
 			return nil, err
 		}
@@ -2359,7 +2405,7 @@ func migrationOutcomes(evidencePath, migrationPath string, args []string, jsonOu
 		if !ok {
 			return errors.New("--policy requires --repair so the policy can be evaluated against a concrete repair")
 		}
-		eval, err := buildPolicyEvaluation(policyPath, repairPath, migrationPath)
+		eval, err := buildPolicyEvaluation(policyPath, repairPath, migrationPath, demo.Graph(), demo.BillingStore())
 		if err != nil {
 			return err
 		}
@@ -3345,7 +3391,7 @@ func ledgerVerify(jsonOut bool) error {
 }
 
 func evaluatePolicy(policyPath, repairPath, migrationPath string, jsonOut bool) error {
-	eval, err := buildPolicyEvaluation(policyPath, repairPath, migrationPath)
+	eval, err := buildPolicyEvaluation(policyPath, repairPath, migrationPath, demo.Graph(), demo.BillingStore())
 	if err != nil {
 		return err
 	}
@@ -3397,7 +3443,7 @@ func exportBundle(reproducePath, policyPath, migrationPath string, jsonOut bool)
 	if err != nil {
 		return err
 	}
-	eval, err := buildPolicyEvaluation(policyPath, manifestPath, migrationPath)
+	eval, err := buildPolicyEvaluation(policyPath, manifestPath, migrationPath, demo.Graph(), demo.BillingStore())
 	if err != nil {
 		return err
 	}
@@ -4049,7 +4095,7 @@ func readEvidenceResult(path string) (evidence.Result, error) {
 	return evidence.IngestJSONL(file)
 }
 
-func buildPolicyEvaluation(policyPath, repairPath, migrationPath string) (policy.Evaluation, error) {
+func buildPolicyEvaluation(policyPath, repairPath, migrationPath string, graph *provenance.Graph, store replay.Store) (policy.Evaluation, error) {
 	pol, err := readPolicy(policyPath)
 	if err != nil {
 		return policy.Evaluation{}, err
@@ -4058,7 +4104,7 @@ func buildPolicyEvaluation(policyPath, repairPath, migrationPath string) (policy
 	if err != nil {
 		return policy.Evaluation{}, err
 	}
-	report, err := replay.DryRun(manifest, demo.Graph(), demo.BillingStore())
+	report, err := replay.DryRun(manifest, graph, store)
 	if err != nil {
 		return policy.Evaluation{}, err
 	}

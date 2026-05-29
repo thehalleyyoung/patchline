@@ -1,0 +1,11 @@
+{
+  "tables": {
+    "issues": {
+      "42": {
+        "id": "42",
+        "state": "reopened",
+        "updated_at": "2018-10-21T22:52:37Z"
+      }
+    }
+  }
+}

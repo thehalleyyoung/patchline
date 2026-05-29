@@ -1,0 +1,43 @@
+{
+  "version": "patchline.artifact-benchmark-run/v1",
+  "dataset_id": "patchline-public-postmortem-derived-archive-v1",
+  "manifest": "benchmarks/manifests/public_archive.json",
+  "ok": true,
+  "metrics": {
+    "total": 1,
+    "passed": 1,
+    "failed": 0,
+    "by_type": {
+      "regression": 1
+    },
+    "by_result": {
+      "flag": 1
+    },
+    "phase_guards": 0
+  },
+  "cases": [
+    {
+      "case_id": "public-postmortem-derived-paired-archive",
+      "case_type": "regression",
+      "phase": "archive_only",
+      "fixture": "../../examples/archive/public-postmortem-derived-paired-archive.json",
+      "ground_truth": "../ground_truth/regressions/public-postmortem-derived-paired-archive.json",
+      "input_kind": "prior_archive",
+      "expected_result": "flag",
+      "actual_result": "flag",
+      "risk": "high",
+      "ok": true,
+      "signals": [
+        "declared-regressions=0",
+        "repair-outcomes=cannot_prove:1,verified:1",
+        "semantic-regressions=1",
+        "semantic-relations=shared_high_risk_table:1"
+      ],
+      "hashes": {
+        "archive": "8eb295e25ca805b7580badced6cc340686e82e30bcf5992bf934fe2287614e5d"
+      }
+    }
+  ],
+  "hash": "c93acc2c5244f52414e160b6d7271dda98a4f299046b2b611143cb2617e84452",
+  "markdown": "# Artifact benchmark report\n\n- dataset_id: `patchline-public-postmortem-derived-archive-v1`\n- ok: `true`\n- hash: `c93acc2c5244f52414e160b6d7271dda98a4f299046b2b611143cb2617e84452`\n- total: `1`\n- passed: `1`\n- failed: `0`\n\n| case | type | phase | expected | actual | ok |\n| --- | --- | --- | --- | --- | ---: |\n| public-postmortem-derived-paired-archive | regression | archive_only | flag | flag | true |\n"
+}

@@ -73,13 +73,21 @@ make artifact-benchmark-public-repairs
 
 That target runs `manifests/public_repairs.json` against one Patchline-authored counterfactual repair manifest derived from GitLab 2017 public sources, then compares against `expected/public-repairs-report.json`. The public postmortem and follow-up issues are the source evidence; the local repair manifest is a derived input artifact. This is intentionally not framed as a full repair corpus yet.
 
+Run the paired public-derived archive boundary with:
+
+```bash
+make artifact-benchmark-public-archive
+```
+
+That target runs `manifests/public_archive.json` against `examples/archive/public-postmortem-derived-paired-archive.json`, then compares against `expected/public-archive-report.json`. The case uses public GitLab/GitHub postmortem-derived observations, but the SQL, repair manifests, and replay stores are explicitly local semantic reconstructions; this keeps the benchmark executable without claiming access to private production rows.
+
 Expected reports are intentionally not refreshed by the compare target. After a deliberate semantics change, maintainers can run:
 
 ```bash
 make artifact-benchmark-refresh
 ```
 
-That target rewrites the committed golden JSON/Markdown reports, including repair, regression, public migration, public incident, and public-derived repair reports, and then runs the normal compare paths against the refreshed files.
+That target rewrites the committed golden JSON/Markdown reports, including repair, regression, public migration, public incident, public-derived repair, and public-derived archive reports, and then runs the normal compare paths against the refreshed files.
 
 ## Executable study outputs
 
@@ -114,6 +122,7 @@ The planned full benchmark families are:
 - public OSS migrations (currently five pinned Bytebase migrations);
 - public historical incidents (currently GitLab 2017 and GitHub 2018 source-observation cases plus an insufficient-evidence boundary);
 - public-derived repair boundaries (currently one GitLab 2017 counterfactual no-snapshot repair case);
+- paired public-derived archives (currently one GitLab/GitHub postmortem-derived recurrence case);
 - repair/replay cases (currently three committed during-repair cases);
 - semantic regression archives (currently one recurrence and one non-recurrence case);
 - negative/limitation cases.

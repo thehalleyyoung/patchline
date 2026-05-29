@@ -1,0 +1,14 @@
+{
+  "version": "patchline.artifact-benchmark/v1",
+  "dataset_id": "patchline-public-postmortem-derived-archive-v1",
+  "description": "Public-postmortem-derived paired archive case. The source evidence is public; replay stores, migration SQL, and repair manifests are Patchline-authored semantic reconstructions rather than verbatim production artifacts.",
+  "cases": [
+    {
+      "case_id": "public-postmortem-derived-paired-archive",
+      "case_type": "regression",
+      "available_at": "archive_only",
+      "fixture": "../../examples/archive/public-postmortem-derived-paired-archive.json",
+      "ground_truth": "../ground_truth/regressions/public-postmortem-derived-paired-archive.json"
+    }
+  ]
+}

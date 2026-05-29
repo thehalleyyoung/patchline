@@ -1,0 +1,32 @@
+{
+  "version": "patchline.repair/v1",
+  "name": "github-2018-manual-reconciliation-reconstruction",
+  "incident": "github-2018-mysql-split-brain",
+  "scope": {
+    "entities": [
+      "record:issues/42",
+      "report:github-visible-issue-state"
+    ],
+    "table": "issues",
+    "where": {
+      "id": "42"
+    }
+  },
+  "operations": [
+    {
+      "id": "reconcile-divergent-issue-state",
+      "kind": "update",
+      "table": "issues",
+      "where": {
+        "id": "42"
+      },
+      "set": {
+        "state": "reconciled"
+      }
+    }
+  ],
+  "rollback": {
+    "strategy": "snapshot",
+    "snapshot_required": true
+  }
+}

@@ -20,6 +20,7 @@ type InputSpec struct {
 	Evidence  string `json:"evidence"`
 	Migration string `json:"migration"`
 	Repair    string `json:"repair"`
+	Store     string `json:"store,omitempty"`
 	Policy    string `json:"policy"`
 	Benchmark string `json:"benchmark"`
 }
@@ -45,6 +46,7 @@ type Entry struct {
 	EvidencePath             string               `json:"evidence_path"`
 	MigrationPath            string               `json:"migration_path"`
 	RepairPath               string               `json:"repair_path"`
+	ReplayStorePath          string               `json:"replay_store_path,omitempty"`
 	PolicyPath               string               `json:"policy_path"`
 	BenchmarkPath            string               `json:"benchmark_path"`
 	EvidenceHash             string               `json:"evidence_hash"`
@@ -60,6 +62,7 @@ type Entry struct {
 	RepairRollbackAvailable  bool                 `json:"repair_rollback_available"`
 	RepairVerificationResult string               `json:"repair_verification_result,omitempty"`
 	RepairVerificationHash   string               `json:"repair_verification_hash,omitempty"`
+	RepairVerificationReason string               `json:"repair_verification_reason,omitempty"`
 	PolicyAllowed            bool                 `json:"policy_allowed"`
 	PolicyFailures           []string             `json:"policy_failures,omitempty"`
 	PolicyHash               string               `json:"policy_hash"`

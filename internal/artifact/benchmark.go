@@ -384,13 +384,62 @@ func predictBenchmarkCase(baseDir string, c ManifestCase, gt GroundTruthCase) (s
 		if len(report.SemanticRegressions)+regressions > 0 {
 			actual = ResultFlag
 		}
-		return actual, inputKind, []string{
+		signals := []string{
 			fmt.Sprintf("semantic-regressions=%d", len(report.SemanticRegressions)),
 			fmt.Sprintf("declared-regressions=%d", regressions),
-		}, map[string]string{"archive": report.Hash}, nil
+		}
+		signals = append(signals, benchmarkArchiveSignals(report)...)
+		return actual, inputKind, signals, map[string]string{"archive": report.Hash}, nil
 	default:
 		return ResultUnsupportedFragment, "unknown", []string{"unsupported:case-type=" + c.CaseType}, nil, nil
 	}
+}
+
+func benchmarkArchiveSignals(report archive.Report) []string {
+	var signals []string
+	if outcomes := countArchiveRepairOutcomes(report.Incidents); outcomes != "" {
+		signals = append(signals, "repair-outcomes="+outcomes)
+	}
+	if relations := countArchiveRegressionRelations(report.SemanticRegressions); relations != "" {
+		signals = append(signals, "semantic-relations="+relations)
+	}
+	return signals
+}
+
+func countArchiveRepairOutcomes(entries []archive.Entry) string {
+	counts := map[string]int{}
+	for _, entry := range entries {
+		if entry.RepairVerificationResult != "" {
+			counts[entry.RepairVerificationResult]++
+		}
+	}
+	return formatStringCounts(counts)
+}
+
+func countArchiveRegressionRelations(regressions []archive.SemanticRegression) string {
+	counts := map[string]int{}
+	for _, regression := range regressions {
+		if regression.Relation != "" {
+			counts[regression.Relation]++
+		}
+	}
+	return formatStringCounts(counts)
+}
+
+func formatStringCounts(counts map[string]int) string {
+	if len(counts) == 0 {
+		return ""
+	}
+	keys := make([]string, 0, len(counts))
+	for key := range counts {
+		keys = append(keys, key)
+	}
+	sort.Strings(keys)
+	parts := make([]string, 0, len(keys))
+	for _, key := range keys {
+		parts = append(parts, fmt.Sprintf("%s:%d", key, counts[key]))
+	}
+	return strings.Join(parts, ",")
 }
 
 func predictEvidenceIncident(baseDir string, c ManifestCase, inputKind string) (string, string, []string, map[string]string, error) {
@@ -678,13 +727,40 @@ func buildBenchmarkArchiveEntry(baseDir string, input archive.InputSpec) (archiv
 	if err != nil {
 		return archive.Entry{}, err
 	}
-	dryRun, err := replay.DryRun(manifest, graph, demo.BillingStore())
+	store := demo.BillingStore()
+	if input.Store != "" {
+		store, err = readReplayStore(resolvePath(baseDir, input.Store))
+		if err != nil {
+			return archive.Entry{}, err
+		}
+	}
+	dryRun, err := replay.DryRun(manifest, graph, store)
 	if err != nil {
 		return archive.Entry{}, err
 	}
-	sqlPlan, err := repair.GenerateSQL(manifest)
-	if err != nil {
-		return archive.Entry{}, err
+	lint := repair.Lint(manifest)
+	sqlHash := ""
+	verificationResult := ResultCannotProve
+	verificationHash := ""
+	verificationReason := "repair-manifest-lint:" + archiveLintReason(lint)
+	rollbackOK := manifest.Rollback.Strategy == "snapshot" && manifest.Rollback.SnapshotRequired
+	if lint.OK {
+		sqlPlan, err := repair.GenerateSQL(manifest)
+		if err != nil {
+			return archive.Entry{}, err
+		}
+		sqlHash = sqlPlan.Hash
+		if rollbackOK {
+			verificationResult = ResultVerified
+			verificationHash = canonical.Hash(struct {
+				DryRunHash string `json:"dry_run_hash"`
+				SQLHash    string `json:"sql_hash"`
+				RollbackOK bool   `json:"rollback_ok"`
+			}{dryRun.Hash(), sqlPlan.Hash, true})
+			verificationReason = ""
+		} else {
+			verificationReason = "rollback-not-available"
+		}
 	}
 	effectSummary := benchmarkEffectSummary(manifest, dryRun)
 	return archive.Entry{
@@ -692,6 +768,7 @@ func buildBenchmarkArchiveEntry(baseDir string, input archive.InputSpec) (archiv
 		EvidencePath:             input.Evidence,
 		MigrationPath:            input.Migration,
 		RepairPath:               input.Repair,
+		ReplayStorePath:          input.Store,
 		EvidenceHash:             evidenceResult.InputHash,
 		ShapeHash:                provenance.ShapeHash(graph),
 		MigrationHash:            migrationReport.Summary.ReportHash,
@@ -701,22 +778,36 @@ func buildBenchmarkArchiveEntry(baseDir string, input archive.InputSpec) (archiv
 		RepairHash:               canonical.Hash(manifest),
 		RepairEffect:             string(effectSummary.Join),
 		RepairDryRunHash:         dryRun.Hash(),
-		RepairAppliedSQLHash:     sqlPlan.Hash,
-		RepairRollbackAvailable:  manifest.Rollback.Strategy == "snapshot" && manifest.Rollback.SnapshotRequired,
-		RepairVerificationResult: ResultVerified,
-		RepairVerificationHash: canonical.Hash(struct {
-			DryRunHash string `json:"dry_run_hash"`
-			SQLHash    string `json:"sql_hash"`
-			RollbackOK bool   `json:"rollback_ok"`
-		}{dryRun.Hash(), sqlPlan.Hash, manifest.Rollback.Strategy == "snapshot" && manifest.Rollback.SnapshotRequired}),
-		PolicyAllowed:    true,
-		BenchmarkOK:      true,
-		DamagedEntities:  len(evidenceResult.DamagedEntities),
-		DamagedEntityIDs: sortedStrings(evidenceResult.DamagedEntities),
-		DerivedReports:   countBenchmarkEntitiesByKind(graph, provenance.KindReport),
-		DerivedReportIDs: benchmarkDerivedReportsFromDamaged(graph, evidenceResult.DamagedEntities),
-		ProofBundleReady: dryRun.Hash() != "" && sqlPlan.Hash != "",
+		RepairAppliedSQLHash:     sqlHash,
+		RepairRollbackAvailable:  rollbackOK,
+		RepairVerificationResult: verificationResult,
+		RepairVerificationHash:   verificationHash,
+		RepairVerificationReason: verificationReason,
+		PolicyAllowed:            true,
+		BenchmarkOK:              true,
+		DamagedEntities:          len(evidenceResult.DamagedEntities),
+		DamagedEntityIDs:         sortedStrings(evidenceResult.DamagedEntities),
+		DerivedReports:           countBenchmarkEntitiesByKind(graph, provenance.KindReport),
+		DerivedReportIDs:         benchmarkDerivedReportsFromDamaged(graph, evidenceResult.DamagedEntities),
+		ProofBundleReady:         dryRun.Hash() != "" && sqlHash != "" && verificationResult == ResultVerified,
 	}, nil
+}
+
+func archiveLintReason(lint repair.LintResult) string {
+	if lint.OK {
+		return "ok"
+	}
+	var codes []string
+	for _, finding := range lint.Findings {
+		if finding.Level == "error" {
+			codes = append(codes, finding.Code)
+		}
+	}
+	if len(codes) == 0 {
+		return "not-ok"
+	}
+	sort.Strings(codes)
+	return strings.Join(codes, ",")
 }
 
 func benchmarkEvidence(path string) (evidence.Result, *provenance.Graph, error) {

@@ -1,0 +1,35 @@
+{
+  "case_id": "public-postmortem-derived-paired-archive",
+  "case_type": "regression",
+  "phase": "archive_only",
+  "labels": {
+    "expected_result": "flag",
+    "risk": "high",
+    "expected_relations": [
+      "shared_high_risk_table"
+    ],
+    "expected_repair_outcomes": [
+      "gitlab-2017-primary-db-removal:cannot_prove",
+      "github-2018-mysql-split-brain:verified"
+    ]
+  },
+  "evidence": [
+    {
+      "kind": "public_postmortem",
+      "locator": "examples/historical-failures/gitlab-2017/source-observations.jsonl",
+      "rationale": "The GitLab public source observations establish a destructive primary database incident with missing verified snapshot evidence; the local SQL, repair manifest, and replay store are source-grounded reconstructions."
+    },
+    {
+      "kind": "public_postmortem",
+      "locator": "examples/historical-failures/github-2018/source-observations.jsonl",
+      "rationale": "The GitHub public source observations establish divergent writes and manual reconciliation; issue 42 is an illustrative replay row in a Patchline-authored reconstruction, not a real GitHub issue number."
+    },
+    {
+      "kind": "archive",
+      "locator": "examples/archive/public-postmortem-derived-paired-archive.json",
+      "rationale": "The paired archive orders two independent public-derived incidents and checks whether a later broad transition over the already damaged issues table is surfaced as a semantic recurrence."
+    }
+  ],
+  "allowed_inputs": ["prior_archive", "current_archive_entry", "public_postmortem_text", "public_issue_text"],
+  "excluded_inputs": ["private_production_data", "verbatim_github_database_rows", "verbatim_gitlab_database_rows"]
+}

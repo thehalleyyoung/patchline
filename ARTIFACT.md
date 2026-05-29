@@ -177,13 +177,21 @@ make artifact-benchmark-public-repairs
 
 It validates `benchmarks/manifests/public_repairs.json`, runs a single Patchline-authored counterfactual repair manifest derived from the GitLab 2017 public postmortem and follow-up issues, and compares the report with `benchmarks/expected/public-repairs-report.json`. This path intentionally checks a boundary claim: with only a repair plan and public recovery-gap evidence, Patchline should say `cannot_prove` rather than inventing snapshot rollback proof.
 
+The paired public-derived archive path is offline and source-grounded:
+
+```bash
+make artifact-benchmark-public-archive
+```
+
+It validates `benchmarks/manifests/public_archive.json`, runs `examples/archive/public-postmortem-derived-paired-archive.json`, and compares the report with `benchmarks/expected/public-archive-report.json`. The source observations are public, while the migration SQL, repair manifests, and replay stores are explicit Patchline reconstructions. The case demonstrates the archive distinction between a GitLab no-snapshot repair that remains `cannot_prove`, a scoped GitHub reconciliation that is `verified`, and a later broad `issues` transition flagged as a shared high-risk-table recurrence.
+
 If a semantic change intentionally changes the benchmark outputs, refresh the frozen reports with:
 
 ```bash
 make artifact-benchmark-refresh
 ```
 
-This command rewrites `benchmarks/expected/*-report.{json,md}`, then reruns `make artifact-benchmark-compare`, `make artifact-benchmark-public`, `make artifact-benchmark-public-incidents`, and `make artifact-benchmark-public-repairs`. Reviewers should use compare targets; refresh is a maintainer workflow for updating golden files after deliberate semantic changes.
+This command rewrites `benchmarks/expected/*-report.{json,md}`, then reruns `make artifact-benchmark-compare`, `make artifact-benchmark-public`, `make artifact-benchmark-public-incidents`, `make artifact-benchmark-public-repairs`, and `make artifact-benchmark-public-archive`. Reviewers should use compare targets; refresh is a maintainer workflow for updating golden files after deliberate semantic changes.
 
 ## Canonical demo
 
@@ -251,7 +259,7 @@ These cases are part of the artifact, not merely prose limitations.
 
 ## Relationship to `make verify-usefulness`
 
-`make verify-usefulness` remains the broader project validation target. It includes network-backed public corpus fetching and source checks. `make artifact-smoke` is the artifact-review entry point: it is smaller, committed-fixture-only, and intended to be stable without network access. `make artifact-studies-compare` is the offline evaluator-facing measurement and drift-check entry point for current baseline/ablation/scale evidence, `make artifact-studies-public-compare` is the explicit public-data study drift check, `make artifact-benchmark-compare` is the offline golden-output check for the executable manifest protocol, `make artifact-benchmark-public` is the explicit public-data benchmark check, `make artifact-benchmark-public-incidents` and `make artifact-benchmark-public-repairs` are offline public-source-derived checks, and the refresh targets are maintainer paths for rewriting expected outputs after intentional semantic changes.
+`make verify-usefulness` remains the broader project validation target. It includes network-backed public corpus fetching and source checks. `make artifact-smoke` is the artifact-review entry point: it is smaller, committed-fixture-only, and intended to be stable without network access. `make artifact-studies-compare` is the offline evaluator-facing measurement and drift-check entry point for current baseline/ablation/scale evidence, `make artifact-studies-public-compare` is the explicit public-data study drift check, `make artifact-benchmark-compare` is the offline golden-output check for the executable manifest protocol, `make artifact-benchmark-public` is the explicit public-data benchmark check, `make artifact-benchmark-public-incidents`, `make artifact-benchmark-public-repairs`, and `make artifact-benchmark-public-archive` are offline public-source-derived checks, and the refresh targets are maintainer paths for rewriting expected outputs after intentional semantic changes.
 
 ## Data provenance
 

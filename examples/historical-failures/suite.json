@@ -138,6 +138,7 @@
         "evidence": "gitlab-2017/evidence.jsonl",
         "migration": "gitlab-2017/destructive-removal.sql",
         "repair": "gitlab-2017/no-snapshot-repair.json",
+        "replay_store": "gitlab-2017/replay-store.json",
         "source_observations": "gitlab-2017/source-observations.jsonl"
       },
       "protected_tables": [
@@ -184,6 +185,9 @@
       ],
       "artifacts": {
         "evidence": "github-2018/evidence.jsonl",
+        "migration": "github-2018/divergent-issues.sql",
+        "repair": "github-2018/manual-reconciliation-repair.json",
+        "replay_store": "github-2018/replay-store.json",
         "source_observations": "github-2018/source-observations.jsonl"
       },
       "expected_signals": [

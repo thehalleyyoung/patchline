@@ -100,13 +100,15 @@
       "ok": true,
       "signals": [
         "declared-regressions=0",
-        "semantic-regressions=3"
+        "repair-outcomes=verified:2",
+        "semantic-regressions=3",
+        "semantic-relations=damaged_derived_report_recurrence:1,same_semantic_shape:1,shared_high_risk_table:1"
       ],
       "hashes": {
         "archive": "4b087876749a4886fc2426ddd0c4724fbd22ce7c73be7d780f71a96213d33862"
       }
     }
   ],
-  "hash": "67396b1fa88d0ab28280298243d026d5c3e056472403c0f4105e49da848a8af9",
-  "markdown": "# Artifact benchmark report\n\n- dataset_id: `patchline-smoke-v1`\n- ok: `true`\n- hash: `67396b1fa88d0ab28280298243d026d5c3e056472403c0f4105e49da848a8af9`\n- total: `4`\n- passed: `4`\n- failed: `0`\n\n| case | type | phase | expected | actual | ok |\n| --- | --- | --- | --- | --- | ---: |\n| billing-bad-backfill-migration | migration | pre_deploy | flag | flag | true |\n| gitlab-2017-destructive-primary-data | incident | postmortem | flag | flag | true |\n| billing-repair-replay | repair | during_repair | verified | verified | true |\n| billing-semantic-regression | regression | archive_only | flag | flag | true |\n"
+  "hash": "ac63990a6962437c44088d9a944207d65bcafa1b4348ba1437caf9b249e0a1cc",
+  "markdown": "# Artifact benchmark report\n\n- dataset_id: `patchline-smoke-v1`\n- ok: `true`\n- hash: `ac63990a6962437c44088d9a944207d65bcafa1b4348ba1437caf9b249e0a1cc`\n- total: `4`\n- passed: `4`\n- failed: `0`\n\n| case | type | phase | expected | actual | ok |\n| --- | --- | --- | --- | --- | ---: |\n| billing-bad-backfill-migration | migration | pre_deploy | flag | flag | true |\n| gitlab-2017-destructive-primary-data | incident | postmortem | flag | flag | true |\n| billing-repair-replay | repair | during_repair | verified | verified | true |\n| billing-semantic-regression | regression | archive_only | flag | flag | true |\n"
 }

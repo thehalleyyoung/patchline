@@ -27,6 +27,8 @@ go run ./cmd/patchline artifact-benchmark validate benchmarks/manifests/public_i
 go run ./cmd/patchline artifact-benchmark run benchmarks/manifests/public_incidents.json --out "$OUT/public-incidents-report.json"
 go run ./cmd/patchline artifact-benchmark validate benchmarks/manifests/public_repairs.json
 go run ./cmd/patchline artifact-benchmark run benchmarks/manifests/public_repairs.json --out "$OUT/public-repairs-report.json"
+go run ./cmd/patchline artifact-benchmark validate benchmarks/manifests/public_archive.json
+go run ./cmd/patchline artifact-benchmark run benchmarks/manifests/public_archive.json --out "$OUT/public-archive-report.json"
 
 go run ./cmd/patchline artifact-benchmark compare "$OUT/smoke-report.json" "$OUT/smoke-report.json"
 go run ./cmd/patchline artifact-benchmark compare "$OUT/negative-report.json" "$OUT/negative-report.json"
@@ -35,5 +37,6 @@ go run ./cmd/patchline artifact-benchmark compare "$OUT/semantic-regressions-rep
 go run ./cmd/patchline artifact-benchmark compare "$OUT/public-migrations-report.json" "$OUT/public-migrations-report.json"
 go run ./cmd/patchline artifact-benchmark compare "$OUT/public-incidents-report.json" "$OUT/public-incidents-report.json"
 go run ./cmd/patchline artifact-benchmark compare "$OUT/public-repairs-report.json" "$OUT/public-repairs-report.json"
+go run ./cmd/patchline artifact-benchmark compare "$OUT/public-archive-report.json" "$OUT/public-archive-report.json"
 
 echo "golden_reports_refreshed=$OUT"

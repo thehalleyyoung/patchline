@@ -1,0 +1,24 @@
+{
+  "version": "patchline.archive-index/v1",
+  "name": "public-postmortem-derived-paired-archive",
+  "incidents": [
+    {
+      "id": "gitlab-2017-primary-db-removal",
+      "evidence": "../historical-failures/gitlab-2017/evidence.jsonl",
+      "migration": "../historical-failures/gitlab-2017/destructive-removal.sql",
+      "repair": "../historical-failures/gitlab-2017/no-snapshot-repair.json",
+      "store": "../historical-failures/gitlab-2017/replay-store.json",
+      "policy": "../policies/review-required.json",
+      "benchmark": "../benchmarks/strict-migration-corpus.json"
+    },
+    {
+      "id": "github-2018-mysql-split-brain",
+      "evidence": "../historical-failures/github-2018/evidence.jsonl",
+      "migration": "../historical-failures/github-2018/divergent-issues.sql",
+      "repair": "../historical-failures/github-2018/manual-reconciliation-repair.json",
+      "store": "../historical-failures/github-2018/replay-store.json",
+      "policy": "../policies/review-required.json",
+      "benchmark": "../benchmarks/strict-migration-corpus.json"
+    }
+  ]
+}

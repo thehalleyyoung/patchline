@@ -55,6 +55,7 @@ type Artifacts struct {
 	Evidence           string `json:"evidence,omitempty"`
 	Migration          string `json:"migration,omitempty"`
 	Repair             string `json:"repair,omitempty"`
+	ReplayStore        string `json:"replay_store,omitempty"`
 	SourceObservations string `json:"source_observations,omitempty"`
 }
 
