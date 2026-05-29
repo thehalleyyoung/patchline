@@ -1,14 +1,16 @@
 # Patchline
 
-Patchline is a deterministic incident-repair workbench for teams that operate high-volume services, own production data correctness, and need evidence they can replay in review instead of prose explanations after an outage.
+Patchline is a deterministic repair-semantics workbench for production data incidents. Its core claim is that an outage, a migration, a row-change stream, a repair script, a backup decision, and a postmortem should not be separate narratives: they should compile into one typed transition system whose claims can be replayed, queried, proved, or refuted.
 
-**Promise today:** given incident evidence, migration SQL, a repair manifest, policy rules, benchmark fixtures, and public postmortem claims, Patchline reconstructs causal provenance, classifies risky data changes, proves repair scope obligations with Z3, replays the repair over a bounded store, checks invariants/workflow properties, emits signed/hashable artifacts, indexes incidents for recurrence analysis, and validates counterfactual failure-avoidance signals on specific historical incidents.
+**Artifact-paper motivation.** Modern services routinely repair production state after bad migrations, unsafe deletes, divergent writes, failed backups, and stale derived outputs. The hard part is not writing one cleanup query; it is connecting the operational evidence, code/data transition, intended repair, rollback story, and future recurrence risk into a checkable object. Patchline makes that object explicit: public or local historical records become source-grounded observations; observations become typed traces and causal graphs; repairs become bounded state transformers; safety claims become Z3 obligations, replay hashes, policy decisions, and archive queries.
 
-**No AI. No guesses.** Patchline is intentionally built from inspectable mechanisms: typed provenance, Z3-backed proof obligations, effect inference, invariant checks, replayable repair manifests, stable canonical output, and hash-chained audit records.
+**Promise today:** given incident evidence, migration SQL, a repair manifest, policy rules, benchmark fixtures, and public historical sources, Patchline reconstructs causal provenance, classifies risky data changes, proves repair scope obligations with Z3, replays the repair over a bounded store, checks invariants/workflow properties, emits signed/hashable artifacts, indexes incidents for recurrence analysis, and validates counterfactual failure-avoidance signals on source-verified public incidents.
+
+**No AI. No guesses.** Patchline is intentionally built from inspectable mechanisms: typed provenance, Z3-backed proof obligations, effect inference, invariant checks, replayable repair manifests, stable canonical output, source-manifest verification, and hash-chained audit records.
 
 ## Verify the current usefulness claim
 
-The repo already has a reproducible validation path for the kind of cross-layer incident review a large observability or infrastructure company needs: it checks a historical-style bad migration fixture end to end, fetches pinned public migration files from an open-source migration platform to validate analyzer behavior against real SQL, and validates two public postmortem counterfactuals against source phrases plus Patchline semantic signals.
+The repo already has a reproducible validation path for the kind of cross-layer incident review a large observability or infrastructure company needs: it checks a historical-style bad migration fixture end to end, fetches pinned public migration files from an open-source migration platform to validate analyzer behavior against real SQL, and validates public incident counterfactuals against source phrases, linked public issue data, source-derived observations, and Patchline semantic signals.
 
 Prerequisites: Go 1.22+, `curl`, `jq`, and Z3. This repository was validated with `Z3 version 4.15.8 - 64 bit`.
 
@@ -17,13 +19,13 @@ z3 --version
 make verify-usefulness
 ```
 
-That target runs the unit suite, strict CI gate, a SHA-verified public migration corpus benchmark, Z3-backed solver obligations, the semantic audit, the incident archive index, deterministic historical archive queries, the historical-failure suite, and public-source phrase checks. The public corpus is downloaded into `examples/public-corpus/downloads/` from pinned raw URLs and checked against `examples/public-corpus/sources.json`; the SQL files are not vendored.
+That target runs the unit suite, strict CI gate, a SHA-verified public migration corpus benchmark, Z3-backed solver obligations, the semantic audit, the incident archive index, deterministic historical archive queries, the historical-failure suite, and public-source phrase checks. The public corpus is downloaded into `examples/public-corpus/downloads/` from pinned raw URLs and checked against `examples/public-corpus/sources.json`; the SQL files are not vendored. The GitLab 2017 case now verifies the postmortem plus linked public issue/API documents for backup monitoring, point-in-time recovery, hourly snapshots, backup-restore testing, staging migration rollback tooling, environment differentiation, and hard-delete policy gaps.
 
 The expected default semantic audit result is `20` conforming artifacts and `0` counterexamples. The expected historical-failure result includes a primary-data destructive-operation case and a split-brain conflicting-write case, both backed by public postmortem source checks. If Z3 is missing, Patchline does not pretend to prove solver obligations: the solver report records the Z3 failure and downgrades those claims instead of using a handwritten SMT substitute.
 
 ## Why this is novel
 
-Patchline's research claim is not "another migration linter" or "another incident tracker." The novel premise is a non-ML, proof-carrying bridge between operational telemetry, relational program semantics, repair execution, CI gates, and historical incident knowledge. Existing systems usually cover one slice: provenance, SQL equivalence, database testing, workflow model checking, repair synthesis, or incident management. Patchline makes those artifacts compose into a single reproducible evidence object: a causal graph plus a repair transformer plus proof obligations plus replay hashes plus archive buckets.
+Patchline's research claim is not "another migration linter" or "another incident tracker." The novel premise is a non-ML, proof-carrying bridge between operational telemetry, relational program semantics, repair execution, CI gates, and historical incident knowledge. Existing systems usually cover one slice: provenance, SQL equivalence, database testing, workflow model checking, repair synthesis, or incident management. Patchline makes those artifacts compose into a single reproducible evidence object: source-grounded observations plus a causal graph plus a repair transformer plus proof obligations plus replay hashes plus archive buckets. That is the unifying promise: Patchline evaluates production repair as a historical program-semantics problem, not as a bag of independent checks.
 
 See [`docs/literature-positioning.md`](docs/literature-positioning.md) for the prior-art matrix and [`docs/usefulness-validation.md`](docs/usefulness-validation.md) for the validation protocol.
 
@@ -43,7 +45,7 @@ The first scaffold in this repo focuses on a small but real core:
 | Workflow model checking | Bounded ingest/explain/approve/dry-run/apply/verify/rollback/audit/archive state exploration with temporal properties, proof holes, and counterexample fixtures |
 | CEGAR refinement | Counterexample/proof-hole guided reruns that refine coarse repair abstractions with invariant specs and incident workflow models |
 | Incident archive | Deterministic archive index and historical queries over evidence, migrations, repair manifests, policies, and benchmark results, bucketed by semantic shape, broad updates, damaged-derived reports, rollback availability, and decisions |
-| Historical failures | Public postmortem counterfactual suite that checks source assertions, destructive primary-data mutations, rollback gaps, damaged reports, and split-brain conflicting writes |
+| Historical failures | Public counterfactual suite that checks postmortems, linked public issue/API records, source-derived observations, destructive primary-data mutations, rollback gaps, damaged reports, and split-brain conflicting writes |
 | Effect inference | A deterministic effect lattice and abstract interpreter over replay diffs |
 | Migration analysis | SQL migration triage plus schema-state diffing, typed relational-signature semantics, and source-code SQL extraction |
 | Replay sandbox | In-memory and imported-snapshot dry-run engine that emits stable row diffs, compensating-action semantics, and snapshot drift reports |

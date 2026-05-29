@@ -29,11 +29,20 @@ type Case struct {
 	ID               string            `json:"id"`
 	Title            string            `json:"title"`
 	SourceURL        string            `json:"source_url"`
+	SourceDocuments  []SourceDocument  `json:"source_documents,omitempty"`
 	SourceAssertions []SourceAssertion `json:"source_assertions,omitempty"`
 	Artifacts        Artifacts         `json:"artifacts"`
 	ProtectedTables  []string          `json:"protected_tables,omitempty"`
 	ExpectedSignals  []string          `json:"expected_signals"`
 	AvoidanceClaim   string            `json:"avoidance_claim"`
+}
+
+type SourceDocument struct {
+	ID         string   `json:"id"`
+	URL        string   `json:"url"`
+	Kind       string   `json:"kind"`
+	Summary    string   `json:"summary"`
+	Assertions []string `json:"assertions,omitempty"`
 }
 
 type SourceAssertion struct {
@@ -43,9 +52,10 @@ type SourceAssertion struct {
 }
 
 type Artifacts struct {
-	Evidence  string `json:"evidence,omitempty"`
-	Migration string `json:"migration,omitempty"`
-	Repair    string `json:"repair,omitempty"`
+	Evidence           string `json:"evidence,omitempty"`
+	Migration          string `json:"migration,omitempty"`
+	Repair             string `json:"repair,omitempty"`
+	SourceObservations string `json:"source_observations,omitempty"`
 }
 
 type Report struct {
@@ -60,12 +70,21 @@ type CaseResult struct {
 	ID               string              `json:"id"`
 	Title            string              `json:"title"`
 	SourceURL        string              `json:"source_url"`
+	SourceDocuments  []DocumentSummary   `json:"source_documents,omitempty"`
 	SourceAssertions []AssertionSummary  `json:"source_assertions,omitempty"`
 	Signals          []Signal            `json:"signals"`
 	ExpectedSignals  []ExpectationResult `json:"expected_signals"`
 	OK               bool                `json:"ok"`
 	AvoidanceClaim   string              `json:"avoidance_claim"`
 	Hash             string              `json:"hash"`
+}
+
+type DocumentSummary struct {
+	ID             string `json:"id"`
+	Kind           string `json:"kind"`
+	URLHash        string `json:"url_hash"`
+	SummaryHash    string `json:"summary_hash"`
+	AssertionCount int    `json:"assertion_count"`
 }
 
 type AssertionSummary struct {
@@ -93,6 +112,14 @@ type rawMutation struct {
 	After  json.RawMessage `json:"after"`
 	Region string          `json:"region"`
 	Writer string          `json:"writer"`
+}
+
+type sourceObservation struct {
+	Type      string `json:"type"`
+	Subject   string `json:"subject"`
+	Source    string `json:"source"`
+	Assertion string `json:"assertion"`
+	Detail    string `json:"detail"`
 }
 
 func ReadSpec(path string) (Spec, error) {
@@ -162,6 +189,13 @@ func runCase(c Case, baseDir string) (CaseResult, error) {
 		}
 		signals = append(signals, repairSignals...)
 	}
+	if c.Artifacts.SourceObservations != "" {
+		observationSignals, err := sourceObservationSignals(resolvePath(baseDir, c.Artifacts.SourceObservations), c.Artifacts.SourceObservations)
+		if err != nil {
+			return CaseResult{}, err
+		}
+		signals = append(signals, observationSignals...)
+	}
 	sortSignals(signals)
 
 	present := map[string]bool{}
@@ -183,6 +217,7 @@ func runCase(c Case, baseDir string) (CaseResult, error) {
 		ID:               c.ID,
 		Title:            c.Title,
 		SourceURL:        c.SourceURL,
+		SourceDocuments:  documentSummaries(c.SourceDocuments),
 		SourceAssertions: assertionSummaries(c.SourceAssertions),
 		Signals:          signals,
 		ExpectedSignals:  expectations,
@@ -193,12 +228,13 @@ func runCase(c Case, baseDir string) (CaseResult, error) {
 		ID               string              `json:"id"`
 		Title            string              `json:"title"`
 		SourceURL        string              `json:"source_url"`
+		SourceDocuments  []DocumentSummary   `json:"source_documents,omitempty"`
 		SourceAssertions []AssertionSummary  `json:"source_assertions,omitempty"`
 		Signals          []Signal            `json:"signals"`
 		ExpectedSignals  []ExpectationResult `json:"expected_signals"`
 		OK               bool                `json:"ok"`
 		AvoidanceClaim   string              `json:"avoidance_claim"`
-	}{result.ID, result.Title, result.SourceURL, result.SourceAssertions, result.Signals, result.ExpectedSignals, result.OK, result.AvoidanceClaim})
+	}{result.ID, result.Title, result.SourceURL, result.SourceDocuments, result.SourceAssertions, result.Signals, result.ExpectedSignals, result.OK, result.AvoidanceClaim})
 	return result, nil
 }
 
@@ -276,6 +312,70 @@ func repairSignals(path, displayPath string) ([]Signal, error) {
 		}
 	}
 	return signals, nil
+}
+
+func sourceObservationSignals(path, displayPath string) ([]Signal, error) {
+	file, err := os.Open(path)
+	if err != nil {
+		return nil, err
+	}
+	defer file.Close()
+	scanner := bufio.NewScanner(file)
+	scanner.Buffer(make([]byte, 0, 64*1024), 1024*1024)
+	var signals []Signal
+	lineNo := 0
+	for scanner.Scan() {
+		lineNo++
+		line := bytes.TrimSpace(scanner.Bytes())
+		if len(line) == 0 {
+			continue
+		}
+		var obs sourceObservation
+		if err := json.Unmarshal(line, &obs); err != nil {
+			return nil, fmt.Errorf("line %d: invalid source observation: %w", lineNo, err)
+		}
+		if obs.Type == "" || obs.Subject == "" || obs.Source == "" || obs.Assertion == "" {
+			return nil, fmt.Errorf("line %d: source observation requires type, subject, source, and assertion", lineNo)
+		}
+		signalID := sourceObservationSignalID(obs.Type)
+		if signalID == "" {
+			return nil, fmt.Errorf("line %d: unsupported source observation type %q", lineNo, obs.Type)
+		}
+		detail := obs.Detail
+		if detail == "" {
+			detail = "public source observation establishes a historical incident fact"
+		}
+		signals = append(signals, newSignal(signalID, displayPath, obs.Subject, fmt.Sprintf("%s via %s/%s", detail, obs.Source, obs.Assertion)))
+	}
+	if err := scanner.Err(); err != nil {
+		return nil, err
+	}
+	return signals, nil
+}
+
+func sourceObservationSignalID(kind string) string {
+	switch kind {
+	case "primary_data_loss":
+		return "source-established-primary-data-loss"
+	case "backup_recovery_gap":
+		return "source-established-recovery-gap"
+	case "hard_delete_policy_gap":
+		return "source-established-hard-delete-policy-gap"
+	case "environment_separation_remediation":
+		return "source-established-environment-remediation"
+	case "recovery_practice_remediation":
+		return "source-established-recovery-remediation"
+	case "migration_revert_remediation":
+		return "source-established-migration-revert-remediation"
+	case "split_brain_writes":
+		return "source-established-split-brain-writes"
+	case "stale_inconsistent_reads":
+		return "source-established-stale-inconsistent-reads"
+	case "manual_reconciliation":
+		return "source-established-manual-reconciliation"
+	default:
+		return ""
+	}
 }
 
 func splitBrainConflicts(reader io.Reader) ([]string, error) {
@@ -359,6 +459,21 @@ func reportsDerivedFromDamage(graph *provenance.Graph, damaged []string) []strin
 		out = append(out, id)
 	}
 	sort.Strings(out)
+	return out
+}
+
+func documentSummaries(documents []SourceDocument) []DocumentSummary {
+	out := make([]DocumentSummary, 0, len(documents))
+	for _, document := range documents {
+		out = append(out, DocumentSummary{
+			ID:             document.ID,
+			Kind:           document.Kind,
+			URLHash:        canonical.HashBytes([]byte(document.URL)),
+			SummaryHash:    canonical.HashBytes([]byte(document.Summary)),
+			AssertionCount: len(document.Assertions),
+		})
+	}
+	sort.Slice(out, func(i, j int) bool { return out[i].ID < out[j].ID })
 	return out
 }
 

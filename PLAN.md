@@ -25,7 +25,7 @@ The immediate value-add is not "prove everything." It is:
 5. Check invariants, policies, and bounded solver obligations against both historical evidence and proposed repairs.
 6. Link migrations to observed traces, row/report damage, repairs, policies, benchmark hashes, and source-code data effects.
 7. Preserve all claims as canonical, benchmarkable artifacts.
-8. Validate counterfactual claims against public historical failures without overstating beyond source evidence.
+8. Validate counterfactual claims against public historical failures without overstating beyond source evidence, including linked public issue/API records when the postmortem alone is too thin.
 
 ## SOTA formal-methods alignment
 
@@ -62,7 +62,7 @@ Patchline should standardize these artifacts as JSON-first, hashable objects:
 13. **Signed attestation**: Ed25519 signature over canonical artifact hashes for CI and incident-review handoff.
 14. **Incident archive index**: deterministic buckets over evidence shape, migration tables/risks, repair effects, policy decisions, benchmark results, and proof-bundle readiness.
 15. **Historical knowledge report**: newly linked facts across deploys, migrations, traces, row mutations, reports, repairs, and recurrence.
-16. **Historical failure counterfactual**: source assertions, semantic reconstruction artifacts, expected Patchline signals, and scoped avoidance claim.
+16. **Historical failure counterfactual**: source documents, source assertions, source-derived observations, semantic reconstruction artifacts, expected Patchline signals, and scoped avoidance claim.
 17. **Proof-carrying incident bundle**: content-addressed archive of all evidence and claims needed for review or replay.
 
 ## Near-term implementation priorities
@@ -81,7 +81,7 @@ The next work should prioritize features that are both formally meaningful and i
 10. **Symbolic execution**: extend current bounded row-path execution toward branch coverage and richer path merging for small repair programs.
 11. **Workflow model checking**: extend current bounded workflow checks with richer workflow descriptors and organization-specific review policies.
 12. **Historical archive index**: make prior incidents queryable by trace shape, migration effect, broad-update fingerprints, damaged-derived reports, rollback availability, policy decision, benchmark decision, and proof-bundle readiness.
-13. **Public historical counterfactuals**: show where current gates would have blocked or escalated publicly documented data failures, with exact source checks.
+13. **Public historical counterfactuals**: show where current gates would have blocked or escalated publicly documented data failures, with exact source checks over postmortems and linked public issue/API records.
 14. **Proof-carrying bundles and attestations**: extend current v2 proof bundles with signed attestation workflows and verification commands.
 
 ## Design constraints
@@ -108,7 +108,7 @@ Patchline can credibly become a platform for extracting new, reproducible knowle
 - It signs and verifies semantic artifacts with Ed25519 so CI gates and incident reviews can detect tampering.
 - It builds deterministic incident archives over historical evidence, migrations, repairs, policies, and benchmark outputs so recurrence and repair-effect queries have stable inputs.
 - It answers deterministic historical questions over those archives, including broad-update migrations, reports derived from damaged rows, and repairs with missing rollback evidence.
-- It validates scoped historical counterfactuals against public postmortems, including destructive primary-data mutation and split-brain write-divergence cases.
+- It validates scoped historical counterfactuals against public postmortems and linked public issue/API records, including destructive primary-data mutation, backup/recovery gaps, migration rollback requirements, hard-delete policy gaps, and split-brain write-divergence cases.
 - It validates usefulness with a `make verify-usefulness` path that runs the core suite, strict gate, Z3-backed solver obligations, semantic audit, archive index/query checks, SHA-pinned public migration corpus, and source-verified historical-failure counterfactuals.
 - It replays repairs over imported historical row snapshots and quantifies drift/stability across snapshots.
 - It gives append-only logs, event streams, queues, and external replays explicit compensating-action semantics instead of pretending snapshot rollback can undo them.

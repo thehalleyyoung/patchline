@@ -6,6 +6,82 @@
       "id": "gitlab-2017-primary-db-removal",
       "title": "GitLab.com 2017 primary database data removal",
       "source_url": "https://about.gitlab.com/blog/postmortem-of-database-outage-of-january-31/",
+      "source_documents": [
+        {
+          "id": "postmortem",
+          "url": "https://about.gitlab.com/blog/postmortem-of-database-outage-of-january-31/",
+          "kind": "postmortem",
+          "summary": "Primary narrative source for the 2017 database outage, data loss, failed backups, and linked follow-up work.",
+          "assertions": [
+            "primary-removal",
+            "production-data-loss",
+            "backup-recovery-failed"
+          ]
+        },
+        {
+          "id": "infra-1094",
+          "url": "https://gitlab.com/api/v4/projects/gitlab-com%2Finfrastructure/issues/1094",
+          "kind": "public-issue",
+          "summary": "Follow-up issue to differentiate production and staging shells so operators can identify host and environment.",
+          "assertions": [
+            "production-staging-ps1"
+          ]
+        },
+        {
+          "id": "infra-1095",
+          "url": "https://gitlab.com/api/v4/projects/gitlab-com%2Finfrastructure/issues/1095",
+          "kind": "public-issue",
+          "summary": "Follow-up issue to move backup monitoring to Prometheus/Slack and graph backup status.",
+          "assertions": [
+            "prometheus-backup-monitoring"
+          ]
+        },
+        {
+          "id": "infra-1097",
+          "url": "https://gitlab.com/api/v4/projects/gitlab-com%2Finfrastructure/issues/1097",
+          "kind": "public-issue",
+          "summary": "Follow-up issue to investigate point-in-time recovery and continuous archiving.",
+          "assertions": [
+            "pitr-continuous-archiving"
+          ]
+        },
+        {
+          "id": "infra-1098",
+          "url": "https://gitlab.com/api/v4/projects/gitlab-com%2Finfrastructure/issues/1098",
+          "kind": "public-issue",
+          "summary": "Follow-up issue to increase production database snapshots from daily to hourly.",
+          "assertions": [
+            "hourly-lvm-snapshots"
+          ]
+        },
+        {
+          "id": "infra-1102",
+          "url": "https://gitlab.com/api/v4/projects/gitlab-com%2Finfrastructure/issues/1102",
+          "kind": "public-issue",
+          "summary": "Follow-up issue to test PostgreSQL backup restores automatically against real tables.",
+          "assertions": [
+            "automated-backup-restore-testing"
+          ]
+        },
+        {
+          "id": "infra-811",
+          "url": "https://gitlab.com/api/v4/projects/gitlab-com%2Finfrastructure/issues/811",
+          "kind": "public-issue",
+          "summary": "Pre-existing public issue for staging migration execution and rollback testing.",
+          "assertions": [
+            "staging-migration-revert-tool"
+          ]
+        },
+        {
+          "id": "gitlab-ce-27581",
+          "url": "https://gitlab.com/api/v4/projects/gitlab-org%2Fgitlab-ce/issues/27581",
+          "kind": "public-issue",
+          "summary": "Public product issue identifying hard deletion as a policy gap after user/project removal.",
+          "assertions": [
+            "hard-delete-policy-gap"
+          ]
+        }
+      ],
       "source_assertions": [
         {
           "id": "primary-removal",
@@ -21,12 +97,48 @@
           "id": "backup-recovery-failed",
           "phrase": "both finding and using backups failed completely",
           "summary": "The postmortem identifies backup/recovery failure as part of the incident."
+        },
+        {
+          "id": "production-staging-ps1",
+          "phrase": "Use bold red for production, normal yellow for staging",
+          "summary": "A public follow-up issue identifies environment confusion between production and staging as repair-relevant operational state."
+        },
+        {
+          "id": "prometheus-backup-monitoring",
+          "phrase": "Backup alerts should instead use Prometheus alerts and be sent to Slack.",
+          "summary": "A public follow-up issue requires executable monitoring over backups."
+        },
+        {
+          "id": "pitr-continuous-archiving",
+          "phrase": "Point in time recovery",
+          "summary": "A public follow-up issue identifies PITR/continuous archiving as a needed recovery mechanism."
+        },
+        {
+          "id": "hourly-lvm-snapshots",
+          "phrase": "This has proven to be inadequate as a recovery technique.",
+          "summary": "A public follow-up issue says daily LVM snapshots were insufficient and should become hourly."
+        },
+        {
+          "id": "automated-backup-restore-testing",
+          "phrase": "Automated testing of recovering PostgreSQL database backups",
+          "summary": "A public follow-up issue requires recurring executable backup-restore tests."
+        },
+        {
+          "id": "staging-migration-revert-tool",
+          "phrase": "Tool for executing and reverting Rails migrations on staging",
+          "summary": "A public issue proposes executable staging migration tests with automatic rollback."
+        },
+        {
+          "id": "hard-delete-policy-gap",
+          "phrase": "Removal of users by spam should not hard delete",
+          "summary": "A public product issue identifies hard deletion as unsafe operational behavior."
         }
       ],
       "artifacts": {
         "evidence": "gitlab-2017/evidence.jsonl",
         "migration": "gitlab-2017/destructive-removal.sql",
-        "repair": "gitlab-2017/no-snapshot-repair.json"
+        "repair": "gitlab-2017/no-snapshot-repair.json",
+        "source_observations": "gitlab-2017/source-observations.jsonl"
       },
       "protected_tables": [
         "projects",
@@ -39,9 +151,15 @@
         "damaged-derived-report",
         "high-risk-destructive-migration",
         "missing-snapshot-rollback",
-        "protected-primary-mutation"
+        "protected-primary-mutation",
+        "source-established-environment-remediation",
+        "source-established-hard-delete-policy-gap",
+        "source-established-migration-revert-remediation",
+        "source-established-primary-data-loss",
+        "source-established-recovery-gap",
+        "source-established-recovery-remediation"
       ],
-      "avoidance_claim": "Patchline would not certify the reconstructed destructive primary-data operation because it touches protected production-data tables and lacks a verified snapshot rollback."
+      "avoidance_claim": "Patchline would not certify the reconstructed destructive primary-data operation because public sources establish primary-data loss, backup/recovery gaps, and follow-up remediation work that map directly to protected-table, snapshot, rollback, and source-grounded recovery obligations."
     },
     {
       "id": "github-2018-mysql-split-brain",

@@ -27,6 +27,12 @@ func TestRunHistoricalSuite(t *testing.T) {
 	if !hasSignal(report, "missing-snapshot-rollback") {
 		t.Fatal("expected missing snapshot rollback signal")
 	}
+	if !hasSignal(report, "source-established-recovery-remediation") {
+		t.Fatal("expected source-established recovery remediation signal")
+	}
+	if sourceDocumentCount(report, "gitlab-2017-primary-db-removal") < 8 {
+		t.Fatal("expected GitLab case to include linked public source documents")
+	}
 }
 
 func hasSignal(report Report, id string) bool {
@@ -38,4 +44,13 @@ func hasSignal(report Report, id string) bool {
 		}
 	}
 	return false
+}
+
+func sourceDocumentCount(report Report, caseID string) int {
+	for _, c := range report.Cases {
+		if c.ID == caseID {
+			return len(c.SourceDocuments)
+		}
+	}
+	return 0
 }

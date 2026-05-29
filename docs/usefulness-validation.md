@@ -20,8 +20,8 @@ make verify-usefulness
 | `semantics-audit` | Rebuilds the semantic evidence bundle and expects all artifacts to conform with zero counterexamples. |
 | `archive-index` | Indexes historical-style evidence, migrations, repairs, policy, and benchmark outputs by semantic shape and decisions. |
 | `archive-query` | Answers deterministic historical questions about broad-update migrations, damaged-derived reports, and repairs lacking rollback. |
-| `historical-failures` | Replays public postmortem counterfactual artifacts and requires expected Patchline signals for known failure classes. |
-| `verify-historical-sources.sh` | Fetches the public postmortems and verifies the exact source phrases used as ground-truth assertions. |
+| `historical-failures` | Replays public incident counterfactual artifacts and requires expected Patchline signals for known failure classes and source-derived observations. |
+| `verify-historical-sources.sh` | Fetches the public postmortems and linked public issue/API records, then verifies the exact source phrases used as ground-truth assertions. |
 
 ## Public corpus
 
@@ -55,16 +55,17 @@ This makes the claim falsifiable: if any artifact cannot be rebuilt, if Z3 canno
 
 ## Public historical-failure counterfactuals
 
-The suite in `examples/historical-failures/suite.json` is deliberately conservative: it does not claim Patchline reproduces every operational detail in a postmortem. Instead, each case has two independently checkable parts:
+The suite in `examples/historical-failures/suite.json` is deliberately conservative: it does not claim Patchline reproduces every operational detail in a postmortem. Instead, each case has three independently checkable parts:
 
-1. public-source assertions, verified by fetching the postmortem and matching exact phrases;
-2. Patchline artifacts that encode the relevant failure class and must produce expected deterministic signals.
+1. public-source assertions, verified by fetching the postmortem or public issue/API document and matching exact phrases;
+2. source-derived observation JSONL that maps verified assertions to Patchline's semantic vocabulary;
+3. Patchline artifacts that encode the relevant failure class and must produce expected deterministic signals.
 
 The current cases validate:
 
 | Case | Publicly sourced failure class | Patchline signal |
 | --- | --- | --- |
-| `gitlab-2017-primary-db-removal` | Accidental removal from a primary database, production-data loss, and failed backup recovery. | High-risk destructive mutations on protected primary-data tables, damaged derived reports, and missing snapshot rollback. |
+| `gitlab-2017-primary-db-removal` | Accidental removal from a primary database, production-data loss, failed backup recovery, and a cluster of public linked issues about backups, snapshots, PITR, restore tests, migration rollback tooling, host/environment separation, and hard deletion. | High-risk destructive mutations on protected primary-data tables, damaged derived reports, missing snapshot rollback, and source-established recovery/rollback/policy observations. |
 | `github-2018-mysql-split-brain` | Divergent writes between database sites plus stale/inconsistent user-visible state. | Split-brain conflicting writes on one logical record and damaged derived report state. |
 
 Run the suite directly with:
