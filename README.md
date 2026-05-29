@@ -29,6 +29,8 @@ Start with [`ARTIFACT.md`](ARTIFACT.md) for the quick evaluator path, [`docs/pap
 
 `make artifact-benchmark-compare` runs the committed smoke and negative benchmark manifests, emits deterministic reports under `results/generated/artifact-benchmark/`, and compares them against frozen expected outputs in `benchmarks/expected/`. This is the no-hindsight-leakage path: ground-truth labels validate the manifest and compare the final answer, while prediction uses only the fixture input kinds allowed for the case phase.
 
+If a semantic change intentionally updates those expected outputs, run `make artifact-benchmark-refresh`. It rewrites `benchmarks/expected/*.json` and then immediately reruns the compare target, keeping the default reviewer path drift-detecting rather than self-updating.
+
 The central artifact object is:
 
 ```text

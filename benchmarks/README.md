@@ -40,6 +40,14 @@ benchmarks/expected/negative-report.json
 
 The runner is phase-aware. It validates that each manifest case points to matching ground truth, enforces `allowed_inputs` and `excluded_inputs`, predicts from committed fixtures or explicit inline fixtures, and only then compares the result with the expected label. This keeps pre-deploy cases from using postmortem-only facts.
 
+Expected reports are intentionally not refreshed by the compare target. After a deliberate semantics change, maintainers can run:
+
+```bash
+make artifact-benchmark-refresh
+```
+
+That target rewrites the committed golden JSON/Markdown reports and then runs the normal compare path against the refreshed files.
+
 ## Executable study outputs
 
 The committed strict corpus under `examples/benchmarks/strict-migration-corpus.json` now feeds:

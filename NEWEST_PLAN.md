@@ -2,6 +2,20 @@
 
 This plan turns the ICSE-style review critique into an implementation roadmap for making Patchline credible as the focus of a software engineering artifact paper. The north star is to move Patchline from a rich semantics-first prototype into a reproducible artifact with a single claim, public data, ground truth, baselines, ablations, and reviewer-friendly execution paths.
 
+## Current State Snapshot (2026-05-29)
+
+Patchline now has the artifact-review scaffold and several executable evaluator paths in place:
+
+- `README.md`, `ARTIFACT.md`, `docs/paper-claim.md`, `docs/semantic-core.md`, `docs/semantic-pipeline.md`, and `docs/literature-positioning.md` frame the repository around the historical repair-semantics artifact claim.
+- `benchmarks/LABELING.md`, `benchmarks/manifests/smoke.json`, `benchmarks/manifests/negative.json`, and `benchmarks/ground_truth/**` provide phase-aware, source-grounded labels.
+- `patchline artifact-ground-truth`, `artifact-baselines`, `artifact-ablations`, `artifact-scale`, and `artifact-benchmark validate/run/compare` are implemented.
+- `make artifact-benchmark-compare` executes smoke and negative manifests, writes deterministic reports under `results/generated/artifact-benchmark/`, and compares them against committed golden reports in `benchmarks/expected/`.
+- `make artifact-benchmark-refresh` is the explicit maintainer path for regenerating those committed golden reports after deliberate semantic changes.
+- `make artifact-full && make verify-usefulness` has passed after the executable benchmark runner and golden-refresh workflow were added.
+- `100_STEPS.md`, `PLAN.md`, and `NEW_PLAN.md` are untracked/ignored; this file remains the tracked implementation roadmap.
+
+The latest refinement closes the manual **golden refresh** gap, so reviewers and maintainers can intentionally regenerate `benchmarks/expected/*.json` after semantic changes instead of copying generated files by hand. The next large step should be public-corpus expansion, not another workflow wrapper.
+
 ## 0. Target Artifact Claim
 
 Patchline should be organized around one memorable claim:
@@ -32,17 +46,17 @@ Patchline should not claim to automatically understand arbitrary production syst
 | Reviewer concern | Current risk | Required repo response | Done when |
 | --- | --- | --- | --- |
 | Single artifact claim | Repo feels broad: provenance, replay, repair, solver, archive, policy, CI, benchmarking | Make all README, docs, examples, and commands converge on the historical repair semantics claim | README, `ARTIFACT.md`, and `docs/paper-claim.md` all state the same claim and map commands to it |
-| Real benchmark suite | Demos may look curated | Add public benchmark datasets with machine-readable manifests, labels, and expected outputs | `make artifact-benchmark` runs at least one public migration corpus and one public incident corpus |
-| Ground truth | Claims may depend on interpretation | Store labels, evidence URLs, source snippets/hashes, labeling rules, and expected classifications | Every benchmark case has `ground_truth/*.json` with label provenance |
-| Baselines | No “better than what?” comparison | Implement simple rule, grep, migration-linter-style, and archive-free baselines | `make artifact-baselines` emits comparative tables |
-| Ablations | Full pipeline value is unclear | Run migration-only, provenance-only, replay-only, solver-only, archive-only, and full Patchline variants | `make artifact-ablations` shows added signal/actionability per component |
-| Time realism | Counterfactuals may use hindsight | Add `available_at` phase annotations and enforce phase-limited evaluation | Pre-deploy claims only consume pre-deploy evidence |
-| Packaging | Reviewer setup may be fragile | Add Docker/devcontainer, `ARTIFACT.md`, smoke/full targets, cached data option | Fresh checkout can run smoke path under 5 minutes |
-| Scale | Utility beyond toy examples unproven | Add corpus-scale benchmark and report runtime/memory/query latency | `make artifact-scale` emits benchmark JSON and Markdown table |
-| Trusted semantic core | Semantics may appear scattered | Define a small explicit core model and connect it to code and CLI commands | `docs/semantic-core.md` maps model terms to implementation files and tests |
-| Negative cases | Claims may seem cherry-picked | Add unsupported/ambiguous cases and explicit failure modes | `make artifact-negative-cases` shows “cannot prove”/“insufficient evidence” outputs |
-| Literature novelty | Novelty needs sharper contrast | Add literature-positioning doc and paper-intro material | `docs/literature-positioning.md` contrasts Patchline with provenance, migration linting, repair, incident tools |
-| Killer demo | No single canonical artifact path | Add one end-to-end demo over named public data | `make artifact-demo` emits a paper-ready bundle hash and result summary |
+| Real benchmark suite | Smoke/negative manifests are executable; larger public corpora are still small | Add public benchmark datasets with machine-readable manifests, labels, and expected outputs | `make artifact-benchmark` runs at least one public migration corpus and one public incident corpus |
+| Ground truth | Core protocol exists and validates | Store labels, evidence URLs, source snippets/hashes, labeling rules, and expected classifications | Every benchmark case has `ground_truth/*.json` with label provenance |
+| Baselines | Implemented for strict migration corpus; still needs larger public corpus | Implement simple rule, grep, migration-linter-style, and archive-free baselines | `make artifact-baselines` emits comparative tables |
+| Ablations | Implemented for current artifact study corpus; needs public-scale expansion | Run migration-only, provenance-only, replay-only, solver-only, archive-only, and full Patchline variants | `make artifact-ablations` shows added signal/actionability per component |
+| Time realism | Phase-aware ground truth and benchmark runner enforce input availability | Add `available_at` phase annotations and enforce phase-limited evaluation | Pre-deploy claims only consume pre-deploy evidence |
+| Packaging | Docker/devcontainer, smoke/full targets, and artifact docs exist | Add Docker/devcontainer, `ARTIFACT.md`, smoke/full targets, cached data option | Fresh checkout can run smoke path under 5 minutes |
+| Scale | `artifact-scale` emits current corpus measurements; needs larger public data | Add corpus-scale benchmark and report runtime/memory/query latency | `make artifact-scale` emits benchmark JSON and Markdown table |
+| Trusted semantic core | `docs/semantic-core.md` exists and is linked from README | Define a small explicit core model and connect it to code and CLI commands | `docs/semantic-core.md` maps model terms to implementation files and tests |
+| Negative cases | Five executable negative controls are in the benchmark path | Add unsupported/ambiguous cases and explicit failure modes | `make artifact-negative-cases` and `make artifact-benchmark-compare` show boundary outcomes |
+| Literature novelty | `docs/literature-positioning.md` exists | Add literature-positioning doc and paper-intro material | `docs/literature-positioning.md` contrasts Patchline with provenance, migration linting, repair, incident tools |
+| Killer demo | `make artifact-demo` exists; expected-output refresh still manual | Add one end-to-end demo over named public data | `make artifact-demo` emits a paper-ready bundle hash and result summary |
 
 ## 2. Workstream A: One Coherent Artifact Story
 
@@ -334,7 +348,7 @@ Manifest schema:
 4. Add expected-output comparison:
 
    ```bash
-   patchline benchmark compare results/... benchmarks/expected/...
+   patchline artifact-benchmark compare results/... benchmarks/expected/...
    ```
 
 5. Add Make targets:
@@ -345,6 +359,11 @@ Manifest schema:
    artifact-benchmark-refresh
    artifact-benchmark-compare
    ```
+
+### Current status
+
+- Done: manifest structs, validation, runner, comparison, smoke/negative manifests, committed golden reports, hash-integrity comparison, `make artifact-benchmark-compare`, and `make artifact-benchmark-refresh`.
+- Next: expand from committed smoke/negative fixtures to `public_migrations.json` and `public_incidents.json` with pinned/cacheable public sources.
 
 ### Acceptance criteria
 
@@ -1180,21 +1199,17 @@ Patchline is artifact-paper-ready when:
 
 ## 18. Immediate Next Commit Plan
 
-The next implementation commit should avoid adding another isolated feature. It should add the artifact-review scaffold:
+The artifact-review scaffold, executable benchmark runner, and golden-refresh workflow are now in place. The next implementation commit should make the benchmark suite less smoke-test-shaped by adding a pinned public migration corpus:
 
-1. `ARTIFACT.md`
-2. `docs/paper-claim.md`
-3. `docs/semantic-core.md`
-4. `docs/semantic-pipeline.md`
-5. `benchmarks/README.md`
-6. `benchmarks/LABELING.md`
-7. `make artifact-smoke`
-8. README revision to point to the artifact path
+1. Add `benchmarks/manifests/public_migrations.json`.
+2. Add at least five public migration cases with pinned source URLs, source hashes, fixture-cache instructions, and phase-aware labels.
+3. Ensure fresh-checkout artifact validation does not require the network path unless the public-corpus target is explicitly requested.
+4. Add committed expected reports only after the manifest can run deterministically from cached fixtures.
 
 Commit message:
 
 ```text
-Frame Patchline as a reproducible repair-semantics artifact
+Add pinned public migration benchmark manifest
 
 Co-authored-by: Copilot <223556219+Copilot@users.noreply.github.com>
 ```

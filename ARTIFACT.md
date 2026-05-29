@@ -116,6 +116,14 @@ go run ./cmd/patchline artifact-benchmark compare results/generated/artifact-ben
 
 The runner separates prediction from comparison. During prediction, Patchline may use the manifest fixture and the case's allowed/excluded input kinds, but it does not use the ground-truth expected label to decide the result. Ground truth is used to validate references, enforce phase guards, and compare the final outcome. The comparison command exits non-zero if a case result or report hash drifts.
 
+If a semantic change intentionally changes the benchmark outputs, refresh the frozen reports with:
+
+```bash
+make artifact-benchmark-refresh
+```
+
+This command rewrites `benchmarks/expected/smoke-report.json` and `benchmarks/expected/negative-report.json`, then reruns `make artifact-benchmark-compare`. Reviewers should use `make artifact-benchmark-compare`; refresh is a maintainer workflow for updating golden files after deliberate semantic changes.
+
 ## Canonical demo
 
 ```bash
@@ -182,7 +190,7 @@ These cases are part of the artifact, not merely prose limitations.
 
 ## Relationship to `make verify-usefulness`
 
-`make verify-usefulness` remains the broader project validation target. It includes network-backed public corpus fetching and source checks. `make artifact-smoke` is the artifact-review entry point: it is smaller, committed-fixture-only, and intended to be stable without network access. `make artifact-studies` is the evaluator-facing measurement entry point for current baseline/ablation/scale evidence, and `make artifact-benchmark-compare` is the golden-output check for the executable manifest protocol.
+`make verify-usefulness` remains the broader project validation target. It includes network-backed public corpus fetching and source checks. `make artifact-smoke` is the artifact-review entry point: it is smaller, committed-fixture-only, and intended to be stable without network access. `make artifact-studies` is the evaluator-facing measurement entry point for current baseline/ablation/scale evidence, `make artifact-benchmark-compare` is the golden-output check for the executable manifest protocol, and `make artifact-benchmark-refresh` is the explicit maintainer path for rewriting those golden outputs.
 
 ## Data provenance
 
