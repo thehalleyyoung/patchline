@@ -18,8 +18,8 @@ Patchline now has a reviewer-oriented artifact path in addition to its broader u
 make artifact-smoke
 make artifact-demo
 make artifact-ground-truth-check
-make artifact-studies
-make artifact-studies-public
+make artifact-studies-compare
+make artifact-studies-public-compare
 make artifact-benchmark-compare
 make artifact-benchmark-public
 make artifact-benchmark-public-incidents
@@ -28,9 +28,9 @@ make artifact-negative-cases
 
 Start with [`ARTIFACT.md`](ARTIFACT.md) for the quick evaluator path, [`docs/paper-claim.md`](docs/paper-claim.md) for the single paper-facing claim, [`docs/semantic-core.md`](docs/semantic-core.md) for the auditable semantic core, and [`benchmarks/LABELING.md`](benchmarks/LABELING.md) for the phase-aware ground-truth protocol.
 
-`make artifact-studies` writes `baselines.{json,md}`, `ablations.{json,md}`, and `scale.{json,md}` under `results/generated/artifact-studies/` for the committed strict corpus. These reports make the current claim sharper: Patchline is not merely detecting bad SQL; it shows, case by case, which semantic layers add tables/effects/reasons, ground-truth links, archive links, Z3-backed repair obligations, stable hashes, and reviewer-actionable evidence beyond DDL-grep, normalized SQL-rule, and effects-only baselines.
+`make artifact-studies-compare` writes `baselines.{json,md}`, `ablations.{json,md}`, and `scale.{json,md}` under `results/generated/artifact-studies/` for the committed strict corpus, then compares their stable report hashes against `benchmarks/expected/studies-strict.json`. These reports make the current claim sharper: Patchline is not merely detecting bad SQL; it shows, case by case, which semantic layers add tables/effects/reasons, ground-truth links, archive links, Z3-backed repair obligations, stable hashes, and reviewer-actionable evidence beyond DDL-grep, normalized SQL-rule, and effects-only baselines.
 
-`make artifact-studies-public` is the explicit network-backed study path. It fetches the pinned Bytebase migration corpus, then writes the same baseline/ablation/scale tables under `results/generated/artifact-studies/public-migrations/`. This public corpus measures migration detection and structural actionability only; it does not claim archive/proof gains for cases that do not declare those inputs.
+`make artifact-studies-public-compare` is the explicit network-backed study path. It fetches the pinned Bytebase migration corpus, writes the same baseline/ablation/scale tables under `results/generated/artifact-studies/public-migrations/`, and checks their stable hashes against `benchmarks/expected/studies-public-migrations.json`. This public corpus measures migration detection and structural actionability only; it does not claim archive/proof gains for cases that do not declare those inputs.
 
 `make artifact-benchmark-compare` runs the committed smoke and negative benchmark manifests, emits deterministic reports under `results/generated/artifact-benchmark/`, and compares them against frozen expected outputs in `benchmarks/expected/`. This is the no-hindsight-leakage path: ground-truth labels validate the manifest and compare the final answer, while prediction uses only the fixture input kinds allowed for the case phase.
 
@@ -38,7 +38,7 @@ Start with [`ARTIFACT.md`](ARTIFACT.md) for the quick evaluator path, [`docs/pap
 
 `make artifact-benchmark-public-incidents` is the offline public-incident counterpart: it runs GitLab 2017 and GitHub 2018 source-observation fixtures plus a too-thin public-summary boundary through the same phase-aware manifest protocol and compares the result to `benchmarks/expected/public-incidents-report.json`.
 
-If a semantic change intentionally updates expected outputs, run `make artifact-benchmark-refresh`. It rewrites `benchmarks/expected/*.json`, refreshes the public migration report after fetching pinned sources, refreshes the offline public-incident report, and immediately reruns the compare targets, keeping the default reviewer path drift-detecting rather than self-updating.
+If a semantic change intentionally updates expected benchmark outputs, run `make artifact-benchmark-refresh`. If it intentionally updates study report hashes, run `make artifact-studies-refresh`. Refresh targets rewrite committed expected files and immediately rerun compare targets, keeping the default reviewer path drift-detecting rather than self-updating.
 
 The central artifact object is:
 
@@ -56,7 +56,7 @@ Evidence -> Trace -> Transition -> Repair -> Proof -> Replay -> Archive -> Regre
 | Replay | `repair-outcomes` | verification and rollback history | connects repair execution to archive memory |
 | Archive | `archive-index`, `archive-query` | deterministic incident index | turns incidents into queryable memory |
 | Regression | `semantic-regressions` | recurrence relations and invariants | detects repeated semantic failure shapes |
-| Artifact studies | `artifact-baselines`, `artifact-ablations`, `artifact-scale` | baseline, ablation, and scale reports | shows what each semantic layer contributes right now |
+| Artifact studies | `artifact-baselines`, `artifact-ablations`, `artifact-scale`, `artifact-study compare` | baseline, ablation, scale, and expected-hash reports | shows and drift-checks what each semantic layer contributes right now |
 | Artifact benchmark | `artifact-benchmark validate/run/compare` | phase-aware run report and golden comparison | verifies current usefulness against committed and pinned-public ground truth without label leakage |
 
 ## Verify the current usefulness claim

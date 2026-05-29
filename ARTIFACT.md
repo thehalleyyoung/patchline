@@ -15,8 +15,8 @@ The current reviewer path is intentionally narrow and executable from a fresh ch
 3. Execute the semantic pipeline over committed smoke fixtures.
 4. Emit deterministic JSON outputs under `results/generated/`.
 5. Run negative/limitation cases that show unsupported or insufficient-evidence outcomes are represented explicitly.
-6. Compare executable benchmark-manifest outputs against frozen expected reports.
-7. Optionally fetch pinned public OSS migrations and run the same phase-aware protocol against real migration SQL.
+6. Compare study report hashes and executable benchmark-manifest outputs against frozen expected reports.
+7. Optionally fetch pinned public OSS migrations and run the same study and phase-aware benchmark protocols against real migration SQL.
 8. Run an offline public-incident benchmark over source-derived GitLab/GitHub observations and an explicit insufficient-evidence boundary.
 
 The smoke path uses only committed fixtures and existing CLI commands. It does not require network access. Public-data targets are explicit and verify pinned hashes before using downloaded files.
@@ -76,8 +76,8 @@ It runs:
 ## Baselines, ablations, and scale
 
 ```bash
-make artifact-studies
-make artifact-studies-public
+make artifact-studies-compare
+make artifact-studies-public-compare
 ```
 
 This target writes:
@@ -107,6 +107,19 @@ The reports are intentionally reviewer-facing rather than paper-scale. They make
 - `artifact-studies-public` repeats the study reports on the pinned Bytebase migration corpus after fetching and hashing the source files. This network-backed corpus measures public migration detection and structural actionability, not archive/proof gains for cases that do not declare archive or repair inputs.
 
 The ablation report only counts solver-backed evidence for cases that declare repair/invariant inputs. This keeps the claim falsifiable: migration text alone can produce risk signals, but not repair proofs.
+
+The compare targets summarize `baselines.json`, `ablations.json`, and `scale.json` into committed expected-hash manifests:
+
+```text
+benchmarks/expected/studies-strict.json
+benchmarks/expected/studies-public-migrations.json
+```
+
+The study comparer checks stable report `hash` fields instead of byte-for-byte JSON. This intentionally ignores machine-dependent timing fields in scale reports while still failing on semantic drift, missing reports, unexpected JSON files, or corrupted stored hashes. Maintainers can refresh these manifests after a deliberate semantics change with:
+
+```bash
+make artifact-studies-refresh
+```
 
 ## Executable benchmark manifests
 
@@ -217,7 +230,7 @@ These cases are part of the artifact, not merely prose limitations.
 
 ## Relationship to `make verify-usefulness`
 
-`make verify-usefulness` remains the broader project validation target. It includes network-backed public corpus fetching and source checks. `make artifact-smoke` is the artifact-review entry point: it is smaller, committed-fixture-only, and intended to be stable without network access. `make artifact-studies` is the offline evaluator-facing measurement entry point for current baseline/ablation/scale evidence, `make artifact-studies-public` is the explicit public-data study path, `make artifact-benchmark-compare` is the offline golden-output check for the executable manifest protocol, `make artifact-benchmark-public` is the explicit public-data check, and `make artifact-benchmark-refresh` is the maintainer path for rewriting golden outputs.
+`make verify-usefulness` remains the broader project validation target. It includes network-backed public corpus fetching and source checks. `make artifact-smoke` is the artifact-review entry point: it is smaller, committed-fixture-only, and intended to be stable without network access. `make artifact-studies-compare` is the offline evaluator-facing measurement and drift-check entry point for current baseline/ablation/scale evidence, `make artifact-studies-public-compare` is the explicit public-data study drift check, `make artifact-benchmark-compare` is the offline golden-output check for the executable manifest protocol, `make artifact-benchmark-public` is the explicit public-data benchmark check, and the refresh targets are maintainer paths for rewriting expected outputs after intentional semantic changes.
 
 ## Data provenance
 

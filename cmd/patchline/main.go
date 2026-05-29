@@ -328,6 +328,11 @@ func run(args []string) error {
 			return errors.New("usage: patchline artifact-benchmark <validate|run|compare> <args> [--json] [--out path]")
 		}
 		return artifactBenchmark(args[1:])
+	case "artifact-study":
+		if len(args) < 3 {
+			return errors.New("usage: patchline artifact-study <summarize|compare> <args> [--json] [--out path]")
+		}
+		return artifactStudy(args[1:])
 	case "ingest-evidence":
 		if len(args) < 2 {
 			return errors.New("usage: patchline ingest-evidence <events.jsonl> [--json] [--out graph.json]")
@@ -417,6 +422,8 @@ Usage:
   patchline artifact-baselines <suite.json> [--out dir] [--json]
   patchline artifact-ablations <suite.json> [--out dir] [--json]
   patchline artifact-scale <suite.json> [--out dir] [--json]
+  patchline artifact-study summarize <report-dir> [--out expected.json] [--json]
+  patchline artifact-study compare <report-dir> <expected.json> [--json]
   patchline artifact-benchmark validate <manifest.json> [--json]
   patchline artifact-benchmark run <manifest.json> [--out report.json] [--json]
   patchline artifact-benchmark compare <actual.json> <expected.json> [--json]
@@ -3618,6 +3625,57 @@ func artifactBenchmark(args []string) error {
 		return nil
 	default:
 		return fmt.Errorf("unknown artifact-benchmark subcommand %q", args[0])
+	}
+}
+
+func artifactStudy(args []string) error {
+	switch args[0] {
+	case "summarize":
+		if len(args) < 2 {
+			return errors.New("usage: patchline artifact-study summarize <report-dir> [--out expected.json] [--json]")
+		}
+		outPath, _ := flagValue(args[2:], "--out")
+		manifest, err := artifact.SummarizeStudyReports(args[1])
+		if err != nil {
+			return err
+		}
+		if outPath != "" {
+			if err := artifact.WriteStudyExpectedManifest(outPath, manifest); err != nil {
+				return err
+			}
+		}
+		if hasFlag(args[2:], "--json") {
+			return writeJSON(os.Stdout, manifest)
+		}
+		fmt.Printf("artifact study expected suite=%s hash=%s reports=%d\n", manifest.Suite, manifest.Hash, len(manifest.Reports))
+		if outPath != "" {
+			fmt.Printf("  written: %s\n", outPath)
+		}
+		return nil
+	case "compare":
+		if len(args) < 3 {
+			return errors.New("usage: patchline artifact-study compare <report-dir> <expected.json> [--json]")
+		}
+		report, err := artifact.CompareStudyReports(args[1], args[2])
+		if err != nil {
+			return err
+		}
+		if hasFlag(args[3:], "--json") {
+			if err := writeJSON(os.Stdout, report); err != nil {
+				return err
+			}
+		} else {
+			fmt.Printf("artifact study compare ok=%t suite=%s actual_hash=%s expected_hash=%s mismatches=%d\n", report.OK, report.Suite, report.ActualHash, report.ExpectedHash, len(report.Mismatches))
+			for _, mismatch := range report.Mismatches {
+				fmt.Printf("  report=%s field=%s actual=%s expected=%s\n", mismatch.Report, mismatch.Field, mismatch.Actual, mismatch.Expected)
+			}
+		}
+		if !report.OK {
+			return errors.New("artifact study comparison failed")
+		}
+		return nil
+	default:
+		return fmt.Errorf("unknown artifact-study subcommand %q", args[0])
 	}
 }
 

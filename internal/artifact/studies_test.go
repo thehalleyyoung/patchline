@@ -1,6 +1,7 @@
 package artifact
 
 import (
+	"encoding/json"
 	"os"
 	"path/filepath"
 	"testing"
@@ -55,6 +56,63 @@ func TestArtifactStudiesRunOnStrictCorpus(t *testing.T) {
 	}
 }
 
+func TestStudyExpectedManifestComparesStableHashes(t *testing.T) {
+	spec := readStrictSpec(t)
+	baseDir := filepath.Join("..", "..", "examples", "benchmarks")
+	outDir := t.TempDir()
+
+	baselines, err := EvaluateBaselines(spec, baseDir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	ablations, err := RunAblations(spec, baseDir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	scale, err := MeasureScale(spec, baseDir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	writeStudyJSON(t, outDir, "baselines.json", baselines)
+	writeStudyJSON(t, outDir, "ablations.json", ablations)
+	writeStudyJSON(t, outDir, "scale.json", scale)
+
+	manifest, err := SummarizeStudyReports(outDir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if manifest.Hash == "" || len(manifest.Reports) != 3 || manifest.Suite != baselines.Suite || manifest.SuiteHash != baselines.SuiteHash {
+		t.Fatalf("unexpected study expected manifest: %#v", manifest)
+	}
+	expectedPath := filepath.Join(t.TempDir(), "study-expected.json")
+	if err := WriteStudyExpectedManifest(expectedPath, manifest); err != nil {
+		t.Fatal(err)
+	}
+	compare, err := CompareStudyReports(outDir, expectedPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !compare.OK || compare.Hash == "" {
+		t.Fatalf("expected matching study reports, got %#v", compare)
+	}
+
+	drifted := manifest
+	drifted.Reports = append([]StudyReportEntry(nil), manifest.Reports...)
+	drifted.Reports[0].Hash = "sha256:drift"
+	drifted.Hash = studyExpectedHash(drifted)
+	driftedPath := filepath.Join(t.TempDir(), "study-expected-drifted.json")
+	if err := WriteStudyExpectedManifest(driftedPath, drifted); err != nil {
+		t.Fatal(err)
+	}
+	driftCompare, err := CompareStudyReports(outDir, driftedPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if driftCompare.OK || len(driftCompare.Mismatches) == 0 {
+		t.Fatalf("expected drift mismatch, got %#v", driftCompare)
+	}
+}
+
 func readStrictSpec(t *testing.T) bench.Spec {
 	t.Helper()
 	path := filepath.Join("..", "..", "examples", "benchmarks", "strict-migration-corpus.json")
@@ -68,4 +126,15 @@ func readStrictSpec(t *testing.T) bench.Spec {
 		t.Fatal(err)
 	}
 	return spec
+}
+
+func writeStudyJSON(t *testing.T, dir, name string, value any) {
+	t.Helper()
+	data, err := json.MarshalIndent(value, "", "  ")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(dir, name), append(data, '\n'), 0o644); err != nil {
+		t.Fatal(err)
+	}
 }

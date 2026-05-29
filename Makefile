@@ -1,4 +1,4 @@
-.PHONY: build test demo gate fmt public-corpus verify-usefulness artifact-smoke artifact-demo artifact-ground-truth-check artifact-baselines artifact-ablations artifact-scale artifact-studies artifact-baselines-public artifact-ablations-public artifact-scale-public artifact-studies-public artifact-studies-all artifact-benchmark artifact-benchmark-public artifact-benchmark-public-incidents artifact-benchmark-refresh artifact-benchmark-compare artifact-negative-cases artifact-full artifact-clean
+.PHONY: build test demo gate fmt public-corpus verify-usefulness artifact-smoke artifact-demo artifact-ground-truth-check artifact-baselines artifact-ablations artifact-scale artifact-studies artifact-studies-expected artifact-studies-compare artifact-studies-refresh artifact-baselines-public artifact-ablations-public artifact-scale-public artifact-studies-public artifact-studies-public-expected artifact-studies-public-compare artifact-studies-all artifact-benchmark artifact-benchmark-public artifact-benchmark-public-incidents artifact-benchmark-refresh artifact-benchmark-compare artifact-negative-cases artifact-full artifact-clean
 
 build:
 	go build -o bin/patchline ./cmd/patchline
@@ -47,6 +47,16 @@ artifact-scale:
 
 artifact-studies: artifact-baselines artifact-ablations artifact-scale
 
+artifact-studies-expected: artifact-studies
+	go run ./cmd/patchline artifact-study summarize results/generated/artifact-studies --out benchmarks/expected/studies-strict.json
+
+artifact-studies-compare: artifact-studies
+	go run ./cmd/patchline artifact-study compare results/generated/artifact-studies benchmarks/expected/studies-strict.json
+
+artifact-studies-refresh:
+	bash scripts/refresh-artifact-studies.sh
+	$(MAKE) artifact-studies-compare
+
 artifact-baselines-public: public-corpus
 	go run ./cmd/patchline artifact-baselines examples/benchmarks/public-bytebase-migration-corpus.json --out results/generated/artifact-studies/public-migrations
 
@@ -57,6 +67,12 @@ artifact-scale-public: public-corpus
 	go run ./cmd/patchline artifact-scale examples/benchmarks/public-bytebase-migration-corpus.json --out results/generated/artifact-studies/public-migrations
 
 artifact-studies-public: artifact-baselines-public artifact-ablations-public artifact-scale-public
+
+artifact-studies-public-expected: artifact-studies-public
+	go run ./cmd/patchline artifact-study summarize results/generated/artifact-studies/public-migrations --out benchmarks/expected/studies-public-migrations.json
+
+artifact-studies-public-compare: artifact-studies-public
+	go run ./cmd/patchline artifact-study compare results/generated/artifact-studies/public-migrations benchmarks/expected/studies-public-migrations.json
 
 artifact-studies-all: artifact-studies artifact-studies-public
 
@@ -89,7 +105,7 @@ artifact-benchmark-compare: artifact-benchmark
 artifact-negative-cases:
 	bash scripts/artifact_negative_cases.sh
 
-artifact-full: artifact-smoke artifact-demo artifact-studies artifact-benchmark-compare artifact-benchmark-public-incidents artifact-negative-cases verify-usefulness
+artifact-full: artifact-smoke artifact-demo artifact-studies-compare artifact-benchmark-compare artifact-benchmark-public-incidents artifact-negative-cases verify-usefulness
 
 artifact-clean:
 	rm -rf results/generated

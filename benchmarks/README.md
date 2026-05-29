@@ -70,17 +70,25 @@ The committed strict corpus under `examples/benchmarks/strict-migration-corpus.j
 
 ```bash
 make artifact-studies
+make artifact-studies-compare
 ```
 
-That target emits baseline, ablation, and scale reports under `results/generated/artifact-studies/`. The reports are deliberately small but load-bearing: they verify that benchmark cases can carry ground-truth links, archive links, repair manifests, invariant specs, Z3-backed obligations, and deterministic migration hashes through the same schema that larger corpora will use.
+Those targets emit baseline, ablation, and scale reports under `results/generated/artifact-studies/`, then compare their stable hashes against `benchmarks/expected/studies-strict.json`. The reports are deliberately small but load-bearing: they verify that benchmark cases can carry ground-truth links, archive links, repair manifests, invariant specs, Z3-backed obligations, and deterministic migration hashes through the same schema that larger corpora will use.
 
 The pinned public migration corpus feeds the same study machinery through an explicit network target:
 
 ```bash
 make artifact-studies-public
+make artifact-studies-public-compare
 ```
 
-That target writes reports under `results/generated/artifact-studies/public-migrations/` after fetching and hashing the Bytebase files. Because this corpus only declares migration files, its reports are scoped to detection and structural actionability; archive/proof/ground-truth gains remain demonstrated by the strict corpus and the phase-aware benchmark manifests.
+Those targets write reports under `results/generated/artifact-studies/public-migrations/` after fetching and hashing the Bytebase files, then compare their stable hashes against `benchmarks/expected/studies-public-migrations.json`. Because this corpus only declares migration files, its reports are scoped to detection and structural actionability; archive/proof/ground-truth gains remain demonstrated by the strict corpus and the phase-aware benchmark manifests.
+
+The study comparison path deliberately compares each report's canonical `hash` instead of exact JSON bytes. This keeps the scale study drift-detecting while ignoring local timing noise. To refresh expected study hashes after an intentional semantic change, run:
+
+```bash
+make artifact-studies-refresh
+```
 
 ## Larger benchmark targets
 

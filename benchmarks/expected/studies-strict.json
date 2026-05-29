@@ -1,0 +1,26 @@
+{
+  "version": "patchline.artifact-study-expected/v1",
+  "suite": "strict-migration-corpus",
+  "suite_hash": "69a6ab84eb6f6b7c810a34726f08b976470f496e25caacdc4fc3a379f769e825",
+  "reports": [
+    {
+      "name": "baselines",
+      "path": "baselines.json",
+      "version": "patchline.artifact-baselines/v1",
+      "hash": "97894a1df9258a880f70bebc4464eec6505b1dbc28d93fa5b5605b15cf6efc43"
+    },
+    {
+      "name": "ablations",
+      "path": "ablations.json",
+      "version": "patchline.artifact-ablations/v1",
+      "hash": "3c0ffa6f3d514a5d12bfbd6300579124f10e913950f6e0daefbefb7d239089fd"
+    },
+    {
+      "name": "scale",
+      "path": "scale.json",
+      "version": "patchline.artifact-scale/v1",
+      "hash": "53c5a1b382804bce4fb8d22bd5299ee82328823f68da5bba3faa6e0b241ad199"
+    }
+  ],
+  "hash": "c6c5c1fa91ea230342c7cf089ac334b6ef86152b36255fc6d945e2ae59ca3d77"
+}

@@ -157,7 +157,12 @@ func EvaluateBaselines(spec bench.Spec, baseDir string) (BaselineReport, error) 
 		},
 	}
 	report.Markdown = renderBaselineMarkdown(report)
-	report.Hash = canonical.Hash(struct {
+	report.Hash = baselineHash(report)
+	return report, nil
+}
+
+func baselineHash(report BaselineReport) string {
+	return canonical.Hash(struct {
 		Version      string         `json:"version"`
 		Suite        string         `json:"suite"`
 		SuiteHash    string         `json:"suite_hash"`
@@ -166,7 +171,6 @@ func EvaluateBaselines(spec bench.Spec, baseDir string) (BaselineReport, error) 
 		CaseAnalyses []CaseAnalysis `json:"case_analyses"`
 		Findings     []string       `json:"findings"`
 	}{report.Version, report.Suite, report.SuiteHash, report.Patchline, report.Baselines, report.CaseAnalyses, report.Findings})
-	return report, nil
 }
 
 func RunAblations(spec bench.Spec, baseDir string) (AblationReport, error) {
@@ -191,13 +195,17 @@ func RunAblations(spec bench.Spec, baseDir string) (AblationReport, error) {
 		},
 	}
 	report.Markdown = renderAblationMarkdown(report)
-	report.Hash = canonical.Hash(struct {
+	report.Hash = ablationHash(report)
+	return report, nil
+}
+
+func ablationHash(report AblationReport) string {
+	return canonical.Hash(struct {
 		Version  string         `json:"version"`
 		Suite    string         `json:"suite"`
 		Modes    []AblationMode `json:"modes"`
 		Findings []string       `json:"findings"`
 	}{report.Version, report.Suite, report.Modes, report.Findings})
-	return report, nil
 }
 
 func MeasureScale(spec bench.Spec, baseDir string) (ScaleReport, error) {
