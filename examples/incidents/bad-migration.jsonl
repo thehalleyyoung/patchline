@@ -1,0 +1,7 @@
+{"type":"deploy","id":"deploy:2026-05-29T12:00Z","commit":"commit:8f3c2ab","service":"billing-api"}
+{"type":"migration","id":"migration:20260529_bad_invoice_backfill","deploy":"deploy:2026-05-29T12:00Z","name":"bad invoice total backfill"}
+{"type":"trace","id":"trace:7a44-billing-backfill","migration":"migration:20260529_bad_invoice_backfill"}
+{"type":"sql_mutation","id":"sql:update_invoice_totals","trace":"trace:7a44-billing-backfill","fingerprint":"update invoices set total_cents = ? where status = ?"}
+{"type":"row_mutation","record":"record:invoices/inv_1002","sql":"sql:update_invoice_totals","before":{"total_cents":"4200"},"after":{"total_cents":"0"}}
+{"type":"derived_record","from":"record:invoices/inv_1002","to":"record:ledger_entries/le_777"}
+{"type":"derived_report","from":"record:ledger_entries/le_777","to":"report:monthly_revenue"}

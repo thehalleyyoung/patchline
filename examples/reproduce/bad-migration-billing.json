@@ -1,0 +1,40 @@
+{
+  "version": "patchline.reproduce/v1",
+  "name": "bad-migration-billing",
+  "repair_manifest": "../repairs/repair-bad-invoice-backfill.json",
+  "expected_report_hash": "98353fadab4e19af5a1d51aefd08dd6425b2f7aa8d1898c183fdbf1cac0a75ab",
+  "expected_ledger_checkpoint": {
+    "count": 2,
+    "tip_hash": "c6e87ee83146c7fd43d1e652d1d19a367e683380b1f5d3ed077a87c299d8872c"
+  },
+  "checks": [
+    {
+      "kind": "max_changed_rows",
+      "expect": "1"
+    },
+    {
+      "kind": "operation_effect_equals",
+      "ref": "restore-invoice-total",
+      "expect": "reversible_update"
+    },
+    {
+      "kind": "changed_row_equals",
+      "ref": "invoices/inv_1002.total_cents",
+      "expect": "4200"
+    },
+    {
+      "kind": "changed_row_equals",
+      "ref": "invoices/inv_1002.repair_marker",
+      "expect": "inc_bad_migration_001"
+    },
+    {
+      "kind": "downstream_contains",
+      "ref": "report:monthly_revenue",
+      "expect": "true"
+    },
+    {
+      "kind": "no_unscoped_updates",
+      "expect": "true"
+    }
+  ]
+}

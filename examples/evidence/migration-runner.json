@@ -1,0 +1,15 @@
+{
+  "tool": "goose",
+  "deploy_id": "2026-05-29T12:00Z",
+  "commit": "8f3c2ab",
+  "service": "billing-api",
+  "migrations": [
+    {
+      "version": "20260529_bad_invoice_backfill",
+      "name": "bad invoice total backfill",
+      "status": "applied",
+      "trace_id": "runner-991",
+      "sql_fingerprint": "UPDATE invoices SET total_cents = ? WHERE status = ?"
+    }
+  ]
+}

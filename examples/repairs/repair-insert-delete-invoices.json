@@ -1,0 +1,55 @@
+{
+  "version": "patchline.repair/v1",
+  "name": "repair-insert-delete-invoices",
+  "incident": "inc_invoice_row_shape_001",
+  "scope": {
+    "table": "invoices",
+    "where": {
+      "status": "issued"
+    }
+  },
+  "preconditions": [
+    {
+      "kind": "sql",
+      "expr": "select count(*) from invoices where id in ('inv_1001', 'inv_1003')",
+      "expect": "1"
+    }
+  ],
+  "operations": [
+    {
+      "id": "insert-missing-invoice",
+      "kind": "insert",
+      "table": "invoices",
+      "set": {
+        "customer_id": "cus_003",
+        "expected_total_cents": "9900",
+        "id": "inv_1003",
+        "status": "issued",
+        "total_cents": "9900"
+      }
+    },
+    {
+      "id": "delete-stale-invoice",
+      "kind": "delete",
+      "table": "invoices",
+      "where": {
+        "id": "inv_1001",
+        "status": "issued"
+      },
+      "depends_on": [
+        "insert-missing-invoice"
+      ]
+    }
+  ],
+  "postconditions": [
+    {
+      "kind": "sql",
+      "expr": "select count(*) from invoices where id = 'inv_1003' and total_cents = 9900",
+      "expect": "1"
+    }
+  ],
+  "rollback": {
+    "strategy": "snapshot",
+    "snapshot_required": true
+  }
+}

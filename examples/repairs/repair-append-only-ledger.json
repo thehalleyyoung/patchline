@@ -1,0 +1,53 @@
+{
+  "version": "patchline.repair/v1",
+  "name": "repair-append-only-ledger",
+  "incident": "inc_append_only_001",
+  "scope": {
+    "table": "ledger_events",
+    "where": {
+      "compensates": "evt_bad_001"
+    }
+  },
+  "preconditions": [
+    {
+      "kind": "sql",
+      "expr": "select count(*) from ledger_events where id = 'evt_bad_001'",
+      "expect": "1"
+    }
+  ],
+  "operations": [
+    {
+      "id": "compensate-ledger-event",
+      "kind": "append-log",
+      "table": "ledger_events",
+      "set": {
+        "target": "ledger_events",
+        "compensates": "evt_bad_001",
+        "amount_cents": "-4200"
+      }
+    },
+    {
+      "id": "enqueue-reconciliation",
+      "kind": "enqueue",
+      "table": "billing_reconciliation_queue",
+      "set": {
+        "target": "billing_reconciliation_queue",
+        "idempotency_key": "inc_append_only_001:evt_bad_001"
+      },
+      "depends_on": [
+        "compensate-ledger-event"
+      ]
+    }
+  ],
+  "postconditions": [
+    {
+      "kind": "sql",
+      "expr": "select count(*) from ledger_events where compensates = 'evt_bad_001'",
+      "expect": "1"
+    }
+  ],
+  "rollback": {
+    "strategy": "manual",
+    "snapshot_required": false
+  }
+}

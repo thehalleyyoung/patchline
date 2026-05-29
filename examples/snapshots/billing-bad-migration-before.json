@@ -1,0 +1,20 @@
+{
+  "tables": {
+    "invoices": {
+      "inv_1001": {
+        "customer_id": "cus_001",
+        "expected_total_cents": "1500",
+        "id": "inv_1001",
+        "status": "issued",
+        "total_cents": "1500"
+      },
+      "inv_1002": {
+        "customer_id": "cus_002",
+        "expected_total_cents": "4200",
+        "id": "inv_1002",
+        "status": "issued",
+        "total_cents": "0"
+      }
+    }
+  }
+}

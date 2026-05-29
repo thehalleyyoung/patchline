@@ -1,0 +1,185 @@
+# Patchline
+
+Patchline is a deterministic repair control plane for production data incidents.
+
+It connects deploys, traces, migrations, SQL mutations, queue events, and corrupted records into a provenance graph, then helps operators validate, dry-run, verify, audit, and roll back repairs.
+
+**No AI. No guesses.** Patchline is intentionally built from inspectable mechanisms: typed provenance, effect inference, invariant checks, replayable repair manifests, stable canonical output, and hash-chained audit records.
+
+## Why this repo exists
+
+Production data failures rarely stay inside one layer. A bad migration corrupts rows, a queue replay duplicates ledger entries, a deploy changes validation, and a dashboard quietly reports the wrong number. Patchline treats those failures as software-engineering incidents with causal evidence, not as one-off SQL cleanups.
+
+The first scaffold in this repo focuses on a small but real core:
+
+| Area | What exists now |
+| --- | --- |
+| Provenance graph | Typed entities and edges plus deterministic cause reports, minimal explanations, blast radius, incident-shape diffing, and causal certificates |
+| Evidence ingestion | JSONL operational evidence ingest plus deterministic trace reconstruction with confidence and clock uncertainty |
+| Repair manifests | JSON repair DSL with semantic validation, Hoare-style proof obligations, frame checks, and SQL refinement checks |
+| Solver obligations | Bounded SMT-style scope/frame proofs plus finite-store row-count and invariant-preservation checks |
+| Symbolic execution | Bounded repair-program row paths with guard constraints, symbolic assignments, and stuck-step hashes |
+| Workflow model checking | Bounded ingest/explain/approve/dry-run/apply/verify/rollback/audit/archive state exploration with temporal properties, proof holes, and counterexample fixtures |
+| Effect inference | A deterministic effect lattice and abstract interpreter over replay diffs |
+| Migration analysis | SQL migration triage plus schema-state diffing, typed relational-signature semantics, and source-code SQL extraction |
+| Replay sandbox | In-memory and imported-snapshot dry-run engine that emits stable row diffs, compensating-action semantics, and snapshot drift reports |
+| Attestation checks | Executable checks for row diffs, operation effects, blast radius, downstream impact, and hashes |
+| Reproducibility artifacts | Benchmark-style manifests that pin dry-run hashes and ledger checkpoints |
+| Strict benchmark suites | Frozen corpora with labels, pinned analyzer hashes, precision, and recall |
+| CI gate | PR-friendly benchmark gate with precision/recall floors, GitHub Actions summaries, and annotations |
+| Policy gates and bundles | Deterministic review policies plus proof-carrying incident bundle manifests for handoff |
+| Audit ledger | Hash-chained repair ledger with checkpoint verification |
+| Semantic contract | Hashable state/observation/repair contract plus conformance audit over historical artifacts |
+| CLI | Commands for explanation, validation, dry-run replay, graph slicing, policy evaluation, bundles, benchmarks, and ledger verification |
+
+See [`docs/rise-research-agenda.md`](docs/rise-research-agenda.md) for the research positioning.
+See [`docs/current-operations.md`](docs/current-operations.md) for the current SRE and CI workflow positioning.
+See [`docs/evidence-jsonl.md`](docs/evidence-jsonl.md) for the telemetry bridge format.
+See [`docs/repair-manifests.md`](docs/repair-manifests.md) for migration, template, and lint tooling.
+See [`docs/effect-lattice.md`](docs/effect-lattice.md) for the deterministic effect lattice and abstraction relation.
+See [`docs/invariants.md`](docs/invariants.md) for invariant declarations, before/after checks, and candidate discovery.
+See [`docs/solver-obligations.md`](docs/solver-obligations.md) for bounded SMT-style proof obligations.
+See [`docs/symbolic-execution.md`](docs/symbolic-execution.md) for bounded repair-program path constraints.
+See [`docs/workflow-model-checking.md`](docs/workflow-model-checking.md) for temporal incident workflow checks and proof holes.
+See [`docs/replay-semantics.md`](docs/replay-semantics.md) for small-step traces, commutativity/confluence checks, and isolation hazards.
+See [`docs/migration-analysis.md`](docs/migration-analysis.md) for generic and dialect-specific SQL migration analysis.
+See [`docs/schema-semantics.md`](docs/schema-semantics.md) for schema diffs and relational-signature migration semantics.
+See [`docs/source-sql-extraction.md`](docs/source-sql-extraction.md) for embedded SQL and ORM/query-builder extraction.
+See [`docs/migration-outcomes.md`](docs/migration-outcomes.md) for migration outcome histories and semantic changelogs.
+See [`docs/semantics.md`](docs/semantics.md) for the semantic contract, state model, observation model, and conformance audit.
+
+## Quick start
+
+```bash
+go test ./...
+go run ./cmd/patchline about
+go run ./cmd/patchline semantics-contract
+go run ./cmd/patchline semantics-audit
+go run ./cmd/patchline trace-reconstruct examples/incidents/bad-migration.jsonl
+go run ./cmd/patchline provenance certificate record:invoices/inv_1002 --evidence examples/incidents/bad-migration.jsonl
+go run ./cmd/patchline explain record:invoices/inv_1002
+go run ./cmd/patchline validate-repair examples/repairs/repair-bad-invoice-backfill.json
+go run ./cmd/patchline lint-repair examples/repairs/repair-bad-invoice-backfill.json --proof
+go run ./cmd/patchline solver-obligations examples/repairs/repair-bad-invoice-backfill.json --invariants examples/invariants/billing-core.json
+go run ./cmd/patchline symbolic-exec examples/repairs/repair-bad-invoice-backfill.json
+go run ./cmd/patchline model-check-workflow examples/workflows/bad-migration-approved.json
+go run ./cmd/patchline analyze-migration demos/billing/migrations/002_bad_backfill.sql
+go run ./cmd/patchline analyze-migration examples/migrations/sqlserver-top-delete.sql --dialect sqlserver
+go run ./cmd/patchline schema-diff demos/billing/migrations/001_schema.sql examples/schemas/empty.json examples/schemas/billing-v1.json
+go run ./cmd/patchline migration-semantics demos/billing/migrations/001_schema.sql examples/schemas/empty.json
+go run ./cmd/patchline extract-sql examples/source-sql
+go run ./cmd/patchline migration-outcomes examples/incidents/bad-migration.jsonl demos/billing/migrations/002_bad_backfill.sql --repair examples/repairs/repair-bad-invoice-backfill.json --policy examples/policies/review-required.json --benchmark examples/benchmarks/strict-migration-corpus.json --source-sql examples/source-sql
+go run ./cmd/patchline dry-run examples/repairs/repair-bad-invoice-backfill.json --json
+go run ./cmd/patchline repair-semantics examples/repairs/repair-bad-invoice-backfill.json
+go run ./cmd/patchline repair-semantics examples/repairs/repair-bad-invoice-backfill.json --store examples/snapshots/billing-bad-migration-before.json
+go run ./cmd/patchline snapshot-drift examples/repairs/repair-bad-invoice-backfill.json examples/snapshots/billing-bad-migration-before.json examples/snapshots/billing-bad-migration-before.json
+go run ./cmd/patchline effect-summary examples/repairs/repair-bad-invoice-backfill.json
+go run ./cmd/patchline check-invariants examples/repairs/repair-bad-invoice-backfill.json examples/invariants/billing-core.json
+go run ./cmd/patchline reproduce examples/reproduce/bad-migration-billing.json
+go run ./cmd/patchline evaluate-policy examples/policies/review-required.json examples/repairs/repair-bad-invoice-backfill.json demos/billing/migrations/002_bad_backfill.sql
+go run ./cmd/patchline benchmark-suite examples/benchmarks/strict-migration-corpus.json
+go run ./cmd/patchline adapt-evidence otlp examples/evidence/otlp-span-export.json --out /tmp/patchline-events.jsonl
+go run ./cmd/patchline adapt-evidence postgres examples/evidence/postgres-logical-decoding.json --out /tmp/patchline-events.jsonl
+go run ./cmd/patchline ingest-evidence examples/incidents/bad-migration.jsonl
+go run ./cmd/patchline ingest-evidence examples/incidents/bad-migration.jsonl --out /tmp/patchline-graph.json
+go run ./cmd/patchline explain report:monthly_revenue --graph /tmp/patchline-graph.json
+go run ./cmd/patchline ci-gate examples/benchmarks/strict-migration-corpus.json --min-precision 0.95 --min-recall 0.95
+go run ./cmd/patchline ledger-verify --json
+```
+
+Or:
+
+```bash
+make test
+make demo
+```
+
+## Example dry run
+
+The included billing scenario models a faulty invoice backfill. Patchline can trace the bad row back to the migration and compute the deterministic repair diff:
+
+```bash
+go run ./cmd/patchline explain record:invoices/inv_1002
+go run ./cmd/patchline analyze-migration demos/billing/migrations/002_bad_backfill.sql
+go run ./cmd/patchline dry-run examples/repairs/repair-bad-invoice-backfill.json
+go run ./cmd/patchline benchmark examples/reproduce/bad-migration-billing.json
+go run ./cmd/patchline benchmark-suite examples/benchmarks/strict-migration-corpus.json
+```
+
+The benchmark artifact pins the expected dry-run hash and ledger checkpoint, then verifies invariant-style checks such as changed row values, max changed rows, operation effect, downstream impact, and scoped updates.
+
+The benchmark suite adds a stricter corpus-level signal: every case has a human label and pinned migration-analysis hash, and the runner reports precision and recall. See [`docs/strict-benchmarking.md`](docs/strict-benchmarking.md) for the real-world validation protocol.
+
+For current SRE/platform workflows, Patchline can also ingest incident evidence JSONL and run as a PR gate:
+
+```bash
+go run ./cmd/patchline adapt-evidence datadog examples/evidence/datadog-span-export.json --out /tmp/patchline-events.jsonl
+go run ./cmd/patchline adapt-evidence github examples/evidence/github-deployments.json --out /tmp/patchline-deploys.jsonl
+go run ./cmd/patchline adapt-evidence migration-runner examples/evidence/migration-runner.json --out /tmp/patchline-migrations.jsonl
+go run ./cmd/patchline ingest-evidence /tmp/patchline-events.jsonl --out /tmp/patchline-adapted-graph.json
+go run ./cmd/patchline ingest-evidence examples/incidents/bad-migration.jsonl --out /tmp/patchline-graph.json
+go run ./cmd/patchline trace-reconstruct examples/incidents/bad-migration.jsonl
+go run ./cmd/patchline trace-equivalence examples/incidents/bad-migration.jsonl examples/incidents/bad-migration.jsonl
+go run ./cmd/patchline provenance cause record:invoices/inv_1002 --evidence examples/incidents/bad-migration.jsonl
+go run ./cmd/patchline provenance blast record:invoices/inv_1002 --evidence examples/incidents/bad-migration.jsonl
+go run ./cmd/patchline provenance diff examples/incidents/bad-migration.jsonl examples/incidents/bad-migration.jsonl
+go run ./cmd/patchline provenance archive examples/incidents/bad-migration.jsonl examples/incidents/bad-migration.jsonl
+go run ./cmd/patchline slice record:invoices/inv_1002 --graph /tmp/patchline-graph.json --json
+go run ./cmd/patchline lint-repair examples/repairs/repair-bad-invoice-backfill.json
+go run ./cmd/patchline lint-repair examples/repairs/repair-bad-invoice-backfill.json --proof --json
+go run ./cmd/patchline generate-sql examples/repairs/repair-bad-invoice-backfill.json
+go run ./cmd/patchline repair-semantics examples/repairs/repair-bad-invoice-backfill.json --json
+go run ./cmd/patchline effect-summary examples/repairs/repair-bad-invoice-backfill.json --json
+go run ./cmd/patchline discover-invariants examples/repairs/repair-bad-invoice-backfill.json --json
+go run ./cmd/patchline rollback-plan examples/repairs/repair-bad-invoice-backfill.json
+go run ./cmd/patchline transaction-plan examples/repairs/repair-bad-invoice-backfill.json
+go run ./cmd/patchline ci-gate examples/benchmarks/strict-migration-corpus.json --min-precision 0.95 --min-recall 0.95
+```
+
+The adapter path converts current OTLP, Datadog, Postgres logical decoding, GitHub deployment/release, and migration-runner JSON exports into Patchline evidence JSONL. Ingest intentionally accepts extra source-system fields while validating required Patchline evidence fields, so operational exports can be converted without losing auditability.
+
+`trace-reconstruct` turns those same JSONL files into a typed trace projection with source confidence, clock confidence, normalized event-time intervals, and a semantic projection hash. `trace-equivalence` compares two imports by reconstructed projection instead of by raw line order or JSON field order.
+
+The `provenance` subcommands turn historical traces into immediately reviewable artifacts: minimal causes, common ancestors, affected observations, semiring evidence summaries, smallest causal slices, differential provenance between incidents, recurring shape buckets, blast-radius summaries, and causal certificates with missing-evidence holes.
+
+Repair manifests also have operational tooling:
+
+```bash
+go run ./cmd/patchline migrate-repair examples/repairs/legacy-v0-repair.json
+go run ./cmd/patchline template-repair row-restore
+go run ./cmd/patchline lint-repair examples/repairs/repair-bad-invoice-backfill.json --json
+go run ./cmd/patchline lint-repair examples/repairs/repair-bad-invoice-backfill.json --proof --json
+go run ./cmd/patchline generate-sql examples/repairs/repair-bad-invoice-backfill.json --json
+go run ./cmd/patchline rollback-plan examples/repairs/repair-bad-invoice-backfill.json --json
+go run ./cmd/patchline transaction-plan examples/repairs/repair-bad-invoice-backfill.json --json
+```
+
+The linter emits deterministic severity, code, reference, and remediation fields so repair review can be automated without making the manifest format loose. With `--proof`, it also emits a hashable Hoare-triple view, weakest preconditions, syntactic frame conditions, and SQL refinement checks, separating checked facts from assumed database obligations. SQL, rollback-plan, and transaction-plan generation are hashable and require the manifest to pass lint before producing executable statements, including scoped insert/delete repairs.
+
+## Repository layout
+
+```text
+cmd/patchline/          CLI entrypoint
+internal/provenance/   Typed causal graph and deterministic incident analysis
+internal/evidence/     Operational evidence ingestion, adapters, and trace reconstruction
+internal/effects/      Deterministic repair-effect inference
+internal/migration/    SQL migration lexical analyzer and risk classifier
+internal/repair/       Repair manifest parser and validator
+internal/replay/       Dry-run state model and canonical reports
+internal/attest/       Executable reproducibility and invariant checks
+internal/ledger/       Hash-chained audit ledger
+internal/reproduce/    Benchmark/reproducibility runner
+internal/bench/        Strict corpus benchmark runner
+internal/gate/         CI threshold gate over benchmark suites
+internal/policy/       Deterministic repair policy gates
+internal/bundle/       Incident bundle manifests
+internal/semantics/    Semantic contract and conformance audit artifacts
+internal/demo/         Reproducible billing incident fixture
+examples/              Incident and repair manifests
+demos/billing/         SQL migration scenario
+docs/                  Architecture, DSL, provenance, and RiSE research notes
+```
+
+## Status
+
+This is a working deterministic core and demo harness, not yet the full production system. The next natural expansions are a native OTLP receiver, Datadog API import, Postgres logical decoding, static SQL extraction, and a web incident cockpit.

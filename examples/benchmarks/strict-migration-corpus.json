@@ -1,0 +1,18 @@
+{
+  "version": "patchline.benchmark-suite/v1",
+  "name": "strict-migration-corpus",
+  "cases": [
+    {
+      "id": "billing-bad-backfill",
+      "path": "../../demos/billing/migrations/002_bad_backfill.sql",
+      "label": "unsafe",
+      "expected_report_hash": "0be915737d677c0d06eae943c9293f175c19ca855acb225d93c06de803f39fbe"
+    },
+    {
+      "id": "billing-corrective-repair",
+      "path": "../../demos/billing/migrations/003_corrective_repair.sql",
+      "label": "safe",
+      "expected_report_hash": "18a77ee5fc7f015c299f1d949e2d5edcc849e976d13f2d4d61ed2e24c168a640"
+    }
+  ]
+}

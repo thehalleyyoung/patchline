@@ -1,0 +1,48 @@
+{
+  "version": "patchline.repair/v1",
+  "name": "repair-bad-invoice-backfill",
+  "incident": "inc_bad_migration_001",
+  "scope": {
+    "entities": [
+      "migration:20260529_bad_invoice_backfill",
+      "record:invoices/inv_1002"
+    ],
+    "table": "invoices",
+    "where": {
+      "id": "inv_1002"
+    }
+  },
+  "preconditions": [
+    {
+      "kind": "sql",
+      "expr": "select count(*) from invoices where id = 'inv_1002' and total_cents = 0",
+      "expect": "1"
+    }
+  ],
+  "operations": [
+    {
+      "id": "restore-invoice-total",
+      "kind": "update",
+      "table": "invoices",
+      "where": {
+        "id": "inv_1002",
+        "total_cents": "0"
+      },
+      "set": {
+        "repair_marker": "inc_bad_migration_001",
+        "total_cents": "4200"
+      }
+    }
+  ],
+  "postconditions": [
+    {
+      "kind": "sql",
+      "expr": "select count(*) from invoices where id = 'inv_1002' and total_cents = 4200",
+      "expect": "1"
+    }
+  ],
+  "rollback": {
+    "strategy": "snapshot",
+    "snapshot_required": true
+  }
+}

@@ -1,0 +1,27 @@
+{
+  "version": "patchline.workflow-model/v1",
+  "name": "bad-migration-approved",
+  "bound": 9,
+  "evidence_hash": "bad-migration-evidence",
+  "manifest_hash": "repair-bad-invoice-backfill",
+  "policy_hash": "review-required",
+  "dry_run_hash": "bad-migration-dry-run",
+  "semantic_audit_hash": "bad-migration-semantic-audit",
+  "bundle_hash": "bad-migration-proof-bundle",
+  "ledger_checkpoint": {
+    "count": 2,
+    "tip_hash": "bad-migration-ledger-tip"
+  },
+  "policy_allowed": true,
+  "rollback_available": true,
+  "witness": [
+    "ingest",
+    "explain",
+    "dry_run",
+    "approve",
+    "apply",
+    "verify",
+    "audit",
+    "archive"
+  ]
+}

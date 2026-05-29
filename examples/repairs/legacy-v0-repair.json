@@ -1,0 +1,29 @@
+{
+  "version": "patchline.repair/v0",
+  "title": "legacy bad invoice backfill repair",
+  "incident_id": "incident:billing-2026-05-29",
+  "affected_entities": [
+    "record:invoices/inv_1002"
+  ],
+  "table": "invoices",
+  "where": {
+    "id": "inv_1002"
+  },
+  "rollback_snapshot": true,
+  "checks": [
+    {
+      "kind": "sql",
+      "expr": "select total_cents from invoices where id = 'inv_1002'",
+      "expect": "0"
+    }
+  ],
+  "steps": [
+    {
+      "name": "restore_total",
+      "action": "update",
+      "values": {
+        "total_cents": "4200"
+      }
+    }
+  ]
+}

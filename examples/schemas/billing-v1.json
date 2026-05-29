@@ -1,0 +1,16 @@
+{
+  "version": "patchline.schema/v1",
+  "tables": [
+    {
+      "name": "invoices",
+      "columns": [
+        {"name": "customer_id", "type": "text"},
+        {"name": "expected_total_cents", "type": "integer"},
+        {"name": "id", "type": "text"},
+        {"name": "repair_marker", "type": "text"},
+        {"name": "status", "type": "text"},
+        {"name": "total_cents", "type": "integer"}
+      ]
+    }
+  ]
+}

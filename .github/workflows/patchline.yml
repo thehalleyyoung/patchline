@@ -1,0 +1,20 @@
+name: patchline
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+
+jobs:
+  repair-safety:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+      - name: Test
+        run: go test ./...
+      - name: Strict benchmark gate
+        run: go run ./cmd/patchline ci-gate examples/benchmarks/strict-migration-corpus.json --min-precision 0.95 --min-recall 0.95

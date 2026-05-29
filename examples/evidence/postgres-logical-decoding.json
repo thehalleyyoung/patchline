@@ -1,0 +1,33 @@
+{
+  "patchline_migration_id": "20260529_bad_invoice_backfill",
+  "patchline_deploy_id": "2026-05-29T12:00Z",
+  "commit": "8f3c2ab",
+  "service": "billing-api",
+  "xid": 991,
+  "lsn": "0/16B6C50",
+  "change": [
+    {
+      "kind": "update",
+      "schema": "public",
+      "table": "invoices",
+      "columnnames": [
+        "id",
+        "status",
+        "total_cents"
+      ],
+      "columnvalues": [
+        "inv_1002",
+        "open",
+        "0"
+      ],
+      "oldkeys": {
+        "keynames": [
+          "id"
+        ],
+        "keyvalues": [
+          "inv_1002"
+        ]
+      }
+    }
+  ]
+}

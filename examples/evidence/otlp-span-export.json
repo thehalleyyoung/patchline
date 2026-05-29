@@ -1,0 +1,59 @@
+{
+  "resourceSpans": [
+    {
+      "resource": {
+        "attributes": [
+          {
+            "key": "service.name",
+            "value": {
+              "stringValue": "billing-api"
+            }
+          },
+          {
+            "key": "git.commit.sha",
+            "value": {
+              "stringValue": "8f3c2ab"
+            }
+          },
+          {
+            "key": "patchline.deploy_id",
+            "value": {
+              "stringValue": "2026-05-29T12:00Z"
+            }
+          }
+        ]
+      },
+      "scopeSpans": [
+        {
+          "spans": [
+            {
+              "traceId": "7a44",
+              "spanId": "billing-backfill",
+              "name": "UPDATE invoices SET total_cents = ?",
+              "attributes": [
+                {
+                  "key": "patchline.migration_id",
+                  "value": {
+                    "stringValue": "20260529_bad_invoice_backfill"
+                  }
+                },
+                {
+                  "key": "db.statement",
+                  "value": {
+                    "stringValue": "UPDATE invoices SET total_cents = ? WHERE status = ?"
+                  }
+                },
+                {
+                  "key": "patchline.record_id",
+                  "value": {
+                    "stringValue": "invoices/inv_1002"
+                  }
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

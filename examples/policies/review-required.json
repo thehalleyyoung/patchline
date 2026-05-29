@@ -1,0 +1,12 @@
+{
+  "version": "patchline.policy/v1",
+  "name": "review-required",
+  "rules": {
+    "require_snapshot_rollback": true,
+    "max_changed_rows": 1,
+    "allow_high_risk_migration": true,
+    "require_pinned_report_hash": true,
+    "allowed_effects": ["reversible_update"],
+    "require_ledger_checkpoint": true
+  }
+}

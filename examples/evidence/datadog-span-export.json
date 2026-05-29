@@ -1,0 +1,26 @@
+{
+  "events": [
+    {
+      "id": "20260529",
+      "title": "deploy billing-api",
+      "tags": [
+        "service:billing-api",
+        "git.commit.sha:8f3c2ab",
+        "patchline.deploy_id:2026-05-29T12:00Z"
+      ]
+    }
+  ],
+  "spans": [
+    {
+      "trace_id": "7a44",
+      "span_id": "billing-backfill",
+      "resource": "UPDATE invoices SET total_cents = ?",
+      "meta": {
+        "patchline.migration_id": "20260529_bad_invoice_backfill",
+        "patchline.deploy_id": "2026-05-29T12:00Z",
+        "db.statement": "UPDATE invoices SET total_cents = ? WHERE status = ?",
+        "patchline.record_id": "invoices/inv_1002"
+      }
+    }
+  ]
+}

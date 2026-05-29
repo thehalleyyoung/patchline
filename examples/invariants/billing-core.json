@@ -1,0 +1,34 @@
+{
+  "version": "patchline.invariants/v1",
+  "name": "billing-core",
+  "invariants": [
+    {
+      "id": "invoices-id-unique",
+      "kind": "unique",
+      "table": "invoices",
+      "column": "id"
+    },
+    {
+      "id": "invoice-total-nonnegative",
+      "kind": "nonnegative",
+      "table": "invoices",
+      "column": "total_cents"
+    },
+    {
+      "id": "invoice-status-enum",
+      "kind": "enum",
+      "table": "invoices",
+      "column": "status",
+      "values": [
+        "issued",
+        "paid"
+      ]
+    },
+    {
+      "id": "invoices-count",
+      "kind": "count",
+      "table": "invoices",
+      "expect": "2"
+    }
+  ]
+}
