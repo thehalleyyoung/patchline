@@ -21,6 +21,7 @@ verify-usefulness: test gate public-corpus
 	go run ./cmd/patchline semantics-audit --json
 	go run ./cmd/patchline archive-index examples/archive/bad-migration-corpus.json --json
 	go run ./cmd/patchline archive-query examples/archive/bad-migration-corpus.json --json
+	go run ./cmd/patchline repair-outcomes examples/archive/bad-migration-corpus.json --json
 	go run ./cmd/patchline historical-failures examples/historical-failures/suite.json --json
 	bash scripts/verify-historical-sources.sh examples/historical-failures/suite.json
 

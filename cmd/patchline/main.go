@@ -102,13 +102,18 @@ func run(args []string) error {
 		return archiveIndex(args[1], hasFlag(args[2:], "--json"))
 	case "archive-query":
 		if len(args) < 2 {
-			return errors.New("usage: patchline archive-query <archive-spec.json> [broad-updates|damaged-reports|missing-rollback|all] [--json]")
+			return errors.New("usage: patchline archive-query <archive-spec.json> [broad-updates|damaged-reports|missing-rollback|repair-outcomes|all] [--json]")
 		}
 		query := "all"
 		if len(args) >= 3 && !strings.HasPrefix(args[2], "--") {
 			query = args[2]
 		}
 		return archiveQuery(args[1], query, hasFlag(args[2:], "--json"))
+	case "repair-outcomes":
+		if len(args) < 2 {
+			return errors.New("usage: patchline repair-outcomes <archive-spec.json> [--json]")
+		}
+		return repairOutcomes(args[1], hasFlag(args[2:], "--json"))
 	case "historical-failures":
 		if len(args) < 2 {
 			return errors.New("usage: patchline historical-failures <suite.json> [--json]")
@@ -336,7 +341,8 @@ Usage:
   patchline provenance diff <left-evidence.jsonl> <right-evidence.jsonl> [--json]
   patchline provenance archive <evidence.jsonl>... [--json]
   patchline archive-index <archive-spec.json> [--json]
-  patchline archive-query <archive-spec.json> [broad-updates|damaged-reports|missing-rollback|all] [--json]
+  patchline archive-query <archive-spec.json> [broad-updates|damaged-reports|missing-rollback|repair-outcomes|all] [--json]
+  patchline repair-outcomes <archive-spec.json> [--json]
   patchline historical-failures <suite.json> [--json]
   patchline demo-graph
   patchline explain <entity-id> [--graph graph.json]
@@ -729,6 +735,8 @@ func archiveQuery(specPath, query string, jsonOut bool) error {
 			return writeJSON(os.Stdout, report.HistoricalQueries.DamagedDerivedReports)
 		case "missing-rollback":
 			return writeJSON(os.Stdout, report.HistoricalQueries.RepairsLackingRollback)
+		case "repair-outcomes":
+			return writeJSON(os.Stdout, report.HistoricalQueries.RepairOutcomeHistory)
 		default:
 			return fmt.Errorf("unknown archive query %q", query)
 		}
@@ -738,16 +746,31 @@ func archiveQuery(specPath, query string, jsonOut bool) error {
 		printBroadUpdateQuery(report.HistoricalQueries.BroadUpdateMigrations)
 		printDamagedReportQuery(report.HistoricalQueries.DamagedDerivedReports)
 		printMissingRollbackQuery(report.HistoricalQueries.RepairsLackingRollback)
+		printRepairOutcomes(report.HistoricalQueries.RepairOutcomeHistory)
 	case "broad-updates":
 		printBroadUpdateQuery(report.HistoricalQueries.BroadUpdateMigrations)
 	case "damaged-reports":
 		printDamagedReportQuery(report.HistoricalQueries.DamagedDerivedReports)
 	case "missing-rollback":
 		printMissingRollbackQuery(report.HistoricalQueries.RepairsLackingRollback)
+	case "repair-outcomes":
+		printRepairOutcomes(report.HistoricalQueries.RepairOutcomeHistory)
 	default:
 		return fmt.Errorf("unknown archive query %q", query)
 	}
 	fmt.Printf("archive query hash=%s\n", report.HistoricalQueries.Hash)
+	return nil
+}
+
+func repairOutcomes(specPath string, jsonOut bool) error {
+	report, err := buildArchiveReport(specPath)
+	if err != nil {
+		return err
+	}
+	if jsonOut {
+		return writeJSON(os.Stdout, report.RepairOutcomes)
+	}
+	printRepairOutcomes(report.RepairOutcomes)
 	return nil
 }
 
@@ -829,6 +852,31 @@ func printMissingRollbackQuery(results []archive.MissingRollbackResult) {
 	}
 }
 
+func printRepairOutcomes(results []archive.RepairOutcome) {
+	fmt.Printf("repair_outcomes count=%d\n", len(results))
+	for _, result := range results {
+		recurrences := "-"
+		if len(result.LaterRecurrences) > 0 {
+			recurrences = strings.Join(result.LaterRecurrences, ",")
+		}
+		fmt.Printf("  %s verification=%s rollback=%t dry_run=%s applied_sql=%s later_recurrences=%s\n",
+			result.IncidentID,
+			result.VerificationResult,
+			result.RollbackAvailable,
+			shortHash(result.DryRunHash),
+			shortHash(result.AppliedSQLHash),
+			recurrences,
+		)
+	}
+}
+
+func shortHash(hash string) string {
+	if len(hash) <= 12 {
+		return hash
+	}
+	return hash[:12]
+}
+
 func buildArchiveEntry(baseDir string, input archive.InputSpec) (archive.Entry, error) {
 	evidencePath := resolvePath(baseDir, input.Evidence)
 	migrationPath := resolvePath(baseDir, input.Migration)
@@ -856,6 +904,10 @@ func buildArchiveEntry(baseDir string, input archive.InputSpec) (archive.Entry, 
 	if err != nil {
 		return archive.Entry{}, err
 	}
+	sqlPlan, err := repair.GenerateSQL(manifest)
+	if err != nil {
+		return archive.Entry{}, err
+	}
 	effectSummary := abstractEffectSummary(manifest, dryRun)
 	policyEvaluation, err := buildPolicyEvaluation(policyPath, repairPath, migrationPath)
 	if err != nil {
@@ -871,33 +923,57 @@ func buildArchiveEntry(baseDir string, input archive.InputSpec) (archive.Entry, 
 	}
 
 	entry := archive.Entry{
-		ID:                      input.ID,
-		EvidencePath:            input.Evidence,
-		MigrationPath:           input.Migration,
-		RepairPath:              input.Repair,
-		PolicyPath:              input.Policy,
-		BenchmarkPath:           input.Benchmark,
-		EvidenceHash:            evidenceResult.InputHash,
-		ShapeHash:               provenance.ShapeHash(graph),
-		MigrationHash:           migrationReport.Summary.ReportHash,
-		MigrationTables:         migrationReport.Summary.Tables,
-		MigrationMaxRisk:        maxMigrationRisk(migrationReport),
-		MigrationBroadUpdates:   archiveBroadUpdates(migrationReport),
-		RepairHash:              canonical.Hash(manifest),
-		RepairEffect:            string(effectSummary.Join),
-		RepairRollbackAvailable: manifest.Rollback.Strategy == "snapshot" && manifest.Rollback.SnapshotRequired,
-		PolicyAllowed:           policyEvaluation.OK,
-		PolicyFailures:          collectPolicyFailures(policyEvaluation),
-		PolicyHash:              policyEvaluation.PolicyHash,
-		BenchmarkOK:             benchmarkResult.OK,
-		BenchmarkHash:           benchmarkResult.SuiteHash,
-		DamagedEntities:         len(evidenceResult.DamagedEntities),
-		DamagedEntityIDs:        sortedStrings(evidenceResult.DamagedEntities),
-		DerivedReports:          countEntitiesByKind(graph, provenance.KindReport),
-		DerivedReportIDs:        derivedReportsFromDamaged(graph, evidenceResult.DamagedEntities),
-		ProofBundleReady:        dryRun.Hash() != "" && policyEvaluation.PolicyHash != "" && benchmarkResult.SuiteHash != "",
+		ID:                       input.ID,
+		EvidencePath:             input.Evidence,
+		MigrationPath:            input.Migration,
+		RepairPath:               input.Repair,
+		PolicyPath:               input.Policy,
+		BenchmarkPath:            input.Benchmark,
+		EvidenceHash:             evidenceResult.InputHash,
+		ShapeHash:                provenance.ShapeHash(graph),
+		MigrationHash:            migrationReport.Summary.ReportHash,
+		MigrationTables:          migrationReport.Summary.Tables,
+		MigrationMaxRisk:         maxMigrationRisk(migrationReport),
+		MigrationBroadUpdates:    archiveBroadUpdates(migrationReport),
+		RepairHash:               canonical.Hash(manifest),
+		RepairEffect:             string(effectSummary.Join),
+		RepairDryRunHash:         dryRun.Hash(),
+		RepairAppliedSQLHash:     sqlPlan.Hash,
+		RepairRollbackAvailable:  manifest.Rollback.Strategy == "snapshot" && manifest.Rollback.SnapshotRequired,
+		RepairVerificationResult: repairVerificationResult(dryRun, policyEvaluation.OK, benchmarkResult.OK),
+		RepairVerificationHash: canonical.Hash(struct {
+			DryRunHash    string `json:"dry_run_hash"`
+			PolicyHash    string `json:"policy_hash"`
+			PolicyOK      bool   `json:"policy_ok"`
+			BenchmarkHash string `json:"benchmark_hash"`
+			BenchmarkOK   bool   `json:"benchmark_ok"`
+			RollbackOK    bool   `json:"rollback_ok"`
+		}{dryRun.Hash(), policyEvaluation.PolicyHash, policyEvaluation.OK, benchmarkResult.SuiteHash, benchmarkResult.OK, manifest.Rollback.Strategy == "snapshot" && manifest.Rollback.SnapshotRequired}),
+		PolicyAllowed:    policyEvaluation.OK,
+		PolicyFailures:   collectPolicyFailures(policyEvaluation),
+		PolicyHash:       policyEvaluation.PolicyHash,
+		BenchmarkOK:      benchmarkResult.OK,
+		BenchmarkHash:    benchmarkResult.SuiteHash,
+		DamagedEntities:  len(evidenceResult.DamagedEntities),
+		DamagedEntityIDs: sortedStrings(evidenceResult.DamagedEntities),
+		DerivedReports:   countEntitiesByKind(graph, provenance.KindReport),
+		DerivedReportIDs: derivedReportsFromDamaged(graph, evidenceResult.DamagedEntities),
+		ProofBundleReady: dryRun.Hash() != "" && policyEvaluation.PolicyHash != "" && benchmarkResult.SuiteHash != "",
 	}
 	return entry, nil
+}
+
+func repairVerificationResult(dryRun replay.Report, policyOK, benchmarkOK bool) string {
+	if dryRun.Hash() == "" {
+		return "failed:no-dry-run-hash"
+	}
+	if !policyOK {
+		return "failed:policy"
+	}
+	if !benchmarkOK {
+		return "failed:benchmark"
+	}
+	return "verified"
 }
 
 func archiveBroadUpdates(report migration.Report) []archive.MigrationStatement {

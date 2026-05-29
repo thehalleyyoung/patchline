@@ -9,6 +9,14 @@
       "repair": "../repairs/repair-bad-invoice-backfill.json",
       "policy": "../policies/review-required.json",
       "benchmark": "../benchmarks/strict-migration-corpus.json"
+    },
+    {
+      "id": "billing-corrective-repair",
+      "evidence": "../incidents/bad-migration.jsonl",
+      "migration": "../../demos/billing/migrations/003_corrective_repair.sql",
+      "repair": "../repairs/repair-bad-invoice-backfill.json",
+      "policy": "../policies/review-required.json",
+      "benchmark": "../benchmarks/strict-migration-corpus.json"
     }
   ]
 }

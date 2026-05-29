@@ -19,7 +19,7 @@ z3 --version
 make verify-usefulness
 ```
 
-That target runs the unit suite, strict CI gate, a SHA-verified public migration corpus benchmark, Z3-backed solver obligations, the semantic audit, the incident archive index, deterministic historical archive queries, the historical-failure suite, and public-source phrase checks. The public corpus is downloaded into `examples/public-corpus/downloads/` from pinned raw URLs and checked against `examples/public-corpus/sources.json`; the SQL files are not vendored. The GitLab 2017 case now verifies the postmortem plus linked public issue/API documents for backup monitoring, point-in-time recovery, hourly snapshots, backup-restore testing, staging migration rollback tooling, environment differentiation, and hard-delete policy gaps.
+That target runs the unit suite, strict CI gate, a SHA-verified public migration corpus benchmark, Z3-backed solver obligations, the semantic audit, the incident archive index, deterministic historical archive queries, repair outcome history, the historical-failure suite, and public-source phrase checks. The public corpus is downloaded into `examples/public-corpus/downloads/` from pinned raw URLs and checked against `examples/public-corpus/sources.json`; the SQL files are not vendored. The GitLab 2017 case now verifies the postmortem plus linked public issue/API documents for backup monitoring, point-in-time recovery, hourly snapshots, backup-restore testing, staging migration rollback tooling, environment differentiation, and hard-delete policy gaps.
 
 The expected default semantic audit result is `20` conforming artifacts and `0` counterexamples. The expected historical-failure result includes a primary-data destructive-operation case and a split-brain conflicting-write case, both backed by public postmortem source checks. If Z3 is missing, Patchline does not pretend to prove solver obligations: the solver report records the Z3 failure and downgrades those claims instead of using a handwritten SMT substitute.
 
@@ -44,7 +44,7 @@ The first scaffold in this repo focuses on a small but real core:
 | Symbolic execution | Bounded repair-program row paths with guard constraints, symbolic assignments, and stuck-step hashes |
 | Workflow model checking | Bounded ingest/explain/approve/dry-run/apply/verify/rollback/audit/archive state exploration with temporal properties, proof holes, and counterexample fixtures |
 | CEGAR refinement | Counterexample/proof-hole guided reruns that refine coarse repair abstractions with invariant specs and incident workflow models |
-| Incident archive | Deterministic archive index and historical queries over evidence, migrations, repair manifests, policies, and benchmark results, bucketed by semantic shape, broad updates, damaged-derived reports, rollback availability, and decisions |
+| Incident archive | Deterministic archive index and historical queries over evidence, migrations, repair manifests, policies, benchmark results, repair outcome hashes, rollback availability, and recurrence candidates |
 | Historical failures | Public counterfactual suite that checks postmortems, linked public issue/API records, source-derived observations, destructive primary-data mutations, rollback gaps, damaged reports, and split-brain conflicting writes |
 | Effect inference | A deterministic effect lattice and abstract interpreter over replay diffs |
 | Migration analysis | SQL migration triage plus schema-state diffing, typed relational-signature semantics, and source-code SQL extraction |
@@ -95,6 +95,7 @@ go run ./cmd/patchline model-check-workflow examples/workflows/bad-migration-app
 go run ./cmd/patchline cegar-refine examples/repairs/repair-bad-invoice-backfill.json --store examples/snapshots/billing-bad-migration-before.json --invariants examples/invariants/billing-core.json --workflow examples/workflows/bad-migration-approved.json
 go run ./cmd/patchline archive-index examples/archive/bad-migration-corpus.json
 go run ./cmd/patchline archive-query examples/archive/bad-migration-corpus.json --json
+go run ./cmd/patchline repair-outcomes examples/archive/bad-migration-corpus.json --json
 go run ./cmd/patchline historical-failures examples/historical-failures/suite.json --json
 go run ./cmd/patchline attestation-keygen --json
 go run ./cmd/patchline analyze-migration demos/billing/migrations/002_bad_backfill.sql
@@ -165,6 +166,7 @@ go run ./cmd/patchline generate-sql examples/repairs/repair-bad-invoice-backfill
 go run ./cmd/patchline repair-semantics examples/repairs/repair-bad-invoice-backfill.json --json
 go run ./cmd/patchline cegar-refine examples/repairs/repair-bad-invoice-backfill.json --store examples/snapshots/billing-bad-migration-before.json --invariants examples/invariants/billing-core.json --workflow examples/workflows/bad-migration-approved.json --json > /tmp/patchline-refinement.json
 go run ./cmd/patchline archive-index examples/archive/bad-migration-corpus.json --json > /tmp/patchline-archive.json
+go run ./cmd/patchline repair-outcomes examples/archive/bad-migration-corpus.json --json | jq '.[] | {incident_id, dry_run_hash, applied_sql_hash, verification_result, rollback_available, later_recurrences}'
 go run ./cmd/patchline sign-artifact /tmp/patchline-refinement.json --subject cegar:billing-bad-migration --seed-hex "$PATCHLINE_ATTESTATION_SEED" --out /tmp/patchline-refinement.attestation.json
 go run ./cmd/patchline verify-artifact /tmp/patchline-refinement.attestation.json --artifact /tmp/patchline-refinement.json
 go run ./cmd/patchline effect-summary examples/repairs/repair-bad-invoice-backfill.json --json

@@ -5,27 +5,35 @@ import "testing"
 func TestBuildIndexesIncidentsBySemanticDimensions(t *testing.T) {
 	report := Build(Spec{Name: "fixtures"}, []Entry{
 		{
-			ID:                      "b",
-			ShapeHash:               "shape-1",
-			MigrationTables:         []string{"invoices"},
-			MigrationMaxRisk:        "high",
-			MigrationBroadUpdates:   []MigrationStatement{{Table: "invoices", Operation: "update", Risk: "high", Fingerprint: "fp-b", Reason: "high-risk update"}},
-			RepairEffect:            "reversible_update",
-			RepairRollbackAvailable: true,
-			PolicyAllowed:           true,
-			BenchmarkOK:             true,
-			DerivedReportIDs:        []string{"report:revenue"},
+			ID:                       "a",
+			ShapeHash:                "shape-1",
+			MigrationTables:          []string{"reports", "invoices"},
+			MigrationMaxRisk:         "medium",
+			RepairEffect:             "derived_rebuild",
+			RepairDryRunHash:         "dry-a",
+			RepairAppliedSQLHash:     "sql-a",
+			RepairRollbackAvailable:  false,
+			RepairVerificationResult: "failed:policy",
+			RepairVerificationHash:   "verify-a",
+			PolicyAllowed:            false,
+			BenchmarkOK:              true,
+			DerivedReportIDs:         []string{"report:revenue"},
 		},
 		{
-			ID:                      "a",
-			ShapeHash:               "shape-1",
-			MigrationTables:         []string{"reports", "invoices"},
-			MigrationMaxRisk:        "medium",
-			RepairEffect:            "derived_rebuild",
-			RepairRollbackAvailable: false,
-			PolicyAllowed:           false,
-			BenchmarkOK:             true,
-			DerivedReportIDs:        []string{"report:revenue"},
+			ID:                       "b",
+			ShapeHash:                "shape-1",
+			MigrationTables:          []string{"invoices"},
+			MigrationMaxRisk:         "high",
+			MigrationBroadUpdates:    []MigrationStatement{{Table: "invoices", Operation: "update", Risk: "high", Fingerprint: "fp-b", Reason: "high-risk update"}},
+			RepairEffect:             "reversible_update",
+			RepairDryRunHash:         "dry-b",
+			RepairAppliedSQLHash:     "sql-b",
+			RepairRollbackAvailable:  true,
+			RepairVerificationResult: "verified",
+			RepairVerificationHash:   "verify-b",
+			PolicyAllowed:            true,
+			BenchmarkOK:              true,
+			DerivedReportIDs:         []string{"report:revenue"},
 		},
 	})
 	if report.Hash == "" {
@@ -48,6 +56,22 @@ func TestBuildIndexesIncidentsBySemanticDimensions(t *testing.T) {
 	}
 	if len(report.HistoricalQueries.RepairsLackingRollback) != 1 || report.HistoricalQueries.RepairsLackingRollback[0].IncidentID != "a" {
 		t.Fatalf("expected missing rollback query result: %#v", report.HistoricalQueries.RepairsLackingRollback)
+	}
+	if len(report.RepairOutcomes) != 2 {
+		t.Fatalf("expected repair outcome history: %#v", report.RepairOutcomes)
+	}
+	firstOutcome := report.RepairOutcomes[0]
+	if firstOutcome.IncidentID != "a" || firstOutcome.DryRunHash != "dry-a" || firstOutcome.AppliedSQLHash != "sql-a" || firstOutcome.VerificationResult != "failed:policy" {
+		t.Fatalf("expected repair hashes and verification result in outcome: %#v", firstOutcome)
+	}
+	if len(firstOutcome.LaterRecurrences) != 1 || firstOutcome.LaterRecurrences[0] != "b" {
+		t.Fatalf("expected later recurrence by shape/table: %#v", firstOutcome.LaterRecurrences)
+	}
+	if firstOutcome.Hash == "" {
+		t.Fatal("expected repair outcome hash")
+	}
+	if len(report.HistoricalQueries.RepairOutcomeHistory) != 2 || report.HistoricalQueries.RepairOutcomeHistory[0].Hash != firstOutcome.Hash {
+		t.Fatalf("expected repair outcome query to mirror report outcomes: %#v", report.HistoricalQueries.RepairOutcomeHistory)
 	}
 	if report.HistoricalQueries.Hash == "" {
 		t.Fatal("expected query hash")
