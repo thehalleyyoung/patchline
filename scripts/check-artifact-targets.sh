@@ -14,6 +14,9 @@ commands=(
   "semantic-regressions"
   "benchmark-suite"
   "artifact-ground-truth"
+  "artifact-baselines"
+  "artifact-ablations"
+  "artifact-scale"
 )
 
 for command in "${commands[@]}"; do

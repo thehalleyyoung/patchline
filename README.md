@@ -18,10 +18,13 @@ Patchline now has a reviewer-oriented artifact path in addition to its broader u
 make artifact-smoke
 make artifact-demo
 make artifact-ground-truth-check
+make artifact-studies
 make artifact-negative-cases
 ```
 
 Start with [`ARTIFACT.md`](ARTIFACT.md) for the quick evaluator path, [`docs/paper-claim.md`](docs/paper-claim.md) for the single paper-facing claim, [`docs/semantic-core.md`](docs/semantic-core.md) for the auditable semantic core, and [`benchmarks/LABELING.md`](benchmarks/LABELING.md) for the phase-aware ground-truth protocol.
+
+`make artifact-studies` writes `baselines.{json,md}`, `ablations.{json,md}`, and `scale.{json,md}` under `results/generated/artifact-studies/`. These reports make the current claim sharper: Patchline is not merely detecting bad SQL; it shows, case by case, which semantic layers add tables/effects/reasons, ground-truth links, archive links, Z3-backed repair obligations, stable hashes, and reviewer-actionable evidence beyond a normalized SQL-rule baseline.
 
 The central artifact object is:
 
@@ -39,6 +42,7 @@ Evidence -> Trace -> Transition -> Repair -> Proof -> Replay -> Archive -> Regre
 | Replay | `repair-outcomes` | verification and rollback history | connects repair execution to archive memory |
 | Archive | `archive-index`, `archive-query` | deterministic incident index | turns incidents into queryable memory |
 | Regression | `semantic-regressions` | recurrence relations and invariants | detects repeated semantic failure shapes |
+| Artifact studies | `artifact-baselines`, `artifact-ablations`, `artifact-scale` | baseline, ablation, and scale reports | shows what each semantic layer contributes right now |
 
 ## Verify the current usefulness claim
 

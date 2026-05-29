@@ -305,6 +305,24 @@ func run(args []string) error {
 			root = args[1]
 		}
 		return artifactGroundTruth(root, hasFlag(args[1:], "--json"))
+	case "artifact-baselines":
+		if len(args) < 2 {
+			return errors.New("usage: patchline artifact-baselines <suite.json> [--out dir] [--json]")
+		}
+		outPath, _ := flagValue(args[2:], "--out")
+		return artifactBaselines(args[1], outPath, hasFlag(args[2:], "--json"))
+	case "artifact-ablations":
+		if len(args) < 2 {
+			return errors.New("usage: patchline artifact-ablations <suite.json> [--out dir] [--json]")
+		}
+		outPath, _ := flagValue(args[2:], "--out")
+		return artifactAblations(args[1], outPath, hasFlag(args[2:], "--json"))
+	case "artifact-scale":
+		if len(args) < 2 {
+			return errors.New("usage: patchline artifact-scale <suite.json> [--out dir] [--json]")
+		}
+		outPath, _ := flagValue(args[2:], "--out")
+		return artifactScale(args[1], outPath, hasFlag(args[2:], "--json"))
 	case "ingest-evidence":
 		if len(args) < 2 {
 			return errors.New("usage: patchline ingest-evidence <events.jsonl> [--json] [--out graph.json]")
@@ -391,6 +409,9 @@ Usage:
   patchline export-bundle <reproduce.json> <policy.json> <migration.sql> [--json]
   patchline benchmark-suite <suite.json> [--json]
   patchline artifact-ground-truth [benchmarks-dir] [--json]
+  patchline artifact-baselines <suite.json> [--out dir] [--json]
+  patchline artifact-ablations <suite.json> [--out dir] [--json]
+  patchline artifact-scale <suite.json> [--out dir] [--json]
   patchline ingest-evidence <events.jsonl> [--json] [--out graph.json]
   patchline adapt-evidence <otlp|datadog|postgres|github|migration-runner> <input.json> [--json] [--out events.jsonl]
   patchline ci-gate <suite.json> [--min-precision 0.95] [--min-recall 0.95] [--json]
@@ -3443,6 +3464,95 @@ func artifactGroundTruth(root string, jsonOut bool) error {
 			fmt.Printf("  %s case=%s error=%s\n", validationErr.File, validationErr.CaseID, validationErr.Message)
 		}
 		return fmt.Errorf("artifact ground truth validation failed with %d error(s)", len(report.Errors))
+	}
+	return nil
+}
+
+func artifactBaselines(path string, outPath string, jsonOut bool) error {
+	spec, err := readBenchmarkSpec(path)
+	if err != nil {
+		return err
+	}
+	report, err := artifact.EvaluateBaselines(spec, filepath.Dir(path))
+	if err != nil {
+		return err
+	}
+	if outPath != "" {
+		if err := writeArtifactStudy(outPath, "baselines", report, report.Markdown); err != nil {
+			return err
+		}
+	}
+	if jsonOut {
+		return writeJSON(os.Stdout, report)
+	}
+	fmt.Printf("artifact baselines suite=%s hash=%s patchline_actionability=%.2f\n", report.Suite, report.Hash, report.Patchline.MeanActionability)
+	for _, baseline := range report.Baselines {
+		fmt.Printf("  baseline=%s precision=%.3f recall=%.3f actionability=%.2f\n", baseline.Name, baseline.Metrics.Precision, baseline.Metrics.Recall, baseline.Metrics.MeanActionability)
+	}
+	return nil
+}
+
+func artifactAblations(path string, outPath string, jsonOut bool) error {
+	spec, err := readBenchmarkSpec(path)
+	if err != nil {
+		return err
+	}
+	report, err := artifact.RunAblations(spec, filepath.Dir(path))
+	if err != nil {
+		return err
+	}
+	if outPath != "" {
+		if err := writeArtifactStudy(outPath, "ablations", report, report.Markdown); err != nil {
+			return err
+		}
+	}
+	if jsonOut {
+		return writeJSON(os.Stdout, report)
+	}
+	fmt.Printf("artifact ablations suite=%s hash=%s modes=%d\n", report.Suite, report.Hash, len(report.Modes))
+	for _, mode := range report.Modes {
+		fmt.Printf("  mode=%s precision=%.3f recall=%.3f actionability=%.2f proof_backed=%d archive_linked=%d\n", mode.Name, mode.Metrics.Precision, mode.Metrics.Recall, mode.Metrics.MeanActionability, mode.Metrics.ProofBackedCases, mode.Metrics.ArchiveLinkedCases)
+	}
+	return nil
+}
+
+func artifactScale(path string, outPath string, jsonOut bool) error {
+	spec, err := readBenchmarkSpec(path)
+	if err != nil {
+		return err
+	}
+	report, err := artifact.MeasureScale(spec, filepath.Dir(path))
+	if err != nil {
+		return err
+	}
+	if outPath != "" {
+		if err := writeArtifactStudy(outPath, "scale", report, report.Markdown); err != nil {
+			return err
+		}
+	}
+	if jsonOut {
+		return writeJSON(os.Stdout, report)
+	}
+	fmt.Printf("artifact scale suite=%s hash=%s cases=%d statements=%d bytes=%d analyze_ms=%d\n", report.Suite, report.Hash, report.Totals.Cases, report.Totals.Statements, report.Totals.Bytes, report.Totals.AnalyzeMillis)
+	return nil
+}
+
+func writeArtifactStudy(outPath string, stem string, report any, markdown string) error {
+	if err := os.MkdirAll(outPath, 0o755); err != nil {
+		return err
+	}
+	jsonPath := filepath.Join(outPath, stem+".json")
+	data, err := json.MarshalIndent(report, "", "  ")
+	if err != nil {
+		return err
+	}
+	if err := os.WriteFile(jsonPath, append(data, '\n'), 0o644); err != nil {
+		return err
+	}
+	if markdown != "" {
+		if err := os.WriteFile(filepath.Join(outPath, stem+".md"), []byte(markdown), 0o644); err != nil {
+			return err
+		}
 	}
 	return nil
 }

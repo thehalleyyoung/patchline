@@ -23,6 +23,11 @@ type Case struct {
 	Path               string `json:"path"`
 	Label              string `json:"label"`
 	ExpectedReportHash string `json:"expected_report_hash"`
+	GroundTruth        string `json:"ground_truth,omitempty"`
+	RepairManifest     string `json:"repair_manifest,omitempty"`
+	Invariants         string `json:"invariants,omitempty"`
+	Store              string `json:"store,omitempty"`
+	ArchiveSpec        string `json:"archive_spec,omitempty"`
 }
 
 type Result struct {

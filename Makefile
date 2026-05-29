@@ -1,4 +1,4 @@
-.PHONY: build test demo gate fmt public-corpus verify-usefulness artifact-smoke artifact-demo artifact-ground-truth-check artifact-negative-cases artifact-full artifact-clean
+.PHONY: build test demo gate fmt public-corpus verify-usefulness artifact-smoke artifact-demo artifact-ground-truth-check artifact-baselines artifact-ablations artifact-scale artifact-studies artifact-negative-cases artifact-full artifact-clean
 
 build:
 	go build -o bin/patchline ./cmd/patchline
@@ -36,10 +36,21 @@ artifact-ground-truth-check:
 	go run ./cmd/patchline artifact-ground-truth benchmarks --json
 	bash scripts/validate-ground-truth.sh
 
+artifact-baselines:
+	go run ./cmd/patchline artifact-baselines examples/benchmarks/strict-migration-corpus.json --out results/generated/artifact-studies
+
+artifact-ablations:
+	go run ./cmd/patchline artifact-ablations examples/benchmarks/strict-migration-corpus.json --out results/generated/artifact-studies
+
+artifact-scale:
+	go run ./cmd/patchline artifact-scale examples/benchmarks/strict-migration-corpus.json --out results/generated/artifact-studies
+
+artifact-studies: artifact-baselines artifact-ablations artifact-scale
+
 artifact-negative-cases:
 	bash scripts/artifact_negative_cases.sh
 
-artifact-full: artifact-smoke artifact-demo artifact-negative-cases verify-usefulness
+artifact-full: artifact-smoke artifact-demo artifact-studies artifact-negative-cases verify-usefulness
 
 artifact-clean:
 	rm -rf results/generated

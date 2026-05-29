@@ -24,6 +24,7 @@ Evidence -> Trace -> Transition -> Repair -> Proof -> Replay -> Archive -> Regre
 | Replay | A deterministic execution over a bounded store that emits row diffs and verification hashes. | `dry-run`, `repair-outcomes` |
 | Archive | An ordered incident corpus with queryable evidence, migration, policy, benchmark, repair, and rollback facts. | `archive-index`, `archive-query` |
 | Regression | A later incident that reuses a previous damaged shape, high-risk table, or damaged derived report relation. | `semantic-regressions` |
+| Artifact study | A generated comparison that shows which layers add detection, actionability, proof links, archive links, ground-truth links, and scale evidence. | `artifact-baselines`, `artifact-ablations`, `artifact-scale` |
 
 ## Phase-aware claims
 
@@ -53,3 +54,5 @@ When evidence is missing or an input fragment is unsupported, the artifact shoul
 ## Why this is novel
 
 The novelty is not that provenance, migration linting, replay, or SMT solving exist independently. The novelty is the executable object that composes them: a historical data-repair incident becomes a stable semantic artifact whose claims are replayable, hashable, queryable, solver-backed where possible, and reusable as future recurrence memory.
+
+The current artifact also exposes this composition through ablations: reviewers can run `make artifact-studies` to observe how a migration-only detector becomes a richer repair artifact as policy, Z3 obligations, archive memory, and phase-aware ground truth are added.

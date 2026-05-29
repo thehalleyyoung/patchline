@@ -58,6 +58,7 @@ It runs:
 
 - `go test ./...`
 - `artifact-ground-truth`
+- command-presence checks for the artifact study commands
 - `scripts/validate-ground-truth.sh`
 - `scripts/check-artifact-targets.sh`
 - `semantics-audit`
@@ -68,6 +69,32 @@ It runs:
 - `archive-query`
 - `semantic-regressions`
 - `benchmark-suite`
+
+## Baselines, ablations, and scale
+
+```bash
+make artifact-studies
+```
+
+This target writes:
+
+```text
+results/generated/artifact-studies/
+  baselines.json
+  baselines.md
+  ablations.json
+  ablations.md
+  scale.json
+  scale.md
+```
+
+The reports are intentionally reviewer-facing rather than paper-scale. They make the current utility claim executable:
+
+- `artifact-baselines` compares Patchline with a transparent normalized SQL-rule baseline and reports both detection metrics and actionability metrics.
+- `artifact-ablations` separates migration-only, migration+policy, migration+policy+solver, migration+policy+solver+archive, and full artifact modes.
+- `artifact-scale` records bytes, statements, high-risk statements, touched tables, hashes, and analyzer time for the committed strict corpus.
+
+The ablation report only counts solver-backed evidence for cases that declare repair/invariant inputs. This keeps the claim falsifiable: migration text alone can produce risk signals, but not repair proofs.
 
 ## Canonical demo
 
@@ -135,7 +162,7 @@ These cases are part of the artifact, not merely prose limitations.
 
 ## Relationship to `make verify-usefulness`
 
-`make verify-usefulness` remains the broader project validation target. It includes network-backed public corpus fetching and source checks. `make artifact-smoke` is the artifact-review entry point: it is smaller, committed-fixture-only, and intended to be stable without network access.
+`make verify-usefulness` remains the broader project validation target. It includes network-backed public corpus fetching and source checks. `make artifact-smoke` is the artifact-review entry point: it is smaller, committed-fixture-only, and intended to be stable without network access. `make artifact-studies` is the evaluator-facing measurement entry point for current baseline/ablation/scale evidence.
 
 ## Data provenance
 
@@ -154,8 +181,8 @@ The following are planned in `NEWEST_PLAN.md` but are not yet claimed as fully i
 
 - large public migration benchmark with hundreds or thousands of statements;
 - multi-incident public postmortem benchmark with precision/recall;
-- full baseline comparison table;
-- full ablation study;
+- full baseline comparison table over large public corpora;
+- full ablation study over multi-family benchmark suites;
 - scale and memory measurements over large corpora.
 
 The smoke artifact path is designed so these can be added without changing the central claim.
