@@ -19,6 +19,7 @@ import (
 	"github.com/thehalleyyoung/patchline/internal/effects"
 	"github.com/thehalleyyoung/patchline/internal/evidence"
 	"github.com/thehalleyyoung/patchline/internal/gate"
+	"github.com/thehalleyyoung/patchline/internal/historical"
 	"github.com/thehalleyyoung/patchline/internal/invariant"
 	"github.com/thehalleyyoung/patchline/internal/ledger"
 	"github.com/thehalleyyoung/patchline/internal/migration"
@@ -108,6 +109,11 @@ func run(args []string) error {
 			query = args[2]
 		}
 		return archiveQuery(args[1], query, hasFlag(args[2:], "--json"))
+	case "historical-failures":
+		if len(args) < 2 {
+			return errors.New("usage: patchline historical-failures <suite.json> [--json]")
+		}
+		return historicalFailures(args[1], hasFlag(args[2:], "--json"))
 	case "demo-graph":
 		return writeJSON(os.Stdout, graphDTO(demo.Graph()))
 	case "explain", "trace-row":
@@ -331,6 +337,7 @@ Usage:
   patchline provenance archive <evidence.jsonl>... [--json]
   patchline archive-index <archive-spec.json> [--json]
   patchline archive-query <archive-spec.json> [broad-updates|damaged-reports|missing-rollback|all] [--json]
+  patchline historical-failures <suite.json> [--json]
   patchline demo-graph
   patchline explain <entity-id> [--graph graph.json]
   patchline slice <entity-id> [--json] [--graph graph.json]
@@ -741,6 +748,46 @@ func archiveQuery(specPath, query string, jsonOut bool) error {
 		return fmt.Errorf("unknown archive query %q", query)
 	}
 	fmt.Printf("archive query hash=%s\n", report.HistoricalQueries.Hash)
+	return nil
+}
+
+func historicalFailures(specPath string, jsonOut bool) error {
+	spec, err := historical.ReadSpec(specPath)
+	if err != nil {
+		return err
+	}
+	report, err := historical.Run(spec, filepath.Dir(specPath))
+	if err != nil {
+		return err
+	}
+	if jsonOut {
+		if err := writeJSON(os.Stdout, report); err != nil {
+			return err
+		}
+	} else {
+		status := "passed"
+		if !report.OK {
+			status = "failed"
+		}
+		fmt.Printf("historical failure suite %s cases=%d hash=%s\n", status, len(report.Cases), report.Hash)
+		for _, c := range report.Cases {
+			caseStatus := "passed"
+			if !c.OK {
+				caseStatus = "failed"
+			}
+			fmt.Printf("  %s %s signals=%d hash=%s\n", caseStatus, c.ID, len(c.Signals), c.Hash)
+			for _, expectation := range c.ExpectedSignals {
+				marker := "missing"
+				if expectation.Present {
+					marker = "present"
+				}
+				fmt.Printf("    %s %s\n", marker, expectation.ID)
+			}
+		}
+	}
+	if !report.OK {
+		return codedError{code: 2, err: errors.New("historical failure suite expectations failed")}
+	}
 	return nil
 }
 

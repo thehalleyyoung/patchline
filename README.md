@@ -2,13 +2,13 @@
 
 Patchline is a deterministic incident-repair workbench for teams that operate high-volume services, own production data correctness, and need evidence they can replay in review instead of prose explanations after an outage.
 
-**Promise today:** given incident evidence, migration SQL, a repair manifest, policy rules, and benchmark fixtures, Patchline reconstructs causal provenance, classifies risky data changes, proves repair scope obligations with Z3, replays the repair over a bounded store, checks invariants/workflow properties, emits signed/hashable artifacts, and indexes the incident for recurrence analysis.
+**Promise today:** given incident evidence, migration SQL, a repair manifest, policy rules, benchmark fixtures, and public postmortem claims, Patchline reconstructs causal provenance, classifies risky data changes, proves repair scope obligations with Z3, replays the repair over a bounded store, checks invariants/workflow properties, emits signed/hashable artifacts, indexes incidents for recurrence analysis, and validates counterfactual failure-avoidance signals on specific historical incidents.
 
 **No AI. No guesses.** Patchline is intentionally built from inspectable mechanisms: typed provenance, Z3-backed proof obligations, effect inference, invariant checks, replayable repair manifests, stable canonical output, and hash-chained audit records.
 
 ## Verify the current usefulness claim
 
-The repo already has a reproducible validation path for the kind of cross-layer incident review a large observability or infrastructure company needs: it checks a historical-style bad migration fixture end to end and fetches pinned public migration files from an open-source migration platform to validate analyzer behavior against real SQL.
+The repo already has a reproducible validation path for the kind of cross-layer incident review a large observability or infrastructure company needs: it checks a historical-style bad migration fixture end to end, fetches pinned public migration files from an open-source migration platform to validate analyzer behavior against real SQL, and validates two public postmortem counterfactuals against source phrases plus Patchline semantic signals.
 
 Prerequisites: Go 1.22+, `curl`, `jq`, and Z3. This repository was validated with `Z3 version 4.15.8 - 64 bit`.
 
@@ -17,9 +17,9 @@ z3 --version
 make verify-usefulness
 ```
 
-That target runs the unit suite, strict CI gate, a SHA-verified public migration corpus benchmark, Z3-backed solver obligations, the semantic audit, the incident archive index, and deterministic historical archive queries. The public corpus is downloaded into `examples/public-corpus/downloads/` from pinned raw URLs and checked against `examples/public-corpus/sources.json`; the SQL files are not vendored.
+That target runs the unit suite, strict CI gate, a SHA-verified public migration corpus benchmark, Z3-backed solver obligations, the semantic audit, the incident archive index, deterministic historical archive queries, the historical-failure suite, and public-source phrase checks. The public corpus is downloaded into `examples/public-corpus/downloads/` from pinned raw URLs and checked against `examples/public-corpus/sources.json`; the SQL files are not vendored.
 
-The expected default semantic audit result is `20` conforming artifacts and `0` counterexamples. If Z3 is missing, Patchline does not pretend to prove solver obligations: the solver report records the Z3 failure and downgrades those claims instead of using a handwritten SMT substitute.
+The expected default semantic audit result is `20` conforming artifacts and `0` counterexamples. The expected historical-failure result includes a primary-data destructive-operation case and a split-brain conflicting-write case, both backed by public postmortem source checks. If Z3 is missing, Patchline does not pretend to prove solver obligations: the solver report records the Z3 failure and downgrades those claims instead of using a handwritten SMT substitute.
 
 ## Why this is novel
 
@@ -43,6 +43,7 @@ The first scaffold in this repo focuses on a small but real core:
 | Workflow model checking | Bounded ingest/explain/approve/dry-run/apply/verify/rollback/audit/archive state exploration with temporal properties, proof holes, and counterexample fixtures |
 | CEGAR refinement | Counterexample/proof-hole guided reruns that refine coarse repair abstractions with invariant specs and incident workflow models |
 | Incident archive | Deterministic archive index and historical queries over evidence, migrations, repair manifests, policies, and benchmark results, bucketed by semantic shape, broad updates, damaged-derived reports, rollback availability, and decisions |
+| Historical failures | Public postmortem counterfactual suite that checks source assertions, destructive primary-data mutations, rollback gaps, damaged reports, and split-brain conflicting writes |
 | Effect inference | A deterministic effect lattice and abstract interpreter over replay diffs |
 | Migration analysis | SQL migration triage plus schema-state diffing, typed relational-signature semantics, and source-code SQL extraction |
 | Replay sandbox | In-memory and imported-snapshot dry-run engine that emits stable row diffs, compensating-action semantics, and snapshot drift reports |
@@ -66,6 +67,7 @@ See [`docs/symbolic-execution.md`](docs/symbolic-execution.md) for bounded repai
 See [`docs/workflow-model-checking.md`](docs/workflow-model-checking.md) for temporal incident workflow checks and proof holes.
 See [`docs/refinement-and-attestations.md`](docs/refinement-and-attestations.md) for CEGAR-style refinement and signed artifact verification.
 See [`docs/archive-index.md`](docs/archive-index.md) for semantic incident archives over historical evidence and repairs.
+See [`docs/historical-failures.md`](docs/historical-failures.md) for public postmortem counterfactual validation.
 See [`docs/replay-semantics.md`](docs/replay-semantics.md) for small-step traces, commutativity/confluence checks, and isolation hazards.
 See [`docs/migration-analysis.md`](docs/migration-analysis.md) for generic and dialect-specific SQL migration analysis.
 See [`docs/schema-semantics.md`](docs/schema-semantics.md) for schema diffs and relational-signature migration semantics.
@@ -91,6 +93,7 @@ go run ./cmd/patchline model-check-workflow examples/workflows/bad-migration-app
 go run ./cmd/patchline cegar-refine examples/repairs/repair-bad-invoice-backfill.json --store examples/snapshots/billing-bad-migration-before.json --invariants examples/invariants/billing-core.json --workflow examples/workflows/bad-migration-approved.json
 go run ./cmd/patchline archive-index examples/archive/bad-migration-corpus.json
 go run ./cmd/patchline archive-query examples/archive/bad-migration-corpus.json --json
+go run ./cmd/patchline historical-failures examples/historical-failures/suite.json --json
 go run ./cmd/patchline attestation-keygen --json
 go run ./cmd/patchline analyze-migration demos/billing/migrations/002_bad_backfill.sql
 go run ./cmd/patchline analyze-migration examples/migrations/sqlserver-top-delete.sql --dialect sqlserver
@@ -202,6 +205,7 @@ internal/replay/       Dry-run state model and canonical reports
 internal/attest/       Executable reproducibility and invariant checks
 internal/refinement/   Counterexample-guided semantic refinement reports
 internal/archive/      Historical incident archive indexes and semantic buckets
+internal/historical/   Public postmortem counterfactual validation
 internal/ledger/       Hash-chained audit ledger
 internal/reproduce/    Benchmark/reproducibility runner
 internal/bench/        Strict corpus benchmark runner
@@ -217,4 +221,4 @@ docs/                  Architecture, DSL, provenance, and RiSE research notes
 
 ## Status
 
-This is a working deterministic core and demo harness, not yet the full production system. The next natural expansions are historical query commands over the archive index, organization-local benchmark generation, redaction-preserving proof artifacts, reusable GitHub Action packaging, and a web incident cockpit.
+This is a working deterministic core and demo harness, not yet the full production system. The next natural expansions are richer repair outcome histories, organization-local benchmark generation, redaction-preserving proof artifacts, reusable GitHub Action packaging, and a web incident cockpit.

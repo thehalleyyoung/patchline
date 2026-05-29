@@ -1,0 +1,9 @@
+{"type":"deploy","id":"deploy:github-2018-network-maintenance","commit":"commit:github-orchestrator-event","service":"mysql-metadata"}
+{"type":"migration","id":"migration:github-2018-failover-reconstruction","deploy":"deploy:github-2018-network-maintenance","name":"semantic reconstruction of failover-induced divergent writes"}
+{"type":"trace","id":"trace:github-2018-us-east","migration":"migration:github-2018-failover-reconstruction"}
+{"type":"trace","id":"trace:github-2018-us-west","migration":"migration:github-2018-failover-reconstruction"}
+{"type":"sql_mutation","id":"sql:github-east-write","trace":"trace:github-2018-us-east","fingerprint":"update issues set state = ? where id = ?"}
+{"type":"sql_mutation","id":"sql:github-west-write","trace":"trace:github-2018-us-west","fingerprint":"update issues set state = ? where id = ?"}
+{"type":"row_mutation","record":"record:issues/42","sql":"sql:github-east-write","before":{"state":"open","updated_at":"2018-10-21T22:52:00Z"},"after":{"state":"closed","updated_at":"2018-10-21T22:52:12Z"},"region":"us-east"}
+{"type":"row_mutation","record":"record:issues/42","sql":"sql:github-west-write","before":{"state":"open","updated_at":"2018-10-21T22:52:00Z"},"after":{"state":"reopened","updated_at":"2018-10-21T22:52:37Z"},"region":"us-west"}
+{"type":"derived_report","from":"record:issues/42","to":"report:github-visible-issue-state"}

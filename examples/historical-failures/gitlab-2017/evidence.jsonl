@@ -1,0 +1,18 @@
+{"type":"deploy","id":"deploy:gitlab-2017-db-recovery","commit":"commit:gitlab-runbook","service":"gitlab-primary-db"}
+{"type":"migration","id":"migration:gitlab-2017-primary-removal-reconstruction","deploy":"deploy:gitlab-2017-db-recovery","name":"semantic reconstruction of destructive primary database removal"}
+{"type":"trace","id":"trace:gitlab-2017-primary-db","migration":"migration:gitlab-2017-primary-removal-reconstruction"}
+{"type":"sql_mutation","id":"sql:gitlab-delete-projects","trace":"trace:gitlab-2017-primary-db","fingerprint":"delete from projects"}
+{"type":"sql_mutation","id":"sql:gitlab-delete-comments","trace":"trace:gitlab-2017-primary-db","fingerprint":"delete from comments"}
+{"type":"sql_mutation","id":"sql:gitlab-delete-users","trace":"trace:gitlab-2017-primary-db","fingerprint":"delete from users"}
+{"type":"sql_mutation","id":"sql:gitlab-delete-issues","trace":"trace:gitlab-2017-primary-db","fingerprint":"delete from issues"}
+{"type":"sql_mutation","id":"sql:gitlab-delete-snippets","trace":"trace:gitlab-2017-primary-db","fingerprint":"delete from snippets"}
+{"type":"row_mutation","record":"record:projects/*","sql":"sql:gitlab-delete-projects","before":{"exists":"true"},"after":{"exists":"false"}}
+{"type":"row_mutation","record":"record:comments/*","sql":"sql:gitlab-delete-comments","before":{"exists":"true"},"after":{"exists":"false"}}
+{"type":"row_mutation","record":"record:users/*","sql":"sql:gitlab-delete-users","before":{"exists":"true"},"after":{"exists":"false"}}
+{"type":"row_mutation","record":"record:issues/*","sql":"sql:gitlab-delete-issues","before":{"exists":"true"},"after":{"exists":"false"}}
+{"type":"row_mutation","record":"record:snippets/*","sql":"sql:gitlab-delete-snippets","before":{"exists":"true"},"after":{"exists":"false"}}
+{"type":"derived_report","from":"record:projects/*","to":"report:gitlab-production-data-integrity"}
+{"type":"derived_report","from":"record:comments/*","to":"report:gitlab-production-data-integrity"}
+{"type":"derived_report","from":"record:users/*","to":"report:gitlab-production-data-integrity"}
+{"type":"derived_report","from":"record:issues/*","to":"report:gitlab-production-data-integrity"}
+{"type":"derived_report","from":"record:snippets/*","to":"report:gitlab-production-data-integrity"}

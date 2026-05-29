@@ -1,0 +1,77 @@
+{
+  "version": "patchline.historical-failure-suite/v1",
+  "name": "public-postmortem-counterfactuals",
+  "cases": [
+    {
+      "id": "gitlab-2017-primary-db-removal",
+      "title": "GitLab.com 2017 primary database data removal",
+      "source_url": "https://about.gitlab.com/blog/postmortem-of-database-outage-of-january-31/",
+      "source_assertions": [
+        {
+          "id": "primary-removal",
+          "phrase": "accidental removal of data from our primary database server",
+          "summary": "The postmortem identifies accidental removal from the primary database as the outage cause."
+        },
+        {
+          "id": "production-data-loss",
+          "phrase": "lost modifications to database data such as projects, comments, user accounts, issues and snippets",
+          "summary": "The postmortem identifies concrete production-data classes that were lost."
+        },
+        {
+          "id": "backup-recovery-failed",
+          "phrase": "both finding and using backups failed completely",
+          "summary": "The postmortem identifies backup/recovery failure as part of the incident."
+        }
+      ],
+      "artifacts": {
+        "evidence": "gitlab-2017/evidence.jsonl",
+        "migration": "gitlab-2017/destructive-removal.sql",
+        "repair": "gitlab-2017/no-snapshot-repair.json"
+      },
+      "protected_tables": [
+        "projects",
+        "comments",
+        "users",
+        "issues",
+        "snippets"
+      ],
+      "expected_signals": [
+        "damaged-derived-report",
+        "high-risk-destructive-migration",
+        "missing-snapshot-rollback",
+        "protected-primary-mutation"
+      ],
+      "avoidance_claim": "Patchline would not certify the reconstructed destructive primary-data operation because it touches protected production-data tables and lacks a verified snapshot rollback."
+    },
+    {
+      "id": "github-2018-mysql-split-brain",
+      "title": "GitHub 2018 MySQL split-brain write divergence",
+      "source_url": "https://github.blog/news-insights/company-news/oct21-post-incident-analysis/",
+      "source_assertions": [
+        {
+          "id": "inconsistent-display",
+          "phrase": "displaying of information that was out of date and inconsistent",
+          "summary": "The post-incident analysis identifies stale and inconsistent user-visible state."
+        },
+        {
+          "id": "divergent-writes",
+          "phrase": "both data centers now contained writes that were not present in the other data center",
+          "summary": "The analysis identifies divergent writes across database sites."
+        },
+        {
+          "id": "manual-reconciliation",
+          "phrase": "manual reconciliation for a few seconds of database writes is still in progress",
+          "summary": "The analysis identifies reconciliation work for writes after the incident."
+        }
+      ],
+      "artifacts": {
+        "evidence": "github-2018/evidence.jsonl"
+      },
+      "expected_signals": [
+        "damaged-derived-report",
+        "split-brain-conflicting-writes"
+      ],
+      "avoidance_claim": "Patchline would flag the divergent logical-record writes before declaring recovery complete, forcing a convergence/reconciliation proof instead of accepting inconsistent derived state."
+    }
+  ]
+}

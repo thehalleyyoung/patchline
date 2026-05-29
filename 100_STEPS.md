@@ -112,6 +112,7 @@ Checked items are already represented in the repo. Unchecked items are the next 
 
 81. [x] Add an incident archive index over past evidence, migrations, repair manifests, policies, and benchmark results.
 82. [x] Add deterministic historical queries: "which migrations caused broad updates?", "which reports repeatedly derived from damaged rows?", "which repairs lacked rollback?"
+82a. [x] Add public historical-failure counterfactuals that verify postmortem source assertions and show current Patchline gates would flag destructive primary-data mutations and split-brain write divergence.
 83. [ ] Add repair outcome history: dry-run hash, applied SQL hash, verification result, rollback availability, and later recurrence.
 84. [ ] Add semantic regression detection over history: a new migration resembles prior high-risk trace shapes or violates learned invariant candidates.
 85. [ ] Add historical invariant dashboards as JSON/Markdown generated from actual records and evidence, with counterexamples included.

@@ -1,0 +1,26 @@
+{
+  "version": "patchline.repair/v1",
+  "name": "gitlab-2017-primary-db-reconstruction",
+  "incident": "gitlab-2017-primary-db-removal",
+  "scope": {
+    "entities": [
+      "migration:gitlab-2017-primary-removal-reconstruction",
+      "report:gitlab-production-data-integrity"
+    ],
+    "table": "projects"
+  },
+  "operations": [
+    {
+      "id": "restore-projects-without-verified-snapshot",
+      "kind": "delete",
+      "table": "projects",
+      "where": {
+        "source": "primary-db"
+      }
+    }
+  ],
+  "rollback": {
+    "strategy": "none",
+    "snapshot_required": false
+  }
+}
