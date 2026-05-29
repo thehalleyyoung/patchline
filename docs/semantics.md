@@ -109,7 +109,7 @@ go run ./cmd/patchline semantics-audit
 It currently checks the bad-migration evidence JSONL, trace reconstruction, causal certificate, repair manifest, replay report, replay semantics, invariant report, solver obligations, symbolic execution, workflow model checking, CEGAR refinement, generated SQL, transaction plan, migration analysis, schema semantics, source SQL inventory, strict benchmark corpus, migration outcome history, incident archive index, and ledger checkpoint. The default audit output is:
 
 ```text
-semantic audit passed artifacts=20 conforming=20 proof_holes=7 counterexamples=0 hash=f53e070c50904d1e06e2e91ef78bc8029910d873470ce9b323936310ad951646
+semantic audit passed artifacts=20 conforming=20 proof_holes=7 counterexamples=0 hash=7123160be738c85d86c87f17d2c443a7b9ff1ffa6425399dffd6856a9d32b2a4
 ```
 
 This is intentionally not a proof of all properties. It is an executable inventory of facts, obligations, proof holes, counterexamples, and hashes over historical artifacts, which gives later formal-methods work concrete obligations to discharge.

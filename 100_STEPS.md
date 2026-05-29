@@ -111,7 +111,7 @@ Checked items are already represented in the repo. Unchecked items are the next 
 ## I. Historical knowledge generation
 
 81. [x] Add an incident archive index over past evidence, migrations, repair manifests, policies, and benchmark results.
-82. [ ] Add deterministic historical queries: "which migrations caused broad updates?", "which reports repeatedly derived from damaged rows?", "which repairs lacked rollback?"
+82. [x] Add deterministic historical queries: "which migrations caused broad updates?", "which reports repeatedly derived from damaged rows?", "which repairs lacked rollback?"
 83. [ ] Add repair outcome history: dry-run hash, applied SQL hash, verification result, rollback availability, and later recurrence.
 84. [ ] Add semantic regression detection over history: a new migration resembles prior high-risk trace shapes or violates learned invariant candidates.
 85. [ ] Add historical invariant dashboards as JSON/Markdown generated from actual records and evidence, with counterexamples included.

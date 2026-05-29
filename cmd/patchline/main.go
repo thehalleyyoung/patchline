@@ -99,6 +99,15 @@ func run(args []string) error {
 			return errors.New("usage: patchline archive-index <archive-spec.json> [--json]")
 		}
 		return archiveIndex(args[1], hasFlag(args[2:], "--json"))
+	case "archive-query":
+		if len(args) < 2 {
+			return errors.New("usage: patchline archive-query <archive-spec.json> [broad-updates|damaged-reports|missing-rollback|all] [--json]")
+		}
+		query := "all"
+		if len(args) >= 3 && !strings.HasPrefix(args[2], "--") {
+			query = args[2]
+		}
+		return archiveQuery(args[1], query, hasFlag(args[2:], "--json"))
 	case "demo-graph":
 		return writeJSON(os.Stdout, graphDTO(demo.Graph()))
 	case "explain", "trace-row":
@@ -321,6 +330,7 @@ Usage:
   patchline provenance diff <left-evidence.jsonl> <right-evidence.jsonl> [--json]
   patchline provenance archive <evidence.jsonl>... [--json]
   patchline archive-index <archive-spec.json> [--json]
+  patchline archive-query <archive-spec.json> [broad-updates|damaged-reports|missing-rollback|all] [--json]
   patchline demo-graph
   patchline explain <entity-id> [--graph graph.json]
   patchline slice <entity-id> [--json] [--graph graph.json]
@@ -697,6 +707,81 @@ func archiveIndex(specPath string, jsonOut bool) error {
 	return nil
 }
 
+func archiveQuery(specPath, query string, jsonOut bool) error {
+	report, err := buildArchiveReport(specPath)
+	if err != nil {
+		return err
+	}
+	if jsonOut {
+		switch query {
+		case "all":
+			return writeJSON(os.Stdout, report.HistoricalQueries)
+		case "broad-updates":
+			return writeJSON(os.Stdout, report.HistoricalQueries.BroadUpdateMigrations)
+		case "damaged-reports":
+			return writeJSON(os.Stdout, report.HistoricalQueries.DamagedDerivedReports)
+		case "missing-rollback":
+			return writeJSON(os.Stdout, report.HistoricalQueries.RepairsLackingRollback)
+		default:
+			return fmt.Errorf("unknown archive query %q", query)
+		}
+	}
+	switch query {
+	case "all":
+		printBroadUpdateQuery(report.HistoricalQueries.BroadUpdateMigrations)
+		printDamagedReportQuery(report.HistoricalQueries.DamagedDerivedReports)
+		printMissingRollbackQuery(report.HistoricalQueries.RepairsLackingRollback)
+	case "broad-updates":
+		printBroadUpdateQuery(report.HistoricalQueries.BroadUpdateMigrations)
+	case "damaged-reports":
+		printDamagedReportQuery(report.HistoricalQueries.DamagedDerivedReports)
+	case "missing-rollback":
+		printMissingRollbackQuery(report.HistoricalQueries.RepairsLackingRollback)
+	default:
+		return fmt.Errorf("unknown archive query %q", query)
+	}
+	fmt.Printf("archive query hash=%s\n", report.HistoricalQueries.Hash)
+	return nil
+}
+
+func buildArchiveReport(specPath string) (archive.Report, error) {
+	spec, err := readArchiveSpec(specPath)
+	if err != nil {
+		return archive.Report{}, err
+	}
+	entries := make([]archive.Entry, 0, len(spec.Incidents))
+	baseDir := filepath.Dir(specPath)
+	for _, incident := range spec.Incidents {
+		entry, err := buildArchiveEntry(baseDir, incident)
+		if err != nil {
+			return archive.Report{}, err
+		}
+		entries = append(entries, entry)
+	}
+	return archive.Build(spec, entries), nil
+}
+
+func printBroadUpdateQuery(results []archive.BroadUpdateResult) {
+	fmt.Printf("broad_update_migrations count=%d\n", len(results))
+	for _, result := range results {
+		fmt.Printf("  %s table=%s op=%s risk=%s migration=%s fingerprint=%s\n", result.IncidentID, result.Table, result.Operation, result.Risk, result.MigrationPath, result.Fingerprint)
+	}
+}
+
+func printDamagedReportQuery(results []archive.DerivedReportResult) {
+	fmt.Printf("damaged_derived_reports count=%d\n", len(results))
+	for _, result := range results {
+		fmt.Printf("  %s count=%d incidents=%s\n", result.ReportID, result.Count, strings.Join(result.Incidents, ","))
+	}
+}
+
+func printMissingRollbackQuery(results []archive.MissingRollbackResult) {
+	fmt.Printf("repairs_lacking_rollback count=%d\n", len(results))
+	for _, result := range results {
+		fmt.Printf("  %s repair=%s effect=%s policy_allowed=%t\n", result.IncidentID, result.RepairPath, result.RepairEffect, result.PolicyAllowed)
+	}
+}
+
 func buildArchiveEntry(baseDir string, input archive.InputSpec) (archive.Entry, error) {
 	evidencePath := resolvePath(baseDir, input.Evidence)
 	migrationPath := resolvePath(baseDir, input.Migration)
@@ -739,29 +824,100 @@ func buildArchiveEntry(baseDir string, input archive.InputSpec) (archive.Entry, 
 	}
 
 	entry := archive.Entry{
-		ID:               input.ID,
-		EvidencePath:     input.Evidence,
-		MigrationPath:    input.Migration,
-		RepairPath:       input.Repair,
-		PolicyPath:       input.Policy,
-		BenchmarkPath:    input.Benchmark,
-		EvidenceHash:     evidenceResult.InputHash,
-		ShapeHash:        provenance.ShapeHash(graph),
-		MigrationHash:    migrationReport.Summary.ReportHash,
-		MigrationTables:  migrationReport.Summary.Tables,
-		MigrationMaxRisk: maxMigrationRisk(migrationReport),
-		RepairHash:       canonical.Hash(manifest),
-		RepairEffect:     string(effectSummary.Join),
-		PolicyAllowed:    policyEvaluation.OK,
-		PolicyFailures:   collectPolicyFailures(policyEvaluation),
-		PolicyHash:       policyEvaluation.PolicyHash,
-		BenchmarkOK:      benchmarkResult.OK,
-		BenchmarkHash:    benchmarkResult.SuiteHash,
-		DamagedEntities:  len(evidenceResult.DamagedEntities),
-		DerivedReports:   countEntitiesByKind(graph, provenance.KindReport),
-		ProofBundleReady: dryRun.Hash() != "" && policyEvaluation.PolicyHash != "" && benchmarkResult.SuiteHash != "",
+		ID:                      input.ID,
+		EvidencePath:            input.Evidence,
+		MigrationPath:           input.Migration,
+		RepairPath:              input.Repair,
+		PolicyPath:              input.Policy,
+		BenchmarkPath:           input.Benchmark,
+		EvidenceHash:            evidenceResult.InputHash,
+		ShapeHash:               provenance.ShapeHash(graph),
+		MigrationHash:           migrationReport.Summary.ReportHash,
+		MigrationTables:         migrationReport.Summary.Tables,
+		MigrationMaxRisk:        maxMigrationRisk(migrationReport),
+		MigrationBroadUpdates:   archiveBroadUpdates(migrationReport),
+		RepairHash:              canonical.Hash(manifest),
+		RepairEffect:            string(effectSummary.Join),
+		RepairRollbackAvailable: manifest.Rollback.Strategy == "snapshot" && manifest.Rollback.SnapshotRequired,
+		PolicyAllowed:           policyEvaluation.OK,
+		PolicyFailures:          collectPolicyFailures(policyEvaluation),
+		PolicyHash:              policyEvaluation.PolicyHash,
+		BenchmarkOK:             benchmarkResult.OK,
+		BenchmarkHash:           benchmarkResult.SuiteHash,
+		DamagedEntities:         len(evidenceResult.DamagedEntities),
+		DamagedEntityIDs:        sortedStrings(evidenceResult.DamagedEntities),
+		DerivedReports:          countEntitiesByKind(graph, provenance.KindReport),
+		DerivedReportIDs:        derivedReportsFromDamaged(graph, evidenceResult.DamagedEntities),
+		ProofBundleReady:        dryRun.Hash() != "" && policyEvaluation.PolicyHash != "" && benchmarkResult.SuiteHash != "",
 	}
 	return entry, nil
+}
+
+func archiveBroadUpdates(report migration.Report) []archive.MigrationStatement {
+	var out []archive.MigrationStatement
+	for _, statement := range report.Statements {
+		if statement.Kind != "update" {
+			continue
+		}
+		if statement.Risk != migration.RiskHigh && statement.HasWhere {
+			continue
+		}
+		reason := "high-risk update"
+		if !statement.HasWhere {
+			reason = "update without where predicate"
+		}
+		out = append(out, archive.MigrationStatement{
+			Table:       statement.Table,
+			Operation:   statement.Kind,
+			Risk:        string(statement.Risk),
+			Effect:      statement.Effect,
+			Fingerprint: statement.Fingerprint,
+			Reason:      reason,
+		})
+	}
+	sort.Slice(out, func(i, j int) bool {
+		if out[i].Table != out[j].Table {
+			return out[i].Table < out[j].Table
+		}
+		return out[i].Fingerprint < out[j].Fingerprint
+	})
+	return out
+}
+
+func derivedReportsFromDamaged(graph *provenance.Graph, damaged []string) []string {
+	damagedSet := map[string]struct{}{}
+	for _, id := range damaged {
+		damagedSet[id] = struct{}{}
+	}
+	reports := map[string]struct{}{}
+	queue := append([]string(nil), damaged...)
+	visited := map[string]struct{}{}
+	for len(queue) > 0 {
+		id := queue[0]
+		queue = queue[1:]
+		if _, seen := visited[id]; seen {
+			continue
+		}
+		visited[id] = struct{}{}
+		entity, ok := graph.Entity(id)
+		if ok && entity.Kind == provenance.KindReport {
+			reports[id] = struct{}{}
+		}
+		for _, edge := range graph.Outgoing(id) {
+			if edge.Kind != provenance.EdgeDerivedInto {
+				continue
+			}
+			if _, alreadyDamaged := damagedSet[edge.To]; alreadyDamaged {
+				queue = append(queue, edge.To)
+				continue
+			}
+			if entity, ok := graph.Entity(edge.To); ok && entity.Kind == provenance.KindReport {
+				reports[edge.To] = struct{}{}
+			}
+			queue = append(queue, edge.To)
+		}
+	}
+	return stringSet(reports)
 }
 
 func maxMigrationRisk(report migration.Report) string {
@@ -3561,6 +3717,12 @@ func keys(values map[string]string) []string {
 	for key := range values {
 		out = append(out, key)
 	}
+	return out
+}
+
+func sortedStrings(values []string) []string {
+	out := append([]string(nil), values...)
+	sort.Strings(out)
 	return out
 }
 

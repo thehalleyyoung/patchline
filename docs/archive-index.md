@@ -43,3 +43,24 @@ For each incident, Patchline recomputes:
 The report then emits sorted buckets by evidence shape, migration table, migration risk, repair effect, policy decision, and benchmark decision. Its own `hash` is canonical, so teams can diff archive knowledge over time and attach it to semantic audits or signed attestations.
 
 This is deliberately not a probabilistic clustering system. The index only groups by explicit, recomputed semantic facts; missing or failing inputs surface as command failures rather than guessed categories.
+
+## Deterministic historical queries
+
+`archive-query` turns the same recomputed archive facts into immediately reviewable historical knowledge:
+
+```bash
+go run ./cmd/patchline archive-query examples/archive/bad-migration-corpus.json
+go run ./cmd/patchline archive-query examples/archive/bad-migration-corpus.json broad-updates --json
+go run ./cmd/patchline archive-query examples/archive/bad-migration-corpus.json damaged-reports --json
+go run ./cmd/patchline archive-query examples/archive/bad-migration-corpus.json missing-rollback --json
+```
+
+The default bundled corpus currently answers:
+
+| Query | Grounded result |
+| --- | --- |
+| Which migrations caused broad updates? | `billing-bad-backfill` contains a high-risk `update invoices` statement fingerprinted as `update invoices set total_cents = ? where status = ?`. |
+| Which reports derived from damaged rows? | `report:monthly_revenue` is reachable through `derived_into` evidence from damaged billing records. |
+| Which repairs lacked rollback? | None in the default corpus; the result is an empty list and the query hash still records that checked fact. |
+
+These queries are deterministic joins over evidence graph structure, migration analyzer output, repair rollback metadata, policy decisions, and benchmark hashes. They are useful on historical archives because they answer operational questions without inventing hidden classifications: every answer carries the incident id, artifact paths, hashes, and canonical query hash.

@@ -17,7 +17,7 @@ z3 --version
 make verify-usefulness
 ```
 
-That target runs the unit suite, strict CI gate, a SHA-verified public migration corpus benchmark, Z3-backed solver obligations, the semantic audit, and the incident archive index. The public corpus is downloaded into `examples/public-corpus/downloads/` from pinned raw URLs and checked against `examples/public-corpus/sources.json`; the SQL files are not vendored.
+That target runs the unit suite, strict CI gate, a SHA-verified public migration corpus benchmark, Z3-backed solver obligations, the semantic audit, the incident archive index, and deterministic historical archive queries. The public corpus is downloaded into `examples/public-corpus/downloads/` from pinned raw URLs and checked against `examples/public-corpus/sources.json`; the SQL files are not vendored.
 
 The expected default semantic audit result is `20` conforming artifacts and `0` counterexamples. If Z3 is missing, Patchline does not pretend to prove solver obligations: the solver report records the Z3 failure and downgrades those claims instead of using a handwritten SMT substitute.
 
@@ -42,7 +42,7 @@ The first scaffold in this repo focuses on a small but real core:
 | Symbolic execution | Bounded repair-program row paths with guard constraints, symbolic assignments, and stuck-step hashes |
 | Workflow model checking | Bounded ingest/explain/approve/dry-run/apply/verify/rollback/audit/archive state exploration with temporal properties, proof holes, and counterexample fixtures |
 | CEGAR refinement | Counterexample/proof-hole guided reruns that refine coarse repair abstractions with invariant specs and incident workflow models |
-| Incident archive | Deterministic archive index over evidence, migrations, repair manifests, policies, and benchmark results, bucketed by semantic shape and decisions |
+| Incident archive | Deterministic archive index and historical queries over evidence, migrations, repair manifests, policies, and benchmark results, bucketed by semantic shape, broad updates, damaged-derived reports, rollback availability, and decisions |
 | Effect inference | A deterministic effect lattice and abstract interpreter over replay diffs |
 | Migration analysis | SQL migration triage plus schema-state diffing, typed relational-signature semantics, and source-code SQL extraction |
 | Replay sandbox | In-memory and imported-snapshot dry-run engine that emits stable row diffs, compensating-action semantics, and snapshot drift reports |
@@ -90,6 +90,7 @@ go run ./cmd/patchline symbolic-exec examples/repairs/repair-bad-invoice-backfil
 go run ./cmd/patchline model-check-workflow examples/workflows/bad-migration-approved.json
 go run ./cmd/patchline cegar-refine examples/repairs/repair-bad-invoice-backfill.json --store examples/snapshots/billing-bad-migration-before.json --invariants examples/invariants/billing-core.json --workflow examples/workflows/bad-migration-approved.json
 go run ./cmd/patchline archive-index examples/archive/bad-migration-corpus.json
+go run ./cmd/patchline archive-query examples/archive/bad-migration-corpus.json --json
 go run ./cmd/patchline attestation-keygen --json
 go run ./cmd/patchline analyze-migration demos/billing/migrations/002_bad_backfill.sql
 go run ./cmd/patchline analyze-migration examples/migrations/sqlserver-top-delete.sql --dialect sqlserver

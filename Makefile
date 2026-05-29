@@ -20,6 +20,7 @@ verify-usefulness: test gate public-corpus
 	go run ./cmd/patchline solver-obligations examples/repairs/repair-bad-invoice-backfill.json --invariants examples/invariants/billing-core.json --json
 	go run ./cmd/patchline semantics-audit --json
 	go run ./cmd/patchline archive-index examples/archive/bad-migration-corpus.json --json
+	go run ./cmd/patchline archive-query examples/archive/bad-migration-corpus.json --json
 
 fmt:
 	gofmt -w cmd internal

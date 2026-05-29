@@ -77,7 +77,7 @@ The next work should prioritize features that are both formally meaningful and i
 9. **Solver-backed proof obligations**: deepen the current bounded equality/finite-store solver into a reusable obligation engine for repair review and gates.
 10. **Symbolic execution**: extend current bounded row-path execution toward branch coverage and richer path merging for small repair programs.
 11. **Workflow model checking**: extend current bounded workflow checks with richer workflow descriptors and organization-specific review policies.
-12. **Historical archive index**: make prior incidents queryable by trace shape, migration effect, repair outcome, policy decision, benchmark decision, and proof-bundle readiness.
+12. **Historical archive index**: make prior incidents queryable by trace shape, migration effect, broad-update fingerprints, damaged-derived reports, rollback availability, policy decision, benchmark decision, and proof-bundle readiness.
 13. **Proof-carrying bundles and attestations**: extend current v2 proof bundles with signed attestation workflows and verification commands.
 
 ## Design constraints
@@ -103,6 +103,7 @@ Patchline can credibly become a platform for extracting new, reproducible knowle
 - It performs CEGAR-style reruns that refine coarse repair abstractions with invariant specs and workflow evidence, while preserving explicit remaining holes.
 - It signs and verifies semantic artifacts with Ed25519 so CI gates and incident reviews can detect tampering.
 - It builds deterministic incident archives over historical evidence, migrations, repairs, policies, and benchmark outputs so recurrence and repair-effect queries have stable inputs.
+- It answers deterministic historical questions over those archives, including broad-update migrations, reports derived from damaged rows, and repairs with missing rollback evidence.
 - It validates usefulness with a `make verify-usefulness` path that runs the core suite, strict gate, Z3-backed solver obligations, semantic audit, archive index, and SHA-pinned public migration corpus.
 - It replays repairs over imported historical row snapshots and quantifies drift/stability across snapshots.
 - It gives append-only logs, event streams, queues, and external replays explicit compensating-action semantics instead of pretending snapshot rollback can undo them.

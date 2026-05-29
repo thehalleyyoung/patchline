@@ -19,6 +19,7 @@ make verify-usefulness
 | `solver-obligations` | Uses Z3 to prove the sample repair predicate is contained in the declared repair scope. |
 | `semantics-audit` | Rebuilds the semantic evidence bundle and expects all artifacts to conform with zero counterexamples. |
 | `archive-index` | Indexes historical-style evidence, migrations, repairs, policy, and benchmark outputs by semantic shape and decisions. |
+| `archive-query` | Answers deterministic historical questions about broad-update migrations, damaged-derived reports, and repairs lacking rollback. |
 
 ## Public corpus
 
@@ -45,6 +46,7 @@ The bundled billing incident is intentionally small, but it exercises the same a
 7. model-check the approval/apply workflow,
 8. emit a semantic audit,
 9. sign or verify artifacts,
-10. archive the incident by semantic shape and repair effect.
+10. archive the incident by semantic shape and repair effect,
+11. query archived facts for broad updates, damaged reports, and rollback gaps.
 
 This makes the claim falsifiable: if any artifact cannot be rebuilt, if Z3 cannot prove the scope obligation, if a policy or benchmark fails, or if a counterexample appears, the validation command fails or downgrades the relevant claim in the JSON.
