@@ -1,0 +1,40 @@
+{
+  "version": "patchline.artifact-benchmark-run/v1",
+  "dataset_id": "patchline-public-derived-repairs-v1",
+  "manifest": "benchmarks/manifests/public_repairs.json",
+  "ok": true,
+  "metrics": {
+    "total": 1,
+    "passed": 1,
+    "failed": 0,
+    "by_type": {
+      "repair": 1
+    },
+    "by_result": {
+      "cannot_prove": 1
+    },
+    "phase_guards": 0
+  },
+  "cases": [
+    {
+      "case_id": "gitlab-2017-counterfactual-no-snapshot-repair",
+      "case_type": "repair",
+      "phase": "during_repair",
+      "fixture": "../../examples/historical-failures/gitlab-2017/no-snapshot-repair.json",
+      "ground_truth": "../ground_truth/repairs/gitlab-2017-counterfactual-no-snapshot-repair.json",
+      "input_kind": "repair_plan",
+      "expected_result": "cannot_prove",
+      "actual_result": "cannot_prove",
+      "risk": "high",
+      "ok": true,
+      "signals": [
+        "repair:not-replayable-or-missing-snapshot"
+      ],
+      "hashes": {
+        "repair_manifest": "315ccb9935c152cded28a44a803693da06d144764aa2687e3c6ebe386fd69905"
+      }
+    }
+  ],
+  "hash": "b23d1e1d35aa200089f0be992fd2316bebef6bad4a82835460972b0a02488acb",
+  "markdown": "# Artifact benchmark report\n\n- dataset_id: `patchline-public-derived-repairs-v1`\n- ok: `true`\n- hash: `b23d1e1d35aa200089f0be992fd2316bebef6bad4a82835460972b0a02488acb`\n- total: `1`\n- passed: `1`\n- failed: `0`\n\n| case | type | phase | expected | actual | ok |\n| --- | --- | --- | --- | --- | ---: |\n| gitlab-2017-counterfactual-no-snapshot-repair | repair | during_repair | cannot_prove | cannot_prove | true |\n"
+}

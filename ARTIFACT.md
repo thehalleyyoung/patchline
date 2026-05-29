@@ -169,13 +169,21 @@ make artifact-benchmark-public-incidents
 
 It validates `benchmarks/manifests/public_incidents.json`, runs GitLab 2017 and GitHub 2018 public source-observation fixtures, and checks that a public summary with no transition/repair facts remains `insufficient_evidence`.
 
+The public-derived repair path is also offline and source-grounded:
+
+```bash
+make artifact-benchmark-public-repairs
+```
+
+It validates `benchmarks/manifests/public_repairs.json`, runs a single Patchline-authored counterfactual repair manifest derived from the GitLab 2017 public postmortem and follow-up issues, and compares the report with `benchmarks/expected/public-repairs-report.json`. This path intentionally checks a boundary claim: with only a repair plan and public recovery-gap evidence, Patchline should say `cannot_prove` rather than inventing snapshot rollback proof.
+
 If a semantic change intentionally changes the benchmark outputs, refresh the frozen reports with:
 
 ```bash
 make artifact-benchmark-refresh
 ```
 
-This command rewrites `benchmarks/expected/*-report.{json,md}`, then reruns `make artifact-benchmark-compare`, `make artifact-benchmark-public`, and `make artifact-benchmark-public-incidents`. Reviewers should use compare targets; refresh is a maintainer workflow for updating golden files after deliberate semantic changes.
+This command rewrites `benchmarks/expected/*-report.{json,md}`, then reruns `make artifact-benchmark-compare`, `make artifact-benchmark-public`, `make artifact-benchmark-public-incidents`, and `make artifact-benchmark-public-repairs`. Reviewers should use compare targets; refresh is a maintainer workflow for updating golden files after deliberate semantic changes.
 
 ## Canonical demo
 
@@ -243,7 +251,7 @@ These cases are part of the artifact, not merely prose limitations.
 
 ## Relationship to `make verify-usefulness`
 
-`make verify-usefulness` remains the broader project validation target. It includes network-backed public corpus fetching and source checks. `make artifact-smoke` is the artifact-review entry point: it is smaller, committed-fixture-only, and intended to be stable without network access. `make artifact-studies-compare` is the offline evaluator-facing measurement and drift-check entry point for current baseline/ablation/scale evidence, `make artifact-studies-public-compare` is the explicit public-data study drift check, `make artifact-benchmark-compare` is the offline golden-output check for the executable manifest protocol, `make artifact-benchmark-public` is the explicit public-data benchmark check, and the refresh targets are maintainer paths for rewriting expected outputs after intentional semantic changes.
+`make verify-usefulness` remains the broader project validation target. It includes network-backed public corpus fetching and source checks. `make artifact-smoke` is the artifact-review entry point: it is smaller, committed-fixture-only, and intended to be stable without network access. `make artifact-studies-compare` is the offline evaluator-facing measurement and drift-check entry point for current baseline/ablation/scale evidence, `make artifact-studies-public-compare` is the explicit public-data study drift check, `make artifact-benchmark-compare` is the offline golden-output check for the executable manifest protocol, `make artifact-benchmark-public` is the explicit public-data benchmark check, `make artifact-benchmark-public-incidents` and `make artifact-benchmark-public-repairs` are offline public-source-derived checks, and the refresh targets are maintainer paths for rewriting expected outputs after intentional semantic changes.
 
 ## Data provenance
 

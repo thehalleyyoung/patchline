@@ -1,0 +1,33 @@
+{
+  "case_id": "gitlab-2017-counterfactual-no-snapshot-repair",
+  "case_type": "repair",
+  "phase": "during_repair",
+  "labels": {
+    "expected_result": "cannot_prove",
+    "risk": "high"
+  },
+  "evidence": [
+    {
+      "kind": "postmortem",
+      "locator": "https://about.gitlab.com/blog/postmortem-of-database-outage-of-january-31/",
+      "rationale": "The public GitLab postmortem establishes destructive primary database data loss and failed backup recovery, so a counterfactual repair cannot be certified from a repair plan alone."
+    },
+    {
+      "kind": "public_issue",
+      "locator": "https://gitlab.com/gitlab-com/gl-infra/production/-/issues/1098",
+      "rationale": "The public follow-up issue states that daily LVM snapshots were inadequate as a recovery technique, making snapshot availability a source-grounded repair obligation."
+    },
+    {
+      "kind": "public_issue",
+      "locator": "https://gitlab.com/gitlab-com/gl-infra/production/-/issues/1102",
+      "rationale": "The public follow-up issue requires automated PostgreSQL backup-restore testing, supporting the benchmark expectation that Patchline should not manufacture proof without verified restore evidence."
+    },
+    {
+      "kind": "derived_artifact",
+      "locator": "examples/historical-failures/gitlab-2017/no-snapshot-repair.json",
+      "rationale": "This Patchline-authored counterfactual repair manifest is derived from public incident evidence and intentionally declares no snapshot rollback, so it is an input artifact rather than independent corroborating evidence."
+    }
+  ],
+  "allowed_inputs": ["repair_plan"],
+  "excluded_inputs": ["bounded_store", "snapshot_rollback", "private_production_data", "preincident_oracle"]
+}

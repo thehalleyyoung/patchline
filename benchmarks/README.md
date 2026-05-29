@@ -65,13 +65,21 @@ make artifact-benchmark-public-incidents
 
 That target runs `manifests/public_incidents.json` against GitLab 2017 and GitHub 2018 source-observation JSONL fixtures, then checks an adjacent boundary case where a public summary remains too thin and must produce `insufficient_evidence`. Unlike `artifact-benchmark-public`, this target does not fetch network data.
 
+Run the public-derived repair boundary with:
+
+```bash
+make artifact-benchmark-public-repairs
+```
+
+That target runs `manifests/public_repairs.json` against one Patchline-authored counterfactual repair manifest derived from GitLab 2017 public sources, then compares against `expected/public-repairs-report.json`. The public postmortem and follow-up issues are the source evidence; the local repair manifest is a derived input artifact. This is intentionally not framed as a full repair corpus yet.
+
 Expected reports are intentionally not refreshed by the compare target. After a deliberate semantics change, maintainers can run:
 
 ```bash
 make artifact-benchmark-refresh
 ```
 
-That target rewrites the committed golden JSON/Markdown reports, including repair, regression, public migration, and public incident reports, and then runs the normal compare paths against the refreshed files.
+That target rewrites the committed golden JSON/Markdown reports, including repair, regression, public migration, public incident, and public-derived repair reports, and then runs the normal compare paths against the refreshed files.
 
 ## Executable study outputs
 
@@ -105,6 +113,7 @@ The planned full benchmark families are:
 
 - public OSS migrations (currently five pinned Bytebase migrations);
 - public historical incidents (currently GitLab 2017 and GitHub 2018 source-observation cases plus an insufficient-evidence boundary);
+- public-derived repair boundaries (currently one GitLab 2017 counterfactual no-snapshot repair case);
 - repair/replay cases (currently three committed during-repair cases);
 - semantic regression archives (currently one recurrence and one non-recurrence case);
 - negative/limitation cases.

@@ -1,0 +1,14 @@
+{
+  "version": "patchline.artifact-benchmark/v1",
+  "dataset_id": "patchline-public-derived-repairs-v1",
+  "description": "Single public-derived counterfactual repair case built from GitLab 2017 postmortem and follow-up issue evidence; the repair manifest is Patchline-authored from public sources, not a verbatim upstream repair artifact.",
+  "cases": [
+    {
+      "case_id": "gitlab-2017-counterfactual-no-snapshot-repair",
+      "case_type": "repair",
+      "available_at": "during_repair",
+      "fixture": "../../examples/historical-failures/gitlab-2017/no-snapshot-repair.json",
+      "ground_truth": "../ground_truth/repairs/gitlab-2017-counterfactual-no-snapshot-repair.json"
+    }
+  ]
+}
