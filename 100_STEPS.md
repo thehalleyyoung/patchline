@@ -105,12 +105,12 @@ Checked items are already represented in the repo. Unchecked items are the next 
 76. [x] Add proof-obligation objects with status `proved`, `checked`, `counterexample`, `assumed`, or `not_supported`.
 77. [x] Add proof-hole reporting so practical checks are honest about what remains unproved.
 78. [x] Add proof-carrying repair bundles containing manifest, evidence slice, dry-run hash, policies, proof obligations, counterexamples, and ledger checkpoint.
-79. [ ] Add CEGAR-style refinement: emit counterexample, refine abstraction, rerun semantic analysis.
-80. [ ] Add signed proof/gate attestations for CI and incident review artifacts.
+79. [x] Add CEGAR-style refinement: emit counterexample, refine abstraction, rerun semantic analysis.
+80. [x] Add signed proof/gate attestations for CI and incident review artifacts.
 
 ## I. Historical knowledge generation
 
-81. [ ] Add an incident archive index over past evidence, migrations, repair manifests, policies, and benchmark results.
+81. [x] Add an incident archive index over past evidence, migrations, repair manifests, policies, and benchmark results.
 82. [ ] Add deterministic historical queries: "which migrations caused broad updates?", "which reports repeatedly derived from damaged rows?", "which repairs lacked rollback?"
 83. [ ] Add repair outcome history: dry-run hash, applied SQL hash, verification result, rollback availability, and later recurrence.
 84. [ ] Add semantic regression detection over history: a new migration resembles prior high-risk trace shapes or violates learned invariant candidates.

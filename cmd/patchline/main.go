@@ -10,6 +10,8 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/patchline/patchline/internal/archive"
+	"github.com/patchline/patchline/internal/attest"
 	"github.com/patchline/patchline/internal/bench"
 	"github.com/patchline/patchline/internal/bundle"
 	"github.com/patchline/patchline/internal/canonical"
@@ -23,6 +25,7 @@ import (
 	"github.com/patchline/patchline/internal/policy"
 	"github.com/patchline/patchline/internal/proof"
 	"github.com/patchline/patchline/internal/provenance"
+	"github.com/patchline/patchline/internal/refinement"
 	"github.com/patchline/patchline/internal/repair"
 	"github.com/patchline/patchline/internal/replay"
 	"github.com/patchline/patchline/internal/reproduce"
@@ -91,6 +94,11 @@ func run(args []string) error {
 		return traceEquivalence(args[1], args[2], hasFlag(args[3:], "--json"))
 	case "provenance":
 		return provenanceCommand(args[1:])
+	case "archive-index":
+		if len(args) < 2 {
+			return errors.New("usage: patchline archive-index <archive-spec.json> [--json]")
+		}
+		return archiveIndex(args[1], hasFlag(args[2:], "--json"))
 	case "demo-graph":
 		return writeJSON(os.Stdout, graphDTO(demo.Graph()))
 	case "explain", "trace-row":
@@ -146,6 +154,23 @@ func run(args []string) error {
 			return errors.New("usage: patchline model-check-workflow <workflow.json> [--json]")
 		}
 		return modelCheckWorkflow(args[1], hasFlag(args[2:], "--json"))
+	case "cegar-refine":
+		if len(args) < 2 {
+			return errors.New("usage: patchline cegar-refine <manifest.json> [--store store.json] [--invariants invariants.json] [--workflow workflow.json] [--json]")
+		}
+		return cegarRefine(args[1], args[2:], hasFlag(args[2:], "--json"))
+	case "attestation-keygen":
+		return attestationKeygen(hasFlag(args[1:], "--json"))
+	case "sign-artifact":
+		if len(args) < 2 {
+			return errors.New("usage: patchline sign-artifact <artifact.json> --subject subject --seed-hex seed [--out attestation.json] [--json]")
+		}
+		return signArtifact(args[1], args[2:], hasFlag(args[2:], "--json"))
+	case "verify-artifact":
+		if len(args) < 2 {
+			return errors.New("usage: patchline verify-artifact <attestation.json> --artifact artifact.json [--json]")
+		}
+		return verifyArtifact(args[1], args[2:], hasFlag(args[2:], "--json"))
 	case "generate-sql":
 		if len(args) < 2 {
 			return errors.New("usage: patchline generate-sql <manifest.json> [--json]")
@@ -286,7 +311,7 @@ func usage() {
 Usage:
   patchline about
   patchline semantics-contract [--json]
-  patchline semantics-audit [--json] [--evidence events.jsonl] [--repair manifest.json] [--migration migration.sql] [--benchmark suite.json] [--policy policy.json] [--workflow workflow.json] [--snapshot-before store.json] [--snapshot-after store.json]
+  patchline semantics-audit [--json] [--evidence events.jsonl] [--repair manifest.json] [--migration migration.sql] [--benchmark suite.json] [--policy policy.json] [--workflow workflow.json] [--archive archive-spec.json] [--snapshot-before store.json] [--snapshot-after store.json]
   patchline trace-reconstruct <evidence.jsonl> [--json]
   patchline trace-equivalence <left.jsonl> <right.jsonl> [--json]
   patchline provenance cause <entity-id> [--json] [--graph graph.json] [--evidence evidence.jsonl]
@@ -295,6 +320,7 @@ Usage:
   patchline provenance certificate <entity-id> [--json] [--graph graph.json] [--evidence evidence.jsonl]
   patchline provenance diff <left-evidence.jsonl> <right-evidence.jsonl> [--json]
   patchline provenance archive <evidence.jsonl>... [--json]
+  patchline archive-index <archive-spec.json> [--json]
   patchline demo-graph
   patchline explain <entity-id> [--graph graph.json]
   patchline slice <entity-id> [--json] [--graph graph.json]
@@ -305,6 +331,10 @@ Usage:
   patchline solver-obligations <manifest.json> [--invariants invariants.json] [--store store.json] [--json]
   patchline symbolic-exec <manifest.json> [--store store.json] [--json]
   patchline model-check-workflow <workflow.json> [--json]
+  patchline cegar-refine <manifest.json> [--store store.json] [--invariants invariants.json] [--workflow workflow.json] [--json]
+  patchline attestation-keygen [--json]
+  patchline sign-artifact <artifact.json> --subject subject --seed-hex seed [--out attestation.json] [--json]
+  patchline verify-artifact <attestation.json> --artifact artifact.json [--json]
   patchline generate-sql <manifest.json> [--json]
   patchline rollback-plan <manifest.json> [--json]
   patchline transaction-plan <manifest.json> [--json]
@@ -346,6 +376,7 @@ type semanticAuditOptions struct {
 	Invariants     string
 	Policy         string
 	Workflow       string
+	Archive        string
 	SnapshotBefore string
 	SnapshotAfter  string
 }
@@ -359,6 +390,7 @@ func parseSemanticAuditOptions(args []string) (semanticAuditOptions, error) {
 		Invariants:     "examples/invariants/billing-core.json",
 		Policy:         "examples/policies/review-required.json",
 		Workflow:       "examples/workflows/bad-migration-approved.json",
+		Archive:        "examples/archive/bad-migration-corpus.json",
 		SnapshotBefore: "examples/snapshots/billing-bad-migration-before.json",
 		SnapshotAfter:  "examples/snapshots/billing-bad-migration-before.json",
 	}
@@ -383,6 +415,9 @@ func parseSemanticAuditOptions(args []string) (semanticAuditOptions, error) {
 	}
 	if opts.Workflow, ok = flagValue(args, "--workflow"); !ok {
 		opts.Workflow = "examples/workflows/bad-migration-approved.json"
+	}
+	if opts.Archive, ok = flagValue(args, "--archive"); !ok {
+		opts.Archive = "examples/archive/bad-migration-corpus.json"
 	}
 	if opts.SnapshotBefore, ok = flagValue(args, "--snapshot-before"); !ok {
 		opts.SnapshotBefore = "examples/snapshots/billing-bad-migration-before.json"
@@ -629,6 +664,127 @@ func printIncidentArchive(paths []string, jsonOut bool) error {
 		fmt.Printf("  bucket: %s count=%d\n", bucket.ShapeHash, bucket.Count)
 	}
 	return nil
+}
+
+func archiveIndex(specPath string, jsonOut bool) error {
+	spec, err := readArchiveSpec(specPath)
+	if err != nil {
+		return err
+	}
+	entries := make([]archive.Entry, 0, len(spec.Incidents))
+	baseDir := filepath.Dir(specPath)
+	for _, incident := range spec.Incidents {
+		entry, err := buildArchiveEntry(baseDir, incident)
+		if err != nil {
+			return err
+		}
+		entries = append(entries, entry)
+	}
+	report := archive.Build(spec, entries)
+	if jsonOut {
+		return writeJSON(os.Stdout, report)
+	}
+	fmt.Printf("archive index incidents=%d shapes=%d migration_tables=%d repair_effects=%d hash=%s\n",
+		len(report.Incidents),
+		len(report.ByShape),
+		len(report.ByMigrationTable),
+		len(report.ByRepairEffect),
+		report.Hash,
+	)
+	for _, bucket := range report.ByMigrationRisk {
+		fmt.Printf("  migration_risk %s count=%d\n", bucket.Key, bucket.Count)
+	}
+	return nil
+}
+
+func buildArchiveEntry(baseDir string, input archive.InputSpec) (archive.Entry, error) {
+	evidencePath := resolvePath(baseDir, input.Evidence)
+	migrationPath := resolvePath(baseDir, input.Migration)
+	repairPath := resolvePath(baseDir, input.Repair)
+	policyPath := resolvePath(baseDir, input.Policy)
+	benchmarkPath := resolvePath(baseDir, input.Benchmark)
+
+	evidenceResult, err := readEvidenceResult(evidencePath)
+	if err != nil {
+		return archive.Entry{}, err
+	}
+	graph, err := provenance.FromSlices(evidenceResult.Entities, evidenceResult.Edges)
+	if err != nil {
+		return archive.Entry{}, err
+	}
+	migrationReport, err := migration.AnalyzeFile(migrationPath)
+	if err != nil {
+		return archive.Entry{}, err
+	}
+	manifest, err := readManifest(repairPath)
+	if err != nil {
+		return archive.Entry{}, err
+	}
+	dryRun, err := replay.DryRun(manifest, graph, demo.BillingStore())
+	if err != nil {
+		return archive.Entry{}, err
+	}
+	effectSummary := abstractEffectSummary(manifest, dryRun)
+	policyEvaluation, err := buildPolicyEvaluation(policyPath, repairPath, migrationPath)
+	if err != nil {
+		return archive.Entry{}, err
+	}
+	benchmarkSpec, err := readBenchmarkSpec(benchmarkPath)
+	if err != nil {
+		return archive.Entry{}, err
+	}
+	benchmarkResult, err := bench.Run(benchmarkSpec, filepath.Dir(benchmarkPath))
+	if err != nil {
+		return archive.Entry{}, err
+	}
+
+	entry := archive.Entry{
+		ID:               input.ID,
+		EvidencePath:     input.Evidence,
+		MigrationPath:    input.Migration,
+		RepairPath:       input.Repair,
+		PolicyPath:       input.Policy,
+		BenchmarkPath:    input.Benchmark,
+		EvidenceHash:     evidenceResult.InputHash,
+		ShapeHash:        provenance.ShapeHash(graph),
+		MigrationHash:    migrationReport.Summary.ReportHash,
+		MigrationTables:  migrationReport.Summary.Tables,
+		MigrationMaxRisk: maxMigrationRisk(migrationReport),
+		RepairHash:       canonical.Hash(manifest),
+		RepairEffect:     string(effectSummary.Join),
+		PolicyAllowed:    policyEvaluation.OK,
+		PolicyFailures:   collectPolicyFailures(policyEvaluation),
+		PolicyHash:       policyEvaluation.PolicyHash,
+		BenchmarkOK:      benchmarkResult.OK,
+		BenchmarkHash:    benchmarkResult.SuiteHash,
+		DamagedEntities:  len(evidenceResult.DamagedEntities),
+		DerivedReports:   countEntitiesByKind(graph, provenance.KindReport),
+		ProofBundleReady: dryRun.Hash() != "" && policyEvaluation.PolicyHash != "" && benchmarkResult.SuiteHash != "",
+	}
+	return entry, nil
+}
+
+func maxMigrationRisk(report migration.Report) string {
+	if report.Summary.HighRisk > 0 {
+		return string(migration.RiskHigh)
+	}
+	if report.Summary.MediumRisk > 0 {
+		return string(migration.RiskMedium)
+	}
+	if report.Summary.LowRisk > 0 {
+		return string(migration.RiskLow)
+	}
+	return "none"
+}
+
+func countEntitiesByKind(g *provenance.Graph, kind provenance.EntityKind) int {
+	count := 0
+	for _, entity := range g.Entities() {
+		if entity.Kind == kind {
+			count++
+		}
+	}
+	return count
 }
 
 func readTraceProjection(path string) (evidence.TraceProjection, error) {
@@ -1253,6 +1409,44 @@ func semanticArtifacts(opts semanticAuditOptions) ([]semantics.ArtifactEvidence,
 	}
 	artifacts = append(artifacts, workflowArtifact)
 
+	refinementReport := refinement.Analyze(manifest, beforeStore, &invariantSpec, &workflowDescriptor)
+	refinementArtifact := semantics.ArtifactEvidence{
+		Path: opts.Repair,
+		Kind: "cegar_refinement",
+		Facts: []string{
+			fmt.Sprintf("iterations=%d", len(refinementReport.Iterations)),
+			fmt.Sprintf("refinements=%d", len(refinementReport.Refinements)),
+			fmt.Sprintf("remaining_holes=%d", len(refinementReport.RemainingHoles)),
+			fmt.Sprintf("counterexamples=%d", len(refinementReport.Counterexamples)),
+		},
+		Hashes: map[string]string{
+			"cegar_refinement_hash": refinementReport.Hash,
+			"bounded_store_hash":    refinementReport.StoreHash,
+		},
+		Claims: []semantics.Claim{{
+			Ref:      "cegar.refinement",
+			Status:   checkedStatus(len(refinementReport.Counterexamples) == 0),
+			Reason:   "counterexample/proof-hole guided refinement reran semantic checks with invariants and workflow evidence; remaining holes are explicit obligations",
+			Evidence: refinementReport.Hash,
+		}},
+		Metadata: map[string]interface{}{"refinements": refinementReport.Refinements},
+	}
+	for _, hole := range refinementReport.RemainingHoles {
+		refinementArtifact.Obligations = append(refinementArtifact.Obligations, semantics.Obligation{
+			Ref:         hole.Ref,
+			Description: hole.Reason,
+			Status:      proofObligationStatus(hole.Status),
+		})
+	}
+	for _, counterexample := range refinementReport.Counterexamples {
+		refinementArtifact.Counterexamples = append(refinementArtifact.Counterexamples, semantics.Counterexample{
+			Ref:     counterexample.Ref,
+			Message: counterexample.Message,
+			Witness: counterexample.Witness,
+		})
+	}
+	artifacts = append(artifacts, refinementArtifact)
+
 	sqlPlan, err := repair.GenerateSQL(manifest)
 	if err != nil {
 		return nil, err
@@ -1528,6 +1722,44 @@ func semanticArtifacts(opts semanticAuditOptions) ([]semantics.ArtifactEvidence,
 		})
 	}
 	artifacts = append(artifacts, outcomeArtifact)
+
+	archiveSpec, err := readArchiveSpec(opts.Archive)
+	if err != nil {
+		return nil, err
+	}
+	archiveEntries := make([]archive.Entry, 0, len(archiveSpec.Incidents))
+	for _, input := range archiveSpec.Incidents {
+		entry, err := buildArchiveEntry(filepath.Dir(opts.Archive), input)
+		if err != nil {
+			return nil, err
+		}
+		archiveEntries = append(archiveEntries, entry)
+	}
+	archiveReport := archive.Build(archiveSpec, archiveEntries)
+	artifacts = append(artifacts, semantics.ArtifactEvidence{
+		Path: opts.Archive,
+		Kind: "incident_archive",
+		Facts: []string{
+			fmt.Sprintf("incidents=%d", len(archiveReport.Incidents)),
+			fmt.Sprintf("shape_buckets=%d", len(archiveReport.ByShape)),
+			fmt.Sprintf("migration_table_buckets=%d", len(archiveReport.ByMigrationTable)),
+			fmt.Sprintf("repair_effect_buckets=%d", len(archiveReport.ByRepairEffect)),
+		},
+		Hashes: map[string]string{"archive_index_hash": archiveReport.Hash},
+		Claims: []semantics.Claim{{
+			Ref:      "archive.incident_index",
+			Status:   checkedStatus(len(archiveReport.Incidents) > 0),
+			Reason:   "historical incidents were deterministically bucketed by evidence shape, migration table/risk, repair effect, policy decision, and benchmark decision",
+			Evidence: archiveReport.Hash,
+		}},
+		Metadata: map[string]interface{}{
+			"by_shape":              archiveReport.ByShape,
+			"by_migration_table":    archiveReport.ByMigrationTable,
+			"by_repair_effect":      archiveReport.ByRepairEffect,
+			"by_policy_decision":    archiveReport.ByPolicyDecision,
+			"by_benchmark_decision": archiveReport.ByBenchmarkDecision,
+		},
+	})
 
 	ledgerEntries, checkpoint := demo.SampleLedger()
 	ledgerErr := ledger.VerifyCheckpoint(ledgerEntries, checkpoint)
@@ -2281,6 +2513,170 @@ func lintRepair(path string, jsonOut, proof bool) error {
 	return nil
 }
 
+func cegarRefine(manifestPath string, args []string, jsonOut bool) error {
+	manifest, err := readManifest(manifestPath)
+	if err != nil {
+		return err
+	}
+	store := demo.BillingStore()
+	if storePath, ok := flagValue(args, "--store"); ok {
+		store, err = readStore(storePath)
+		if err != nil {
+			return err
+		}
+	}
+	var spec *invariant.Spec
+	if invariantPath, ok := flagValue(args, "--invariants"); ok {
+		loaded, err := readInvariantSpec(invariantPath)
+		if err != nil {
+			return err
+		}
+		spec = &loaded
+	}
+	var descriptor *workflow.Descriptor
+	if workflowPath, ok := flagValue(args, "--workflow"); ok {
+		loaded, err := readWorkflowDescriptor(workflowPath)
+		if err != nil {
+			return err
+		}
+		descriptor = &loaded
+	}
+	report := refinement.Analyze(manifest, store, spec, descriptor)
+	if jsonOut {
+		return writeJSON(os.Stdout, report)
+	}
+	fmt.Printf("cegar refinement manifest=%s iterations=%d refinements=%d holes=%d counterexamples=%d ok=%t hash=%s\n",
+		report.Manifest,
+		len(report.Iterations),
+		len(report.Refinements),
+		len(report.RemainingHoles),
+		len(report.Counterexamples),
+		report.OK,
+		report.Hash,
+	)
+	if len(report.Counterexamples) > 0 {
+		return errors.New("cegar refinement found counterexamples")
+	}
+	return nil
+}
+
+func attestationKeygen(jsonOut bool) error {
+	seed, err := attest.GenerateSeed()
+	if err != nil {
+		return err
+	}
+	publicKey, err := attest.PublicKeyHex(seed)
+	if err != nil {
+		return err
+	}
+	result := struct {
+		Version   string `json:"version"`
+		SeedHex   string `json:"seed_hex"`
+		PublicKey string `json:"public_key"`
+		Warning   string `json:"warning"`
+	}{
+		Version:   attest.SignatureVersion,
+		SeedHex:   attest.SeedHex(seed),
+		PublicKey: publicKey,
+		Warning:   "store seed_hex in CI secrets or a local vault; do not commit it",
+	}
+	if jsonOut {
+		return writeJSON(os.Stdout, result)
+	}
+	fmt.Printf("attestation key generated public_key=%s\nwarning: %s\nseed_hex=%s\n", result.PublicKey, result.Warning, result.SeedHex)
+	return nil
+}
+
+func signArtifact(path string, args []string, jsonOut bool) error {
+	subject, ok := flagValue(args, "--subject")
+	if !ok || subject == "" {
+		return errors.New("sign-artifact requires --subject")
+	}
+	seedValue, ok := flagValue(args, "--seed-hex")
+	if !ok || seedValue == "" {
+		return errors.New("sign-artifact requires --seed-hex")
+	}
+	seed, err := attest.SeedFromHex(seedValue)
+	if err != nil {
+		return err
+	}
+	artifact, err := os.ReadFile(path)
+	if err != nil {
+		return err
+	}
+	statement, err := attest.Sign(subject, artifact, seed)
+	if err != nil {
+		return err
+	}
+	if outPath, ok := flagValue(args, "--out"); ok {
+		file, err := os.Create(outPath)
+		if err != nil {
+			return err
+		}
+		if err := writeJSON(file, statement); err != nil {
+			file.Close()
+			return err
+		}
+		if err := file.Close(); err != nil {
+			return err
+		}
+	}
+	if jsonOut || !hasFlag(args, "--out") {
+		return writeJSON(os.Stdout, statement)
+	}
+	fmt.Printf("signed artifact subject=%s artifact_hash=%s public_key=%s\n", statement.Subject, statement.ArtifactHash, statement.PublicKey)
+	return nil
+}
+
+func verifyArtifact(attestationPath string, args []string, jsonOut bool) error {
+	artifactPath, ok := flagValue(args, "--artifact")
+	if !ok || artifactPath == "" {
+		return errors.New("verify-artifact requires --artifact")
+	}
+	statementFile, err := os.Open(attestationPath)
+	if err != nil {
+		return err
+	}
+	defer statementFile.Close()
+	decoder := json.NewDecoder(statementFile)
+	decoder.DisallowUnknownFields()
+	var statement attest.Signed
+	if err := decoder.Decode(&statement); err != nil {
+		return err
+	}
+	artifact, err := os.ReadFile(artifactPath)
+	if err != nil {
+		return err
+	}
+	verifyErr := attest.VerifySignature(statement, artifact)
+	result := struct {
+		OK           bool   `json:"ok"`
+		Subject      string `json:"subject"`
+		ArtifactHash string `json:"artifact_hash"`
+		PublicKey    string `json:"public_key"`
+		Error        string `json:"error,omitempty"`
+	}{
+		OK:           verifyErr == nil,
+		Subject:      statement.Subject,
+		ArtifactHash: statement.ArtifactHash,
+		PublicKey:    statement.PublicKey,
+	}
+	if verifyErr != nil {
+		result.Error = verifyErr.Error()
+	}
+	if jsonOut {
+		if err := writeJSON(os.Stdout, result); err != nil {
+			return err
+		}
+	} else {
+		fmt.Printf("attestation verify subject=%s ok=%t artifact_hash=%s public_key=%s\n", result.Subject, result.OK, result.ArtifactHash, result.PublicKey)
+	}
+	if verifyErr != nil {
+		return verifyErr
+	}
+	return nil
+}
+
 func generateSQL(path string, jsonOut bool) error {
 	manifest, err := readManifest(path)
 	if err != nil {
@@ -2948,6 +3344,24 @@ func readWorkflowDescriptor(path string) (workflow.Descriptor, error) {
 		return workflow.Descriptor{}, err
 	}
 	return descriptor, nil
+}
+
+func readArchiveSpec(path string) (archive.Spec, error) {
+	file, err := os.Open(path)
+	if err != nil {
+		return archive.Spec{}, err
+	}
+	defer file.Close()
+	decoder := json.NewDecoder(file)
+	decoder.DisallowUnknownFields()
+	var spec archive.Spec
+	if err := decoder.Decode(&spec); err != nil {
+		return archive.Spec{}, err
+	}
+	if spec.Version != archive.Version {
+		return archive.Spec{}, fmt.Errorf("archive spec version must be %s", archive.Version)
+	}
+	return spec, nil
 }
 
 func readReproduceSpec(path string) (reproduce.Spec, error) {

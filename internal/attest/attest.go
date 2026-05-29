@@ -1,13 +1,21 @@
 package attest
 
 import (
+	"crypto/ed25519"
+	"crypto/rand"
+	"crypto/sha256"
+	"encoding/hex"
+	"errors"
 	"fmt"
 	"strings"
 
+	"github.com/patchline/patchline/internal/canonical"
 	"github.com/patchline/patchline/internal/migration"
 	"github.com/patchline/patchline/internal/repair"
 	"github.com/patchline/patchline/internal/replay"
 )
+
+const SignatureVersion = "patchline.signed-attestation/v1"
 
 type Check struct {
 	Kind   string `json:"kind"`
@@ -22,6 +30,15 @@ type Result struct {
 	Expected string `json:"expected"`
 	Actual   string `json:"actual"`
 	Message  string `json:"message,omitempty"`
+}
+
+type Signed struct {
+	Version      string `json:"version"`
+	Algorithm    string `json:"algorithm"`
+	Subject      string `json:"subject"`
+	ArtifactHash string `json:"artifact_hash"`
+	PublicKey    string `json:"public_key"`
+	Signature    string `json:"signature"`
 }
 
 func Verify(report replay.Report, manifest repair.Manifest, checks []Check) []Result {
@@ -39,6 +56,91 @@ func OK(results []Result) bool {
 		}
 	}
 	return true
+}
+
+func GenerateSeed() ([]byte, error) {
+	seed := make([]byte, ed25519.SeedSize)
+	if _, err := rand.Read(seed); err != nil {
+		return nil, err
+	}
+	return seed, nil
+}
+
+func SeedFromHex(value string) ([]byte, error) {
+	seed, err := hex.DecodeString(value)
+	if err != nil {
+		return nil, err
+	}
+	if len(seed) != ed25519.SeedSize {
+		return nil, fmt.Errorf("ed25519 seed must be %d bytes", ed25519.SeedSize)
+	}
+	return seed, nil
+}
+
+func SeedHex(seed []byte) string {
+	return hex.EncodeToString(seed)
+}
+
+func PublicKeyHex(seed []byte) (string, error) {
+	if len(seed) != ed25519.SeedSize {
+		return "", fmt.Errorf("ed25519 seed must be %d bytes", ed25519.SeedSize)
+	}
+	privateKey := ed25519.NewKeyFromSeed(seed)
+	return hex.EncodeToString(privateKey.Public().(ed25519.PublicKey)), nil
+}
+
+func Sign(subject string, artifact []byte, seed []byte) (Signed, error) {
+	if subject == "" {
+		return Signed{}, errors.New("attestation subject is required")
+	}
+	if len(seed) != ed25519.SeedSize {
+		return Signed{}, fmt.Errorf("ed25519 seed must be %d bytes", ed25519.SeedSize)
+	}
+	privateKey := ed25519.NewKeyFromSeed(seed)
+	publicKey := privateKey.Public().(ed25519.PublicKey)
+	statement := Signed{
+		Version:      SignatureVersion,
+		Algorithm:    "ed25519",
+		Subject:      subject,
+		ArtifactHash: artifactHash(artifact),
+		PublicKey:    hex.EncodeToString(publicKey),
+	}
+	signature := ed25519.Sign(privateKey, statementMessage(statement))
+	statement.Signature = hex.EncodeToString(signature)
+	return statement, nil
+}
+
+func VerifySignature(statement Signed, artifact []byte) error {
+	if statement.Version != SignatureVersion {
+		return fmt.Errorf("attestation version must be %s", SignatureVersion)
+	}
+	if statement.Algorithm != "ed25519" {
+		return fmt.Errorf("unsupported attestation algorithm %q", statement.Algorithm)
+	}
+	if statement.Subject == "" {
+		return errors.New("attestation subject is required")
+	}
+	if statement.ArtifactHash != artifactHash(artifact) {
+		return fmt.Errorf("artifact hash mismatch: attestation=%s actual=%s", statement.ArtifactHash, artifactHash(artifact))
+	}
+	publicKey, err := hex.DecodeString(statement.PublicKey)
+	if err != nil {
+		return err
+	}
+	if len(publicKey) != ed25519.PublicKeySize {
+		return fmt.Errorf("ed25519 public key must be %d bytes", ed25519.PublicKeySize)
+	}
+	signature, err := hex.DecodeString(statement.Signature)
+	if err != nil {
+		return err
+	}
+	if len(signature) != ed25519.SignatureSize {
+		return fmt.Errorf("ed25519 signature must be %d bytes", ed25519.SignatureSize)
+	}
+	if !ed25519.Verify(ed25519.PublicKey(publicKey), statementMessage(statement), signature) {
+		return errors.New("attestation signature verification failed")
+	}
+	return nil
 }
 
 func verifyOne(report replay.Report, manifest repair.Manifest, check Check) Result {
@@ -86,6 +188,16 @@ func verifyOne(report replay.Report, manifest repair.Manifest, check Check) Resu
 		result.Message = "unknown attestation check kind"
 	}
 	return result
+}
+
+func artifactHash(artifact []byte) string {
+	sum := sha256.Sum256(artifact)
+	return hex.EncodeToString(sum[:])
+}
+
+func statementMessage(statement Signed) []byte {
+	statement.Signature = ""
+	return []byte(canonical.Hash(statement))
 }
 
 func totalChangedRows(report replay.Report) int {

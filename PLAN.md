@@ -38,8 +38,8 @@ The immediate value-add is not "prove everything." It is:
 | SMT solving | Decide predicate implication, scope containment, row-count bounds, and bounded invariant preservation. |
 | Datalog and provenance semirings | Query historical evidence for minimal causes, affected observations, recurring incident shapes, and confidence-aware traces. |
 | Model checking and temporal logic | Enforce workflow properties: no apply before approval, evidence before approval, eventual verification, rollback availability, immutable audit. |
-| Proof-carrying code/data | Bundle repair manifests, trace slices, dry-run hashes, policy results, proof obligations, counterexamples, and ledger checkpoints. |
-| CEGAR | When a claim fails, emit a counterexample and refine the abstraction instead of hiding uncertainty. |
+| Proof-carrying code/data | Bundle repair manifests, trace slices, dry-run hashes, policy results, proof obligations, counterexamples, ledger checkpoints, and signed artifact attestations. |
+| CEGAR | When a claim fails, emit a counterexample/proof hole, load missing historical evidence such as invariants or workflow models, and rerun the analysis with stable hashes. |
 
 ## Semantic artifacts to implement
 
@@ -56,8 +56,11 @@ Patchline should standardize these artifacts as JSON-first, hashable objects:
 9. **Proof-obligation report**: statuses for proved, checked, assumed, unsupported/not-supported, and counterexample-producing claims, including bounded SMT-style scope/frame/row-count/invariant checks.
 10. **Symbolic execution report**: bounded row paths, guard constraints, symbolic assignments, and stuck-step counterexamples for small repair programs.
 11. **Workflow model-check report**: bounded incident-response state exploration, temporal properties, counterexample traces, proof obligations, and proof holes.
-12. **Historical knowledge report**: newly linked facts across deploys, migrations, traces, row mutations, reports, repairs, and recurrence.
-13. **Proof-carrying incident bundle**: content-addressed archive of all evidence and claims needed for review or replay.
+12. **CEGAR refinement report**: iteration-by-iteration abstraction refinements, remaining proof holes, and counterexamples across replay, solver, symbolic, and workflow checks.
+13. **Signed attestation**: Ed25519 signature over canonical artifact hashes for CI and incident-review handoff.
+14. **Incident archive index**: deterministic buckets over evidence shape, migration tables/risks, repair effects, policy decisions, benchmark results, and proof-bundle readiness.
+15. **Historical knowledge report**: newly linked facts across deploys, migrations, traces, row mutations, reports, repairs, and recurrence.
+16. **Proof-carrying incident bundle**: content-addressed archive of all evidence and claims needed for review or replay.
 
 ## Near-term implementation priorities
 
@@ -74,8 +77,8 @@ The next work should prioritize features that are both formally meaningful and i
 9. **Solver-backed proof obligations**: deepen the current bounded equality/finite-store solver into a reusable obligation engine for repair review and gates.
 10. **Symbolic execution**: extend current bounded row-path execution toward branch coverage and richer path merging for small repair programs.
 11. **Workflow model checking**: extend current bounded workflow checks with richer workflow descriptors and organization-specific review policies.
-12. **Historical archive index**: make prior incidents queryable by trace shape, migration effect, repair outcome, and invariant violation.
-13. **Proof-carrying bundles**: extend current v2 proof bundles with signed attestations and verification commands.
+12. **Historical archive index**: make prior incidents queryable by trace shape, migration effect, repair outcome, policy decision, benchmark decision, and proof-bundle readiness.
+13. **Proof-carrying bundles and attestations**: extend current v2 proof bundles with signed attestation workflows and verification commands.
 
 ## Design constraints
 
@@ -97,6 +100,9 @@ Patchline can credibly become a platform for extracting new, reproducible knowle
 - It discharges practical bounded proof obligations for scope, frame, row-count, and invariant preservation claims.
 - It symbolically executes bounded repair programs to expose path conditions and touched-row explanations.
 - It model-checks bounded incident workflows and exposes counterexamples/proof holes before repair application.
+- It performs CEGAR-style reruns that refine coarse repair abstractions with invariant specs and workflow evidence, while preserving explicit remaining holes.
+- It signs and verifies semantic artifacts with Ed25519 so CI gates and incident reviews can detect tampering.
+- It builds deterministic incident archives over historical evidence, migrations, repairs, policies, and benchmark outputs so recurrence and repair-effect queries have stable inputs.
 - It replays repairs over imported historical row snapshots and quantifies drift/stability across snapshots.
 - It gives append-only logs, event streams, queues, and external replays explicit compensating-action semantics instead of pretending snapshot rollback can undo them.
 - It compares new incidents and migrations against historical semantic shapes.

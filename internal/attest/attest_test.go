@@ -1,6 +1,7 @@
 package attest
 
 import (
+	"strings"
 	"testing"
 
 	"github.com/patchline/patchline/internal/demo"
@@ -22,6 +23,25 @@ func TestVerifyAttestsDryRunReport(t *testing.T) {
 	})
 	if !OK(results) {
 		t.Fatalf("expected successful attestation: %#v", results)
+	}
+}
+
+func TestSignedAttestationRoundTrip(t *testing.T) {
+	seed := strings.Repeat("01", 32)
+	decoded, err := SeedFromHex(seed)
+	if err != nil {
+		t.Fatal(err)
+	}
+	artifact := []byte(`{"ok":true,"hash":"abc"}`)
+	statement, err := Sign("ci-gate:strict", artifact, decoded)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := VerifySignature(statement, artifact); err != nil {
+		t.Fatal(err)
+	}
+	if err := VerifySignature(statement, []byte(`{"ok":false}`)); err == nil {
+		t.Fatal("expected modified artifact to fail verification")
 	}
 }
 

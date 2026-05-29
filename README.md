@@ -20,10 +20,12 @@ The first scaffold in this repo focuses on a small but real core:
 | Solver obligations | Bounded SMT-style scope/frame proofs plus finite-store row-count and invariant-preservation checks |
 | Symbolic execution | Bounded repair-program row paths with guard constraints, symbolic assignments, and stuck-step hashes |
 | Workflow model checking | Bounded ingest/explain/approve/dry-run/apply/verify/rollback/audit/archive state exploration with temporal properties, proof holes, and counterexample fixtures |
+| CEGAR refinement | Counterexample/proof-hole guided reruns that refine coarse repair abstractions with invariant specs and incident workflow models |
+| Incident archive | Deterministic archive index over evidence, migrations, repair manifests, policies, and benchmark results, bucketed by semantic shape and decisions |
 | Effect inference | A deterministic effect lattice and abstract interpreter over replay diffs |
 | Migration analysis | SQL migration triage plus schema-state diffing, typed relational-signature semantics, and source-code SQL extraction |
 | Replay sandbox | In-memory and imported-snapshot dry-run engine that emits stable row diffs, compensating-action semantics, and snapshot drift reports |
-| Attestation checks | Executable checks for row diffs, operation effects, blast radius, downstream impact, and hashes |
+| Attestation checks | Executable checks for row diffs, operation effects, blast radius, downstream impact, hashes, plus Ed25519 signatures over semantic artifacts |
 | Reproducibility artifacts | Benchmark-style manifests that pin dry-run hashes and ledger checkpoints |
 | Strict benchmark suites | Frozen corpora with labels, pinned analyzer hashes, precision, and recall |
 | CI gate | PR-friendly benchmark gate with precision/recall floors, GitHub Actions summaries, and annotations |
@@ -41,6 +43,8 @@ See [`docs/invariants.md`](docs/invariants.md) for invariant declarations, befor
 See [`docs/solver-obligations.md`](docs/solver-obligations.md) for bounded SMT-style proof obligations.
 See [`docs/symbolic-execution.md`](docs/symbolic-execution.md) for bounded repair-program path constraints.
 See [`docs/workflow-model-checking.md`](docs/workflow-model-checking.md) for temporal incident workflow checks and proof holes.
+See [`docs/refinement-and-attestations.md`](docs/refinement-and-attestations.md) for CEGAR-style refinement and signed artifact verification.
+See [`docs/archive-index.md`](docs/archive-index.md) for semantic incident archives over historical evidence and repairs.
 See [`docs/replay-semantics.md`](docs/replay-semantics.md) for small-step traces, commutativity/confluence checks, and isolation hazards.
 See [`docs/migration-analysis.md`](docs/migration-analysis.md) for generic and dialect-specific SQL migration analysis.
 See [`docs/schema-semantics.md`](docs/schema-semantics.md) for schema diffs and relational-signature migration semantics.
@@ -63,6 +67,9 @@ go run ./cmd/patchline lint-repair examples/repairs/repair-bad-invoice-backfill.
 go run ./cmd/patchline solver-obligations examples/repairs/repair-bad-invoice-backfill.json --invariants examples/invariants/billing-core.json
 go run ./cmd/patchline symbolic-exec examples/repairs/repair-bad-invoice-backfill.json
 go run ./cmd/patchline model-check-workflow examples/workflows/bad-migration-approved.json
+go run ./cmd/patchline cegar-refine examples/repairs/repair-bad-invoice-backfill.json --store examples/snapshots/billing-bad-migration-before.json --invariants examples/invariants/billing-core.json --workflow examples/workflows/bad-migration-approved.json
+go run ./cmd/patchline archive-index examples/archive/bad-migration-corpus.json
+go run ./cmd/patchline attestation-keygen --json
 go run ./cmd/patchline analyze-migration demos/billing/migrations/002_bad_backfill.sql
 go run ./cmd/patchline analyze-migration examples/migrations/sqlserver-top-delete.sql --dialect sqlserver
 go run ./cmd/patchline schema-diff demos/billing/migrations/001_schema.sql examples/schemas/empty.json examples/schemas/billing-v1.json
@@ -129,6 +136,10 @@ go run ./cmd/patchline lint-repair examples/repairs/repair-bad-invoice-backfill.
 go run ./cmd/patchline lint-repair examples/repairs/repair-bad-invoice-backfill.json --proof --json
 go run ./cmd/patchline generate-sql examples/repairs/repair-bad-invoice-backfill.json
 go run ./cmd/patchline repair-semantics examples/repairs/repair-bad-invoice-backfill.json --json
+go run ./cmd/patchline cegar-refine examples/repairs/repair-bad-invoice-backfill.json --store examples/snapshots/billing-bad-migration-before.json --invariants examples/invariants/billing-core.json --workflow examples/workflows/bad-migration-approved.json --json > /tmp/patchline-refinement.json
+go run ./cmd/patchline archive-index examples/archive/bad-migration-corpus.json --json > /tmp/patchline-archive.json
+go run ./cmd/patchline sign-artifact /tmp/patchline-refinement.json --subject cegar:billing-bad-migration --seed-hex "$PATCHLINE_ATTESTATION_SEED" --out /tmp/patchline-refinement.attestation.json
+go run ./cmd/patchline verify-artifact /tmp/patchline-refinement.attestation.json --artifact /tmp/patchline-refinement.json
 go run ./cmd/patchline effect-summary examples/repairs/repair-bad-invoice-backfill.json --json
 go run ./cmd/patchline discover-invariants examples/repairs/repair-bad-invoice-backfill.json --json
 go run ./cmd/patchline rollback-plan examples/repairs/repair-bad-invoice-backfill.json
@@ -167,6 +178,8 @@ internal/migration/    SQL migration lexical analyzer and risk classifier
 internal/repair/       Repair manifest parser and validator
 internal/replay/       Dry-run state model and canonical reports
 internal/attest/       Executable reproducibility and invariant checks
+internal/refinement/   Counterexample-guided semantic refinement reports
+internal/archive/      Historical incident archive indexes and semantic buckets
 internal/ledger/       Hash-chained audit ledger
 internal/reproduce/    Benchmark/reproducibility runner
 internal/bench/        Strict corpus benchmark runner
@@ -182,4 +195,4 @@ docs/                  Architecture, DSL, provenance, and RiSE research notes
 
 ## Status
 
-This is a working deterministic core and demo harness, not yet the full production system. The next natural expansions are a native OTLP receiver, Datadog API import, Postgres logical decoding, static SQL extraction, and a web incident cockpit.
+This is a working deterministic core and demo harness, not yet the full production system. The next natural expansions are historical query commands over the archive index, organization-local benchmark generation, redaction-preserving proof artifacts, reusable GitHub Action packaging, and a web incident cockpit.

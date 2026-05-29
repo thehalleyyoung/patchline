@@ -1,0 +1,14 @@
+{
+  "version": "patchline.archive-index/v1",
+  "name": "bad-migration-corpus",
+  "incidents": [
+    {
+      "id": "billing-bad-backfill",
+      "evidence": "../incidents/bad-migration.jsonl",
+      "migration": "../../demos/billing/migrations/002_bad_backfill.sql",
+      "repair": "../repairs/repair-bad-invoice-backfill.json",
+      "policy": "../policies/review-required.json",
+      "benchmark": "../benchmarks/strict-migration-corpus.json"
+    }
+  ]
+}

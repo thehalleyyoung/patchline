@@ -11,8 +11,8 @@ go run ./cmd/patchline semantics-contract
 Current contract:
 
 ```text
-Patchline semantic contract patchline.semantics/v1 hash=454f2c1118eceb189de322e79cb07cfd6fb0b6c180b8cce8bb0727218b4cd47a
-  state components=8 observations=5 commands=26 failure states=6
+Patchline semantic contract patchline.semantics/v1 hash=420d1a803b4380e68f04ea0cde65064ffefabc62d300c4fa617fc4a41c9b4bfb
+  state components=8 observations=5 commands=30 failure states=6
 ```
 
 ## Semantic contract
@@ -33,6 +33,9 @@ Every Patchline command should emit at least one checkable semantic artifact:
 | Solver obligations | Bounded SMT-style scope, frame, row-count, and invariant checks, hashes, counterexamples | `solver-obligations`, `semantics-audit` |
 | Symbolic execution | Bounded row paths, path constraints, symbolic assignments, hashes, counterexamples | `symbolic-exec`, `semantics-audit` |
 | Workflow model check | Bounded workflow states, temporal properties, proof obligations, proof holes, counterexamples | `model-check-workflow`, `semantics-audit` |
+| CEGAR refinement | Iterative abstraction refinement, remaining proof holes, hashes, counterexamples | `cegar-refine`, `semantics-audit` |
+| Signed attestation | Ed25519 signature facts over semantic artifact hashes | `sign-artifact`, `verify-artifact` |
+| Incident archive | Evidence-shape, migration-risk/table, repair-effect, policy-decision, and benchmark-decision buckets | `archive-index`, `semantics-audit` |
 | Benchmark report | Facts, obligations, counterexamples, hashes | `benchmark-suite`, `ci-gate` |
 | Ledger checkpoint | Facts and hashes | `ledger-verify` |
 
@@ -87,6 +90,12 @@ Its domain is the manifest, the historical evidence graph, a current or reconstr
 
 `model-check-workflow` materializes incident review as a bounded transition system over ingest, explain, approve, dry-run, apply, verify, rollback, audit, and archive states. It checks temporal properties, emits standardized proof obligations, produces counterexample traces for invalid workflows, and records proof holes when claims require stronger evidence.
 
+`cegar-refine` materializes counterexample-guided abstraction refinement over the current repair. The first iteration runs replay semantics, solver obligations, and symbolic execution over the bounded store; if invariant or workflow evidence is supplied, a second iteration reruns with those refinements and reports whether proof holes decreased or new counterexamples appeared.
+
+`sign-artifact` and `verify-artifact` materialize tamper-evident review evidence. The signature covers an artifact hash, subject, algorithm, and public key, so CI can attach signed approvals to semantic audits, refinement reports, proof bundles, dry-runs, or gate results.
+
+`archive-index` materializes historical incident retrieval as a deterministic semantic artifact. Each indexed incident links evidence, migration analysis, repair replay/effect summaries, policy evaluation, and benchmark results, then buckets incidents by graph shape, migration tables/risk, repair effect, policy decision, and benchmark decision.
+
 `check-invariants` adds executable semantic predicates over reconstructed snapshots before and after replay. Current declarations cover uniqueness, foreign keys, enums, sums, counts, materialized reports, ledger balance, and customer-visible grouped totals. `discover-invariants` emits support-backed candidates separately from enforced declarations so historical knowledge extraction stays auditable.
 
 ## Historical conformance audit
@@ -97,10 +106,10 @@ The audit command runs the semantic contract against existing real-world-like in
 go run ./cmd/patchline semantics-audit
 ```
 
-It currently checks the bad-migration evidence JSONL, trace reconstruction, causal certificate, repair manifest, replay report, replay semantics, invariant report, solver obligations, symbolic execution, workflow model checking, generated SQL, transaction plan, migration analysis, schema semantics, source SQL inventory, strict benchmark corpus, migration outcome history, and ledger checkpoint. The default audit output is:
+It currently checks the bad-migration evidence JSONL, trace reconstruction, causal certificate, repair manifest, replay report, replay semantics, invariant report, solver obligations, symbolic execution, workflow model checking, CEGAR refinement, generated SQL, transaction plan, migration analysis, schema semantics, source SQL inventory, strict benchmark corpus, migration outcome history, incident archive index, and ledger checkpoint. The default audit output is:
 
 ```text
-semantic audit passed artifacts=18 conforming=18 proof_holes=7 counterexamples=0 hash=cebc550240a3cf3c4a018d4db3dbd9dcf9912c86b8856095670a7e69293027ac
+semantic audit passed artifacts=20 conforming=20 proof_holes=7 counterexamples=0 hash=3d204d71488c0aa64f3c2a24e364edcaa907ea8d7f44e04e9077043aab3bf529
 ```
 
 This is intentionally not a proof of all properties. It is an executable inventory of facts, obligations, proof holes, counterexamples, and hashes over historical artifacts, which gives later formal-methods work concrete obligations to discharge.
