@@ -8,7 +8,7 @@ This directory contains the artifact-paper benchmark scaffold. It is intentional
 benchmarks/
   manifests/       dataset manifests that point to fixtures and ground truth
   ground_truth/    source-grounded labels with phase metadata
-  expected/        expected outputs for future full benchmark runs
+  expected/        frozen expected reports for executable manifest runs
   cache/           optional local cache for downloaded public corpora
 ```
 
@@ -22,6 +22,23 @@ benchmarks/
 4. an archive-only semantic regression label.
 
 The smoke set is not a paper-scale evaluation. Its purpose is to make the artifact protocol executable before adding the larger public corpora described in `NEWEST_PLAN.md`.
+
+## Executable manifests and golden reports
+
+Run the committed benchmark manifests and compare them to expected outputs with:
+
+```bash
+make artifact-benchmark-compare
+```
+
+The target writes generated reports to `results/generated/artifact-benchmark/` and compares them with:
+
+```text
+benchmarks/expected/smoke-report.json
+benchmarks/expected/negative-report.json
+```
+
+The runner is phase-aware. It validates that each manifest case points to matching ground truth, enforces `allowed_inputs` and `excluded_inputs`, predicts from committed fixtures or explicit inline fixtures, and only then compares the result with the expected label. This keeps pre-deploy cases from using postmortem-only facts.
 
 ## Executable study outputs
 

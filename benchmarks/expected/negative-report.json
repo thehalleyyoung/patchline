@@ -1,0 +1,117 @@
+{
+  "version": "patchline.artifact-benchmark-run/v1",
+  "dataset_id": "patchline-negative-v1",
+  "manifest": "benchmarks/manifests/negative.json",
+  "ok": true,
+  "metrics": {
+    "total": 5,
+    "passed": 5,
+    "failed": 0,
+    "by_type": {
+      "incident": 2,
+      "migration": 1,
+      "regression": 1,
+      "repair": 1
+    },
+    "by_result": {
+      "cannot_prove": 2,
+      "insufficient_evidence": 1,
+      "pass": 1,
+      "unsupported_fragment": 1
+    },
+    "phase_guards": 1
+  },
+  "cases": [
+    {
+      "case_id": "unsupported-procedural-sql",
+      "case_type": "migration",
+      "phase": "pre_deploy",
+      "fixture": "inline:procedural-sql",
+      "ground_truth": "../ground_truth/negative/unsupported-procedural-sql.json",
+      "input_kind": "migration_text",
+      "expected_result": "unsupported_fragment",
+      "actual_result": "unsupported_fragment",
+      "risk": "unknown",
+      "ok": true,
+      "signals": [
+        "inline-bytes=67",
+        "unsupported:procedural-sql"
+      ],
+      "hashes": {
+        "inline": "e8d27f7cb131cf3364d7c92177325750bc3345e7f9e1d004a65aa3ddfeb128cd"
+      }
+    },
+    {
+      "case_id": "insufficient-public-incident-evidence",
+      "case_type": "incident",
+      "phase": "postmortem",
+      "fixture": "inline:public-summary-too-thin",
+      "ground_truth": "../ground_truth/negative/insufficient-public-incident-evidence.json",
+      "input_kind": "postmortem_text",
+      "expected_result": "insufficient_evidence",
+      "actual_result": "insufficient_evidence",
+      "risk": "unknown",
+      "ok": true,
+      "signals": [
+        "inline-bytes=89",
+        "insufficient:missing-transition-and-repair-facts"
+      ],
+      "hashes": {
+        "inline": "b903afd66c8408954ce420c2448b568bbbd4f13229466ad2f48ff20e4547301c"
+      }
+    },
+    {
+      "case_id": "predeploy-postmortem-leakage",
+      "case_type": "incident",
+      "phase": "pre_deploy",
+      "fixture": "inline:phase-guard",
+      "ground_truth": "../ground_truth/negative/predeploy-postmortem-leakage.json",
+      "input_kind": "postmortem_text",
+      "expected_result": "cannot_prove",
+      "actual_result": "cannot_prove",
+      "risk": "unknown",
+      "ok": true,
+      "signals": [
+        "phase-guard:input-not-available=postmortem_text"
+      ]
+    },
+    {
+      "case_id": "non-replayable-missing-backup",
+      "case_type": "repair",
+      "phase": "during_repair",
+      "fixture": "../../examples/historical-failures/gitlab-2017/no-snapshot-repair.json",
+      "ground_truth": "../ground_truth/negative/non-replayable-missing-backup.json",
+      "input_kind": "repair_plan",
+      "expected_result": "cannot_prove",
+      "actual_result": "cannot_prove",
+      "risk": "high",
+      "ok": true,
+      "signals": [
+        "repair:not-replayable-or-missing-snapshot"
+      ],
+      "hashes": {
+        "repair_manifest": "315ccb9935c152cded28a44a803693da06d144764aa2687e3c6ebe386fd69905"
+      }
+    },
+    {
+      "case_id": "safe-scoped-nonrecurrence",
+      "case_type": "regression",
+      "phase": "archive_only",
+      "fixture": "../../demos/billing/migrations/003_corrective_repair.sql",
+      "ground_truth": "../ground_truth/negative/safe-scoped-nonrecurrence.json",
+      "input_kind": "migration_text",
+      "expected_result": "pass",
+      "actual_result": "pass",
+      "risk": "low",
+      "ok": true,
+      "signals": [
+        "high-risk-statements=0"
+      ],
+      "hashes": {
+        "migration_report": "18a77ee5fc7f015c299f1d949e2d5edcc849e976d13f2d4d61ed2e24c168a640"
+      }
+    }
+  ],
+  "hash": "142aaba102b1244049db63e5caca8342332f297702a511341aa1cdbf82a825ae",
+  "markdown": "# Artifact benchmark report\n\n- dataset_id: `patchline-negative-v1`\n- ok: `true`\n- hash: `142aaba102b1244049db63e5caca8342332f297702a511341aa1cdbf82a825ae`\n- total: `5`\n- passed: `5`\n- failed: `0`\n\n| case | type | phase | expected | actual | ok |\n| --- | --- | --- | --- | --- | ---: |\n| unsupported-procedural-sql | migration | pre_deploy | unsupported_fragment | unsupported_fragment | true |\n| insufficient-public-incident-evidence | incident | postmortem | insufficient_evidence | insufficient_evidence | true |\n| predeploy-postmortem-leakage | incident | pre_deploy | cannot_prove | cannot_prove | true |\n| non-replayable-missing-backup | repair | during_repair | cannot_prove | cannot_prove | true |\n| safe-scoped-nonrecurrence | regression | archive_only | pass | pass | true |\n"
+}

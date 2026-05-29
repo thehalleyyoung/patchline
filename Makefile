@@ -1,4 +1,4 @@
-.PHONY: build test demo gate fmt public-corpus verify-usefulness artifact-smoke artifact-demo artifact-ground-truth-check artifact-baselines artifact-ablations artifact-scale artifact-studies artifact-negative-cases artifact-full artifact-clean
+.PHONY: build test demo gate fmt public-corpus verify-usefulness artifact-smoke artifact-demo artifact-ground-truth-check artifact-baselines artifact-ablations artifact-scale artifact-studies artifact-benchmark artifact-benchmark-compare artifact-negative-cases artifact-full artifact-clean
 
 build:
 	go build -o bin/patchline ./cmd/patchline
@@ -47,10 +47,20 @@ artifact-scale:
 
 artifact-studies: artifact-baselines artifact-ablations artifact-scale
 
+artifact-benchmark:
+	go run ./cmd/patchline artifact-benchmark validate benchmarks/manifests/smoke.json
+	go run ./cmd/patchline artifact-benchmark run benchmarks/manifests/smoke.json --out results/generated/artifact-benchmark/smoke-report.json
+	go run ./cmd/patchline artifact-benchmark validate benchmarks/manifests/negative.json
+	go run ./cmd/patchline artifact-benchmark run benchmarks/manifests/negative.json --out results/generated/artifact-benchmark/negative-report.json
+
+artifact-benchmark-compare: artifact-benchmark
+	go run ./cmd/patchline artifact-benchmark compare results/generated/artifact-benchmark/smoke-report.json benchmarks/expected/smoke-report.json
+	go run ./cmd/patchline artifact-benchmark compare results/generated/artifact-benchmark/negative-report.json benchmarks/expected/negative-report.json
+
 artifact-negative-cases:
 	bash scripts/artifact_negative_cases.sh
 
-artifact-full: artifact-smoke artifact-demo artifact-studies artifact-negative-cases verify-usefulness
+artifact-full: artifact-smoke artifact-demo artifact-studies artifact-benchmark-compare artifact-negative-cases verify-usefulness
 
 artifact-clean:
 	rm -rf results/generated

@@ -17,6 +17,7 @@ commands=(
   "artifact-baselines"
   "artifact-ablations"
   "artifact-scale"
+  "artifact-benchmark"
 )
 
 for command in "${commands[@]}"; do

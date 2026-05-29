@@ -25,6 +25,7 @@ Evidence -> Trace -> Transition -> Repair -> Proof -> Replay -> Archive -> Regre
 | Archive | An ordered incident corpus with queryable evidence, migration, policy, benchmark, repair, and rollback facts. | `archive-index`, `archive-query` |
 | Regression | A later incident that reuses a previous damaged shape, high-risk table, or damaged derived report relation. | `semantic-regressions` |
 | Artifact study | A generated comparison that shows which layers add detection, actionability, proof links, archive links, ground-truth links, and scale evidence. | `artifact-baselines`, `artifact-ablations`, `artifact-scale` |
+| Artifact benchmark | A phase-aware manifest run that predicts from fixtures, refuses excluded inputs, and compares against frozen expected reports. | `artifact-benchmark validate/run/compare` |
 
 ## Phase-aware claims
 
@@ -55,4 +56,4 @@ When evidence is missing or an input fragment is unsupported, the artifact shoul
 
 The novelty is not that provenance, migration linting, replay, or SMT solving exist independently. The novelty is the executable object that composes them: a historical data-repair incident becomes a stable semantic artifact whose claims are replayable, hashable, queryable, solver-backed where possible, and reusable as future recurrence memory.
 
-The current artifact also exposes this composition through ablations: reviewers can run `make artifact-studies` to observe how a migration-only detector becomes a richer repair artifact as policy, Z3 obligations, archive memory, and phase-aware ground truth are added.
+The current artifact also exposes this composition through ablations and executable manifests: reviewers can run `make artifact-studies` to observe how a migration-only detector becomes a richer repair artifact as policy, Z3 obligations, archive memory, and phase-aware ground truth are added, then run `make artifact-benchmark-compare` to verify the committed smoke and negative cases against frozen no-leakage expected reports.

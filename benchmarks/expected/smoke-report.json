@@ -1,0 +1,107 @@
+{
+  "version": "patchline.artifact-benchmark-run/v1",
+  "dataset_id": "patchline-smoke-v1",
+  "manifest": "benchmarks/manifests/smoke.json",
+  "ok": true,
+  "metrics": {
+    "total": 4,
+    "passed": 4,
+    "failed": 0,
+    "by_type": {
+      "incident": 1,
+      "migration": 1,
+      "regression": 1,
+      "repair": 1
+    },
+    "by_result": {
+      "flag": 3,
+      "verified": 1
+    },
+    "phase_guards": 0
+  },
+  "cases": [
+    {
+      "case_id": "billing-bad-backfill-migration",
+      "case_type": "migration",
+      "phase": "pre_deploy",
+      "fixture": "../../demos/billing/migrations/002_bad_backfill.sql",
+      "ground_truth": "../ground_truth/migrations/billing-bad-backfill.json",
+      "input_kind": "migration_text",
+      "expected_result": "flag",
+      "actual_result": "flag",
+      "risk": "high",
+      "ok": true,
+      "signals": [
+        "high-risk-statements=1",
+        "tables=invoices"
+      ],
+      "hashes": {
+        "migration_report": "0be915737d677c0d06eae943c9293f175c19ca855acb225d93c06de803f39fbe"
+      }
+    },
+    {
+      "case_id": "gitlab-2017-destructive-primary-data",
+      "case_type": "incident",
+      "phase": "postmortem",
+      "fixture": "../../examples/historical-failures/gitlab-2017/evidence.jsonl",
+      "ground_truth": "../ground_truth/incidents/gitlab-2017-destructive-primary-data.json",
+      "input_kind": "source_observations",
+      "expected_result": "flag",
+      "actual_result": "flag",
+      "risk": "high",
+      "ok": true,
+      "signals": [
+        "damaged-entities=6",
+        "events=18"
+      ],
+      "hashes": {
+        "evidence_input": "f0a3ebaa91289de7ac48971ef78549c047f4f7e51341852ec6a4ccbac6efa826",
+        "graph": "b8917b44a0aa9f008964cd9f2018edf7ebbdac369f8f4be488d1586b3cc1ea95"
+      }
+    },
+    {
+      "case_id": "billing-repair-replay",
+      "case_type": "repair",
+      "phase": "during_repair",
+      "fixture": "../../examples/repairs/repair-bad-invoice-backfill.json",
+      "ground_truth": "../ground_truth/repairs/billing-repair-replay.json",
+      "input_kind": "repair_plan",
+      "expected_result": "verified",
+      "actual_result": "verified",
+      "risk": "medium",
+      "ok": true,
+      "signals": [
+        "postconditions=1",
+        "preconditions=1",
+        "solver-checked=1",
+        "solver-engine=z3",
+        "solver-proved=2"
+      ],
+      "hashes": {
+        "repair_manifest": "cc4481c680bb59bfa6f74e4a0580bd979e6a32b7e00f1d7a06e50ecd259a9e8f",
+        "solver": "a32ccb0f847b1bb78312ab44f256e5d586693601db257d5d9e44124029991cc6"
+      }
+    },
+    {
+      "case_id": "billing-semantic-regression",
+      "case_type": "regression",
+      "phase": "archive_only",
+      "fixture": "../../examples/archive/bad-migration-corpus.json",
+      "ground_truth": "../ground_truth/regressions/billing-semantic-regression.json",
+      "input_kind": "prior_archive",
+      "expected_result": "flag",
+      "actual_result": "flag",
+      "risk": "high",
+      "ok": true,
+      "signals": [
+        "declared-regressions=0",
+        "semantic-regressions=3"
+      ],
+      "hashes": {
+        "archive": "4b087876749a4886fc2426ddd0c4724fbd22ce7c73be7d780f71a96213d33862"
+      }
+    }
+  ],
+  "hash": "2626447e24ed733a4662c01a03e780780751c2194854bf19acaaf2f1eba08e90",
+  "markdown": "# Artifact benchmark report\n\n- dataset_id: `patchline-smoke-v1`\n- ok: `true`\n- hash: `2626447e24ed733a4662c01a03e780780751c2194854bf19acaaf2f1eba08e90`\n- total: `4`\n- passed: `4`\n- failed: `0`\n\n| case | type | phase | expected | actual | ok |\n| --- | --- | --- | --- | --- | ---: |\n| billing-bad-backfill-migration | migration | pre_deploy | flag | flag | true |\n| gitlab-2017-destructive-primary-data | incident | postmortem | flag | flag | true |\n| billing-repair-replay | repair | during_repair | verified | verified | true |\n| billing-semantic-regression | regression | archive_only | flag | flag | true |\n"
+}

@@ -19,12 +19,15 @@ make artifact-smoke
 make artifact-demo
 make artifact-ground-truth-check
 make artifact-studies
+make artifact-benchmark-compare
 make artifact-negative-cases
 ```
 
 Start with [`ARTIFACT.md`](ARTIFACT.md) for the quick evaluator path, [`docs/paper-claim.md`](docs/paper-claim.md) for the single paper-facing claim, [`docs/semantic-core.md`](docs/semantic-core.md) for the auditable semantic core, and [`benchmarks/LABELING.md`](benchmarks/LABELING.md) for the phase-aware ground-truth protocol.
 
 `make artifact-studies` writes `baselines.{json,md}`, `ablations.{json,md}`, and `scale.{json,md}` under `results/generated/artifact-studies/`. These reports make the current claim sharper: Patchline is not merely detecting bad SQL; it shows, case by case, which semantic layers add tables/effects/reasons, ground-truth links, archive links, Z3-backed repair obligations, stable hashes, and reviewer-actionable evidence beyond a normalized SQL-rule baseline.
+
+`make artifact-benchmark-compare` runs the committed smoke and negative benchmark manifests, emits deterministic reports under `results/generated/artifact-benchmark/`, and compares them against frozen expected outputs in `benchmarks/expected/`. This is the no-hindsight-leakage path: ground-truth labels validate the manifest and compare the final answer, while prediction uses only the fixture input kinds allowed for the case phase.
 
 The central artifact object is:
 
@@ -43,6 +46,7 @@ Evidence -> Trace -> Transition -> Repair -> Proof -> Replay -> Archive -> Regre
 | Archive | `archive-index`, `archive-query` | deterministic incident index | turns incidents into queryable memory |
 | Regression | `semantic-regressions` | recurrence relations and invariants | detects repeated semantic failure shapes |
 | Artifact studies | `artifact-baselines`, `artifact-ablations`, `artifact-scale` | baseline, ablation, and scale reports | shows what each semantic layer contributes right now |
+| Artifact benchmark | `artifact-benchmark validate/run/compare` | phase-aware run report and golden comparison | verifies current usefulness against committed ground truth without label leakage |
 
 ## Verify the current usefulness claim
 
@@ -150,6 +154,7 @@ go run ./cmd/patchline check-invariants examples/repairs/repair-bad-invoice-back
 go run ./cmd/patchline reproduce examples/reproduce/bad-migration-billing.json
 go run ./cmd/patchline evaluate-policy examples/policies/review-required.json examples/repairs/repair-bad-invoice-backfill.json demos/billing/migrations/002_bad_backfill.sql
 go run ./cmd/patchline benchmark-suite examples/benchmarks/strict-migration-corpus.json
+go run ./cmd/patchline artifact-benchmark run benchmarks/manifests/smoke.json
 go run ./cmd/patchline adapt-evidence otlp examples/evidence/otlp-span-export.json --out /tmp/patchline-events.jsonl
 go run ./cmd/patchline adapt-evidence postgres examples/evidence/postgres-logical-decoding.json --out /tmp/patchline-events.jsonl
 go run ./cmd/patchline ingest-evidence examples/incidents/bad-migration.jsonl

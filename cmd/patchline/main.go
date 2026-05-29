@@ -323,6 +323,11 @@ func run(args []string) error {
 		}
 		outPath, _ := flagValue(args[2:], "--out")
 		return artifactScale(args[1], outPath, hasFlag(args[2:], "--json"))
+	case "artifact-benchmark":
+		if len(args) < 3 {
+			return errors.New("usage: patchline artifact-benchmark <validate|run|compare> <args> [--json] [--out path]")
+		}
+		return artifactBenchmark(args[1:])
 	case "ingest-evidence":
 		if len(args) < 2 {
 			return errors.New("usage: patchline ingest-evidence <events.jsonl> [--json] [--out graph.json]")
@@ -412,6 +417,9 @@ Usage:
   patchline artifact-baselines <suite.json> [--out dir] [--json]
   patchline artifact-ablations <suite.json> [--out dir] [--json]
   patchline artifact-scale <suite.json> [--out dir] [--json]
+  patchline artifact-benchmark validate <manifest.json> [--json]
+  patchline artifact-benchmark run <manifest.json> [--out report.json] [--json]
+  patchline artifact-benchmark compare <actual.json> <expected.json> [--json]
   patchline ingest-evidence <events.jsonl> [--json] [--out graph.json]
   patchline adapt-evidence <otlp|datadog|postgres|github|migration-runner> <input.json> [--json] [--out events.jsonl]
   patchline ci-gate <suite.json> [--min-precision 0.95] [--min-recall 0.95] [--json]
@@ -3534,6 +3542,98 @@ func artifactScale(path string, outPath string, jsonOut bool) error {
 		return writeJSON(os.Stdout, report)
 	}
 	fmt.Printf("artifact scale suite=%s hash=%s cases=%d statements=%d bytes=%d analyze_ms=%d\n", report.Suite, report.Hash, report.Totals.Cases, report.Totals.Statements, report.Totals.Bytes, report.Totals.AnalyzeMillis)
+	return nil
+}
+
+func artifactBenchmark(args []string) error {
+	switch args[0] {
+	case "validate":
+		if len(args) < 2 {
+			return errors.New("usage: patchline artifact-benchmark validate <manifest.json> [--json]")
+		}
+		report, err := artifact.ValidateBenchmarkManifest(args[1])
+		if err != nil {
+			return err
+		}
+		if hasFlag(args[2:], "--json") {
+			if err := writeJSON(os.Stdout, report); err != nil {
+				return err
+			}
+		} else {
+			fmt.Printf("artifact benchmark manifest=%s ok=%t ground_truth_files=%d errors=%d\n", args[1], report.OK, report.GroundTruthFiles, len(report.Errors))
+		}
+		if !report.OK {
+			return errors.New("artifact benchmark manifest validation failed")
+		}
+		return nil
+	case "run":
+		if len(args) < 2 {
+			return errors.New("usage: patchline artifact-benchmark run <manifest.json> [--out report.json] [--json]")
+		}
+		outPath, _ := flagValue(args[2:], "--out")
+		report, err := artifact.RunBenchmarkManifest(args[1])
+		if err != nil {
+			return err
+		}
+		if outPath != "" {
+			if err := writeBenchmarkRun(outPath, report); err != nil {
+				return err
+			}
+		}
+		if hasFlag(args[2:], "--json") {
+			if err := writeJSON(os.Stdout, report); err != nil {
+				return err
+			}
+		} else {
+			fmt.Printf("artifact benchmark dataset=%s ok=%t hash=%s passed=%d failed=%d\n", report.DatasetID, report.OK, report.Hash, report.Metrics.Passed, report.Metrics.Failed)
+			for _, c := range report.Cases {
+				fmt.Printf("  case=%s expected=%s actual=%s ok=%t\n", c.CaseID, c.ExpectedResult, c.ActualResult, c.OK)
+			}
+		}
+		if !report.OK {
+			return errors.New("artifact benchmark mismatched ground truth")
+		}
+		return nil
+	case "compare":
+		if len(args) < 3 {
+			return errors.New("usage: patchline artifact-benchmark compare <actual.json> <expected.json> [--json]")
+		}
+		report, err := artifact.CompareBenchmarkReports(args[1], args[2])
+		if err != nil {
+			return err
+		}
+		if hasFlag(args[3:], "--json") {
+			if err := writeJSON(os.Stdout, report); err != nil {
+				return err
+			}
+		} else {
+			fmt.Printf("artifact benchmark compare ok=%t actual_hash=%s expected_hash=%s mismatches=%d\n", report.OK, report.ActualHash, report.ExpectedHash, len(report.Mismatches))
+			for _, mismatch := range report.Mismatches {
+				fmt.Printf("  case=%s field=%s actual=%s expected=%s\n", mismatch.CaseID, mismatch.Field, mismatch.Actual, mismatch.Expected)
+			}
+		}
+		if !report.OK {
+			return errors.New("artifact benchmark comparison failed")
+		}
+		return nil
+	default:
+		return fmt.Errorf("unknown artifact-benchmark subcommand %q", args[0])
+	}
+}
+
+func writeBenchmarkRun(outPath string, report artifact.BenchmarkRunReport) error {
+	if err := os.MkdirAll(filepath.Dir(outPath), 0o755); err != nil {
+		return err
+	}
+	if err := artifact.WriteBenchmarkReport(outPath, report); err != nil {
+		return err
+	}
+	if report.Markdown != "" && strings.HasSuffix(outPath, ".json") {
+		mdPath := strings.TrimSuffix(outPath, ".json") + ".md"
+		if err := os.WriteFile(mdPath, []byte(report.Markdown), 0o644); err != nil {
+			return err
+		}
+	}
 	return nil
 }
 

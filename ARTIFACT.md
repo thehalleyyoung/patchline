@@ -15,6 +15,7 @@ The current reviewer path is intentionally narrow and executable from a fresh ch
 3. Execute the semantic pipeline over committed smoke fixtures.
 4. Emit deterministic JSON outputs under `results/generated/`.
 5. Run negative/limitation cases that show unsupported or insufficient-evidence outcomes are represented explicitly.
+6. Compare executable benchmark-manifest outputs against frozen expected reports.
 
 The smoke path uses only committed fixtures and existing CLI commands. It does not require network access.
 
@@ -96,6 +97,25 @@ The reports are intentionally reviewer-facing rather than paper-scale. They make
 
 The ablation report only counts solver-backed evidence for cases that declare repair/invariant inputs. This keeps the claim falsifiable: migration text alone can produce risk signals, but not repair proofs.
 
+## Executable benchmark manifests
+
+```bash
+make artifact-benchmark-compare
+```
+
+This target runs:
+
+```bash
+go run ./cmd/patchline artifact-benchmark validate benchmarks/manifests/smoke.json
+go run ./cmd/patchline artifact-benchmark run benchmarks/manifests/smoke.json --out results/generated/artifact-benchmark/smoke-report.json
+go run ./cmd/patchline artifact-benchmark validate benchmarks/manifests/negative.json
+go run ./cmd/patchline artifact-benchmark run benchmarks/manifests/negative.json --out results/generated/artifact-benchmark/negative-report.json
+go run ./cmd/patchline artifact-benchmark compare results/generated/artifact-benchmark/smoke-report.json benchmarks/expected/smoke-report.json
+go run ./cmd/patchline artifact-benchmark compare results/generated/artifact-benchmark/negative-report.json benchmarks/expected/negative-report.json
+```
+
+The runner separates prediction from comparison. During prediction, Patchline may use the manifest fixture and the case's allowed/excluded input kinds, but it does not use the ground-truth expected label to decide the result. Ground truth is used to validate references, enforce phase guards, and compare the final outcome. The comparison command exits non-zero if a case result or report hash drifts.
+
 ## Canonical demo
 
 ```bash
@@ -162,7 +182,7 @@ These cases are part of the artifact, not merely prose limitations.
 
 ## Relationship to `make verify-usefulness`
 
-`make verify-usefulness` remains the broader project validation target. It includes network-backed public corpus fetching and source checks. `make artifact-smoke` is the artifact-review entry point: it is smaller, committed-fixture-only, and intended to be stable without network access. `make artifact-studies` is the evaluator-facing measurement entry point for current baseline/ablation/scale evidence.
+`make verify-usefulness` remains the broader project validation target. It includes network-backed public corpus fetching and source checks. `make artifact-smoke` is the artifact-review entry point: it is smaller, committed-fixture-only, and intended to be stable without network access. `make artifact-studies` is the evaluator-facing measurement entry point for current baseline/ablation/scale evidence, and `make artifact-benchmark-compare` is the golden-output check for the executable manifest protocol.
 
 ## Data provenance
 
