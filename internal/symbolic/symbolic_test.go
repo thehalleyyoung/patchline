@@ -3,7 +3,7 @@ package symbolic
 import (
 	"testing"
 
-	"github.com/patchline/patchline/internal/demo"
+	"github.com/thehalleyyoung/patchline/internal/demo"
 )
 
 func TestExecuteExploresBoundedRepairPaths(t *testing.T) {

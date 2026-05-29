@@ -4,9 +4,9 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/patchline/patchline/internal/demo"
-	"github.com/patchline/patchline/internal/invariant"
-	"github.com/patchline/patchline/internal/repair"
+	"github.com/thehalleyyoung/patchline/internal/demo"
+	"github.com/thehalleyyoung/patchline/internal/invariant"
+	"github.com/thehalleyyoung/patchline/internal/repair"
 )
 
 func TestAnalyzeProvesSampleRepairObligations(t *testing.T) {

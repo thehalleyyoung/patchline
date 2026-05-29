@@ -3,7 +3,7 @@ package migration_test
 import (
 	"testing"
 
-	"github.com/patchline/patchline/internal/migration"
+	"github.com/thehalleyyoung/patchline/internal/migration"
 )
 
 func TestExtractSourceSQLFindsEmbeddedSQLAcrossLanguages(t *testing.T) {

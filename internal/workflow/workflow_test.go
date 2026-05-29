@@ -3,8 +3,8 @@ package workflow
 import (
 	"testing"
 
-	"github.com/patchline/patchline/internal/ledger"
-	"github.com/patchline/patchline/internal/proof"
+	"github.com/thehalleyyoung/patchline/internal/ledger"
+	"github.com/thehalleyyoung/patchline/internal/proof"
 )
 
 func TestCheckApprovedWorkflow(t *testing.T) {

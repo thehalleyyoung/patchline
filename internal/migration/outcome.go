@@ -5,8 +5,8 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/patchline/patchline/internal/canonical"
-	"github.com/patchline/patchline/internal/provenance"
+	"github.com/thehalleyyoung/patchline/internal/canonical"
+	"github.com/thehalleyyoung/patchline/internal/provenance"
 )
 
 const MigrationOutcomeVersion = "patchline.migration-outcomes/v1"

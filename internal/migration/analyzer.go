@@ -10,8 +10,8 @@ import (
 	"strings"
 	"unicode"
 
-	"github.com/patchline/patchline/internal/canonical"
-	"github.com/patchline/patchline/internal/effects"
+	"github.com/thehalleyyoung/patchline/internal/canonical"
+	"github.com/thehalleyyoung/patchline/internal/effects"
 )
 
 const Version = "patchline.migration-lex/v1"

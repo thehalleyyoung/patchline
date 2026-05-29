@@ -3,7 +3,7 @@ package gate
 import (
 	"testing"
 
-	"github.com/patchline/patchline/internal/bench"
+	"github.com/thehalleyyoung/patchline/internal/bench"
 )
 
 func TestEvaluatePassesWhenSuiteAndThresholdsPass(t *testing.T) {

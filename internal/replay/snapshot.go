@@ -1,9 +1,9 @@
 package replay
 
 import (
-	"github.com/patchline/patchline/internal/canonical"
-	"github.com/patchline/patchline/internal/provenance"
-	"github.com/patchline/patchline/internal/repair"
+	"github.com/thehalleyyoung/patchline/internal/canonical"
+	"github.com/thehalleyyoung/patchline/internal/provenance"
+	"github.com/thehalleyyoung/patchline/internal/repair"
 )
 
 const SnapshotComparisonVersion = "patchline.snapshot-comparison/v1"

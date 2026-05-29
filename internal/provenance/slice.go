@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"sort"
 
-	"github.com/patchline/patchline/internal/canonical"
+	"github.com/thehalleyyoung/patchline/internal/canonical"
 )
 
 type Direction string

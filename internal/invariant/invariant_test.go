@@ -4,7 +4,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/patchline/patchline/internal/replay"
+	"github.com/thehalleyyoung/patchline/internal/replay"
 )
 
 func TestCheckStoreFindsCounterexamples(t *testing.T) {

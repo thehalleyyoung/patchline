@@ -6,8 +6,8 @@ import (
 	"io"
 	"sort"
 
-	"github.com/patchline/patchline/internal/effects"
-	"github.com/patchline/patchline/internal/provenance"
+	"github.com/thehalleyyoung/patchline/internal/effects"
+	"github.com/thehalleyyoung/patchline/internal/provenance"
 )
 
 const Version = "patchline.repair/v1"

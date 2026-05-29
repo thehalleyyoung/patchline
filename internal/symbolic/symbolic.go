@@ -5,9 +5,9 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/patchline/patchline/internal/canonical"
-	"github.com/patchline/patchline/internal/repair"
-	"github.com/patchline/patchline/internal/replay"
+	"github.com/thehalleyyoung/patchline/internal/canonical"
+	"github.com/thehalleyyoung/patchline/internal/repair"
+	"github.com/thehalleyyoung/patchline/internal/replay"
 )
 
 const Version = "patchline.symbolic-execution/v1"

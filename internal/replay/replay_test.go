@@ -4,9 +4,9 @@ import (
 	"bytes"
 	"testing"
 
-	"github.com/patchline/patchline/internal/demo"
-	"github.com/patchline/patchline/internal/repair"
-	"github.com/patchline/patchline/internal/replay"
+	"github.com/thehalleyyoung/patchline/internal/demo"
+	"github.com/thehalleyyoung/patchline/internal/repair"
+	"github.com/thehalleyyoung/patchline/internal/replay"
 )
 
 func TestDryRunIsByteDeterministic(t *testing.T) {

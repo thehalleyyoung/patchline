@@ -3,7 +3,7 @@ package effects
 import (
 	"sort"
 
-	"github.com/patchline/patchline/internal/canonical"
+	"github.com/thehalleyyoung/patchline/internal/canonical"
 )
 
 type Effect string

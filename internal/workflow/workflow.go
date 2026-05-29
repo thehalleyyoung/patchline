@@ -5,9 +5,9 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/patchline/patchline/internal/canonical"
-	"github.com/patchline/patchline/internal/ledger"
-	"github.com/patchline/patchline/internal/proof"
+	"github.com/thehalleyyoung/patchline/internal/canonical"
+	"github.com/thehalleyyoung/patchline/internal/ledger"
+	"github.com/thehalleyyoung/patchline/internal/proof"
 )
 
 const Version = "patchline.workflow-model/v1"

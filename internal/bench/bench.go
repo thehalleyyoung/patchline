@@ -6,8 +6,8 @@ import (
 	"io"
 	"path/filepath"
 
-	"github.com/patchline/patchline/internal/canonical"
-	"github.com/patchline/patchline/internal/migration"
+	"github.com/thehalleyyoung/patchline/internal/canonical"
+	"github.com/thehalleyyoung/patchline/internal/migration"
 )
 
 const Version = "patchline.benchmark-suite/v1"

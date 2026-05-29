@@ -8,7 +8,7 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/patchline/patchline/internal/canonical"
+	"github.com/thehalleyyoung/patchline/internal/canonical"
 )
 
 const AdapterVersion = "patchline.evidence-adapter/v1"

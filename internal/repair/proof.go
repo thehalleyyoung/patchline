@@ -5,7 +5,7 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/patchline/patchline/internal/canonical"
+	"github.com/thehalleyyoung/patchline/internal/canonical"
 )
 
 const ProofVersion = "patchline.repair-proof/v1"

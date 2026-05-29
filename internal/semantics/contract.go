@@ -3,9 +3,9 @@ package semantics
 import (
 	"sort"
 
-	"github.com/patchline/patchline/internal/canonical"
-	"github.com/patchline/patchline/internal/effects"
-	"github.com/patchline/patchline/internal/provenance"
+	"github.com/thehalleyyoung/patchline/internal/canonical"
+	"github.com/thehalleyyoung/patchline/internal/effects"
+	"github.com/thehalleyyoung/patchline/internal/provenance"
 )
 
 const Version = "patchline.semantics/v1"

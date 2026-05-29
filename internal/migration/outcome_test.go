@@ -4,7 +4,7 @@ import (
 	"os"
 	"testing"
 
-	"github.com/patchline/patchline/internal/evidence"
+	"github.com/thehalleyyoung/patchline/internal/evidence"
 )
 
 func TestBuildMigrationOutcomeReportLinksHistoricalChain(t *testing.T) {

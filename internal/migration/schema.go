@@ -7,7 +7,7 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/patchline/patchline/internal/canonical"
+	"github.com/thehalleyyoung/patchline/internal/canonical"
 )
 
 const SchemaVersion = "patchline.schema/v1"

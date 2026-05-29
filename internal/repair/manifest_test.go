@@ -4,7 +4,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/patchline/patchline/internal/provenance"
+	"github.com/thehalleyyoung/patchline/internal/provenance"
 )
 
 func TestValidateChecksGraphReferencesAndOperationSemantics(t *testing.T) {

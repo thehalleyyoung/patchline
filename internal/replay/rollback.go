@@ -3,8 +3,8 @@ package replay
 import (
 	"fmt"
 
-	"github.com/patchline/patchline/internal/canonical"
-	"github.com/patchline/patchline/internal/repair"
+	"github.com/thehalleyyoung/patchline/internal/canonical"
+	"github.com/thehalleyyoung/patchline/internal/repair"
 )
 
 type RollbackPlan struct {

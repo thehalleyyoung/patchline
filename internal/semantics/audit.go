@@ -1,6 +1,6 @@
 package semantics
 
-import "github.com/patchline/patchline/internal/canonical"
+import "github.com/thehalleyyoung/patchline/internal/canonical"
 
 type Claim struct {
 	Ref      string      `json:"ref"`

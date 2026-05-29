@@ -4,7 +4,7 @@ import (
 	"os"
 	"testing"
 
-	"github.com/patchline/patchline/internal/migration"
+	"github.com/thehalleyyoung/patchline/internal/migration"
 )
 
 func TestDiffMigrationSchemaChecksExpectedSignature(t *testing.T) {

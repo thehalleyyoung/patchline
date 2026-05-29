@@ -3,7 +3,7 @@ package ledger
 import (
 	"fmt"
 
-	"github.com/patchline/patchline/internal/canonical"
+	"github.com/thehalleyyoung/patchline/internal/canonical"
 )
 
 const domain = "patchline-ledger-v1"

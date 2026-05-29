@@ -3,8 +3,8 @@ package gate
 import (
 	"fmt"
 
-	"github.com/patchline/patchline/internal/bench"
-	"github.com/patchline/patchline/internal/canonical"
+	"github.com/thehalleyyoung/patchline/internal/bench"
+	"github.com/thehalleyyoung/patchline/internal/canonical"
 )
 
 const Version = "patchline.ci-gate/v1"

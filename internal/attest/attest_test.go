@@ -4,8 +4,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/patchline/patchline/internal/demo"
-	"github.com/patchline/patchline/internal/replay"
+	"github.com/thehalleyyoung/patchline/internal/demo"
+	"github.com/thehalleyyoung/patchline/internal/replay"
 )
 
 func TestVerifyAttestsDryRunReport(t *testing.T) {

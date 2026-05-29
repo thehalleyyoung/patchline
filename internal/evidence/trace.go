@@ -10,7 +10,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/patchline/patchline/internal/canonical"
+	"github.com/thehalleyyoung/patchline/internal/canonical"
 )
 
 const TraceVersion = "patchline.trace-projection/v1"

@@ -3,8 +3,8 @@ package reproduce
 import (
 	"testing"
 
-	"github.com/patchline/patchline/internal/attest"
-	"github.com/patchline/patchline/internal/demo"
+	"github.com/thehalleyyoung/patchline/internal/attest"
+	"github.com/thehalleyyoung/patchline/internal/demo"
 )
 
 func TestRunProducesSuccessfulReproducibilityResult(t *testing.T) {
