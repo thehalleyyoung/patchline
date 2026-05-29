@@ -18,6 +18,7 @@ The current reviewer path is intentionally narrow and executable from a fresh ch
 6. Compare study report hashes and executable benchmark-manifest outputs against frozen expected reports.
 7. Optionally fetch pinned public OSS migrations and run the same study and phase-aware benchmark protocols against real migration SQL.
 8. Run an offline public-incident benchmark over source-derived GitLab/GitHub observations and an explicit insufficient-evidence boundary.
+9. Regenerate paper-facing corpus, detection/actionability, ablation, historical-counterfactual, and scale tables from the checked reports.
 
 The smoke path uses only committed fixtures and existing CLI commands. It does not require network access. Public-data targets are explicit and verify pinned hashes before using downloaded files.
 
@@ -107,6 +108,22 @@ The reports are intentionally reviewer-facing rather than paper-scale. They make
 - `artifact-studies-public` repeats the study reports on the pinned Bytebase migration corpus after fetching and hashing the source files. This network-backed corpus measures public migration detection and structural actionability, not archive/proof gains for cases that do not declare archive or repair inputs.
 
 The ablation report only counts solver-backed evidence for cases that declare repair/invariant inputs. This keeps the claim falsifiable: migration text alone can produce risk signals, but not repair proofs.
+
+## Paper-facing result tables
+
+```bash
+make artifact-tables
+```
+
+This target writes:
+
+```text
+results/generated/artifact-tables/
+  summary.json
+  summary.md
+```
+
+The `artifact-tables` command derives five deterministic ICSE-style tables from existing checked inputs: executable corpora, detection/actionability, semantic-evidence ablation, historical public-derived counterfactuals, and scale. It uses frozen benchmark reports plus the strict and public migration study specs, records source hashes, states the public-postmortem-derived boundary, and excludes machine-dependent timing from stable table claims.
 
 The compare targets summarize `baselines.json`, `ablations.json`, and `scale.json` into committed expected-hash manifests:
 
@@ -259,7 +276,7 @@ These cases are part of the artifact, not merely prose limitations.
 
 ## Relationship to `make verify-usefulness`
 
-`make verify-usefulness` remains the broader project validation target. It includes network-backed public corpus fetching and source checks. `make artifact-smoke` is the artifact-review entry point: it is smaller, committed-fixture-only, and intended to be stable without network access. `make artifact-studies-compare` is the offline evaluator-facing measurement and drift-check entry point for current baseline/ablation/scale evidence, `make artifact-studies-public-compare` is the explicit public-data study drift check, `make artifact-benchmark-compare` is the offline golden-output check for the executable manifest protocol, `make artifact-benchmark-public` is the explicit public-data benchmark check, `make artifact-benchmark-public-incidents`, `make artifact-benchmark-public-repairs`, and `make artifact-benchmark-public-archive` are offline public-source-derived checks, and the refresh targets are maintainer paths for rewriting expected outputs after intentional semantic changes.
+`make verify-usefulness` remains the broader project validation target. It includes network-backed public corpus fetching and source checks. `make artifact-smoke` is the artifact-review entry point: it is smaller, committed-fixture-only, and intended to be stable without network access. `make artifact-studies-compare` is the offline evaluator-facing measurement and drift-check entry point for current baseline/ablation/scale evidence, `make artifact-studies-public-compare` is the explicit public-data study drift check, `make artifact-tables` is the paper-facing table regeneration path, `make artifact-benchmark-compare` is the offline golden-output check for the executable manifest protocol, `make artifact-benchmark-public` is the explicit public-data benchmark check, `make artifact-benchmark-public-incidents`, `make artifact-benchmark-public-repairs`, and `make artifact-benchmark-public-archive` are offline public-source-derived checks, and the refresh targets are maintainer paths for rewriting expected outputs after intentional semantic changes.
 
 ## Data provenance
 

@@ -8,7 +8,7 @@ Patchline now has the artifact-review scaffold and several executable evaluator 
 
 - `README.md`, `ARTIFACT.md`, `docs/paper-claim.md`, `docs/semantic-core.md`, `docs/semantic-pipeline.md`, and `docs/literature-positioning.md` frame the repository around the historical repair-semantics artifact claim.
 - `benchmarks/LABELING.md`, `benchmarks/manifests/smoke.json`, `benchmarks/manifests/negative.json`, `benchmarks/manifests/repair_cases.json`, `benchmarks/manifests/semantic_regressions.json`, `benchmarks/manifests/public_migrations.json`, `benchmarks/manifests/public_incidents.json`, `benchmarks/manifests/public_repairs.json`, `benchmarks/manifests/public_archive.json`, and `benchmarks/ground_truth/**` provide phase-aware, source-grounded labels.
-- `patchline artifact-ground-truth`, `artifact-baselines`, `artifact-ablations`, `artifact-scale`, `artifact-study summarize/compare`, and `artifact-benchmark validate/run/compare` are implemented.
+- `patchline artifact-ground-truth`, `artifact-baselines`, `artifact-ablations`, `artifact-scale`, `artifact-study summarize/compare`, `artifact-tables`, and `artifact-benchmark validate/run/compare` are implemented.
 - `make artifact-studies` remains the offline strict-corpus study generation path, while `make artifact-studies-compare` checks those generated reports against committed expected hashes in `benchmarks/expected/studies-strict.json`.
 - `make artifact-studies-public` repeats baseline/ablation/scale reports on the pinned public Bytebase migration corpus, while `make artifact-studies-public-compare` checks them against `benchmarks/expected/studies-public-migrations.json`.
 - `make artifact-benchmark-compare` executes smoke, negative, repair/replay, and semantic-regression manifests, writes deterministic reports under `results/generated/artifact-benchmark/`, and compares them against committed golden reports in `benchmarks/expected/`.
@@ -16,11 +16,12 @@ Patchline now has the artifact-review scaffold and several executable evaluator 
 - `make artifact-benchmark-public-incidents` runs an offline public-incident corpus over GitLab 2017 and GitHub 2018 source-derived observations plus a too-thin-public-summary boundary, comparing against a committed golden report.
 - `make artifact-benchmark-public-repairs` runs an offline public-derived repair boundary over a Patchline-authored GitLab 2017 counterfactual no-snapshot repair manifest and compares against a committed golden report.
 - `make artifact-benchmark-public-archive` runs an offline paired public-postmortem-derived archive over GitLab 2017 and GitHub 2018 source observations plus explicit Patchline reconstructions, comparing against a committed golden report.
+- `make artifact-tables` regenerates five paper-facing tables under `results/generated/artifact-tables/summary.{json,md}` from the checked reports and study specs.
 - `make artifact-benchmark-refresh` and `make artifact-studies-refresh` are the explicit maintainer paths for regenerating committed golden reports/manifests after deliberate semantic changes.
 - `make artifact-full && make verify-usefulness` has passed after the executable benchmark runner, golden-refresh workflow, and public migration corpus were added.
 - `100_STEPS.md`, `PLAN.md`, and `NEW_PLAN.md` are untracked/ignored; this file remains the tracked implementation roadmap.
 
-The latest refinement adds the first paired public-derived archive dataset. It is intentionally named `public-postmortem-derived-paired-archive`: public GitLab/GitHub observations are the source evidence, while SQL, repair manifests, and replay stores are explicit Patchline-authored semantic reconstructions. The benchmark now checks that GitLab's missing snapshot repair remains `cannot_prove`, GitHub's scoped reconciliation is `verified`, and the archive flags a later broad `issues` transition as `shared_high_risk_table` recurrence without claiming private production data.
+The latest refinement adds deterministic paper-facing table generation. `patchline artifact-tables` turns the existing frozen benchmark reports and strict/public study specs into five ICSE-style result tables: executable corpora, detection/actionability, semantic-evidence ablation, historical public-derived counterfactuals, and scale. It records source hashes, excludes machine-dependent timing from stable table claims, and keeps the paired archive explicitly framed as public-postmortem-derived rather than private production data.
 
 ## 0. Target Artifact Claim
 
@@ -56,6 +57,7 @@ Patchline should not claim to automatically understand arbitrary production syst
 | Ground truth | Core protocol exists and validates | Store labels, evidence URLs, source snippets/hashes, labeling rules, and expected classifications | Every benchmark case has `ground_truth/*.json` with label provenance |
 | Baselines | DDL-grep, normalized SQL-rule, and effects-without-evidence baselines run on strict and public migration corpora with expected-hash drift checks | Add larger public corpus coverage | `make artifact-studies-compare` and `make artifact-studies-public-compare` emit and verify comparative tables |
 | Ablations | Strict and public migration study targets exist with expected-hash drift checks; public corpus intentionally measures only migration detection/actionability unless inputs declare proof/archive links | Add public cases with repair/archive inputs | `make artifact-studies-compare`, `make artifact-studies-public-compare`, and `make artifact-benchmark-compare` show added signal/actionability per component |
+| Paper-facing tables | `artifact-tables` emits five deterministic result tables with source hashes | Expand table rows as corpora grow | `make artifact-tables` writes `results/generated/artifact-tables/summary.{json,md}` |
 | Time realism | Phase-aware ground truth and benchmark runner enforce input availability | Add `available_at` phase annotations and enforce phase-limited evaluation | Pre-deploy claims only consume pre-deploy evidence |
 | Packaging | Docker/devcontainer, smoke/full targets, and artifact docs exist | Add Docker/devcontainer, `ARTIFACT.md`, smoke/full targets, cached data option | Fresh checkout can run smoke path under 5 minutes |
 | Scale | `artifact-scale` and `artifact-scale-public` emit corpus measurements; corpus size is still small | Add larger corpus-scale benchmark and report runtime/memory/query latency | study targets emit benchmark JSON and Markdown tables for strict and public corpora |
@@ -1105,7 +1107,7 @@ Reason: this makes the artifact credible and honest.
 
 ### Phase 8: Paper-facing polish
 
-1. Add generated tables under `results/`.
+1. Add generated tables under `results/`. **Done:** `make artifact-tables` writes `results/generated/artifact-tables/summary.{json,md}`.
 2. Add a paper-introduction motivation draft.
 3. Add citation/literature positioning.
 4. Ensure README, `ARTIFACT.md`, and docs make identical claims.

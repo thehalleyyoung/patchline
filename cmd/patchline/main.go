@@ -333,6 +333,8 @@ func run(args []string) error {
 			return errors.New("usage: patchline artifact-study <summarize|compare> <args> [--json] [--out path]")
 		}
 		return artifactStudy(args[1:])
+	case "artifact-tables":
+		return artifactTables(args[1:])
 	case "ingest-evidence":
 		if len(args) < 2 {
 			return errors.New("usage: patchline ingest-evidence <events.jsonl> [--json] [--out graph.json]")
@@ -424,6 +426,7 @@ Usage:
   patchline artifact-scale <suite.json> [--out dir] [--json]
   patchline artifact-study summarize <report-dir> [--out expected.json] [--json]
   patchline artifact-study compare <report-dir> <expected.json> [--json]
+  patchline artifact-tables [--root repo-root] [--out results/generated/artifact-tables] [--json]
   patchline artifact-benchmark validate <manifest.json> [--json]
   patchline artifact-benchmark run <manifest.json> [--out report.json] [--json]
   patchline artifact-benchmark compare <actual.json> <expected.json> [--json]
@@ -3723,6 +3726,34 @@ func artifactStudy(args []string) error {
 	default:
 		return fmt.Errorf("unknown artifact-study subcommand %q", args[0])
 	}
+}
+
+func artifactTables(args []string) error {
+	root, _ := flagValue(args, "--root")
+	if root == "" {
+		root = "."
+	}
+	outPath, _ := flagValue(args, "--out")
+	if outPath == "" {
+		outPath = filepath.Join("results", "generated", "artifact-tables")
+	}
+	report, err := artifact.GeneratePaperTables(root)
+	if err != nil {
+		return err
+	}
+	if outPath != "" {
+		if err := artifact.WritePaperTablesReport(outPath, report); err != nil {
+			return err
+		}
+	}
+	if hasFlag(args, "--json") {
+		return writeJSON(os.Stdout, report)
+	}
+	fmt.Printf("artifact tables hash=%s tables=%d out=%s\n", report.Hash, len(report.Tables), outPath)
+	for _, table := range report.Tables {
+		fmt.Printf("  %s rows=%d\n", table.ID, len(table.Rows))
+	}
+	return nil
 }
 
 func writeBenchmarkRun(outPath string, report artifact.BenchmarkRunReport) error {

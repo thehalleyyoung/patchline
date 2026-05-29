@@ -1,4 +1,4 @@
-.PHONY: build test demo gate fmt public-corpus verify-usefulness artifact-smoke artifact-demo artifact-ground-truth-check artifact-baselines artifact-ablations artifact-scale artifact-studies artifact-studies-expected artifact-studies-compare artifact-studies-refresh artifact-baselines-public artifact-ablations-public artifact-scale-public artifact-studies-public artifact-studies-public-expected artifact-studies-public-compare artifact-studies-all artifact-benchmark artifact-benchmark-repairs artifact-benchmark-regressions artifact-benchmark-public artifact-benchmark-public-incidents artifact-benchmark-public-repairs artifact-benchmark-public-archive artifact-benchmark-refresh artifact-benchmark-compare artifact-negative-cases artifact-full artifact-clean
+.PHONY: build test demo gate fmt public-corpus verify-usefulness artifact-smoke artifact-demo artifact-ground-truth-check artifact-baselines artifact-ablations artifact-scale artifact-studies artifact-studies-expected artifact-studies-compare artifact-studies-refresh artifact-baselines-public artifact-ablations-public artifact-scale-public artifact-studies-public artifact-studies-public-expected artifact-studies-public-compare artifact-studies-all artifact-tables artifact-benchmark artifact-benchmark-repairs artifact-benchmark-regressions artifact-benchmark-public artifact-benchmark-public-incidents artifact-benchmark-public-repairs artifact-benchmark-public-archive artifact-benchmark-refresh artifact-benchmark-compare artifact-negative-cases artifact-full artifact-clean
 
 build:
 	go build -o bin/patchline ./cmd/patchline
@@ -76,6 +76,9 @@ artifact-studies-public-compare: artifact-studies-public
 
 artifact-studies-all: artifact-studies artifact-studies-public
 
+artifact-tables: artifact-studies-all
+	go run ./cmd/patchline artifact-tables --out results/generated/artifact-tables
+
 artifact-benchmark:
 	go run ./cmd/patchline artifact-benchmark validate benchmarks/manifests/smoke.json
 	go run ./cmd/patchline artifact-benchmark run benchmarks/manifests/smoke.json --out results/generated/artifact-benchmark/smoke-report.json
@@ -127,7 +130,7 @@ artifact-benchmark-compare: artifact-benchmark artifact-benchmark-repairs artifa
 artifact-negative-cases:
 	bash scripts/artifact_negative_cases.sh
 
-artifact-full: artifact-smoke artifact-demo artifact-studies-compare artifact-benchmark-compare artifact-benchmark-public-incidents artifact-benchmark-public-repairs artifact-benchmark-public-archive artifact-negative-cases verify-usefulness
+artifact-full: artifact-smoke artifact-demo artifact-studies-compare artifact-tables artifact-benchmark-compare artifact-benchmark-public-incidents artifact-benchmark-public-repairs artifact-benchmark-public-archive artifact-negative-cases verify-usefulness
 
 artifact-clean:
 	rm -rf results/generated

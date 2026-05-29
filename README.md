@@ -20,6 +20,7 @@ make artifact-demo
 make artifact-ground-truth-check
 make artifact-studies-compare
 make artifact-studies-public-compare
+make artifact-tables
 make artifact-benchmark-compare
 make artifact-benchmark-public
 make artifact-benchmark-public-incidents
@@ -33,6 +34,8 @@ Start with [`ARTIFACT.md`](ARTIFACT.md) for the quick evaluator path, [`docs/pap
 `make artifact-studies-compare` writes `baselines.{json,md}`, `ablations.{json,md}`, and `scale.{json,md}` under `results/generated/artifact-studies/` for the committed strict corpus, then compares their stable report hashes against `benchmarks/expected/studies-strict.json`. These reports make the current claim sharper: Patchline is not merely detecting bad SQL; it shows, case by case, which semantic layers add tables/effects/reasons, ground-truth links, archive links, Z3-backed repair obligations, stable hashes, and reviewer-actionable evidence beyond DDL-grep, normalized SQL-rule, and effects-only baselines.
 
 `make artifact-studies-public-compare` is the explicit network-backed study path. It fetches the pinned Bytebase migration corpus, writes the same baseline/ablation/scale tables under `results/generated/artifact-studies/public-migrations/`, and checks their stable hashes against `benchmarks/expected/studies-public-migrations.json`. This public corpus measures migration detection and structural actionability only; it does not claim archive/proof gains for cases that do not declare those inputs.
+
+`make artifact-tables` emits paper-facing summaries under `results/generated/artifact-tables/summary.{json,md}`. The generator derives five deterministic ICSE-style tables from the checked benchmark reports and study specs: executable corpora, detection/actionability, semantic-evidence ablation, historical public-derived counterfactuals, and scale. It keeps the public-postmortem-derived boundary explicit and excludes machine-dependent timing from stable table claims.
 
 `make artifact-benchmark-compare` runs the committed smoke, negative, repair, and regression benchmark manifests, emits deterministic reports under `results/generated/artifact-benchmark/`, and compares them against frozen expected outputs in `benchmarks/expected/`. This is the no-hindsight-leakage path: ground-truth labels validate the manifest and compare the final answer, while prediction uses only the fixture input kinds allowed for the case phase.
 
@@ -65,6 +68,7 @@ Evidence -> Trace -> Transition -> Repair -> Proof -> Replay -> Archive -> Regre
 | Archive | `archive-index`, `archive-query` | deterministic incident index | turns incidents into queryable memory |
 | Regression | `semantic-regressions` | recurrence relations and invariants | detects repeated semantic failure shapes |
 | Artifact studies | `artifact-baselines`, `artifact-ablations`, `artifact-scale`, `artifact-study compare` | baseline, ablation, scale, and expected-hash reports | shows and drift-checks what each semantic layer contributes right now |
+| Paper tables | `artifact-tables` | five deterministic ICSE-style result tables | turns checked reports into reviewer-facing corpus, detection, ablation, historical, and scale summaries |
 | Artifact benchmark | `artifact-benchmark validate/run/compare` | phase-aware migration, incident, public-derived repair, paired public-archive, and regression reports with golden comparisons | verifies current usefulness against committed and pinned-public ground truth without label leakage |
 
 ## Verify the current usefulness claim

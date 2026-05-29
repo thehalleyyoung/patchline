@@ -115,6 +115,16 @@ The study comparison path deliberately compares each report's canonical `hash` i
 make artifact-studies-refresh
 ```
 
+## Paper-facing table generation
+
+Regenerate the reviewer-facing result tables with:
+
+```bash
+make artifact-tables
+```
+
+This writes `results/generated/artifact-tables/summary.json` and `summary.md`. The generator derives five paper tables from the checked benchmark reports and study specs: executable corpora, detection/actionability, ablation, historical public-derived counterfactuals, and scale. It records source hashes and keeps public incident/archive claims scoped to public-postmortem-derived semantic reconstructions.
+
 ## Larger benchmark targets
 
 The planned full benchmark families are:
