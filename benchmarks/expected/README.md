@@ -8,7 +8,7 @@ Compare generated reports with:
 make artifact-benchmark-compare
 ```
 
-Generated reports are written to `results/generated/artifact-benchmark/`; the committed JSON files here are the golden comparison targets for the smoke and negative manifests.
+Generated reports are written to `results/generated/artifact-benchmark/`; the committed JSON files here are the golden comparison targets for the smoke, negative, and pinned public migration manifests.
 
 When a semantic change intentionally changes the expected report shape or result hashes, refresh the committed golden files with:
 
@@ -16,4 +16,4 @@ When a semantic change intentionally changes the expected report shape or result
 make artifact-benchmark-refresh
 ```
 
-Do not use refresh as a reviewer check: it rewrites this directory. Use `make artifact-benchmark-compare` to detect drift.
+Do not use refresh as a reviewer check: it rewrites this directory. Use `make artifact-benchmark-compare` for the offline smoke/negative drift check and `make artifact-benchmark-public` for the explicit public-data drift check.

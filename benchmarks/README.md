@@ -40,13 +40,21 @@ benchmarks/expected/negative-report.json
 
 The runner is phase-aware. It validates that each manifest case points to matching ground truth, enforces `allowed_inputs` and `excluded_inputs`, predicts from committed fixtures or explicit inline fixtures, and only then compares the result with the expected label. This keeps pre-deploy cases from using postmortem-only facts.
 
+Run the pinned public migration corpus with:
+
+```bash
+make artifact-benchmark-public
+```
+
+That target fetches five Bytebase migrations at a pinned commit, verifies their source hashes, runs the legacy label/hash benchmark suite, then runs `manifests/public_migrations.json` against `expected/public-migrations-report.json`. The public manifest is marked `requires_fetch`, so ground-truth validation can remain offline while the public benchmark target deliberately exercises network-backed real-world data.
+
 Expected reports are intentionally not refreshed by the compare target. After a deliberate semantics change, maintainers can run:
 
 ```bash
 make artifact-benchmark-refresh
 ```
 
-That target rewrites the committed golden JSON/Markdown reports and then runs the normal compare path against the refreshed files.
+That target rewrites the committed golden JSON/Markdown reports, including the public migration report, and then runs the normal compare paths against the refreshed files.
 
 ## Executable study outputs
 
@@ -62,7 +70,7 @@ That target emits baseline, ablation, and scale reports under `results/generated
 
 The planned full benchmark families are:
 
-- public OSS migrations;
+- public OSS migrations (currently five pinned Bytebase migrations);
 - public historical incidents;
 - repair/replay cases;
 - semantic regression archives;

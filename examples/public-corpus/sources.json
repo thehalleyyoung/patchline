@@ -20,6 +20,18 @@
       "url": "https://raw.githubusercontent.com/bytebase/bytebase/47d2522552ce44271680424bf31a4cddd8a50ab1/backend/migrator/migration/3.17/0009%23%23add_workspace_table.sql",
       "sha256": "276ad1148252ce21849054acf1d6ac62db5d72df3f88c9c2b4b42c28e7f5e98c",
       "out": "bytebase-workspace.sql"
+    },
+    {
+      "id": "bytebase-drop-sheet-table",
+      "url": "https://raw.githubusercontent.com/bytebase/bytebase/47d2522552ce44271680424bf31a4cddd8a50ab1/backend/migrator/migration/3.15/0007%23%23drop_sheet_table.sql",
+      "sha256": "456248872b099828f958143f0ee5ce5d006d9705c7e85345486ad3430d140f13",
+      "out": "bytebase-drop-sheet-table.sql"
+    },
+    {
+      "id": "bytebase-drop-unused-id-columns",
+      "url": "https://raw.githubusercontent.com/bytebase/bytebase/47d2522552ce44271680424bf31a4cddd8a50ab1/backend/migrator/migration/3.16/0002%23%23drop_unused_id_columns.sql",
+      "sha256": "e9d46ecb1e229aa55b02426b052891783dd637492655b22c8ce385d5b0ac5492",
+      "out": "bytebase-drop-unused-id-columns.sql"
     }
   ]
 }

@@ -27,8 +27,8 @@ Ground-truth labels must be source-grounded and phase-aware.
 
 1. Every case must include `case_id`, `case_type`, `phase`, `labels.expected_result`, `labels.risk`, `evidence`, `allowed_inputs`, and `excluded_inputs`.
 2. Pre-deploy claims must not cite postmortem-only evidence.
-3. Public sources should include a URL, retrieval date, and license/provenance note where possible.
-4. File-based labels must point to committed fixtures.
+3. Public sources should include a URL, pinned commit or content hash, retrieval date, and license/provenance note where possible.
+4. File-based labels must point to committed fixtures or to explicit `requires_fetch` manifests whose fetch target verifies pinned hashes before execution.
 5. Ambiguous cases should be labeled `insufficient_evidence` rather than forced into a positive or negative result.
 
 ## Evidence kinds
@@ -41,5 +41,7 @@ Allowed evidence kinds in the smoke validator:
 - `postmortem`
 - `archive`
 - `fixture`
+- `public_source`
+- `sha256`
 
 Future validators may add commit-hash and source-bundle evidence kinds.

@@ -7,14 +7,15 @@ This plan turns the ICSE-style review critique into an implementation roadmap fo
 Patchline now has the artifact-review scaffold and several executable evaluator paths in place:
 
 - `README.md`, `ARTIFACT.md`, `docs/paper-claim.md`, `docs/semantic-core.md`, `docs/semantic-pipeline.md`, and `docs/literature-positioning.md` frame the repository around the historical repair-semantics artifact claim.
-- `benchmarks/LABELING.md`, `benchmarks/manifests/smoke.json`, `benchmarks/manifests/negative.json`, and `benchmarks/ground_truth/**` provide phase-aware, source-grounded labels.
+- `benchmarks/LABELING.md`, `benchmarks/manifests/smoke.json`, `benchmarks/manifests/negative.json`, `benchmarks/manifests/public_migrations.json`, and `benchmarks/ground_truth/**` provide phase-aware, source-grounded labels.
 - `patchline artifact-ground-truth`, `artifact-baselines`, `artifact-ablations`, `artifact-scale`, and `artifact-benchmark validate/run/compare` are implemented.
 - `make artifact-benchmark-compare` executes smoke and negative manifests, writes deterministic reports under `results/generated/artifact-benchmark/`, and compares them against committed golden reports in `benchmarks/expected/`.
-- `make artifact-benchmark-refresh` is the explicit maintainer path for regenerating those committed golden reports after deliberate semantic changes.
+- `make artifact-benchmark-public` fetches five pinned Bytebase migrations, verifies source hashes, runs the legacy benchmark-suite label/hash check, and compares the phase-aware artifact benchmark to a committed golden report.
+- `make artifact-benchmark-refresh` is the explicit maintainer path for regenerating committed golden reports after deliberate semantic changes.
 - `make artifact-full && make verify-usefulness` has passed after the executable benchmark runner and golden-refresh workflow were added.
 - `100_STEPS.md`, `PLAN.md`, and `NEW_PLAN.md` are untracked/ignored; this file remains the tracked implementation roadmap.
 
-The latest refinement closes the manual **golden refresh** gap, so reviewers and maintainers can intentionally regenerate `benchmarks/expected/*.json` after semantic changes instead of copying generated files by hand. The next large step should be public-corpus expansion, not another workflow wrapper.
+The latest refinement adds the first pinned public migration corpus. The next large step should add a public incident corpus with source-derived observations and explicit insufficient-evidence boundaries.
 
 ## 0. Target Artifact Claim
 
@@ -362,8 +363,8 @@ Manifest schema:
 
 ### Current status
 
-- Done: manifest structs, validation, runner, comparison, smoke/negative manifests, committed golden reports, hash-integrity comparison, `make artifact-benchmark-compare`, and `make artifact-benchmark-refresh`.
-- Next: expand from committed smoke/negative fixtures to `public_migrations.json` and `public_incidents.json` with pinned/cacheable public sources.
+- Done: manifest structs, validation, runner, comparison, smoke/negative manifests, `public_migrations.json`, committed golden reports, hash-integrity comparison, `make artifact-benchmark-compare`, `make artifact-benchmark-public`, and `make artifact-benchmark-refresh`.
+- Next: expand from public migrations to `public_incidents.json` with pinned/cacheable public source-derived observations.
 
 ### Acceptance criteria
 
@@ -1199,17 +1200,18 @@ Patchline is artifact-paper-ready when:
 
 ## 18. Immediate Next Commit Plan
 
-The artifact-review scaffold, executable benchmark runner, and golden-refresh workflow are now in place. The next implementation commit should make the benchmark suite less smoke-test-shaped by adding a pinned public migration corpus:
+The artifact-review scaffold, executable benchmark runner, golden-refresh workflow, and pinned public migration corpus are now in place. The next implementation commit should make the benchmark suite cover public incidents with the same phase-safe manifest protocol:
 
-1. Add `benchmarks/manifests/public_migrations.json`.
-2. Add at least five public migration cases with pinned source URLs, source hashes, fixture-cache instructions, and phase-aware labels.
-3. Ensure fresh-checkout artifact validation does not require the network path unless the public-corpus target is explicitly requested.
-4. Add committed expected reports only after the manifest can run deterministically from cached fixtures.
+1. Add `benchmarks/manifests/public_incidents.json`.
+2. Add source-derived observation fixtures from at least two public incidents with pinned evidence URLs/hashes.
+3. Include at least one positive recurrence/flag case and one insufficient-evidence boundary case.
+4. Keep fresh-checkout smoke validation offline; put network-backed fetching behind an explicit public-incident target.
+5. Add committed expected reports only after the manifest can run deterministically from cached fixtures.
 
 Commit message:
 
 ```text
-Add pinned public migration benchmark manifest
+Add pinned public incident benchmark manifest
 
 Co-authored-by: Copilot <223556219+Copilot@users.noreply.github.com>
 ```

@@ -20,6 +20,7 @@ make artifact-demo
 make artifact-ground-truth-check
 make artifact-studies
 make artifact-benchmark-compare
+make artifact-benchmark-public
 make artifact-negative-cases
 ```
 
@@ -29,7 +30,9 @@ Start with [`ARTIFACT.md`](ARTIFACT.md) for the quick evaluator path, [`docs/pap
 
 `make artifact-benchmark-compare` runs the committed smoke and negative benchmark manifests, emits deterministic reports under `results/generated/artifact-benchmark/`, and compares them against frozen expected outputs in `benchmarks/expected/`. This is the no-hindsight-leakage path: ground-truth labels validate the manifest and compare the final answer, while prediction uses only the fixture input kinds allowed for the case phase.
 
-If a semantic change intentionally updates those expected outputs, run `make artifact-benchmark-refresh`. It rewrites `benchmarks/expected/*.json` and then immediately reruns the compare target, keeping the default reviewer path drift-detecting rather than self-updating.
+`make artifact-benchmark-public` explicitly fetches five pinned Bytebase migrations, verifies their SHA-256 hashes, runs the older benchmark-suite label/hash check, then runs the phase-aware artifact benchmark over `benchmarks/manifests/public_migrations.json`. It is the current real-OSS migration corpus path; it is kept out of the default smoke target so fresh-checkout review does not require network access.
+
+If a semantic change intentionally updates expected outputs, run `make artifact-benchmark-refresh`. It rewrites `benchmarks/expected/*.json`, refreshes the public migration report after fetching pinned sources, and immediately reruns the compare targets, keeping the default reviewer path drift-detecting rather than self-updating.
 
 The central artifact object is:
 
@@ -48,7 +51,7 @@ Evidence -> Trace -> Transition -> Repair -> Proof -> Replay -> Archive -> Regre
 | Archive | `archive-index`, `archive-query` | deterministic incident index | turns incidents into queryable memory |
 | Regression | `semantic-regressions` | recurrence relations and invariants | detects repeated semantic failure shapes |
 | Artifact studies | `artifact-baselines`, `artifact-ablations`, `artifact-scale` | baseline, ablation, and scale reports | shows what each semantic layer contributes right now |
-| Artifact benchmark | `artifact-benchmark validate/run/compare` | phase-aware run report and golden comparison | verifies current usefulness against committed ground truth without label leakage |
+| Artifact benchmark | `artifact-benchmark validate/run/compare` | phase-aware run report and golden comparison | verifies current usefulness against committed and pinned-public ground truth without label leakage |
 
 ## Verify the current usefulness claim
 

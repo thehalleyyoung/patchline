@@ -1,0 +1,28 @@
+{
+  "case_id": "bytebase-replica-heartbeat",
+  "case_type": "migration",
+  "phase": "pre_deploy",
+  "labels": {
+    "expected_result": "flag",
+    "risk": "high"
+  },
+  "evidence": [
+    {
+      "kind": "public_source",
+      "locator": "https://github.com/bytebase/bytebase/blob/47d2522552ce44271680424bf31a4cddd8a50ab1/backend/migrator/migration/3.14/0027%23%23replica_heartbeat.sql",
+      "rationale": "Pinned Bytebase migration text marks all RUNNING task runs as FAILED during the migration."
+    },
+    {
+      "kind": "sha256",
+      "locator": "examples/public-corpus/sources.json#bytebase-replica-heartbeat",
+      "rationale": "The fetch script verifies sha256 1ab807c25f64eec2c05cfe3e0d4af218ff5f469bcaeb8c199d9559f6d0058c83 before benchmark execution."
+    },
+    {
+      "kind": "rule",
+      "locator": "migration-analysis:broad-update",
+      "rationale": "Pre-deploy migration text is enough to require review because the status rewrite can affect every running task row."
+    }
+  ],
+  "allowed_inputs": ["migration_text", "schema", "policy", "prior_archive"],
+  "excluded_inputs": ["postmortem_text"]
+}

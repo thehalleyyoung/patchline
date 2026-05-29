@@ -48,10 +48,11 @@ type Evidence struct {
 }
 
 type Manifest struct {
-	Version     string         `json:"version"`
-	DatasetID   string         `json:"dataset_id"`
-	Description string         `json:"description"`
-	Cases       []ManifestCase `json:"cases"`
+	Version       string         `json:"version"`
+	DatasetID     string         `json:"dataset_id"`
+	Description   string         `json:"description"`
+	RequiresFetch bool           `json:"requires_fetch,omitempty"`
+	Cases         []ManifestCase `json:"cases"`
 }
 
 type ManifestCase struct {
@@ -211,7 +212,9 @@ func validateManifest(path string, manifest Manifest, groundTruthByPath map[stri
 		if manifestCase.Fixture != "" && !strings.HasPrefix(manifestCase.Fixture, "inline:") {
 			fixturePath := filepath.Join(filepath.Dir(path), manifestCase.Fixture)
 			if _, err := os.Stat(fixturePath); err != nil {
-				add(manifestCase.CaseID, "manifest fixture does not exist: "+manifestCase.Fixture)
+				if !manifest.RequiresFetch {
+					add(manifestCase.CaseID, "manifest fixture does not exist: "+manifestCase.Fixture)
+				}
 			}
 		}
 	}

@@ -16,8 +16,9 @@ The current reviewer path is intentionally narrow and executable from a fresh ch
 4. Emit deterministic JSON outputs under `results/generated/`.
 5. Run negative/limitation cases that show unsupported or insufficient-evidence outcomes are represented explicitly.
 6. Compare executable benchmark-manifest outputs against frozen expected reports.
+7. Optionally fetch pinned public OSS migrations and run the same phase-aware protocol against real migration SQL.
 
-The smoke path uses only committed fixtures and existing CLI commands. It does not require network access.
+The smoke path uses only committed fixtures and existing CLI commands. It does not require network access. Public-data targets are explicit and verify pinned hashes before using downloaded files.
 
 ## Setup
 
@@ -116,13 +117,21 @@ go run ./cmd/patchline artifact-benchmark compare results/generated/artifact-ben
 
 The runner separates prediction from comparison. During prediction, Patchline may use the manifest fixture and the case's allowed/excluded input kinds, but it does not use the ground-truth expected label to decide the result. Ground truth is used to validate references, enforce phase guards, and compare the final outcome. The comparison command exits non-zero if a case result or report hash drifts.
 
+The real-OSS public migration path is explicit because it fetches pinned public sources:
+
+```bash
+make artifact-benchmark-public
+```
+
+That target downloads five Bytebase migrations at commit `47d2522552ce44271680424bf31a4cddd8a50ab1`, verifies each SHA-256 hash from `examples/public-corpus/sources.json`, runs `examples/benchmarks/public-bytebase-migration-corpus.json`, and compares the artifact benchmark report with `benchmarks/expected/public-migrations-report.json`.
+
 If a semantic change intentionally changes the benchmark outputs, refresh the frozen reports with:
 
 ```bash
 make artifact-benchmark-refresh
 ```
 
-This command rewrites `benchmarks/expected/smoke-report.json` and `benchmarks/expected/negative-report.json`, then reruns `make artifact-benchmark-compare`. Reviewers should use `make artifact-benchmark-compare`; refresh is a maintainer workflow for updating golden files after deliberate semantic changes.
+This command rewrites `benchmarks/expected/smoke-report.json`, `benchmarks/expected/negative-report.json`, and `benchmarks/expected/public-migrations-report.json`, then reruns `make artifact-benchmark-compare` and `make artifact-benchmark-public`. Reviewers should use compare targets; refresh is a maintainer workflow for updating golden files after deliberate semantic changes.
 
 ## Canonical demo
 
@@ -190,7 +199,7 @@ These cases are part of the artifact, not merely prose limitations.
 
 ## Relationship to `make verify-usefulness`
 
-`make verify-usefulness` remains the broader project validation target. It includes network-backed public corpus fetching and source checks. `make artifact-smoke` is the artifact-review entry point: it is smaller, committed-fixture-only, and intended to be stable without network access. `make artifact-studies` is the evaluator-facing measurement entry point for current baseline/ablation/scale evidence, `make artifact-benchmark-compare` is the golden-output check for the executable manifest protocol, and `make artifact-benchmark-refresh` is the explicit maintainer path for rewriting those golden outputs.
+`make verify-usefulness` remains the broader project validation target. It includes network-backed public corpus fetching and source checks. `make artifact-smoke` is the artifact-review entry point: it is smaller, committed-fixture-only, and intended to be stable without network access. `make artifact-studies` is the evaluator-facing measurement entry point for current baseline/ablation/scale evidence, `make artifact-benchmark-compare` is the offline golden-output check for the executable manifest protocol, `make artifact-benchmark-public` is the explicit public-data check, and `make artifact-benchmark-refresh` is the maintainer path for rewriting golden outputs.
 
 ## Data provenance
 

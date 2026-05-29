@@ -1,0 +1,43 @@
+{
+  "version": "patchline.artifact-benchmark/v1",
+  "dataset_id": "patchline-public-migrations-v1",
+  "description": "Pinned Bytebase migration cases fetched explicitly by make public-corpus.",
+  "requires_fetch": true,
+  "cases": [
+    {
+      "case_id": "bytebase-sheet-blob",
+      "case_type": "migration",
+      "available_at": "pre_deploy",
+      "fixture": "../../examples/public-corpus/downloads/bytebase-sheet-blob.sql",
+      "ground_truth": "../ground_truth/public_migrations/bytebase-sheet-blob.json"
+    },
+    {
+      "case_id": "bytebase-replica-heartbeat",
+      "case_type": "migration",
+      "available_at": "pre_deploy",
+      "fixture": "../../examples/public-corpus/downloads/bytebase-replica-heartbeat.sql",
+      "ground_truth": "../ground_truth/public_migrations/bytebase-replica-heartbeat.json"
+    },
+    {
+      "case_id": "bytebase-workspace",
+      "case_type": "migration",
+      "available_at": "pre_deploy",
+      "fixture": "../../examples/public-corpus/downloads/bytebase-workspace.sql",
+      "ground_truth": "../ground_truth/public_migrations/bytebase-workspace.json"
+    },
+    {
+      "case_id": "bytebase-drop-sheet-table",
+      "case_type": "migration",
+      "available_at": "pre_deploy",
+      "fixture": "../../examples/public-corpus/downloads/bytebase-drop-sheet-table.sql",
+      "ground_truth": "../ground_truth/public_migrations/bytebase-drop-sheet-table.json"
+    },
+    {
+      "case_id": "bytebase-drop-unused-id-columns",
+      "case_type": "migration",
+      "available_at": "pre_deploy",
+      "fixture": "../../examples/public-corpus/downloads/bytebase-drop-unused-id-columns.sql",
+      "ground_truth": "../ground_truth/public_migrations/bytebase-drop-unused-id-columns.json"
+    }
+  ]
+}

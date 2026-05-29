@@ -19,6 +19,18 @@
       "path": "../public-corpus/downloads/bytebase-workspace.sql",
       "label": "unsafe",
       "expected_report_hash": "c22cb691a15350239fe7d07b67edf120247c975f3338ca58d6abd7d17592edd2"
+    },
+    {
+      "id": "bytebase-drop-sheet-table",
+      "path": "../public-corpus/downloads/bytebase-drop-sheet-table.sql",
+      "label": "unsafe",
+      "expected_report_hash": "5cfbd473224cbaf4059997a9d4b457f79f1fe3592aac6d9cc96930355f4945c7"
+    },
+    {
+      "id": "bytebase-drop-unused-id-columns",
+      "path": "../public-corpus/downloads/bytebase-drop-unused-id-columns.sql",
+      "label": "safe",
+      "expected_report_hash": "6d4c9549c477cb3cd0a08242bc33354c6a6884bfe5ed45e4051f8284bbef21f2"
     }
   ]
 }

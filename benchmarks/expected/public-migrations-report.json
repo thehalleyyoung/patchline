@@ -1,0 +1,118 @@
+{
+  "version": "patchline.artifact-benchmark-run/v1",
+  "dataset_id": "patchline-public-migrations-v1",
+  "manifest": "benchmarks/manifests/public_migrations.json",
+  "ok": true,
+  "metrics": {
+    "total": 5,
+    "passed": 5,
+    "failed": 0,
+    "by_type": {
+      "migration": 5
+    },
+    "by_result": {
+      "flag": 4,
+      "pass": 1
+    },
+    "phase_guards": 0
+  },
+  "cases": [
+    {
+      "case_id": "bytebase-sheet-blob",
+      "case_type": "migration",
+      "phase": "pre_deploy",
+      "fixture": "../../examples/public-corpus/downloads/bytebase-sheet-blob.sql",
+      "ground_truth": "../ground_truth/public_migrations/bytebase-sheet-blob.json",
+      "input_kind": "migration_text",
+      "expected_result": "flag",
+      "actual_result": "flag",
+      "risk": "high",
+      "ok": true,
+      "signals": [
+        "high-risk-statements=1",
+        "tables=if,sheet,sheet_blob"
+      ],
+      "hashes": {
+        "migration_report": "2368aff7cd31b7a849a9325024ddc72b442ba1b66d690376ab044b412fede8eb"
+      }
+    },
+    {
+      "case_id": "bytebase-replica-heartbeat",
+      "case_type": "migration",
+      "phase": "pre_deploy",
+      "fixture": "../../examples/public-corpus/downloads/bytebase-replica-heartbeat.sql",
+      "ground_truth": "../ground_truth/public_migrations/bytebase-replica-heartbeat.json",
+      "input_kind": "migration_text",
+      "expected_result": "flag",
+      "actual_result": "flag",
+      "risk": "high",
+      "ok": true,
+      "signals": [
+        "high-risk-statements=1",
+        "tables=replica_heartbeat,task_run"
+      ],
+      "hashes": {
+        "migration_report": "544e0961d0cf9f577830b904f457f1288a6ed6eafda69d2a5f1438b4b029037b"
+      }
+    },
+    {
+      "case_id": "bytebase-workspace",
+      "case_type": "migration",
+      "phase": "pre_deploy",
+      "fixture": "../../examples/public-corpus/downloads/bytebase-workspace.sql",
+      "ground_truth": "../ground_truth/public_migrations/bytebase-workspace.json",
+      "input_kind": "migration_text",
+      "expected_result": "flag",
+      "actual_result": "flag",
+      "risk": "high",
+      "ok": true,
+      "signals": [
+        "high-risk-statements=3",
+        "tables=if,server_config,workspace"
+      ],
+      "hashes": {
+        "migration_report": "c22cb691a15350239fe7d07b67edf120247c975f3338ca58d6abd7d17592edd2"
+      }
+    },
+    {
+      "case_id": "bytebase-drop-sheet-table",
+      "case_type": "migration",
+      "phase": "pre_deploy",
+      "fixture": "../../examples/public-corpus/downloads/bytebase-drop-sheet-table.sql",
+      "ground_truth": "../ground_truth/public_migrations/bytebase-drop-sheet-table.json",
+      "input_kind": "migration_text",
+      "expected_result": "flag",
+      "actual_result": "flag",
+      "risk": "high",
+      "ok": true,
+      "signals": [
+        "high-risk-statements=1",
+        "tables=sheet"
+      ],
+      "hashes": {
+        "migration_report": "5cfbd473224cbaf4059997a9d4b457f79f1fe3592aac6d9cc96930355f4945c7"
+      }
+    },
+    {
+      "case_id": "bytebase-drop-unused-id-columns",
+      "case_type": "migration",
+      "phase": "pre_deploy",
+      "fixture": "../../examples/public-corpus/downloads/bytebase-drop-unused-id-columns.sql",
+      "ground_truth": "../ground_truth/public_migrations/bytebase-drop-unused-id-columns.json",
+      "input_kind": "migration_text",
+      "expected_result": "pass",
+      "actual_result": "pass",
+      "risk": "medium",
+      "ok": true,
+      "signals": [
+        "high-risk-statements=0",
+        "tables=db,db_group,db_schema,idp,instance,policy,project,release,role,setting,task_run_log"
+      ],
+      "hashes": {
+        "migration_report": "6d4c9549c477cb3cd0a08242bc33354c6a6884bfe5ed45e4051f8284bbef21f2"
+      }
+    }
+  ],
+  "hash": "2ab0dae25d6135703dacd624105ad823a64ce3317a569775811759b534dd3fec",
+  "markdown": "# Artifact benchmark report\n\n- dataset_id: `patchline-public-migrations-v1`\n- ok: `true`\n- hash: `2ab0dae25d6135703dacd624105ad823a64ce3317a569775811759b534dd3fec`\n- total: `5`\n- passed: `5`\n- failed: `0`\n\n| case | type | phase | expected | actual | ok |\n| --- | --- | --- | --- | --- | ---: |\n| bytebase-sheet-blob | migration | pre_deploy | flag | flag | true |\n| bytebase-replica-heartbeat | migration | pre_deploy | flag | flag | true |\n| bytebase-workspace | migration | pre_deploy | flag | flag | true |\n| bytebase-drop-sheet-table | migration | pre_deploy | flag | flag | true |\n| bytebase-drop-unused-id-columns | migration | pre_deploy | pass | pass | true |\n"
+}

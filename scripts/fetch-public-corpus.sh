@@ -39,3 +39,15 @@ fetch_one \
   "https://raw.githubusercontent.com/bytebase/bytebase/47d2522552ce44271680424bf31a4cddd8a50ab1/backend/migrator/migration/3.17/0009%23%23add_workspace_table.sql" \
   "276ad1148252ce21849054acf1d6ac62db5d72df3f88c9c2b4b42c28e7f5e98c" \
   "bytebase-workspace.sql"
+
+fetch_one \
+  "bytebase-drop-sheet-table" \
+  "https://raw.githubusercontent.com/bytebase/bytebase/47d2522552ce44271680424bf31a4cddd8a50ab1/backend/migrator/migration/3.15/0007%23%23drop_sheet_table.sql" \
+  "456248872b099828f958143f0ee5ce5d006d9705c7e85345486ad3430d140f13" \
+  "bytebase-drop-sheet-table.sql"
+
+fetch_one \
+  "bytebase-drop-unused-id-columns" \
+  "https://raw.githubusercontent.com/bytebase/bytebase/47d2522552ce44271680424bf31a4cddd8a50ab1/backend/migrator/migration/3.16/0002%23%23drop_unused_id_columns.sql" \
+  "e9d46ecb1e229aa55b02426b052891783dd637492655b22c8ce385d5b0ac5492" \
+  "bytebase-drop-unused-id-columns.sql"
