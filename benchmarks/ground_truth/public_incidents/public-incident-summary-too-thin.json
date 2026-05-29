@@ -1,0 +1,18 @@
+{
+  "case_id": "public-incident-summary-too-thin",
+  "case_type": "incident",
+  "phase": "postmortem",
+  "labels": {
+    "expected_result": "insufficient_evidence",
+    "risk": "unknown"
+  },
+  "evidence": [
+    {
+      "kind": "fixture",
+      "locator": "inline:public-summary-too-thin",
+      "rationale": "A public summary with no transition, repair, rollback, or source-observation facts should not support a stronger counterfactual claim."
+    }
+  ],
+  "allowed_inputs": ["postmortem_text"],
+  "excluded_inputs": ["private_production_data", "unstated_transition", "source_observations"]
+}

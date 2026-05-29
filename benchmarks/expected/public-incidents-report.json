@@ -1,0 +1,93 @@
+{
+  "version": "patchline.artifact-benchmark-run/v1",
+  "dataset_id": "patchline-public-incidents-v1",
+  "manifest": "benchmarks/manifests/public_incidents.json",
+  "ok": true,
+  "metrics": {
+    "total": 3,
+    "passed": 3,
+    "failed": 0,
+    "by_type": {
+      "incident": 3
+    },
+    "by_result": {
+      "flag": 2,
+      "insufficient_evidence": 1
+    },
+    "phase_guards": 0
+  },
+  "cases": [
+    {
+      "case_id": "gitlab-2017-public-source-observations",
+      "case_type": "incident",
+      "phase": "postmortem",
+      "fixture": "../../examples/historical-failures/gitlab-2017/source-observations.jsonl",
+      "ground_truth": "../ground_truth/public_incidents/gitlab-2017-public-source-observations.json",
+      "input_kind": "source_observations",
+      "expected_result": "flag",
+      "actual_result": "flag",
+      "risk": "high",
+      "ok": true,
+      "signals": [
+        "source-established-environment-remediation=production-shell-differentiation",
+        "source-established-hard-delete-policy-gap=spam-user-hard-delete",
+        "source-established-migration-revert-remediation=staging-migration-revert-tool",
+        "source-established-primary-data-loss=primary-database-removal",
+        "source-established-primary-data-loss=projects-comments-users-issues-snippets",
+        "source-established-recovery-gap=backup-restore-practice",
+        "source-established-recovery-remediation=automated-backup-restore-testing",
+        "source-established-recovery-remediation=backup-monitoring",
+        "source-established-recovery-remediation=hourly-production-snapshots",
+        "source-established-recovery-remediation=point-in-time-recovery",
+        "source-observation-signals=10"
+      ],
+      "hashes": {
+        "source_observation_signals": "a4cc62d5356c93b511162243c996b4b5dd62a7ce238ce4b86289a24c9a3b4d97",
+        "source_observations_input": "0f5bda2fed3e215c4daa97e8865dbe05fc43da1952b8207fe17326d5f57100eb"
+      }
+    },
+    {
+      "case_id": "github-2018-public-source-observations",
+      "case_type": "incident",
+      "phase": "postmortem",
+      "fixture": "../../examples/historical-failures/github-2018/source-observations.jsonl",
+      "ground_truth": "../ground_truth/public_incidents/github-2018-public-source-observations.json",
+      "input_kind": "source_observations",
+      "expected_result": "flag",
+      "actual_result": "flag",
+      "risk": "high",
+      "ok": true,
+      "signals": [
+        "source-established-manual-reconciliation=database-write-reconciliation",
+        "source-established-split-brain-writes=cross-datacenter-divergent-writes",
+        "source-established-stale-inconsistent-reads=user-visible-out-of-date-state",
+        "source-observation-signals=3"
+      ],
+      "hashes": {
+        "source_observation_signals": "03733b4d18cd6d2874855ae5eea5c9a34e98546f5b7111f5428fcb44e9345f18",
+        "source_observations_input": "c829cb0023d87b5abe73cde00752be5d17a1503674c6195dc5e4710602091ee4"
+      }
+    },
+    {
+      "case_id": "public-incident-summary-too-thin",
+      "case_type": "incident",
+      "phase": "postmortem",
+      "fixture": "inline:public-summary-too-thin",
+      "ground_truth": "../ground_truth/public_incidents/public-incident-summary-too-thin.json",
+      "input_kind": "postmortem_text",
+      "expected_result": "insufficient_evidence",
+      "actual_result": "insufficient_evidence",
+      "risk": "unknown",
+      "ok": true,
+      "signals": [
+        "inline-bytes=89",
+        "insufficient:missing-transition-and-repair-facts"
+      ],
+      "hashes": {
+        "inline": "b903afd66c8408954ce420c2448b568bbbd4f13229466ad2f48ff20e4547301c"
+      }
+    }
+  ],
+  "hash": "fdd6ad5a133f845281e505ec0555fa39d9ef285926bf72d2c03ef09353aa29d5",
+  "markdown": "# Artifact benchmark report\n\n- dataset_id: `patchline-public-incidents-v1`\n- ok: `true`\n- hash: `fdd6ad5a133f845281e505ec0555fa39d9ef285926bf72d2c03ef09353aa29d5`\n- total: `3`\n- passed: `3`\n- failed: `0`\n\n| case | type | phase | expected | actual | ok |\n| --- | --- | --- | --- | --- | ---: |\n| gitlab-2017-public-source-observations | incident | postmortem | flag | flag | true |\n| github-2018-public-source-observations | incident | postmortem | flag | flag | true |\n| public-incident-summary-too-thin | incident | postmortem | insufficient_evidence | insufficient_evidence | true |\n"
+}

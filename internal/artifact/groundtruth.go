@@ -59,6 +59,7 @@ type ManifestCase struct {
 	CaseID      string `json:"case_id"`
 	CaseType    string `json:"case_type"`
 	AvailableAt string `json:"available_at"`
+	InputKind   string `json:"input_kind,omitempty"`
 	Fixture     string `json:"fixture"`
 	GroundTruth string `json:"ground_truth"`
 }
@@ -208,6 +209,9 @@ func validateManifest(path string, manifest Manifest, groundTruthByPath map[stri
 		}
 		if gt.Phase != "" && manifestCase.AvailableAt != "" && gt.Phase != manifestCase.AvailableAt {
 			add(manifestCase.CaseID, "manifest available_at disagrees with ground_truth phase")
+		}
+		if manifestCase.InputKind != "" && !contains(gt.AllowedInputs, manifestCase.InputKind) {
+			add(manifestCase.CaseID, "manifest input_kind is not allowed by ground_truth")
 		}
 		if manifestCase.Fixture != "" && !strings.HasPrefix(manifestCase.Fixture, "inline:") {
 			fixturePath := filepath.Join(filepath.Dir(path), manifestCase.Fixture)

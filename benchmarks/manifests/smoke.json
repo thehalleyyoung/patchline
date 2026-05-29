@@ -14,6 +14,7 @@
       "case_id": "gitlab-2017-destructive-primary-data",
       "case_type": "incident",
       "available_at": "postmortem",
+      "input_kind": "evidence_jsonl",
       "fixture": "../../examples/historical-failures/gitlab-2017/evidence.jsonl",
       "ground_truth": "../ground_truth/incidents/gitlab-2017-destructive-primary-data.json"
     },

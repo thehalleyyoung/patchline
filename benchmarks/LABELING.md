@@ -29,7 +29,8 @@ Ground-truth labels must be source-grounded and phase-aware.
 2. Pre-deploy claims must not cite postmortem-only evidence.
 3. Public sources should include a URL, pinned commit or content hash, retrieval date, and license/provenance note where possible.
 4. File-based labels must point to committed fixtures or to explicit `requires_fetch` manifests whose fetch target verifies pinned hashes before execution.
-5. Ambiguous cases should be labeled `insufficient_evidence` rather than forced into a positive or negative result.
+5. Manifest cases may declare `input_kind` when one case type has multiple admissible fixture formats, such as `evidence_jsonl` and `source_observations` for public incidents. The declared input kind must appear in `allowed_inputs`.
+6. Ambiguous cases should be labeled `insufficient_evidence` rather than forced into a positive or negative result.
 
 ## Evidence kinds
 

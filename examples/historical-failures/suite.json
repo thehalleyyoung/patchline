@@ -183,10 +183,14 @@
         }
       ],
       "artifacts": {
-        "evidence": "github-2018/evidence.jsonl"
+        "evidence": "github-2018/evidence.jsonl",
+        "source_observations": "github-2018/source-observations.jsonl"
       },
       "expected_signals": [
         "damaged-derived-report",
+        "source-established-manual-reconciliation",
+        "source-established-split-brain-writes",
+        "source-established-stale-inconsistent-reads",
         "split-brain-conflicting-writes"
       ],
       "avoidance_claim": "Patchline would flag the divergent logical-record writes before declaring recovery complete, forcing a convergence/reconciliation proof instead of accepting inconsistent derived state."

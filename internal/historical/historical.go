@@ -190,7 +190,7 @@ func runCase(c Case, baseDir string) (CaseResult, error) {
 		signals = append(signals, repairSignals...)
 	}
 	if c.Artifacts.SourceObservations != "" {
-		observationSignals, err := sourceObservationSignals(resolvePath(baseDir, c.Artifacts.SourceObservations), c.Artifacts.SourceObservations)
+		observationSignals, err := SourceObservationSignals(resolvePath(baseDir, c.Artifacts.SourceObservations), c.Artifacts.SourceObservations)
 		if err != nil {
 			return CaseResult{}, err
 		}
@@ -314,7 +314,7 @@ func repairSignals(path, displayPath string) ([]Signal, error) {
 	return signals, nil
 }
 
-func sourceObservationSignals(path, displayPath string) ([]Signal, error) {
+func SourceObservationSignals(path, displayPath string) ([]Signal, error) {
 	file, err := os.Open(path)
 	if err != nil {
 		return nil, err
@@ -337,7 +337,7 @@ func sourceObservationSignals(path, displayPath string) ([]Signal, error) {
 		if obs.Type == "" || obs.Subject == "" || obs.Source == "" || obs.Assertion == "" {
 			return nil, fmt.Errorf("line %d: source observation requires type, subject, source, and assertion", lineNo)
 		}
-		signalID := sourceObservationSignalID(obs.Type)
+		signalID := SourceObservationSignalID(obs.Type)
 		if signalID == "" {
 			return nil, fmt.Errorf("line %d: unsupported source observation type %q", lineNo, obs.Type)
 		}
@@ -353,7 +353,7 @@ func sourceObservationSignals(path, displayPath string) ([]Signal, error) {
 	return signals, nil
 }
 
-func sourceObservationSignalID(kind string) string {
+func SourceObservationSignalID(kind string) string {
 	switch kind {
 	case "primary_data_loss":
 		return "source-established-primary-data-loss"

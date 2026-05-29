@@ -1,7 +1,9 @@
 package artifact
 
 import (
+	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 )
 
@@ -49,6 +51,82 @@ func TestBenchmarkRunHashIsDeterministic(t *testing.T) {
 	}
 }
 
+func TestRunBenchmarkManifestConsumesSourceObservationIncidents(t *testing.T) {
+	dir := t.TempDir()
+	writeBenchmarkTestFile(t, dir, "observations.jsonl", `{"type":"primary_data_loss","subject":"primary-db","source":"postmortem","assertion":"primary-removal","detail":"public source establishes primary-data loss"}`+"\n")
+	writeBenchmarkTestFile(t, dir, "ground_truth/source-observation-incident.json", `{
+		"case_id":"source-observation-incident",
+		"case_type":"incident",
+		"phase":"postmortem",
+		"labels":{"expected_result":"flag","risk":"high"},
+		"evidence":[{"kind":"file","locator":"observations.jsonl","rationale":"source observation fixture"}],
+		"allowed_inputs":["source_observations"],
+		"excluded_inputs":["private_production_data"]
+	}`)
+	writeBenchmarkTestFile(t, dir, "manifests/source-observation-test.json", `{
+		"version":"patchline.artifact-benchmark/v1",
+		"dataset_id":"source-observation-test",
+		"description":"source observation incident test",
+		"cases":[{
+			"case_id":"source-observation-incident",
+			"case_type":"incident",
+			"available_at":"postmortem",
+			"input_kind":"source_observations",
+			"fixture":"../observations.jsonl",
+			"ground_truth":"../ground_truth/source-observation-incident.json"
+		}]
+	}`)
+
+	report, err := RunBenchmarkManifest(filepath.Join(dir, "manifests", "source-observation-test.json"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !report.OK || len(report.Cases) != 1 {
+		t.Fatalf("expected one passing case: %+v", report)
+	}
+	if report.Cases[0].InputKind != "source_observations" {
+		t.Fatalf("expected explicit source_observations input kind, got %q", report.Cases[0].InputKind)
+	}
+	if !contains(report.Cases[0].Signals, "source-established-primary-data-loss=primary-db") {
+		t.Fatalf("expected source-established signal, got %v", report.Cases[0].Signals)
+	}
+}
+
+func TestRunBenchmarkManifestRejectsDisallowedInputKind(t *testing.T) {
+	dir := t.TempDir()
+	writeBenchmarkTestFile(t, dir, "observations.jsonl", `{"type":"primary_data_loss","subject":"primary-db","source":"postmortem","assertion":"primary-removal"}`+"\n")
+	writeBenchmarkTestFile(t, dir, "ground_truth/source-observation-incident.json", `{
+		"case_id":"source-observation-incident",
+		"case_type":"incident",
+		"phase":"postmortem",
+		"labels":{"expected_result":"flag","risk":"high"},
+		"evidence":[{"kind":"file","locator":"observations.jsonl","rationale":"source observation fixture"}],
+		"allowed_inputs":["postmortem_text"],
+		"excluded_inputs":["private_production_data"]
+	}`)
+	writeBenchmarkTestFile(t, dir, "manifests/source-observation-test.json", `{
+		"version":"patchline.artifact-benchmark/v1",
+		"dataset_id":"source-observation-test",
+		"description":"source observation incident test",
+		"cases":[{
+			"case_id":"source-observation-incident",
+			"case_type":"incident",
+			"available_at":"postmortem",
+			"input_kind":"source_observations",
+			"fixture":"../observations.jsonl",
+			"ground_truth":"../ground_truth/source-observation-incident.json"
+		}]
+	}`)
+
+	_, err := RunBenchmarkManifest(filepath.Join(dir, "manifests", "source-observation-test.json"))
+	if err == nil {
+		t.Fatal("expected disallowed input_kind validation error")
+	}
+	if !strings.Contains(err.Error(), "benchmark manifest validation failed") {
+		t.Fatalf("expected manifest validation failure, got %v", err)
+	}
+}
+
 func TestCompareBenchmarkReportsRecomputesHashes(t *testing.T) {
 	expected, err := RunBenchmarkManifest("../../benchmarks/manifests/smoke.json")
 	if err != nil {
@@ -86,4 +164,15 @@ func findBenchmarkCase(report BenchmarkRunReport, id string) BenchmarkCaseResult
 		}
 	}
 	return BenchmarkCaseResult{}
+}
+
+func writeBenchmarkTestFile(t *testing.T, dir, name, content string) {
+	t.Helper()
+	path := filepath.Join(dir, name)
+	if err := os.MkdirAll(filepath.Dir(path), 0o700); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(path, []byte(content), 0o600); err != nil {
+		t.Fatal(err)
+	}
 }

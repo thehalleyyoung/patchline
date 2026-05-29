@@ -17,6 +17,7 @@ The current reviewer path is intentionally narrow and executable from a fresh ch
 5. Run negative/limitation cases that show unsupported or insufficient-evidence outcomes are represented explicitly.
 6. Compare executable benchmark-manifest outputs against frozen expected reports.
 7. Optionally fetch pinned public OSS migrations and run the same phase-aware protocol against real migration SQL.
+8. Run an offline public-incident benchmark over source-derived GitLab/GitHub observations and an explicit insufficient-evidence boundary.
 
 The smoke path uses only committed fixtures and existing CLI commands. It does not require network access. Public-data targets are explicit and verify pinned hashes before using downloaded files.
 
@@ -125,13 +126,21 @@ make artifact-benchmark-public
 
 That target downloads five Bytebase migrations at commit `47d2522552ce44271680424bf31a4cddd8a50ab1`, verifies each SHA-256 hash from `examples/public-corpus/sources.json`, runs `examples/benchmarks/public-bytebase-migration-corpus.json`, and compares the artifact benchmark report with `benchmarks/expected/public-migrations-report.json`.
 
+The public-incident path is offline but source-derived:
+
+```bash
+make artifact-benchmark-public-incidents
+```
+
+It validates `benchmarks/manifests/public_incidents.json`, runs GitLab 2017 and GitHub 2018 public source-observation fixtures, and checks that a public summary with no transition/repair facts remains `insufficient_evidence`.
+
 If a semantic change intentionally changes the benchmark outputs, refresh the frozen reports with:
 
 ```bash
 make artifact-benchmark-refresh
 ```
 
-This command rewrites `benchmarks/expected/smoke-report.json`, `benchmarks/expected/negative-report.json`, and `benchmarks/expected/public-migrations-report.json`, then reruns `make artifact-benchmark-compare` and `make artifact-benchmark-public`. Reviewers should use compare targets; refresh is a maintainer workflow for updating golden files after deliberate semantic changes.
+This command rewrites `benchmarks/expected/smoke-report.json`, `benchmarks/expected/negative-report.json`, `benchmarks/expected/public-migrations-report.json`, and `benchmarks/expected/public-incidents-report.json`, then reruns `make artifact-benchmark-compare`, `make artifact-benchmark-public`, and `make artifact-benchmark-public-incidents`. Reviewers should use compare targets; refresh is a maintainer workflow for updating golden files after deliberate semantic changes.
 
 ## Canonical demo
 

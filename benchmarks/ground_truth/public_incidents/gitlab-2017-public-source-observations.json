@@ -1,0 +1,29 @@
+{
+  "case_id": "gitlab-2017-public-source-observations",
+  "case_type": "incident",
+  "phase": "postmortem",
+  "labels": {
+    "expected_result": "flag",
+    "risk": "high",
+    "failure_class": "source-established-destructive-primary-data-transition"
+  },
+  "evidence": [
+    {
+      "kind": "postmortem",
+      "locator": "https://about.gitlab.com/blog/postmortem-of-database-outage-of-january-31/",
+      "rationale": "Public postmortem establishes primary data loss and backup/recovery failure."
+    },
+    {
+      "kind": "public_issue",
+      "locator": "https://gitlab.com/gitlab-com/gl-infra/production/-/issues/1094",
+      "rationale": "Public remediation issue establishes environment-separation repair obligations."
+    },
+    {
+      "kind": "file",
+      "locator": "examples/historical-failures/gitlab-2017/source-observations.jsonl",
+      "rationale": "Committed source-observation fixture preserves only source-derived incident facts, not private production data."
+    }
+  ],
+  "allowed_inputs": ["postmortem_text", "source_observations"],
+  "excluded_inputs": ["private_production_data", "preincident_oracle"]
+}

@@ -21,6 +21,6 @@
       "rationale": "Committed Patchline fixture encodes source-derived incident observations for reproducible smoke validation."
     }
   ],
-  "allowed_inputs": ["postmortem_text", "source_observations", "repair_outcome"],
+  "allowed_inputs": ["postmortem_text", "source_observations", "evidence_jsonl", "repair_outcome"],
   "excluded_inputs": ["private_production_data"]
 }

@@ -19,9 +19,12 @@ echo "Fetching pinned public migration corpus for public golden report"
 bash scripts/fetch-public-corpus.sh
 go run ./cmd/patchline artifact-benchmark validate benchmarks/manifests/public_migrations.json
 go run ./cmd/patchline artifact-benchmark run benchmarks/manifests/public_migrations.json --out "$OUT/public-migrations-report.json"
+go run ./cmd/patchline artifact-benchmark validate benchmarks/manifests/public_incidents.json
+go run ./cmd/patchline artifact-benchmark run benchmarks/manifests/public_incidents.json --out "$OUT/public-incidents-report.json"
 
 go run ./cmd/patchline artifact-benchmark compare "$OUT/smoke-report.json" "$OUT/smoke-report.json"
 go run ./cmd/patchline artifact-benchmark compare "$OUT/negative-report.json" "$OUT/negative-report.json"
 go run ./cmd/patchline artifact-benchmark compare "$OUT/public-migrations-report.json" "$OUT/public-migrations-report.json"
+go run ./cmd/patchline artifact-benchmark compare "$OUT/public-incidents-report.json" "$OUT/public-incidents-report.json"
 
 echo "golden_reports_refreshed=$OUT"

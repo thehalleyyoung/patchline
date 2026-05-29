@@ -7,15 +7,16 @@ This plan turns the ICSE-style review critique into an implementation roadmap fo
 Patchline now has the artifact-review scaffold and several executable evaluator paths in place:
 
 - `README.md`, `ARTIFACT.md`, `docs/paper-claim.md`, `docs/semantic-core.md`, `docs/semantic-pipeline.md`, and `docs/literature-positioning.md` frame the repository around the historical repair-semantics artifact claim.
-- `benchmarks/LABELING.md`, `benchmarks/manifests/smoke.json`, `benchmarks/manifests/negative.json`, `benchmarks/manifests/public_migrations.json`, and `benchmarks/ground_truth/**` provide phase-aware, source-grounded labels.
+- `benchmarks/LABELING.md`, `benchmarks/manifests/smoke.json`, `benchmarks/manifests/negative.json`, `benchmarks/manifests/public_migrations.json`, `benchmarks/manifests/public_incidents.json`, and `benchmarks/ground_truth/**` provide phase-aware, source-grounded labels.
 - `patchline artifact-ground-truth`, `artifact-baselines`, `artifact-ablations`, `artifact-scale`, and `artifact-benchmark validate/run/compare` are implemented.
 - `make artifact-benchmark-compare` executes smoke and negative manifests, writes deterministic reports under `results/generated/artifact-benchmark/`, and compares them against committed golden reports in `benchmarks/expected/`.
 - `make artifact-benchmark-public` fetches five pinned Bytebase migrations, verifies source hashes, runs the legacy benchmark-suite label/hash check, and compares the phase-aware artifact benchmark to a committed golden report.
+- `make artifact-benchmark-public-incidents` runs an offline public-incident corpus over GitLab 2017 and GitHub 2018 source-derived observations plus a too-thin-public-summary boundary, comparing against a committed golden report.
 - `make artifact-benchmark-refresh` is the explicit maintainer path for regenerating committed golden reports after deliberate semantic changes.
-- `make artifact-full && make verify-usefulness` has passed after the executable benchmark runner and golden-refresh workflow were added.
+- `make artifact-full && make verify-usefulness` has passed after the executable benchmark runner, golden-refresh workflow, and public migration corpus were added.
 - `100_STEPS.md`, `PLAN.md`, and `NEW_PLAN.md` are untracked/ignored; this file remains the tracked implementation roadmap.
 
-The latest refinement adds the first pinned public migration corpus. The next large step should add a public incident corpus with source-derived observations and explicit insufficient-evidence boundaries.
+The latest refinement adds a first public incident benchmark path and makes incident manifests declare explicit input kinds (`evidence_jsonl` vs. `source_observations`) to avoid format guessing. The next large step should expand these public corpora into scale reports and baseline/ablation tables rather than adding more isolated demos.
 
 ## 0. Target Artifact Claim
 
@@ -47,7 +48,7 @@ Patchline should not claim to automatically understand arbitrary production syst
 | Reviewer concern | Current risk | Required repo response | Done when |
 | --- | --- | --- | --- |
 | Single artifact claim | Repo feels broad: provenance, replay, repair, solver, archive, policy, CI, benchmarking | Make all README, docs, examples, and commands converge on the historical repair semantics claim | README, `ARTIFACT.md`, and `docs/paper-claim.md` all state the same claim and map commands to it |
-| Real benchmark suite | Smoke/negative manifests are executable; larger public corpora are still small | Add public benchmark datasets with machine-readable manifests, labels, and expected outputs | `make artifact-benchmark` runs at least one public migration corpus and one public incident corpus |
+| Real benchmark suite | Smoke/negative manifests plus first public migration/incident corpora are executable; corpus size is still small | Expand public benchmark datasets with machine-readable manifests, labels, expected outputs, and scale summaries | `make artifact-benchmark-public`, `make artifact-benchmark-public-incidents`, and `make artifact-scale` cover public corpora |
 | Ground truth | Core protocol exists and validates | Store labels, evidence URLs, source snippets/hashes, labeling rules, and expected classifications | Every benchmark case has `ground_truth/*.json` with label provenance |
 | Baselines | Implemented for strict migration corpus; still needs larger public corpus | Implement simple rule, grep, migration-linter-style, and archive-free baselines | `make artifact-baselines` emits comparative tables |
 | Ablations | Implemented for current artifact study corpus; needs public-scale expansion | Run migration-only, provenance-only, replay-only, solver-only, archive-only, and full Patchline variants | `make artifact-ablations` shows added signal/actionability per component |

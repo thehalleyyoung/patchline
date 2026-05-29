@@ -13,6 +13,7 @@ import (
 	"github.com/thehalleyyoung/patchline/internal/demo"
 	"github.com/thehalleyyoung/patchline/internal/effects"
 	"github.com/thehalleyyoung/patchline/internal/evidence"
+	"github.com/thehalleyyoung/patchline/internal/historical"
 	"github.com/thehalleyyoung/patchline/internal/migration"
 	"github.com/thehalleyyoung/patchline/internal/provenance"
 	"github.com/thehalleyyoung/patchline/internal/repair"
@@ -298,31 +299,18 @@ func predictBenchmarkCase(baseDir string, c ManifestCase, gt GroundTruthCase) (s
 		}
 		return actual, inputKind, signals, map[string]string{"migration_report": report.Summary.ReportHash}, nil
 	case "incident":
-		inputKind := "source_observations"
+		inputKind := incidentInputKind(c)
 		if guard := phaseInputGuard(inputKind, gt); guard != "" {
 			return guard, inputKind, []string{"phase-guard:input-not-available=" + inputKind}, nil, nil
 		}
-		file, err := os.Open(resolvePath(baseDir, c.Fixture))
-		if err != nil {
-			return "", inputKind, nil, nil, err
+		switch inputKind {
+		case "evidence_jsonl":
+			return predictEvidenceIncident(baseDir, c, inputKind)
+		case "source_observations":
+			return predictSourceObservationIncident(baseDir, c, inputKind)
+		default:
+			return ResultUnsupportedFragment, inputKind, []string{"unsupported:incident-input-kind=" + inputKind}, nil, nil
 		}
-		defer file.Close()
-		ingested, err := evidence.IngestJSONL(file)
-		if err != nil {
-			return "", inputKind, nil, nil, err
-		}
-		if !ingested.OK || ingested.EventCount == 0 {
-			return ResultInsufficientEvidence, inputKind, append([]string{"evidence-ingest:insufficient"}, ingested.Errors...), map[string]string{"input": ingested.InputHash}, nil
-		}
-		actual := ResultPass
-		if len(ingested.DamagedEntities) > 0 {
-			actual = ResultFlag
-		}
-		signals := []string{
-			fmt.Sprintf("events=%d", ingested.EventCount),
-			fmt.Sprintf("damaged-entities=%d", len(ingested.DamagedEntities)),
-		}
-		return actual, inputKind, signals, map[string]string{"evidence_input": ingested.InputHash, "graph": ingested.GraphHash}, nil
 	case "repair":
 		inputKind := "repair_plan"
 		if guard := phaseInputGuard(inputKind, gt); guard != "" {
@@ -384,6 +372,53 @@ func predictBenchmarkCase(baseDir string, c ManifestCase, gt GroundTruthCase) (s
 	}
 }
 
+func predictEvidenceIncident(baseDir string, c ManifestCase, inputKind string) (string, string, []string, map[string]string, error) {
+	file, err := os.Open(resolvePath(baseDir, c.Fixture))
+	if err != nil {
+		return "", inputKind, nil, nil, err
+	}
+	defer file.Close()
+	ingested, err := evidence.IngestJSONL(file)
+	if err != nil {
+		return "", inputKind, nil, nil, err
+	}
+	if !ingested.OK || ingested.EventCount == 0 {
+		return ResultInsufficientEvidence, inputKind, append([]string{"evidence-ingest:insufficient"}, ingested.Errors...), map[string]string{"input": ingested.InputHash}, nil
+	}
+	actual := ResultPass
+	if len(ingested.DamagedEntities) > 0 {
+		actual = ResultFlag
+	}
+	signals := []string{
+		fmt.Sprintf("events=%d", ingested.EventCount),
+		fmt.Sprintf("damaged-entities=%d", len(ingested.DamagedEntities)),
+	}
+	return actual, inputKind, signals, map[string]string{"evidence_input": ingested.InputHash, "graph": ingested.GraphHash}, nil
+}
+
+func predictSourceObservationIncident(baseDir string, c ManifestCase, inputKind string) (string, string, []string, map[string]string, error) {
+	path := resolvePath(baseDir, c.Fixture)
+	content, err := os.ReadFile(path)
+	if err != nil {
+		return "", inputKind, nil, nil, err
+	}
+	sourceSignals, err := historical.SourceObservationSignals(path, c.Fixture)
+	if err != nil {
+		return "", inputKind, nil, nil, err
+	}
+	if len(sourceSignals) == 0 {
+		return ResultInsufficientEvidence, inputKind, []string{"source-observations:empty"}, map[string]string{"source_observations_input": canonical.HashBytes(content)}, nil
+	}
+	signals := []string{fmt.Sprintf("source-observation-signals=%d", len(sourceSignals))}
+	for _, signal := range sourceSignals {
+		signals = append(signals, signal.ID+"="+signal.Evidence)
+	}
+	return ResultFlag, inputKind, signals, map[string]string{
+		"source_observations_input":  canonical.HashBytes(content),
+		"source_observation_signals": canonical.Hash(sourceSignals),
+	}, nil
+}
+
 func phaseInputGuard(inputKind string, gt GroundTruthCase) string {
 	if contains(gt.ExcludedInputs, inputKind) || !contains(gt.AllowedInputs, inputKind) {
 		return ResultCannotProve
@@ -396,6 +431,13 @@ func regressionInputKind(fixture string) string {
 		return "migration_text"
 	}
 	return "prior_archive"
+}
+
+func incidentInputKind(c ManifestCase) string {
+	if c.InputKind != "" {
+		return c.InputKind
+	}
+	return "evidence_jsonl"
 }
 
 func readManifestFile(path string) (Manifest, error) {

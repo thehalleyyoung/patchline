@@ -48,13 +48,21 @@ make artifact-benchmark-public
 
 That target fetches five Bytebase migrations at a pinned commit, verifies their source hashes, runs the legacy label/hash benchmark suite, then runs `manifests/public_migrations.json` against `expected/public-migrations-report.json`. The public manifest is marked `requires_fetch`, so ground-truth validation can remain offline while the public benchmark target deliberately exercises network-backed real-world data.
 
+Run the offline public-incident corpus with:
+
+```bash
+make artifact-benchmark-public-incidents
+```
+
+That target runs `manifests/public_incidents.json` against GitLab 2017 and GitHub 2018 source-observation JSONL fixtures, then checks an adjacent boundary case where a public summary remains too thin and must produce `insufficient_evidence`. Unlike `artifact-benchmark-public`, this target does not fetch network data.
+
 Expected reports are intentionally not refreshed by the compare target. After a deliberate semantics change, maintainers can run:
 
 ```bash
 make artifact-benchmark-refresh
 ```
 
-That target rewrites the committed golden JSON/Markdown reports, including the public migration report, and then runs the normal compare paths against the refreshed files.
+That target rewrites the committed golden JSON/Markdown reports, including the public migration and public incident reports, and then runs the normal compare paths against the refreshed files.
 
 ## Executable study outputs
 
@@ -71,7 +79,7 @@ That target emits baseline, ablation, and scale reports under `results/generated
 The planned full benchmark families are:
 
 - public OSS migrations (currently five pinned Bytebase migrations);
-- public historical incidents;
+- public historical incidents (currently GitLab 2017 and GitHub 2018 source-observation cases plus an insufficient-evidence boundary);
 - repair/replay cases;
 - semantic regression archives;
 - negative/limitation cases.

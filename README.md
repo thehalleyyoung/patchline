@@ -21,6 +21,7 @@ make artifact-ground-truth-check
 make artifact-studies
 make artifact-benchmark-compare
 make artifact-benchmark-public
+make artifact-benchmark-public-incidents
 make artifact-negative-cases
 ```
 
@@ -32,7 +33,9 @@ Start with [`ARTIFACT.md`](ARTIFACT.md) for the quick evaluator path, [`docs/pap
 
 `make artifact-benchmark-public` explicitly fetches five pinned Bytebase migrations, verifies their SHA-256 hashes, runs the older benchmark-suite label/hash check, then runs the phase-aware artifact benchmark over `benchmarks/manifests/public_migrations.json`. It is the current real-OSS migration corpus path; it is kept out of the default smoke target so fresh-checkout review does not require network access.
 
-If a semantic change intentionally updates expected outputs, run `make artifact-benchmark-refresh`. It rewrites `benchmarks/expected/*.json`, refreshes the public migration report after fetching pinned sources, and immediately reruns the compare targets, keeping the default reviewer path drift-detecting rather than self-updating.
+`make artifact-benchmark-public-incidents` is the offline public-incident counterpart: it runs GitLab 2017 and GitHub 2018 source-observation fixtures plus a too-thin public-summary boundary through the same phase-aware manifest protocol and compares the result to `benchmarks/expected/public-incidents-report.json`.
+
+If a semantic change intentionally updates expected outputs, run `make artifact-benchmark-refresh`. It rewrites `benchmarks/expected/*.json`, refreshes the public migration report after fetching pinned sources, refreshes the offline public-incident report, and immediately reruns the compare targets, keeping the default reviewer path drift-detecting rather than self-updating.
 
 The central artifact object is:
 

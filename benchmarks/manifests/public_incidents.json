@@ -1,0 +1,30 @@
+{
+  "version": "patchline.artifact-benchmark/v1",
+  "dataset_id": "patchline-public-incidents-v1",
+  "description": "Offline public-incident cases built from source-derived observations and an explicit insufficient-evidence boundary.",
+  "cases": [
+    {
+      "case_id": "gitlab-2017-public-source-observations",
+      "case_type": "incident",
+      "available_at": "postmortem",
+      "input_kind": "source_observations",
+      "fixture": "../../examples/historical-failures/gitlab-2017/source-observations.jsonl",
+      "ground_truth": "../ground_truth/public_incidents/gitlab-2017-public-source-observations.json"
+    },
+    {
+      "case_id": "github-2018-public-source-observations",
+      "case_type": "incident",
+      "available_at": "postmortem",
+      "input_kind": "source_observations",
+      "fixture": "../../examples/historical-failures/github-2018/source-observations.jsonl",
+      "ground_truth": "../ground_truth/public_incidents/github-2018-public-source-observations.json"
+    },
+    {
+      "case_id": "public-incident-summary-too-thin",
+      "case_type": "incident",
+      "available_at": "postmortem",
+      "fixture": "inline:public-summary-too-thin",
+      "ground_truth": "../ground_truth/public_incidents/public-incident-summary-too-thin.json"
+    }
+  ]
+}

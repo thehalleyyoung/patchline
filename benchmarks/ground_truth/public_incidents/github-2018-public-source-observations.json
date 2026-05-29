@@ -1,0 +1,24 @@
+{
+  "case_id": "github-2018-public-source-observations",
+  "case_type": "incident",
+  "phase": "postmortem",
+  "labels": {
+    "expected_result": "flag",
+    "risk": "high",
+    "failure_class": "source-established-split-brain-write-divergence"
+  },
+  "evidence": [
+    {
+      "kind": "postmortem",
+      "locator": "https://github.blog/news-insights/company-news/oct21-post-incident-analysis/",
+      "rationale": "Public post-incident analysis establishes stale inconsistent reads, divergent writes across database sites, and manual reconciliation."
+    },
+    {
+      "kind": "file",
+      "locator": "examples/historical-failures/github-2018/source-observations.jsonl",
+      "rationale": "Committed source-observation fixture encodes the public incident facts used by the benchmark."
+    }
+  ],
+  "allowed_inputs": ["postmortem_text", "source_observations"],
+  "excluded_inputs": ["private_production_data", "preincident_oracle"]
+}
