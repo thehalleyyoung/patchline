@@ -52,6 +52,38 @@ func TestAnalyzeFindsScopeCounterexample(t *testing.T) {
 	}
 }
 
+func TestImplicationSMTUsesZ3SafeVariables(t *testing.T) {
+	query := implicationSMT(
+		map[string]string{"record:id/with-dashes": `inv_"1002"`},
+		map[string]string{"record:id/with-dashes": `inv_"1002"`},
+	)
+	if strings.Contains(query, "record:id") {
+		t.Fatalf("query leaked raw identifier instead of stable Z3 variable: %s", query)
+	}
+	if !strings.Contains(query, `(declare-const v0 String)`) {
+		t.Fatalf("query did not declare deterministic Z3 variable: %s", query)
+	}
+	if !strings.Contains(query, `"inv_""1002"""`) {
+		t.Fatalf("query did not escape SMT-LIB string literal: %s", query)
+	}
+}
+
+func TestRunZ3DischargesImplicationQuery(t *testing.T) {
+	if z3Version() == "" {
+		t.Skip("z3 is not installed")
+	}
+	result, err := runZ3(implicationSMT(
+		map[string]string{"id": "inv_1002", "total_cents": "0"},
+		map[string]string{"id": "inv_1002"},
+	))
+	if err != nil {
+		t.Fatalf("z3 failed: %v", err)
+	}
+	if result != "unsat" {
+		t.Fatalf("expected z3 to prove implication via unsat, got %s", result)
+	}
+}
+
 func TestAnalyzeFindsFrameCounterexample(t *testing.T) {
 	manifest := repair.Manifest{
 		Version:  repair.Version,

@@ -1,0 +1,24 @@
+{
+  "version": "patchline.benchmark-suite/v1",
+  "name": "public-bytebase-migration-corpus",
+  "cases": [
+    {
+      "id": "bytebase-sheet-blob",
+      "path": "../public-corpus/downloads/bytebase-sheet-blob.sql",
+      "label": "unsafe",
+      "expected_report_hash": "2368aff7cd31b7a849a9325024ddc72b442ba1b66d690376ab044b412fede8eb"
+    },
+    {
+      "id": "bytebase-replica-heartbeat",
+      "path": "../public-corpus/downloads/bytebase-replica-heartbeat.sql",
+      "label": "unsafe",
+      "expected_report_hash": "544e0961d0cf9f577830b904f457f1288a6ed6eafda69d2a5f1438b4b029037b"
+    },
+    {
+      "id": "bytebase-workspace",
+      "path": "../public-corpus/downloads/bytebase-workspace.sql",
+      "label": "unsafe",
+      "expected_report_hash": "c22cb691a15350239fe7d07b67edf120247c975f3338ca58d6abd7d17592edd2"
+    }
+  ]
+}

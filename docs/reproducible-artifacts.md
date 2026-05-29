@@ -58,7 +58,7 @@ This workflow is meant to feel like golden tests for production repair research.
 
 | Entry | Meaning |
 | --- | --- |
-| `solver-obligations.json` | Bounded SMT-style scope/frame/row-count/invariant obligations. |
+| `solver-obligations.json` | Z3-backed scope implication plus bounded frame/row-count/invariant obligations. |
 | `symbolic-execution.json` | Bounded row paths and symbolic assignments. |
 | `workflow-model-check.json` | Incident workflow temporal properties, proof obligations, proof holes, and counterexamples. |
 

@@ -1,0 +1,25 @@
+{
+  "version": "patchline.public-corpus/v1",
+  "name": "public-bytebase-migration-corpus",
+  "license_note": "Downloaded from the public bytebase/bytebase repository at a pinned commit for local validation; files are not vendored in this repo.",
+  "sources": [
+    {
+      "id": "bytebase-sheet-blob",
+      "url": "https://raw.githubusercontent.com/bytebase/bytebase/47d2522552ce44271680424bf31a4cddd8a50ab1/backend/migrator/migration/3.1/0000%23%23sheet_blob.sql",
+      "sha256": "3ea36a1d57832319f241a32f361e32c53e85bba34f67350ba3cd7512f1c40fa5",
+      "out": "bytebase-sheet-blob.sql"
+    },
+    {
+      "id": "bytebase-replica-heartbeat",
+      "url": "https://raw.githubusercontent.com/bytebase/bytebase/47d2522552ce44271680424bf31a4cddd8a50ab1/backend/migrator/migration/3.14/0027%23%23replica_heartbeat.sql",
+      "sha256": "1ab807c25f64eec2c05cfe3e0d4af218ff5f469bcaeb8c199d9559f6d0058c83",
+      "out": "bytebase-replica-heartbeat.sql"
+    },
+    {
+      "id": "bytebase-workspace",
+      "url": "https://raw.githubusercontent.com/bytebase/bytebase/47d2522552ce44271680424bf31a4cddd8a50ab1/backend/migrator/migration/3.17/0009%23%23add_workspace_table.sql",
+      "sha256": "276ad1148252ce21849054acf1d6ac62db5d72df3f88c9c2b4b42c28e7f5e98c",
+      "out": "bytebase-workspace.sql"
+    }
+  ]
+}

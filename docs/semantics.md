@@ -11,7 +11,7 @@ go run ./cmd/patchline semantics-contract
 Current contract:
 
 ```text
-Patchline semantic contract patchline.semantics/v1 hash=420d1a803b4380e68f04ea0cde65064ffefabc62d300c4fa617fc4a41c9b4bfb
+Patchline semantic contract patchline.semantics/v1 hash=e2b0a58d7743b3f6bcce243b0101a9a307a71501a12a5baea6c3e775e254047c
   state components=8 observations=5 commands=30 failure states=6
 ```
 
@@ -30,7 +30,7 @@ Every Patchline command should emit at least one checkable semantic artifact:
 | Schema semantics | Schema diffs, relational-signature transformations, relational statements, hashes | `schema-diff`, `migration-semantics` |
 | Source SQL inventory | Embedded SQL, ORM/query-builder observations, framework/language counts, hashes | `extract-sql` |
 | Migration outcome history | Migration-to-trace/row/report/repair/policy links, semantic changelog, hashes | `migration-outcomes`, `migration-changelog` |
-| Solver obligations | Bounded SMT-style scope, frame, row-count, and invariant checks, hashes, counterexamples | `solver-obligations`, `semantics-audit` |
+| Solver obligations | Z3-backed scope implication plus bounded frame, row-count, and invariant checks, hashes, counterexamples | `solver-obligations`, `semantics-audit` |
 | Symbolic execution | Bounded row paths, path constraints, symbolic assignments, hashes, counterexamples | `symbolic-exec`, `semantics-audit` |
 | Workflow model check | Bounded workflow states, temporal properties, proof obligations, proof holes, counterexamples | `model-check-workflow`, `semantics-audit` |
 | CEGAR refinement | Iterative abstraction refinement, remaining proof holes, hashes, counterexamples | `cegar-refine`, `semantics-audit` |
@@ -84,7 +84,7 @@ Its domain is the manifest, the historical evidence graph, a current or reconstr
 
 `migration-outcomes` materializes migration history as an observed outcome graph: migration entities link to traces, SQL mutations, row mutations, derived records/reports, repair manifests, policy failures, benchmark hashes, and source-SQL hashes. The same report includes a semantic changelog that lists changed tables, broad effects, observed downstream outcomes, invariant candidates, and reproducibility hashes.
 
-`solver-obligations` materializes a bounded SMT-style proof report. It emits quantifier-free equality SMT-LIB queries for scope implication, checks assignment frames against protected scope columns, enumerates finite store row-count bounds, replays the repair over a bounded store, and checks invariant preservation before and after replay. Claims are classified as `proved`, `checked`, `assumed`, `not_supported`, or `counterexample` in the solver report and are projected into the semantic audit's standard claim statuses.
+`solver-obligations` materializes a bounded proof report. It sends quantifier-free string-equality SMT-LIB queries to Z3 for scope implication, checks assignment frames against protected scope columns, enumerates finite store row-count bounds, replays the repair over a bounded store, and checks invariant preservation before and after replay. Claims are classified as `proved`, `checked`, `assumed`, `not_supported`, or `counterexample` in the solver report and are projected into the semantic audit's standard claim statuses. If Z3 is unavailable, scope claims are not marked proved.
 
 `symbolic-exec` materializes small repair programs as bounded row-path executions. Each step records the operation, pre/post store hashes, guard constraints over row symbols, satisfying and unsatisfying paths, and symbolic assignments for rows that the operation touches.
 
@@ -109,7 +109,7 @@ go run ./cmd/patchline semantics-audit
 It currently checks the bad-migration evidence JSONL, trace reconstruction, causal certificate, repair manifest, replay report, replay semantics, invariant report, solver obligations, symbolic execution, workflow model checking, CEGAR refinement, generated SQL, transaction plan, migration analysis, schema semantics, source SQL inventory, strict benchmark corpus, migration outcome history, incident archive index, and ledger checkpoint. The default audit output is:
 
 ```text
-semantic audit passed artifacts=20 conforming=20 proof_holes=7 counterexamples=0 hash=3d204d71488c0aa64f3c2a24e364edcaa907ea8d7f44e04e9077043aab3bf529
+semantic audit passed artifacts=20 conforming=20 proof_holes=7 counterexamples=0 hash=f53e070c50904d1e06e2e91ef78bc8029910d873470ce9b323936310ad951646
 ```
 
 This is intentionally not a proof of all properties. It is an executable inventory of facts, obligations, proof holes, counterexamples, and hashes over historical artifacts, which gives later formal-methods work concrete obligations to discharge.

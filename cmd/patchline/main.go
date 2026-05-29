@@ -1265,6 +1265,8 @@ func semanticArtifacts(opts semanticAuditOptions) ([]semantics.ArtifactEvidence,
 		Path: opts.Repair,
 		Kind: "solver_obligations",
 		Facts: []string{
+			"solver_engine=" + solverReport.SolverEngine,
+			"solver_version=" + solverReport.SolverVersion,
 			fmt.Sprintf("scope_implications=%d", len(solverReport.ScopeImplications)),
 			fmt.Sprintf("frame_checks=%d", len(solverReport.FrameChecks)),
 			fmt.Sprintf("row_count_checks=%d", len(solverReport.RowCountChecks)),

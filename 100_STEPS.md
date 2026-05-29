@@ -97,8 +97,8 @@ Checked items are already represented in the repo. Unchecked items are the next 
 
 ## H. Solvers, model checking, and proof-carrying artifacts
 
-71. [x] Add SMT-backed predicate implication for scope containment and frame conditions.
-72. [x] Add SMT-backed row-count and invariant preservation checks for bounded relational fragments.
+71. [x] Add Z3-backed predicate implication for scope containment.
+72. [x] Add finite-store frame, row-count, and invariant preservation checks for bounded relational fragments.
 73. [x] Add symbolic execution for small repair programs over bounded stores.
 74. [x] Add model checking for incident workflows: ingest, explain, approve, dry-run, apply, verify, rollback, audit, archive.
 75. [x] Add temporal properties: no apply before approval, no approval without evidence, eventual verification, rollback availability, immutable audit.

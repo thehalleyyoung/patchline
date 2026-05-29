@@ -1,9 +1,12 @@
 package solver
 
 import (
+	"context"
 	"fmt"
+	"os/exec"
 	"sort"
 	"strings"
+	"time"
 
 	"github.com/patchline/patchline/internal/canonical"
 	"github.com/patchline/patchline/internal/invariant"
@@ -27,6 +30,8 @@ type Report struct {
 	Version           string             `json:"version"`
 	Manifest          string             `json:"manifest"`
 	StoreHash         string             `json:"store_hash"`
+	SolverEngine      string             `json:"solver_engine"`
+	SolverVersion     string             `json:"solver_version,omitempty"`
 	ScopeImplications []ImplicationCheck `json:"scope_implications"`
 	FrameChecks       []FrameCheck       `json:"frame_checks"`
 	RowCountChecks    []RowCountCheck    `json:"row_count_checks"`
@@ -41,6 +46,8 @@ type ImplicationCheck struct {
 	Antecedent     map[string]string `json:"antecedent,omitempty"`
 	Consequent     map[string]string `json:"consequent,omitempty"`
 	SMTLIB         string            `json:"smtlib"`
+	Solver         string            `json:"solver"`
+	SolverResult   string            `json:"solver_result,omitempty"`
 	Counterexample map[string]string `json:"counterexample,omitempty"`
 	Reason         string            `json:"reason"`
 }
@@ -83,10 +90,13 @@ type Summary struct {
 }
 
 func Analyze(manifest repair.Manifest, store replay.Store, spec *invariant.Spec) Report {
+	solverVersion := z3Version()
 	report := Report{
-		Version:   Version,
-		Manifest:  manifest.Name,
-		StoreHash: store.Hash(),
+		Version:       Version,
+		Manifest:      manifest.Name,
+		StoreHash:     store.Hash(),
+		SolverEngine:  "z3",
+		SolverVersion: solverVersion,
 	}
 	for _, op := range sortedOperations(manifest.Operations) {
 		report.ScopeImplications = append(report.ScopeImplications, proveImplication(op, manifest.Scope))
@@ -101,12 +111,14 @@ func Analyze(manifest repair.Manifest, store replay.Store, spec *invariant.Spec)
 		Version           string             `json:"version"`
 		Manifest          string             `json:"manifest"`
 		StoreHash         string             `json:"store_hash"`
+		SolverEngine      string             `json:"solver_engine"`
+		SolverVersion     string             `json:"solver_version,omitempty"`
 		ScopeImplications []ImplicationCheck `json:"scope_implications"`
 		FrameChecks       []FrameCheck       `json:"frame_checks"`
 		RowCountChecks    []RowCountCheck    `json:"row_count_checks"`
 		InvariantChecks   []InvariantCheck   `json:"invariant_checks,omitempty"`
 		Summary           Summary            `json:"summary"`
-	}{report.Version, report.Manifest, report.StoreHash, report.ScopeImplications, report.FrameChecks, report.RowCountChecks, report.InvariantChecks, report.Summary})
+	}{report.Version, report.Manifest, report.StoreHash, report.SolverEngine, report.SolverVersion, report.ScopeImplications, report.FrameChecks, report.RowCountChecks, report.InvariantChecks, report.Summary})
 	return report
 }
 
@@ -116,6 +128,7 @@ func proveImplication(op repair.Operation, scope repair.Scope) ImplicationCheck 
 		Antecedent:  copyMap(op.Where),
 		Consequent:  copyMap(scope.Where),
 		SMTLIB:      implicationSMT(op.Where, scope.Where),
+		Solver:      "z3",
 	}
 	if op.Table == "" || scope.Table == "" {
 		check.Status = StatusNotSupported
@@ -133,18 +146,77 @@ func proveImplication(op repair.Operation, scope repair.Scope) ImplicationCheck 
 		check.Reason = "declared scope has no predicate to prove"
 		return check
 	}
-	for key, want := range scope.Where {
-		if got, ok := op.Where[key]; !ok || got != want {
-			check.Status = StatusCounterexample
-			check.Counterexample = copyMap(op.Where)
-			check.Counterexample["violates_scope_"+key] = want
-			check.Reason = "SMT equality fragment found operation predicate does not imply declared scope predicate"
-			return check
+	result, err := runZ3(check.SMTLIB)
+	if err != nil {
+		check.Status = StatusAssumed
+		check.SolverResult = "unavailable"
+		check.Reason = "z3 did not discharge the obligation: " + err.Error()
+		return check
+	}
+	check.SolverResult = result
+	switch result {
+	case "unsat":
+		check.Status = StatusProved
+		check.Reason = "z3 proved unsat(operation predicate and not scope predicate) in quantifier-free string equality"
+	case "sat":
+		check.Status = StatusCounterexample
+		check.Counterexample = deterministicImplicationCounterexample(op.Where, scope.Where)
+		check.Reason = "z3 found operation predicate does not imply declared scope predicate"
+	default:
+		check.Status = StatusAssumed
+		check.Reason = "z3 returned " + result + " for predicate implication"
+	}
+	return check
+}
+
+func runZ3(smtlib string) (string, error) {
+	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+	defer cancel()
+	cmd := exec.CommandContext(ctx, "z3", "-in", "-smt2")
+	cmd.Stdin = strings.NewReader(smtlib)
+	output, err := cmd.CombinedOutput()
+	if ctx.Err() == context.DeadlineExceeded {
+		return "", fmt.Errorf("timeout after 2s")
+	}
+	if err != nil {
+		return "", fmt.Errorf("%v: %s", err, strings.TrimSpace(string(output)))
+	}
+	fields := strings.Fields(string(output))
+	if len(fields) == 0 {
+		return "", fmt.Errorf("empty z3 output")
+	}
+	switch fields[0] {
+	case "sat", "unsat", "unknown":
+		return fields[0], nil
+	default:
+		return "", fmt.Errorf("unexpected z3 output %q", fields[0])
+	}
+}
+
+func z3Version() string {
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
+	defer cancel()
+	output, err := exec.CommandContext(ctx, "z3", "--version").CombinedOutput()
+	if err != nil {
+		return ""
+	}
+	return strings.TrimSpace(string(output))
+}
+
+func deterministicImplicationCounterexample(antecedent, consequent map[string]string) map[string]string {
+	out := copyMap(antecedent)
+	if out == nil {
+		out = map[string]string{}
+	}
+	for _, key := range sortedKeys(consequent) {
+		if got, ok := antecedent[key]; !ok || got != consequent[key] {
+			out["violates_scope_"+key] = consequent[key]
+			if ok {
+				out["actual_"+key] = got
+			}
 		}
 	}
-	check.Status = StatusProved
-	check.Reason = "unsat(operation predicate and not scope predicate) in quantifier-free equality fragment"
-	return check
+	return out
 }
 
 func proveFrame(op repair.Operation, scope repair.Scope) FrameCheck {
@@ -178,7 +250,7 @@ func proveFrame(op repair.Operation, scope repair.Scope) FrameCheck {
 		}
 	}
 	check.Status = StatusProved
-	check.Reason = "assignment set is disjoint from scope predicate columns in equality fragment"
+	check.Reason = "assignment set is disjoint from scope predicate columns"
 	return check
 }
 
@@ -290,29 +362,43 @@ func summarize(report Report) Summary {
 
 func implicationSMT(antecedent, consequent map[string]string) string {
 	var b strings.Builder
-	b.WriteString("(set-logic QF_UF)\n")
-	for _, key := range sortedUnionKeys(antecedent, consequent) {
-		b.WriteString(fmt.Sprintf("(declare-const %s String)\n", smtIdent(key)))
+	keys := sortedUnionKeys(antecedent, consequent)
+	vars := map[string]string{}
+	for index, key := range keys {
+		vars[key] = fmt.Sprintf("v%d", index)
+	}
+	b.WriteString("(set-logic QF_S)\n")
+	b.WriteString("(set-option :timeout 2000)\n")
+	for _, key := range keys {
+		b.WriteString(fmt.Sprintf("(declare-const %s String)\n", vars[key]))
 	}
 	b.WriteString("(assert ")
-	b.WriteString(smtAnd(antecedent))
+	b.WriteString(smtAndWithVars(antecedent, vars))
 	b.WriteString(")\n(assert (not ")
-	b.WriteString(smtAnd(consequent))
+	b.WriteString(smtAndWithVars(consequent, vars))
 	b.WriteString("))\n(check-sat)")
 	return b.String()
 }
 
 func rowCountSMT(op repair.Operation) string {
-	return fmt.Sprintf("; bounded finite-model row-count query for %s\n; count rows in %s satisfying %s\n(check-sat)", op.ID, op.Table, smtAnd(op.Where))
+	return fmt.Sprintf("; finite-store row-count check for %s\n; count rows in %s satisfying %s\n(check-sat)", op.ID, op.Table, smtAnd(op.Where))
 }
 
 func smtAnd(pred map[string]string) string {
+	return smtAndWithVars(pred, nil)
+}
+
+func smtAndWithVars(pred map[string]string, vars map[string]string) string {
 	if len(pred) == 0 {
 		return "true"
 	}
 	parts := make([]string, 0, len(pred))
 	for _, key := range sortedKeys(pred) {
-		parts = append(parts, fmt.Sprintf("(= %s %q)", smtIdent(key), pred[key]))
+		ident := smtIdent(key)
+		if vars != nil {
+			ident = vars[key]
+		}
+		parts = append(parts, fmt.Sprintf("(= %s %s)", ident, smtString(pred[key])))
 	}
 	if len(parts) == 1 {
 		return parts[0]
@@ -323,6 +409,10 @@ func smtAnd(pred map[string]string) string {
 func smtIdent(value string) string {
 	value = strings.ReplaceAll(value, "-", "_")
 	return strings.ReplaceAll(value, ".", "_")
+}
+
+func smtString(value string) string {
+	return `"` + strings.ReplaceAll(value, `"`, `""`) + `"`
 }
 
 func inferredUpperBound(op repair.Operation, store replay.Store) int {

@@ -153,7 +153,7 @@ func DefaultContract() Contract {
 			{"schema_semantics", []string{"facts", "hashes"}, []string{"schema-diff", "migration-semantics"}, "schema-state diffing and typed relational-signature transformations"},
 			{"source_sql_inventory", []string{"facts", "hashes"}, []string{"extract-sql"}, "embedded SQL and ORM/query-builder extraction from application code"},
 			{"migration_outcome_history", []string{"facts", "obligations", "hashes"}, []string{"migration-outcomes", "migration-changelog"}, "historical migration-to-trace/row/repair/policy links and semantic changelogs"},
-			{"solver_obligations", []string{"facts", "hashes", "counterexamples"}, []string{"solver-obligations", "semantics-audit"}, "bounded SMT-style checks for scope containment, frame conditions, row counts, and invariant preservation"},
+			{"solver_obligations", []string{"facts", "hashes", "counterexamples"}, []string{"solver-obligations", "semantics-audit"}, "Z3-backed scope implication plus bounded frame, row-count, and invariant-preservation checks"},
 			{"symbolic_execution", []string{"facts", "hashes", "counterexamples"}, []string{"symbolic-exec", "semantics-audit"}, "bounded symbolic execution of repair programs with row path constraints and symbolic assignments"},
 			{"workflow_model_check", []string{"facts", "hashes", "counterexamples"}, []string{"model-check-workflow", "semantics-audit"}, "bounded incident-workflow model checking with temporal properties, proof obligations, and proof holes"},
 			{"cegar_refinement", []string{"facts", "obligations", "counterexamples", "hashes"}, []string{"cegar-refine"}, "counterexample-guided reruns that refine coarse repair abstractions with invariants and workflow models"},

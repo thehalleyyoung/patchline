@@ -53,7 +53,7 @@ Patchline should standardize these artifacts as JSON-first, hashable objects:
 6. **Snapshot drift report**: strict comparison of repair behavior across imported historical row snapshots.
 7. **Abstract effect summary**: monotone abstraction of replay diffs.
 8. **Invariant report**: declared and candidate invariants, support counts, violations, and counterexamples.
-9. **Proof-obligation report**: statuses for proved, checked, assumed, unsupported/not-supported, and counterexample-producing claims, including bounded SMT-style scope/frame/row-count/invariant checks.
+9. **Proof-obligation report**: statuses for proved, checked, assumed, unsupported/not-supported, and counterexample-producing claims, including Z3-backed scope implication plus bounded frame, row-count, and invariant checks.
 10. **Symbolic execution report**: bounded row paths, guard constraints, symbolic assignments, and stuck-step counterexamples for small repair programs.
 11. **Workflow model-check report**: bounded incident-response state exploration, temporal properties, counterexample traces, proof obligations, and proof holes.
 12. **CEGAR refinement report**: iteration-by-iteration abstraction refinements, remaining proof holes, and counterexamples across replay, solver, symbolic, and workflow checks.
@@ -103,6 +103,7 @@ Patchline can credibly become a platform for extracting new, reproducible knowle
 - It performs CEGAR-style reruns that refine coarse repair abstractions with invariant specs and workflow evidence, while preserving explicit remaining holes.
 - It signs and verifies semantic artifacts with Ed25519 so CI gates and incident reviews can detect tampering.
 - It builds deterministic incident archives over historical evidence, migrations, repairs, policies, and benchmark outputs so recurrence and repair-effect queries have stable inputs.
+- It validates usefulness with a `make verify-usefulness` path that runs the core suite, strict gate, Z3-backed solver obligations, semantic audit, archive index, and SHA-pinned public migration corpus.
 - It replays repairs over imported historical row snapshots and quantifies drift/stability across snapshots.
 - It gives append-only logs, event streams, queues, and external replays explicit compensating-action semantics instead of pretending snapshot rollback can undo them.
 - It compares new incidents and migrations against historical semantic shapes.

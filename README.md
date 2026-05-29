@@ -1,10 +1,31 @@
 # Patchline
 
-Patchline is a deterministic repair control plane for production data incidents.
+Patchline is a deterministic incident-repair workbench for teams that operate high-volume services, own production data correctness, and need evidence they can replay in review instead of prose explanations after an outage.
 
-It connects deploys, traces, migrations, SQL mutations, queue events, and corrupted records into a provenance graph, then helps operators validate, dry-run, verify, audit, and roll back repairs.
+**Promise today:** given incident evidence, migration SQL, a repair manifest, policy rules, and benchmark fixtures, Patchline reconstructs causal provenance, classifies risky data changes, proves repair scope obligations with Z3, replays the repair over a bounded store, checks invariants/workflow properties, emits signed/hashable artifacts, and indexes the incident for recurrence analysis.
 
-**No AI. No guesses.** Patchline is intentionally built from inspectable mechanisms: typed provenance, effect inference, invariant checks, replayable repair manifests, stable canonical output, and hash-chained audit records.
+**No AI. No guesses.** Patchline is intentionally built from inspectable mechanisms: typed provenance, Z3-backed proof obligations, effect inference, invariant checks, replayable repair manifests, stable canonical output, and hash-chained audit records.
+
+## Verify the current usefulness claim
+
+The repo already has a reproducible validation path for the kind of cross-layer incident review a large observability or infrastructure company needs: it checks a historical-style bad migration fixture end to end and fetches pinned public migration files from an open-source migration platform to validate analyzer behavior against real SQL.
+
+Prerequisites: Go 1.22+, `curl`, `jq`, and Z3. This repository was validated with `Z3 version 4.15.8 - 64 bit`.
+
+```bash
+z3 --version
+make verify-usefulness
+```
+
+That target runs the unit suite, strict CI gate, a SHA-verified public migration corpus benchmark, Z3-backed solver obligations, the semantic audit, and the incident archive index. The public corpus is downloaded into `examples/public-corpus/downloads/` from pinned raw URLs and checked against `examples/public-corpus/sources.json`; the SQL files are not vendored.
+
+The expected default semantic audit result is `20` conforming artifacts and `0` counterexamples. If Z3 is missing, Patchline does not pretend to prove solver obligations: the solver report records the Z3 failure and downgrades those claims instead of using a handwritten SMT substitute.
+
+## Why this is novel
+
+Patchline's research claim is not "another migration linter" or "another incident tracker." The novel premise is a non-ML, proof-carrying bridge between operational telemetry, relational program semantics, repair execution, CI gates, and historical incident knowledge. Existing systems usually cover one slice: provenance, SQL equivalence, database testing, workflow model checking, repair synthesis, or incident management. Patchline makes those artifacts compose into a single reproducible evidence object: a causal graph plus a repair transformer plus proof obligations plus replay hashes plus archive buckets.
+
+See [`docs/literature-positioning.md`](docs/literature-positioning.md) for the prior-art matrix and [`docs/usefulness-validation.md`](docs/usefulness-validation.md) for the validation protocol.
 
 ## Why this repo exists
 
@@ -17,7 +38,7 @@ The first scaffold in this repo focuses on a small but real core:
 | Provenance graph | Typed entities and edges plus deterministic cause reports, minimal explanations, blast radius, incident-shape diffing, and causal certificates |
 | Evidence ingestion | JSONL operational evidence ingest plus deterministic trace reconstruction with confidence and clock uncertainty |
 | Repair manifests | JSON repair DSL with semantic validation, Hoare-style proof obligations, frame checks, and SQL refinement checks |
-| Solver obligations | Bounded SMT-style scope/frame proofs plus finite-store row-count and invariant-preservation checks |
+| Solver obligations | Z3-backed scope implication proofs plus finite-store frame, row-count, and invariant-preservation checks with explicit downgrade if Z3 is unavailable |
 | Symbolic execution | Bounded repair-program row paths with guard constraints, symbolic assignments, and stuck-step hashes |
 | Workflow model checking | Bounded ingest/explain/approve/dry-run/apply/verify/rollback/audit/archive state exploration with temporal properties, proof holes, and counterexample fixtures |
 | CEGAR refinement | Counterexample/proof-hole guided reruns that refine coarse repair abstractions with invariant specs and incident workflow models |
@@ -40,7 +61,7 @@ See [`docs/evidence-jsonl.md`](docs/evidence-jsonl.md) for the telemetry bridge 
 See [`docs/repair-manifests.md`](docs/repair-manifests.md) for migration, template, and lint tooling.
 See [`docs/effect-lattice.md`](docs/effect-lattice.md) for the deterministic effect lattice and abstraction relation.
 See [`docs/invariants.md`](docs/invariants.md) for invariant declarations, before/after checks, and candidate discovery.
-See [`docs/solver-obligations.md`](docs/solver-obligations.md) for bounded SMT-style proof obligations.
+See [`docs/solver-obligations.md`](docs/solver-obligations.md) for Z3-backed proof obligations.
 See [`docs/symbolic-execution.md`](docs/symbolic-execution.md) for bounded repair-program path constraints.
 See [`docs/workflow-model-checking.md`](docs/workflow-model-checking.md) for temporal incident workflow checks and proof holes.
 See [`docs/refinement-and-attestations.md`](docs/refinement-and-attestations.md) for CEGAR-style refinement and signed artifact verification.
@@ -120,7 +141,7 @@ The benchmark suite adds a stricter corpus-level signal: every case has a human 
 For current SRE/platform workflows, Patchline can also ingest incident evidence JSONL and run as a PR gate:
 
 ```bash
-go run ./cmd/patchline adapt-evidence datadog examples/evidence/datadog-span-export.json --out /tmp/patchline-events.jsonl
+go run ./cmd/patchline adapt-evidence otlp examples/evidence/otlp-span-export.json --out /tmp/patchline-events.jsonl
 go run ./cmd/patchline adapt-evidence github examples/evidence/github-deployments.json --out /tmp/patchline-deploys.jsonl
 go run ./cmd/patchline adapt-evidence migration-runner examples/evidence/migration-runner.json --out /tmp/patchline-migrations.jsonl
 go run ./cmd/patchline ingest-evidence /tmp/patchline-events.jsonl --out /tmp/patchline-adapted-graph.json
@@ -147,7 +168,7 @@ go run ./cmd/patchline transaction-plan examples/repairs/repair-bad-invoice-back
 go run ./cmd/patchline ci-gate examples/benchmarks/strict-migration-corpus.json --min-precision 0.95 --min-recall 0.95
 ```
 
-The adapter path converts current OTLP, Datadog, Postgres logical decoding, GitHub deployment/release, and migration-runner JSON exports into Patchline evidence JSONL. Ingest intentionally accepts extra source-system fields while validating required Patchline evidence fields, so operational exports can be converted without losing auditability.
+The adapter path converts current span exports, Postgres logical decoding, GitHub deployment/release, and migration-runner JSON exports into Patchline evidence JSONL. Ingest intentionally accepts extra source-system fields while validating required Patchline evidence fields, so operational exports can be converted without losing auditability.
 
 `trace-reconstruct` turns those same JSONL files into a typed trace projection with source confidence, clock confidence, normalized event-time intervals, and a semantic projection hash. `trace-equivalence` compares two imports by reconstructed projection instead of by raw line order or JSON field order.
 
