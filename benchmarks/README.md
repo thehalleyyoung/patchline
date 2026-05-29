@@ -40,7 +40,7 @@ benchmarks/expected/repair-cases-report.json
 benchmarks/expected/semantic-regressions-report.json
 ```
 
-The runner is phase-aware. It validates that each manifest case points to matching ground truth, enforces `allowed_inputs` and `excluded_inputs`, predicts from committed fixtures or explicit inline fixtures, and only then compares the result with the expected label. This keeps pre-deploy cases from using postmortem-only facts. Repair cases may also declare explicit bounded stores and invariant specs, which makes replay hashes, solver hashes, and invariant counts part of the benchmark result instead of hidden defaults.
+The runner is phase-aware. It validates that each manifest case points to matching ground truth, checks `available_at` against the ground-truth phase, enforces `allowed_inputs` and `excluded_inputs`, rejects allowed inputs whose earliest availability is after the case phase, predicts from committed fixtures or explicit inline fixtures, and only then compares the result with the expected label. This keeps pre-deploy cases from using postmortem-only facts. Repair cases may also declare explicit bounded stores and invariant specs, which makes replay hashes, solver hashes, and invariant counts part of the benchmark result instead of hidden defaults.
 
 The offline compare target now covers:
 
@@ -137,4 +137,4 @@ The planned full benchmark families are:
 - semantic regression archives (currently one recurrence and one non-recurrence case);
 - negative/limitation cases.
 
-Each case must have a ground-truth JSON file with source, phase, allowed inputs, excluded inputs, expected result, and evidence rationale.
+Each case must have a ground-truth JSON file with source, phase, allowed inputs, excluded inputs, expected result, and evidence rationale. `benchmarks/LABELING.md` defines the accepted phase names and the earliest phase for every allowed input kind.

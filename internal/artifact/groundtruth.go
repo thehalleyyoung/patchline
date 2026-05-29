@@ -66,6 +66,35 @@ type ManifestCase struct {
 	GroundTruth string `json:"ground_truth"`
 }
 
+var phaseOrder = map[string]int{
+	"pre_deploy":       0,
+	"during_migration": 1,
+	"during_repair":    2,
+	"postmortem":       3,
+	"archive_only":     4,
+}
+
+var inputEarliestPhase = map[string]string{
+	"migration_text":         "pre_deploy",
+	"schema":                 "pre_deploy",
+	"policy":                 "pre_deploy",
+	"prior_archive":          "pre_deploy",
+	"invariants":             "pre_deploy",
+	"repair_plan":            "during_repair",
+	"bounded_store":          "during_repair",
+	"rollback_plan":          "during_repair",
+	"available_backups":      "during_repair",
+	"snapshot_rollback":      "during_repair",
+	"evidence_jsonl":         "postmortem",
+	"postmortem_text":        "postmortem",
+	"source_observations":    "postmortem",
+	"repair_outcome":         "postmortem",
+	"public_postmortem_text": "postmortem",
+	"public_issue_text":      "postmortem",
+	"root_cause_report":      "postmortem",
+	"current_archive_entry":  "archive_only",
+}
+
 func ValidateGroundTruth(root string) (GroundTruthReport, error) {
 	report := GroundTruthReport{
 		Version:      "patchline.artifact-ground-truth/v1",
@@ -142,12 +171,26 @@ func validateGroundTruthCase(path string, gt GroundTruthCase) []ValidationError 
 	require(len(gt.Evidence) > 0, "missing evidence")
 	require(gt.AllowedInputs != nil, "missing allowed_inputs")
 	require(gt.ExcludedInputs != nil, "missing excluded_inputs")
+	if gt.Phase != "" && !knownPhase(gt.Phase) {
+		errs = append(errs, ValidationError{File: path, CaseID: gt.CaseID, Message: "unknown phase: " + gt.Phase})
+	}
 
 	for i, evidence := range gt.Evidence {
 		prefix := fmt.Sprintf("evidence[%d]", i)
 		require(evidence.Kind != "", prefix+" missing kind")
 		require(evidence.Locator != "", prefix+" missing locator")
 		require(evidence.Rationale != "", prefix+" missing rationale")
+	}
+
+	for _, input := range gt.AllowedInputs {
+		earliest, ok := inputEarliestPhase[input]
+		if !ok {
+			errs = append(errs, ValidationError{File: path, CaseID: gt.CaseID, Message: "allowed input has no phase availability: " + input})
+			continue
+		}
+		if gt.Phase != "" && knownPhase(gt.Phase) && !phaseAtOrAfter(gt.Phase, earliest) {
+			errs = append(errs, ValidationError{File: path, CaseID: gt.CaseID, Message: fmt.Sprintf("allowed input %s is only available at %s, after case phase %s", input, earliest, gt.Phase)})
+		}
 	}
 
 	if gt.Phase == "pre_deploy" {
@@ -188,6 +231,8 @@ func validateManifest(path string, manifest Manifest, groundTruthByPath map[stri
 		}
 		if manifestCase.AvailableAt == "" {
 			add(manifestCase.CaseID, "manifest case missing available_at")
+		} else if !knownPhase(manifestCase.AvailableAt) {
+			add(manifestCase.CaseID, "manifest case has unknown available_at: "+manifestCase.AvailableAt)
 		}
 		if manifestCase.GroundTruth == "" {
 			add(manifestCase.CaseID, "manifest case missing ground_truth")
@@ -251,6 +296,17 @@ func contains(values []string, needle string) bool {
 		}
 	}
 	return false
+}
+
+func knownPhase(phase string) bool {
+	_, ok := phaseOrder[phase]
+	return ok
+}
+
+func phaseAtOrAfter(actual, earliest string) bool {
+	actualOrder, actualOK := phaseOrder[actual]
+	earliestOrder, earliestOK := phaseOrder[earliest]
+	return actualOK && earliestOK && actualOrder >= earliestOrder
 }
 
 func sortValidationErrors(errs []ValidationError) {

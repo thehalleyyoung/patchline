@@ -22,6 +22,8 @@ The current reviewer path is intentionally narrow and executable from a fresh ch
 
 The smoke path uses only committed fixtures and existing CLI commands. It does not require network access. Public-data targets are explicit and verify pinned hashes before using downloaded files.
 
+The benchmark protocol is time-realistic: each manifest case declares `available_at`, each ground-truth file declares its phase plus allowed/excluded inputs, and validation rejects any allowed input whose earliest availability is later than the case phase. This is the artifact guard against hindsight leakage in pre-deploy and during-repair claims.
+
 ## Setup
 
 Prerequisites:
@@ -161,7 +163,7 @@ go run ./cmd/patchline artifact-benchmark compare results/generated/artifact-ben
 go run ./cmd/patchline artifact-benchmark compare results/generated/artifact-benchmark/semantic-regressions-report.json benchmarks/expected/semantic-regressions-report.json
 ```
 
-The runner separates prediction from comparison. During prediction, Patchline may use the manifest fixture and the case's allowed/excluded input kinds, but it does not use the ground-truth expected label to decide the result. Ground truth is used to validate references, enforce phase guards, and compare the final outcome. The comparison command exits non-zero if a case result or report hash drifts.
+The runner separates prediction from comparison. During prediction, Patchline may use the manifest fixture and the case's allowed/excluded input kinds, but it does not use the ground-truth expected label to decide the result. Ground truth is used to validate references, enforce phase guards and input availability, and compare the final outcome. The comparison command exits non-zero if a case result or report hash drifts.
 
 The offline compare path includes four committed manifest families:
 

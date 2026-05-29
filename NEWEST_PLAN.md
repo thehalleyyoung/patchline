@@ -17,11 +17,12 @@ Patchline now has the artifact-review scaffold and several executable evaluator 
 - `make artifact-benchmark-public-repairs` runs an offline public-derived repair boundary over a Patchline-authored GitLab 2017 counterfactual no-snapshot repair manifest and compares against a committed golden report.
 - `make artifact-benchmark-public-archive` runs an offline paired public-postmortem-derived archive over GitLab 2017 and GitHub 2018 source observations plus explicit Patchline reconstructions, comparing against a committed golden report.
 - `make artifact-tables` regenerates five paper-facing tables under `results/generated/artifact-tables/summary.{json,md}` from the checked reports and study specs.
+- Ground-truth validation now enforces a fixed phase/input availability model, so an `allowed_inputs` entry cannot first become available after the case's declared phase.
 - `make artifact-benchmark-refresh` and `make artifact-studies-refresh` are the explicit maintainer paths for regenerating committed golden reports/manifests after deliberate semantic changes.
 - `make artifact-full && make verify-usefulness` has passed after the executable benchmark runner, golden-refresh workflow, and public migration corpus were added.
 - `100_STEPS.md`, `PLAN.md`, and `NEW_PLAN.md` are untracked/ignored; this file remains the tracked implementation roadmap.
 
-The latest refinement adds deterministic paper-facing table generation. `patchline artifact-tables` turns the existing frozen benchmark reports and strict/public study specs into five ICSE-style result tables: executable corpora, detection/actionability, semantic-evidence ablation, historical public-derived counterfactuals, and scale. It records source hashes, excludes machine-dependent timing from stable table claims, and keeps the paired archive explicitly framed as public-postmortem-derived rather than private production data.
+The latest refinement tightens time-realistic validation. `artifact-ground-truth` now rejects unknown phases, unknown allowed input kinds, and allowed inputs that are only available after the case phase, while preserving the explicit pre-deploy exclusion of postmortem text. This makes the no-hindsight-leakage rule a checked property of every benchmark label rather than only a documentation convention.
 
 ## 0. Target Artifact Claim
 
@@ -58,7 +59,7 @@ Patchline should not claim to automatically understand arbitrary production syst
 | Baselines | DDL-grep, normalized SQL-rule, and effects-without-evidence baselines run on strict and public migration corpora with expected-hash drift checks | Add larger public corpus coverage | `make artifact-studies-compare` and `make artifact-studies-public-compare` emit and verify comparative tables |
 | Ablations | Strict and public migration study targets exist with expected-hash drift checks; public corpus intentionally measures only migration detection/actionability unless inputs declare proof/archive links | Add public cases with repair/archive inputs | `make artifact-studies-compare`, `make artifact-studies-public-compare`, and `make artifact-benchmark-compare` show added signal/actionability per component |
 | Paper-facing tables | `artifact-tables` emits five deterministic result tables with source hashes | Expand table rows as corpora grow | `make artifact-tables` writes `results/generated/artifact-tables/summary.{json,md}` |
-| Time realism | Phase-aware ground truth and benchmark runner enforce input availability | Add `available_at` phase annotations and enforce phase-limited evaluation | Pre-deploy claims only consume pre-deploy evidence |
+| Time realism | Phase-aware ground truth and benchmark runner enforce input availability with a fixed earliest-phase table | Expand phase coverage as new input kinds are added | Pre-deploy claims only consume pre-deploy evidence |
 | Packaging | Docker/devcontainer, smoke/full targets, and artifact docs exist | Add Docker/devcontainer, `ARTIFACT.md`, smoke/full targets, cached data option | Fresh checkout can run smoke path under 5 minutes |
 | Scale | `artifact-scale` and `artifact-scale-public` emit corpus measurements; corpus size is still small | Add larger corpus-scale benchmark and report runtime/memory/query latency | study targets emit benchmark JSON and Markdown tables for strict and public corpora |
 | Trusted semantic core | `docs/semantic-core.md` exists and is linked from README | Define a small explicit core model and connect it to code and CLI commands | `docs/semantic-core.md` maps model terms to implementation files and tests |
@@ -678,15 +679,15 @@ Every artifact input should declare `available_at`.
 
 ### Implementation tasks
 
-1. Add `available_at` to archive entries and benchmark cases.
-2. Add phase-checking validation.
+1. Add `available_at` to archive entries and benchmark cases. **Done for benchmark cases:** every manifest case declares `available_at` and validation checks it against ground-truth phase.
+2. Add phase-checking validation. **Done:** ground-truth validation rejects unknown phases, unknown allowed inputs, and inputs whose earliest availability is after the case phase.
 3. Add command:
 
    ```bash
    patchline phase-check benchmarks/manifests/public_incidents.json
    ```
 
-4. Add tests for preventing pre-deploy/postmortem leakage.
+4. Add tests for preventing pre-deploy/postmortem leakage. **Done:** validation tests cover future-phase allowed inputs and unknown phase/input kinds.
 5. Update historical counterfactual claims to state phase explicitly.
 
 ### Acceptance criteria
