@@ -16,11 +16,16 @@ func TestArtifactStudiesRunOnStrictCorpus(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if baselines.Hash == "" || len(baselines.Baselines) != 1 {
+	if baselines.Hash == "" || len(baselines.Baselines) != 3 {
 		t.Fatalf("unexpected baseline report: %#v", baselines)
 	}
+	for _, baseline := range baselines.Baselines {
+		if baselines.Patchline.MeanActionability < baseline.Metrics.MeanActionability {
+			t.Fatalf("expected Patchline to expose at least as much actionability as %s: patchline=%f baseline=%f", baseline.Name, baselines.Patchline.MeanActionability, baseline.Metrics.MeanActionability)
+		}
+	}
 	if baselines.Patchline.MeanActionability <= baselines.Baselines[0].Metrics.MeanActionability {
-		t.Fatalf("expected Patchline to expose more actionability than the rule baseline: patchline=%f baseline=%f", baselines.Patchline.MeanActionability, baselines.Baselines[0].Metrics.MeanActionability)
+		t.Fatalf("expected Patchline to expose more actionability than the DDL-only baseline: patchline=%f baseline=%f", baselines.Patchline.MeanActionability, baselines.Baselines[0].Metrics.MeanActionability)
 	}
 
 	ablations, err := RunAblations(spec, baseDir)

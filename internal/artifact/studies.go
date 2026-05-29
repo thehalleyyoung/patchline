@@ -73,6 +73,7 @@ type CaseAnalysis struct {
 	Prediction           string   `json:"prediction"`
 	ReportHash           string   `json:"report_hash"`
 	ExpectedReportHash   string   `json:"expected_report_hash"`
+	StatementKinds       []string `json:"statement_kinds,omitempty"`
 	Tables               []string `json:"tables,omitempty"`
 	Effects              []string `json:"effects,omitempty"`
 	RiskReasons          []string `json:"risk_reasons,omitempty"`
@@ -140,17 +141,19 @@ func EvaluateBaselines(spec bench.Spec, baseDir string) (BaselineReport, error) 
 	if err != nil {
 		return BaselineReport{}, err
 	}
+	lexicalDDL := ddlDestructiveBaseline(analyses)
 	sqlRules := sqlRuleBaseline(analyses)
+	effectsOnly := semanticEffectsBaseline(analyses)
 	report := BaselineReport{
 		Version:      BaselineVersion,
 		Suite:        spec.Name,
 		SuiteHash:    patchlineResult.SuiteHash,
 		Patchline:    metricsFromAnalyses(analyses),
-		Baselines:    []Baseline{sqlRules},
+		Baselines:    []Baseline{lexicalDDL, sqlRules, effectsOnly},
 		CaseAnalyses: analyses,
 		Findings: []string{
-			"Patchline emits semantic context (tables, effects, risk reasons, hashes, ground-truth links, and optional Z3-backed repair proof links) that a rule-only baseline does not expose.",
-			"Rule-only detection is retained as a transparent floor; the artifact report makes any detection parity visible instead of hiding it.",
+			"Patchline emits semantic context (tables, effects, risk reasons, hashes, ground-truth links, and optional Z3-backed repair proof links) that narrower transparent baselines do not expose.",
+			"Baselines are deliberately local and deterministic: DDL grep, normalized SQL rules, and semantic effects without evidence/proof/archive links. Detection parity remains visible instead of being hidden by aggregate scores.",
 		},
 	}
 	report.Markdown = renderBaselineMarkdown(report)
@@ -315,8 +318,12 @@ func analyzeCases(spec bench.Spec, baseDir string) ([]CaseAnalysis, error) {
 			analysis.Prediction = "safe"
 		}
 		effects := map[string]bool{}
+		kinds := map[string]bool{}
 		reasons := map[string]bool{}
 		for _, stmt := range migrationReport.Statements {
+			if stmt.Kind != "" {
+				kinds[stmt.Kind] = true
+			}
 			if stmt.Effect != "" {
 				effects[stmt.Effect] = true
 			}
@@ -324,6 +331,7 @@ func analyzeCases(spec bench.Spec, baseDir string) ([]CaseAnalysis, error) {
 				reasons[reason] = true
 			}
 		}
+		analysis.StatementKinds = sortedKeys(kinds)
 		analysis.Effects = sortedKeys(effects)
 		analysis.RiskReasons = sortedKeys(reasons)
 		analysis.ActionabilitySignals = actionabilitySignals(analysis, c)
@@ -346,6 +354,39 @@ func analyzeCases(spec bench.Spec, baseDir string) ([]CaseAnalysis, error) {
 	return analyses, nil
 }
 
+func ddlDestructiveBaseline(analyses []CaseAnalysis) Baseline {
+	var results []BaselineCaseResult
+	for _, analysis := range analyses {
+		rules := map[string]bool{}
+		for _, kind := range analysis.StatementKinds {
+			switch kind {
+			case "drop":
+				rules["statement-kind-drop"] = true
+			case "truncate":
+				rules["statement-kind-truncate"] = true
+			}
+		}
+		matched := sortedKeys(rules)
+		prediction := "safe"
+		if len(matched) > 0 {
+			prediction = "unsafe"
+		}
+		results = append(results, BaselineCaseResult{
+			ID:           analysis.ID,
+			Label:        analysis.Label,
+			Prediction:   prediction,
+			MatchedRules: matched,
+			ReportHash:   analysis.ReportHash,
+		})
+	}
+	return Baseline{
+		Name:        "grep-ddl-destructive",
+		Description: "DDL-only transparent baseline: flags normalized DROP/TRUNCATE statement kinds and ignores repair semantics, broad DML, proof, archive, and ground-truth evidence.",
+		Metrics:     metricsFromBaseline(results, nil),
+		Cases:       results,
+	}
+}
+
 func sqlRuleBaseline(analyses []CaseAnalysis) Baseline {
 	var results []BaselineCaseResult
 	for _, analysis := range analyses {
@@ -365,6 +406,49 @@ func sqlRuleBaseline(analyses []CaseAnalysis) Baseline {
 	return Baseline{
 		Name:        "normalized-sql-rules",
 		Description: "Transparent non-semantic rule baseline over normalized migration statements.",
+		Metrics:     metricsFromBaseline(results, nil),
+		Cases:       results,
+	}
+}
+
+func semanticEffectsBaseline(analyses []CaseAnalysis) Baseline {
+	var results []BaselineCaseResult
+	for _, analysis := range analyses {
+		rules := map[string]bool{}
+		for _, effect := range analysis.Effects {
+			switch effect {
+			case "destructive":
+				rules["effect-destructive"] = true
+			case "unknown":
+				rules["effect-review-required"] = true
+			}
+		}
+		for _, reason := range analysis.RiskReasons {
+			switch {
+			case strings.Contains(reason, "unbounded"):
+				rules["unbounded-mutation"] = true
+			case strings.Contains(reason, "broad"):
+				rules["broad-mutation"] = true
+			case strings.Contains(reason, "schema alteration"):
+				rules["schema-alteration"] = true
+			}
+		}
+		matched := sortedKeys(rules)
+		prediction := "safe"
+		if len(matched) > 0 {
+			prediction = "unsafe"
+		}
+		results = append(results, BaselineCaseResult{
+			ID:           analysis.ID,
+			Label:        analysis.Label,
+			Prediction:   prediction,
+			MatchedRules: matched,
+			ReportHash:   analysis.ReportHash,
+		})
+	}
+	return Baseline{
+		Name:        "semantic-effects-no-evidence",
+		Description: "Patchline analyzer effects without provenance, ground-truth, solver, archive, or replay links; this isolates detection-style semantic enrichment from the full artifact.",
 		Metrics:     metricsFromBaseline(results, nil),
 		Cases:       results,
 	}
@@ -400,7 +484,11 @@ func modeFromAnalyses(name, description string, analyses []CaseAnalysis, level i
 			modeAnalysis.ArchiveLinked = false
 			modeAnalysis.GroundTruthLinked = false
 		case 1:
-			modeAnalysis.ActionabilitySignals = append(filterSignals(analysis.ActionabilitySignals, "tables=", "effects=", "risk-reasons="), "review-gate-candidate")
+			modeAnalysis.ActionabilitySignals = filterSignals(analysis.ActionabilitySignals, "tables=", "effects=", "risk-reasons=")
+			if analysis.Prediction == "unsafe" {
+				modeAnalysis.ActionabilitySignals = append(modeAnalysis.ActionabilitySignals, "review-gate-candidate")
+				sort.Strings(modeAnalysis.ActionabilitySignals)
+			}
 			modeAnalysis.ProofBacked = false
 			modeAnalysis.ArchiveLinked = false
 			modeAnalysis.GroundTruthLinked = false

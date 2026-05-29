@@ -77,6 +77,7 @@ It runs:
 
 ```bash
 make artifact-studies
+make artifact-studies-public
 ```
 
 This target writes:
@@ -89,13 +90,21 @@ results/generated/artifact-studies/
   ablations.md
   scale.json
   scale.md
+  public-migrations/
+    baselines.json
+    baselines.md
+    ablations.json
+    ablations.md
+    scale.json
+    scale.md
 ```
 
 The reports are intentionally reviewer-facing rather than paper-scale. They make the current utility claim executable:
 
-- `artifact-baselines` compares Patchline with a transparent normalized SQL-rule baseline and reports both detection metrics and actionability metrics.
+- `artifact-baselines` compares Patchline with transparent DDL-grep, normalized SQL-rule, and semantic-effects-without-evidence baselines and reports both detection metrics and actionability metrics.
 - `artifact-ablations` separates migration-only, migration+policy, migration+policy+solver, migration+policy+solver+archive, and full artifact modes.
 - `artifact-scale` records bytes, statements, high-risk statements, touched tables, hashes, and analyzer time for the committed strict corpus.
+- `artifact-studies-public` repeats the study reports on the pinned Bytebase migration corpus after fetching and hashing the source files. This network-backed corpus measures public migration detection and structural actionability, not archive/proof gains for cases that do not declare archive or repair inputs.
 
 The ablation report only counts solver-backed evidence for cases that declare repair/invariant inputs. This keeps the claim falsifiable: migration text alone can produce risk signals, but not repair proofs.
 
@@ -208,7 +217,7 @@ These cases are part of the artifact, not merely prose limitations.
 
 ## Relationship to `make verify-usefulness`
 
-`make verify-usefulness` remains the broader project validation target. It includes network-backed public corpus fetching and source checks. `make artifact-smoke` is the artifact-review entry point: it is smaller, committed-fixture-only, and intended to be stable without network access. `make artifact-studies` is the evaluator-facing measurement entry point for current baseline/ablation/scale evidence, `make artifact-benchmark-compare` is the offline golden-output check for the executable manifest protocol, `make artifact-benchmark-public` is the explicit public-data check, and `make artifact-benchmark-refresh` is the maintainer path for rewriting golden outputs.
+`make verify-usefulness` remains the broader project validation target. It includes network-backed public corpus fetching and source checks. `make artifact-smoke` is the artifact-review entry point: it is smaller, committed-fixture-only, and intended to be stable without network access. `make artifact-studies` is the offline evaluator-facing measurement entry point for current baseline/ablation/scale evidence, `make artifact-studies-public` is the explicit public-data study path, `make artifact-benchmark-compare` is the offline golden-output check for the executable manifest protocol, `make artifact-benchmark-public` is the explicit public-data check, and `make artifact-benchmark-refresh` is the maintainer path for rewriting golden outputs.
 
 ## Data provenance
 

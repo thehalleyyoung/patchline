@@ -1,4 +1,4 @@
-.PHONY: build test demo gate fmt public-corpus verify-usefulness artifact-smoke artifact-demo artifact-ground-truth-check artifact-baselines artifact-ablations artifact-scale artifact-studies artifact-benchmark artifact-benchmark-public artifact-benchmark-public-incidents artifact-benchmark-refresh artifact-benchmark-compare artifact-negative-cases artifact-full artifact-clean
+.PHONY: build test demo gate fmt public-corpus verify-usefulness artifact-smoke artifact-demo artifact-ground-truth-check artifact-baselines artifact-ablations artifact-scale artifact-studies artifact-baselines-public artifact-ablations-public artifact-scale-public artifact-studies-public artifact-studies-all artifact-benchmark artifact-benchmark-public artifact-benchmark-public-incidents artifact-benchmark-refresh artifact-benchmark-compare artifact-negative-cases artifact-full artifact-clean
 
 build:
 	go build -o bin/patchline ./cmd/patchline
@@ -46,6 +46,19 @@ artifact-scale:
 	go run ./cmd/patchline artifact-scale examples/benchmarks/strict-migration-corpus.json --out results/generated/artifact-studies
 
 artifact-studies: artifact-baselines artifact-ablations artifact-scale
+
+artifact-baselines-public: public-corpus
+	go run ./cmd/patchline artifact-baselines examples/benchmarks/public-bytebase-migration-corpus.json --out results/generated/artifact-studies/public-migrations
+
+artifact-ablations-public: public-corpus
+	go run ./cmd/patchline artifact-ablations examples/benchmarks/public-bytebase-migration-corpus.json --out results/generated/artifact-studies/public-migrations
+
+artifact-scale-public: public-corpus
+	go run ./cmd/patchline artifact-scale examples/benchmarks/public-bytebase-migration-corpus.json --out results/generated/artifact-studies/public-migrations
+
+artifact-studies-public: artifact-baselines-public artifact-ablations-public artifact-scale-public
+
+artifact-studies-all: artifact-studies artifact-studies-public
 
 artifact-benchmark:
 	go run ./cmd/patchline artifact-benchmark validate benchmarks/manifests/smoke.json

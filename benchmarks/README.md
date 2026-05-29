@@ -74,6 +74,14 @@ make artifact-studies
 
 That target emits baseline, ablation, and scale reports under `results/generated/artifact-studies/`. The reports are deliberately small but load-bearing: they verify that benchmark cases can carry ground-truth links, archive links, repair manifests, invariant specs, Z3-backed obligations, and deterministic migration hashes through the same schema that larger corpora will use.
 
+The pinned public migration corpus feeds the same study machinery through an explicit network target:
+
+```bash
+make artifact-studies-public
+```
+
+That target writes reports under `results/generated/artifact-studies/public-migrations/` after fetching and hashing the Bytebase files. Because this corpus only declares migration files, its reports are scoped to detection and structural actionability; archive/proof/ground-truth gains remain demonstrated by the strict corpus and the phase-aware benchmark manifests.
+
 ## Larger benchmark targets
 
 The planned full benchmark families are:

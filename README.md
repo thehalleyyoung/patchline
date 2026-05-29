@@ -19,6 +19,7 @@ make artifact-smoke
 make artifact-demo
 make artifact-ground-truth-check
 make artifact-studies
+make artifact-studies-public
 make artifact-benchmark-compare
 make artifact-benchmark-public
 make artifact-benchmark-public-incidents
@@ -27,7 +28,9 @@ make artifact-negative-cases
 
 Start with [`ARTIFACT.md`](ARTIFACT.md) for the quick evaluator path, [`docs/paper-claim.md`](docs/paper-claim.md) for the single paper-facing claim, [`docs/semantic-core.md`](docs/semantic-core.md) for the auditable semantic core, and [`benchmarks/LABELING.md`](benchmarks/LABELING.md) for the phase-aware ground-truth protocol.
 
-`make artifact-studies` writes `baselines.{json,md}`, `ablations.{json,md}`, and `scale.{json,md}` under `results/generated/artifact-studies/`. These reports make the current claim sharper: Patchline is not merely detecting bad SQL; it shows, case by case, which semantic layers add tables/effects/reasons, ground-truth links, archive links, Z3-backed repair obligations, stable hashes, and reviewer-actionable evidence beyond a normalized SQL-rule baseline.
+`make artifact-studies` writes `baselines.{json,md}`, `ablations.{json,md}`, and `scale.{json,md}` under `results/generated/artifact-studies/` for the committed strict corpus. These reports make the current claim sharper: Patchline is not merely detecting bad SQL; it shows, case by case, which semantic layers add tables/effects/reasons, ground-truth links, archive links, Z3-backed repair obligations, stable hashes, and reviewer-actionable evidence beyond DDL-grep, normalized SQL-rule, and effects-only baselines.
+
+`make artifact-studies-public` is the explicit network-backed study path. It fetches the pinned Bytebase migration corpus, then writes the same baseline/ablation/scale tables under `results/generated/artifact-studies/public-migrations/`. This public corpus measures migration detection and structural actionability only; it does not claim archive/proof gains for cases that do not declare those inputs.
 
 `make artifact-benchmark-compare` runs the committed smoke and negative benchmark manifests, emits deterministic reports under `results/generated/artifact-benchmark/`, and compares them against frozen expected outputs in `benchmarks/expected/`. This is the no-hindsight-leakage path: ground-truth labels validate the manifest and compare the final answer, while prediction uses only the fixture input kinds allowed for the case phase.
 
