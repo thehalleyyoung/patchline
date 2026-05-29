@@ -73,6 +73,16 @@ func TestBuildIndexesIncidentsBySemanticDimensions(t *testing.T) {
 	if len(report.HistoricalQueries.RepairOutcomeHistory) != 2 || report.HistoricalQueries.RepairOutcomeHistory[0].Hash != firstOutcome.Hash {
 		t.Fatalf("expected repair outcome query to mirror report outcomes: %#v", report.HistoricalQueries.RepairOutcomeHistory)
 	}
+	if len(report.SemanticRegressions) == 0 {
+		t.Fatalf("expected semantic regression history: %#v", report.SemanticRegressions)
+	}
+	firstRegression := report.SemanticRegressions[0]
+	if firstRegression.IncidentID != "b" || firstRegression.PriorIncidentID != "a" || firstRegression.Relation == "" || firstRegression.Hash == "" {
+		t.Fatalf("expected regression from later incident to prior semantic evidence: %#v", firstRegression)
+	}
+	if len(report.HistoricalQueries.SemanticRegressions) != len(report.SemanticRegressions) {
+		t.Fatalf("expected semantic regression query to mirror report regressions: %#v", report.HistoricalQueries.SemanticRegressions)
+	}
 	if report.HistoricalQueries.Hash == "" {
 		t.Fatal("expected query hash")
 	}

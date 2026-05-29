@@ -102,7 +102,7 @@ func run(args []string) error {
 		return archiveIndex(args[1], hasFlag(args[2:], "--json"))
 	case "archive-query":
 		if len(args) < 2 {
-			return errors.New("usage: patchline archive-query <archive-spec.json> [broad-updates|damaged-reports|missing-rollback|repair-outcomes|all] [--json]")
+			return errors.New("usage: patchline archive-query <archive-spec.json> [broad-updates|damaged-reports|missing-rollback|repair-outcomes|semantic-regressions|all] [--json]")
 		}
 		query := "all"
 		if len(args) >= 3 && !strings.HasPrefix(args[2], "--") {
@@ -114,6 +114,11 @@ func run(args []string) error {
 			return errors.New("usage: patchline repair-outcomes <archive-spec.json> [--json]")
 		}
 		return repairOutcomes(args[1], hasFlag(args[2:], "--json"))
+	case "semantic-regressions":
+		if len(args) < 2 {
+			return errors.New("usage: patchline semantic-regressions <archive-spec.json> [--json]")
+		}
+		return semanticRegressions(args[1], hasFlag(args[2:], "--json"))
 	case "historical-failures":
 		if len(args) < 2 {
 			return errors.New("usage: patchline historical-failures <suite.json> [--json]")
@@ -341,8 +346,9 @@ Usage:
   patchline provenance diff <left-evidence.jsonl> <right-evidence.jsonl> [--json]
   patchline provenance archive <evidence.jsonl>... [--json]
   patchline archive-index <archive-spec.json> [--json]
-  patchline archive-query <archive-spec.json> [broad-updates|damaged-reports|missing-rollback|repair-outcomes|all] [--json]
+  patchline archive-query <archive-spec.json> [broad-updates|damaged-reports|missing-rollback|repair-outcomes|semantic-regressions|all] [--json]
   patchline repair-outcomes <archive-spec.json> [--json]
+  patchline semantic-regressions <archive-spec.json> [--json]
   patchline historical-failures <suite.json> [--json]
   patchline demo-graph
   patchline explain <entity-id> [--graph graph.json]
@@ -737,6 +743,8 @@ func archiveQuery(specPath, query string, jsonOut bool) error {
 			return writeJSON(os.Stdout, report.HistoricalQueries.RepairsLackingRollback)
 		case "repair-outcomes":
 			return writeJSON(os.Stdout, report.HistoricalQueries.RepairOutcomeHistory)
+		case "semantic-regressions":
+			return writeJSON(os.Stdout, report.HistoricalQueries.SemanticRegressions)
 		default:
 			return fmt.Errorf("unknown archive query %q", query)
 		}
@@ -747,6 +755,7 @@ func archiveQuery(specPath, query string, jsonOut bool) error {
 		printDamagedReportQuery(report.HistoricalQueries.DamagedDerivedReports)
 		printMissingRollbackQuery(report.HistoricalQueries.RepairsLackingRollback)
 		printRepairOutcomes(report.HistoricalQueries.RepairOutcomeHistory)
+		printSemanticRegressions(report.HistoricalQueries.SemanticRegressions)
 	case "broad-updates":
 		printBroadUpdateQuery(report.HistoricalQueries.BroadUpdateMigrations)
 	case "damaged-reports":
@@ -755,6 +764,8 @@ func archiveQuery(specPath, query string, jsonOut bool) error {
 		printMissingRollbackQuery(report.HistoricalQueries.RepairsLackingRollback)
 	case "repair-outcomes":
 		printRepairOutcomes(report.HistoricalQueries.RepairOutcomeHistory)
+	case "semantic-regressions":
+		printSemanticRegressions(report.HistoricalQueries.SemanticRegressions)
 	default:
 		return fmt.Errorf("unknown archive query %q", query)
 	}
@@ -771,6 +782,18 @@ func repairOutcomes(specPath string, jsonOut bool) error {
 		return writeJSON(os.Stdout, report.RepairOutcomes)
 	}
 	printRepairOutcomes(report.RepairOutcomes)
+	return nil
+}
+
+func semanticRegressions(specPath string, jsonOut bool) error {
+	report, err := buildArchiveReport(specPath)
+	if err != nil {
+		return err
+	}
+	if jsonOut {
+		return writeJSON(os.Stdout, report.SemanticRegressions)
+	}
+	printSemanticRegressions(report.SemanticRegressions)
 	return nil
 }
 
@@ -868,6 +891,43 @@ func printRepairOutcomes(results []archive.RepairOutcome) {
 			recurrences,
 		)
 	}
+}
+
+func printSemanticRegressions(results []archive.SemanticRegression) {
+	fmt.Printf("semantic_regressions count=%d\n", len(results))
+	for _, result := range results {
+		anchor := semanticRegressionAnchor(result)
+		fmt.Printf("  %s resembles %s relation=%s severity=%s anchor=%s invariant=%q\n",
+			result.IncidentID,
+			result.PriorIncidentID,
+			result.Relation,
+			result.Severity,
+			shortRegressionAnchor(anchor),
+			result.LearnedInvariant,
+		)
+	}
+}
+
+func shortRegressionAnchor(anchor string) string {
+	if strings.Contains(anchor, ":") {
+		return anchor
+	}
+	return shortHash(anchor)
+}
+
+func semanticRegressionAnchor(result archive.SemanticRegression) string {
+	if result.Table != "" {
+		return result.Table
+	}
+	if result.ShapeHash != "" {
+		return result.ShapeHash
+	}
+	for _, evidence := range result.Evidence {
+		if strings.HasPrefix(evidence, "derived_report:") || strings.HasPrefix(evidence, "table:") || strings.HasPrefix(evidence, "shape_hash:") {
+			return evidence
+		}
+	}
+	return "unknown"
 }
 
 func shortHash(hash string) string {
@@ -2025,12 +2085,14 @@ func semanticArtifacts(opts semanticAuditOptions) ([]semantics.ArtifactEvidence,
 			fmt.Sprintf("shape_buckets=%d", len(archiveReport.ByShape)),
 			fmt.Sprintf("migration_table_buckets=%d", len(archiveReport.ByMigrationTable)),
 			fmt.Sprintf("repair_effect_buckets=%d", len(archiveReport.ByRepairEffect)),
+			fmt.Sprintf("repair_outcomes=%d", len(archiveReport.RepairOutcomes)),
+			fmt.Sprintf("semantic_regressions=%d", len(archiveReport.SemanticRegressions)),
 		},
 		Hashes: map[string]string{"archive_index_hash": archiveReport.Hash},
 		Claims: []semantics.Claim{{
 			Ref:      "archive.incident_index",
 			Status:   checkedStatus(len(archiveReport.Incidents) > 0),
-			Reason:   "historical incidents were deterministically bucketed by evidence shape, migration table/risk, repair effect, policy decision, and benchmark decision",
+			Reason:   "historical incidents were deterministically bucketed by evidence shape, migration table/risk, repair effect, policy decision, benchmark decision, repair outcome, and semantic regression",
 			Evidence: archiveReport.Hash,
 		}},
 		Metadata: map[string]interface{}{
@@ -2039,6 +2101,8 @@ func semanticArtifacts(opts semanticAuditOptions) ([]semantics.ArtifactEvidence,
 			"by_repair_effect":      archiveReport.ByRepairEffect,
 			"by_policy_decision":    archiveReport.ByPolicyDecision,
 			"by_benchmark_decision": archiveReport.ByBenchmarkDecision,
+			"repair_outcomes":       archiveReport.RepairOutcomes,
+			"semantic_regressions":  archiveReport.SemanticRegressions,
 		},
 	})
 

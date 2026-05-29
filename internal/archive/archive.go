@@ -2,6 +2,7 @@ package archive
 
 import (
 	"sort"
+	"strings"
 
 	"github.com/thehalleyyoung/patchline/internal/canonical"
 )
@@ -24,18 +25,19 @@ type InputSpec struct {
 }
 
 type Report struct {
-	Version             string          `json:"version"`
-	Name                string          `json:"name"`
-	Incidents           []Entry         `json:"incidents"`
-	ByShape             []Bucket        `json:"by_shape"`
-	ByMigrationTable    []Bucket        `json:"by_migration_table"`
-	ByMigrationRisk     []Bucket        `json:"by_migration_risk"`
-	ByRepairEffect      []Bucket        `json:"by_repair_effect"`
-	ByPolicyDecision    []Bucket        `json:"by_policy_decision"`
-	ByBenchmarkDecision []Bucket        `json:"by_benchmark_decision"`
-	RepairOutcomes      []RepairOutcome `json:"repair_outcomes"`
-	HistoricalQueries   Queries         `json:"historical_queries"`
-	Hash                string          `json:"hash"`
+	Version             string               `json:"version"`
+	Name                string               `json:"name"`
+	Incidents           []Entry              `json:"incidents"`
+	ByShape             []Bucket             `json:"by_shape"`
+	ByMigrationTable    []Bucket             `json:"by_migration_table"`
+	ByMigrationRisk     []Bucket             `json:"by_migration_risk"`
+	ByRepairEffect      []Bucket             `json:"by_repair_effect"`
+	ByPolicyDecision    []Bucket             `json:"by_policy_decision"`
+	ByBenchmarkDecision []Bucket             `json:"by_benchmark_decision"`
+	RepairOutcomes      []RepairOutcome      `json:"repair_outcomes"`
+	SemanticRegressions []SemanticRegression `json:"semantic_regressions"`
+	HistoricalQueries   Queries              `json:"historical_queries"`
+	Hash                string               `json:"hash"`
 }
 
 type Entry struct {
@@ -83,6 +85,20 @@ type RepairOutcome struct {
 	Hash               string   `json:"hash"`
 }
 
+type SemanticRegression struct {
+	IncidentID               string   `json:"incident_id"`
+	PriorIncidentID          string   `json:"prior_incident_id"`
+	Relation                 string   `json:"relation"`
+	Severity                 string   `json:"severity"`
+	LearnedInvariant         string   `json:"learned_invariant"`
+	Evidence                 []string `json:"evidence"`
+	ShapeHash                string   `json:"shape_hash,omitempty"`
+	Table                    string   `json:"table,omitempty"`
+	MigrationRisk            string   `json:"migration_risk"`
+	RepairVerificationResult string   `json:"repair_verification_result,omitempty"`
+	Hash                     string   `json:"hash"`
+}
+
 type Bucket struct {
 	Key       string   `json:"key"`
 	Count     int      `json:"count"`
@@ -103,6 +119,7 @@ type Queries struct {
 	DamagedDerivedReports  []DerivedReportResult   `json:"damaged_derived_reports"`
 	RepairsLackingRollback []MissingRollbackResult `json:"repairs_lacking_rollback"`
 	RepairOutcomeHistory   []RepairOutcome         `json:"repair_outcome_history"`
+	SemanticRegressions    []SemanticRegression    `json:"semantic_regressions"`
 	Hash                   string                  `json:"hash"`
 }
 
@@ -143,6 +160,7 @@ func Build(spec Spec, entries []Entry) Report {
 	sort.Slice(entries, func(i, j int) bool { return entries[i].ID < entries[j].ID })
 	queries := buildQueries(entries, orderByID)
 	repairOutcomes := repairOutcomes(entries, orderByID)
+	semanticRegressions := semanticRegressions(entries, orderByID)
 	report := Report{
 		Version:             Version,
 		Name:                spec.Name,
@@ -154,21 +172,23 @@ func Build(spec Spec, entries []Entry) Report {
 		ByPolicyDecision:    bucket(entries, func(e Entry) []string { return []string{boolKey(e.PolicyAllowed)} }),
 		ByBenchmarkDecision: bucket(entries, func(e Entry) []string { return []string{boolKey(e.BenchmarkOK)} }),
 		RepairOutcomes:      repairOutcomes,
+		SemanticRegressions: semanticRegressions,
 		HistoricalQueries:   queries,
 	}
 	report.Hash = canonical.Hash(struct {
-		Version             string          `json:"version"`
-		Name                string          `json:"name"`
-		Incidents           []Entry         `json:"incidents"`
-		ByShape             []Bucket        `json:"by_shape"`
-		ByMigrationTable    []Bucket        `json:"by_migration_table"`
-		ByMigrationRisk     []Bucket        `json:"by_migration_risk"`
-		ByRepairEffect      []Bucket        `json:"by_repair_effect"`
-		ByPolicyDecision    []Bucket        `json:"by_policy_decision"`
-		ByBenchmarkDecision []Bucket        `json:"by_benchmark_decision"`
-		RepairOutcomes      []RepairOutcome `json:"repair_outcomes"`
-		HistoricalQueries   Queries         `json:"historical_queries"`
-	}{report.Version, report.Name, report.Incidents, report.ByShape, report.ByMigrationTable, report.ByMigrationRisk, report.ByRepairEffect, report.ByPolicyDecision, report.ByBenchmarkDecision, report.RepairOutcomes, report.HistoricalQueries})
+		Version             string               `json:"version"`
+		Name                string               `json:"name"`
+		Incidents           []Entry              `json:"incidents"`
+		ByShape             []Bucket             `json:"by_shape"`
+		ByMigrationTable    []Bucket             `json:"by_migration_table"`
+		ByMigrationRisk     []Bucket             `json:"by_migration_risk"`
+		ByRepairEffect      []Bucket             `json:"by_repair_effect"`
+		ByPolicyDecision    []Bucket             `json:"by_policy_decision"`
+		ByBenchmarkDecision []Bucket             `json:"by_benchmark_decision"`
+		RepairOutcomes      []RepairOutcome      `json:"repair_outcomes"`
+		SemanticRegressions []SemanticRegression `json:"semantic_regressions"`
+		HistoricalQueries   Queries              `json:"historical_queries"`
+	}{report.Version, report.Name, report.Incidents, report.ByShape, report.ByMigrationTable, report.ByMigrationRisk, report.ByRepairEffect, report.ByPolicyDecision, report.ByBenchmarkDecision, report.RepairOutcomes, report.SemanticRegressions, report.HistoricalQueries})
 	return report
 }
 
@@ -178,13 +198,15 @@ func buildQueries(entries []Entry, orderByID map[string]int) Queries {
 		DamagedDerivedReports:  damagedDerivedReports(entries),
 		RepairsLackingRollback: repairsLackingRollback(entries),
 		RepairOutcomeHistory:   repairOutcomes(entries, orderByID),
+		SemanticRegressions:    semanticRegressions(entries, orderByID),
 	}
 	queries.Hash = canonical.Hash(struct {
 		BroadUpdateMigrations  []BroadUpdateResult     `json:"broad_update_migrations"`
 		DamagedDerivedReports  []DerivedReportResult   `json:"damaged_derived_reports"`
 		RepairsLackingRollback []MissingRollbackResult `json:"repairs_lacking_rollback"`
 		RepairOutcomeHistory   []RepairOutcome         `json:"repair_outcome_history"`
-	}{queries.BroadUpdateMigrations, queries.DamagedDerivedReports, queries.RepairsLackingRollback, queries.RepairOutcomeHistory})
+		SemanticRegressions    []SemanticRegression    `json:"semantic_regressions"`
+	}{queries.BroadUpdateMigrations, queries.DamagedDerivedReports, queries.RepairsLackingRollback, queries.RepairOutcomeHistory, queries.SemanticRegressions})
 	return queries
 }
 
@@ -243,6 +265,148 @@ func laterRecurrences(entries []Entry, current Entry, orderByID map[string]int) 
 		out = append(out, candidate.ID)
 	}
 	return out
+}
+
+func semanticRegressions(entries []Entry, orderByID map[string]int) []SemanticRegression {
+	ordered := append([]Entry(nil), entries...)
+	sort.Slice(ordered, func(i, j int) bool {
+		left := orderByID[ordered[i].ID]
+		right := orderByID[ordered[j].ID]
+		if left == right {
+			return ordered[i].ID < ordered[j].ID
+		}
+		return left < right
+	})
+
+	var out []SemanticRegression
+	seen := map[string]struct{}{}
+	for currentIndex, current := range ordered {
+		for _, prior := range ordered[:currentIndex] {
+			for _, regression := range regressionsAgainstPrior(current, prior) {
+				key := regression.IncidentID + "\x00" + regression.PriorIncidentID + "\x00" + regression.Relation + "\x00" + regression.Table + "\x00" + regression.ShapeHash + "\x00" + strings.Join(regression.Evidence, "\x00")
+				if _, exists := seen[key]; exists {
+					continue
+				}
+				seen[key] = struct{}{}
+				regression.Hash = canonical.Hash(struct {
+					IncidentID               string   `json:"incident_id"`
+					PriorIncidentID          string   `json:"prior_incident_id"`
+					Relation                 string   `json:"relation"`
+					Severity                 string   `json:"severity"`
+					LearnedInvariant         string   `json:"learned_invariant"`
+					Evidence                 []string `json:"evidence"`
+					ShapeHash                string   `json:"shape_hash,omitempty"`
+					Table                    string   `json:"table,omitempty"`
+					MigrationRisk            string   `json:"migration_risk"`
+					RepairVerificationResult string   `json:"repair_verification_result,omitempty"`
+				}{regression.IncidentID, regression.PriorIncidentID, regression.Relation, regression.Severity, regression.LearnedInvariant, regression.Evidence, regression.ShapeHash, regression.Table, regression.MigrationRisk, regression.RepairVerificationResult})
+				out = append(out, regression)
+			}
+		}
+	}
+	sort.Slice(out, func(i, j int) bool {
+		left := orderByID[out[i].IncidentID]
+		right := orderByID[out[j].IncidentID]
+		if left != right {
+			return left < right
+		}
+		if out[i].PriorIncidentID != out[j].PriorIncidentID {
+			return out[i].PriorIncidentID < out[j].PriorIncidentID
+		}
+		if out[i].Relation != out[j].Relation {
+			return out[i].Relation < out[j].Relation
+		}
+		return out[i].Table < out[j].Table
+	})
+	return out
+}
+
+func regressionsAgainstPrior(current, prior Entry) []SemanticRegression {
+	var out []SemanticRegression
+	if current.ShapeHash != "" && current.ShapeHash == prior.ShapeHash {
+		out = append(out, SemanticRegression{
+			IncidentID:               current.ID,
+			PriorIncidentID:          prior.ID,
+			Relation:                 "same_semantic_shape",
+			Severity:                 semanticRegressionSeverity(current, prior),
+			LearnedInvariant:         "historical semantic shapes that reached damaged state should not recur without reviewable repair evidence",
+			Evidence:                 regressionEvidence(current, prior, "shape_hash:"+current.ShapeHash),
+			ShapeHash:                current.ShapeHash,
+			MigrationRisk:            current.MigrationMaxRisk,
+			RepairVerificationResult: current.RepairVerificationResult,
+		})
+	}
+
+	currentTables := stringSet(current.MigrationTables)
+	for _, table := range prior.MigrationTables {
+		if _, ok := currentTables[table]; !ok {
+			continue
+		}
+		if !(hasBroadUpdate(current, table) || hasBroadUpdate(prior, table) || current.MigrationMaxRisk == "high" || prior.MigrationMaxRisk == "high") {
+			continue
+		}
+		out = append(out, SemanticRegression{
+			IncidentID:               current.ID,
+			PriorIncidentID:          prior.ID,
+			Relation:                 "shared_high_risk_table",
+			Severity:                 semanticRegressionSeverity(current, prior),
+			LearnedInvariant:         "tables previously involved in broad or high-risk repair incidents should reject repeated risky transitions unless scoped by proof and replay",
+			Evidence:                 regressionEvidence(current, prior, "table:"+table),
+			Table:                    table,
+			MigrationRisk:            current.MigrationMaxRisk,
+			RepairVerificationResult: current.RepairVerificationResult,
+		})
+	}
+
+	currentReports := stringSet(current.DerivedReportIDs)
+	for _, reportID := range prior.DerivedReportIDs {
+		if _, ok := currentReports[reportID]; !ok {
+			continue
+		}
+		out = append(out, SemanticRegression{
+			IncidentID:               current.ID,
+			PriorIncidentID:          prior.ID,
+			Relation:                 "damaged_derived_report_recurrence",
+			Severity:                 semanticRegressionSeverity(current, prior),
+			LearnedInvariant:         "derived reports previously downstream of damaged rows should not be touched again without a stable replay and verification hash",
+			Evidence:                 regressionEvidence(current, prior, "derived_report:"+reportID),
+			MigrationRisk:            current.MigrationMaxRisk,
+			RepairVerificationResult: current.RepairVerificationResult,
+		})
+	}
+	return out
+}
+
+func semanticRegressionSeverity(current, prior Entry) string {
+	if current.MigrationMaxRisk == "high" || prior.MigrationMaxRisk == "high" || len(current.MigrationBroadUpdates) > 0 {
+		return "high"
+	}
+	if !current.PolicyAllowed || !current.BenchmarkOK || !current.RepairRollbackAvailable {
+		return "medium"
+	}
+	return "info"
+}
+
+func regressionEvidence(current, prior Entry, relationEvidence string) []string {
+	evidence := []string{
+		relationEvidence,
+		"current_migration_risk:" + valueOrUnknown(current.MigrationMaxRisk),
+		"current_repair_verification:" + valueOrUnknown(current.RepairVerificationResult),
+		"current_rollback_available:" + boolKey(current.RepairRollbackAvailable),
+		"prior_migration_risk:" + valueOrUnknown(prior.MigrationMaxRisk),
+		"prior_repair_verification:" + valueOrUnknown(prior.RepairVerificationResult),
+	}
+	sort.Strings(evidence)
+	return evidence
+}
+
+func hasBroadUpdate(entry Entry, table string) bool {
+	for _, statement := range entry.MigrationBroadUpdates {
+		if statement.Table == table {
+			return true
+		}
+	}
+	return false
 }
 
 func broadUpdateMigrations(entries []Entry) []BroadUpdateResult {
@@ -360,6 +524,13 @@ func boolKey(value bool) string {
 		return "true"
 	}
 	return "false"
+}
+
+func valueOrUnknown(value string) string {
+	if value == "" {
+		return "unknown"
+	}
+	return value
 }
 
 func stringSet(values []string) map[string]struct{} {

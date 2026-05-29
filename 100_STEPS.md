@@ -115,7 +115,7 @@ Checked items are already represented in the repo. Unchecked items are the next 
 82a. [x] Add public historical-failure counterfactuals that verify postmortem source assertions and show current Patchline gates would flag destructive primary-data mutations and split-brain write divergence.
 82b. [x] Add source-derived public incident observations from linked GitLab 2017 postmortem/issues/API records, so historical counterfactuals are grounded in a multi-document public corpus rather than a single synthetic reconstruction.
 83. [x] Add repair outcome history: dry-run hash, applied SQL hash, verification result, rollback availability, and later recurrence.
-84. [ ] Add semantic regression detection over history: a new migration resembles prior high-risk trace shapes or violates learned invariant candidates.
+84. [x] Add semantic regression detection over history: a new migration resembles prior high-risk trace shapes or violates learned invariant candidates.
 85. [ ] Add historical invariant dashboards as JSON/Markdown generated from actual records and evidence, with counterexamples included.
 86. [ ] Add "new knowledge" reports that summarize previously unconnected causal links across deploys, traces, migrations, row mutations, and repairs.
 87. [ ] Add time-windowed incident slicing so teams can ask what changed before a corruption window.

@@ -21,6 +21,7 @@ make verify-usefulness
 | `archive-index` | Indexes historical-style evidence, migrations, repairs, policy, and benchmark outputs by semantic shape and decisions. |
 | `archive-query` | Answers deterministic historical questions about broad-update migrations, damaged-derived reports, repairs lacking rollback, and repair outcome history. |
 | `repair-outcomes` | Recomputes dry-run hashes, generated/applied SQL hashes, verification result hashes, rollback availability, and later same-shape/table recurrence candidates for archived repairs. |
+| `semantic-regressions` | Turns archive history into executable Patchline semantics: later incidents are checked against prior semantic shapes, high-risk table transitions, damaged derived reports, and learned invariant candidates. |
 | `historical-failures` | Replays public incident counterfactual artifacts and requires expected Patchline signals for known failure classes and source-derived observations. |
 | `verify-historical-sources.sh` | Fetches the public postmortems and linked public issue/API records, then verifies the exact source phrases used as ground-truth assertions. |
 
@@ -50,7 +51,7 @@ The bundled billing incident is intentionally small, but it exercises the same a
 8. emit a semantic audit,
 9. sign or verify artifacts,
 10. archive the incident by semantic shape and repair effect,
-11. query archived facts for broad updates, damaged reports, rollback gaps, and recurrence-linked repair outcomes.
+11. query archived facts for broad updates, damaged reports, rollback gaps, recurrence-linked repair outcomes, and semantic regressions.
 
 This makes the claim falsifiable: if any artifact cannot be rebuilt, if Z3 cannot prove the scope obligation, if a policy or benchmark fails, or if a counterexample appears, the validation command fails or downgrades the relevant claim in the JSON.
 
