@@ -1,0 +1,33 @@
+{
+  "version": "patchline.artifact-benchmark/v1",
+  "dataset_id": "patchline-repair-cases-v1",
+  "description": "During-repair semantic artifacts with replay, solver, invariant, and rollback evidence.",
+  "cases": [
+    {
+      "case_id": "billing-repair-replay",
+      "case_type": "repair",
+      "available_at": "during_repair",
+      "fixture": "../../examples/repairs/repair-bad-invoice-backfill.json",
+      "store": "../../examples/snapshots/billing-bad-migration-before.json",
+      "invariants": "../../examples/invariants/billing-core.json",
+      "ground_truth": "../ground_truth/repairs/billing-repair-replay.json"
+    },
+    {
+      "case_id": "billing-insert-delete-repair",
+      "case_type": "repair",
+      "available_at": "during_repair",
+      "fixture": "../../examples/repairs/repair-insert-delete-invoices.json",
+      "store": "../../examples/snapshots/billing-bad-migration-before.json",
+      "invariants": "../../examples/invariants/billing-core.json",
+      "ground_truth": "../ground_truth/repairs/billing-insert-delete-repair.json"
+    },
+    {
+      "case_id": "append-only-ledger-manual-rollback",
+      "case_type": "repair",
+      "available_at": "during_repair",
+      "fixture": "../../examples/repairs/repair-append-only-ledger.json",
+      "store": "../../examples/snapshots/billing-bad-migration-before.json",
+      "ground_truth": "../ground_truth/repairs/append-only-ledger-manual-rollback.json"
+    }
+  ]
+}

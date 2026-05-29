@@ -134,11 +134,24 @@ go run ./cmd/patchline artifact-benchmark validate benchmarks/manifests/smoke.js
 go run ./cmd/patchline artifact-benchmark run benchmarks/manifests/smoke.json --out results/generated/artifact-benchmark/smoke-report.json
 go run ./cmd/patchline artifact-benchmark validate benchmarks/manifests/negative.json
 go run ./cmd/patchline artifact-benchmark run benchmarks/manifests/negative.json --out results/generated/artifact-benchmark/negative-report.json
+go run ./cmd/patchline artifact-benchmark validate benchmarks/manifests/repair_cases.json
+go run ./cmd/patchline artifact-benchmark run benchmarks/manifests/repair_cases.json --out results/generated/artifact-benchmark/repair-cases-report.json
+go run ./cmd/patchline artifact-benchmark validate benchmarks/manifests/semantic_regressions.json
+go run ./cmd/patchline artifact-benchmark run benchmarks/manifests/semantic_regressions.json --out results/generated/artifact-benchmark/semantic-regressions-report.json
 go run ./cmd/patchline artifact-benchmark compare results/generated/artifact-benchmark/smoke-report.json benchmarks/expected/smoke-report.json
 go run ./cmd/patchline artifact-benchmark compare results/generated/artifact-benchmark/negative-report.json benchmarks/expected/negative-report.json
+go run ./cmd/patchline artifact-benchmark compare results/generated/artifact-benchmark/repair-cases-report.json benchmarks/expected/repair-cases-report.json
+go run ./cmd/patchline artifact-benchmark compare results/generated/artifact-benchmark/semantic-regressions-report.json benchmarks/expected/semantic-regressions-report.json
 ```
 
 The runner separates prediction from comparison. During prediction, Patchline may use the manifest fixture and the case's allowed/excluded input kinds, but it does not use the ground-truth expected label to decide the result. Ground truth is used to validate references, enforce phase guards, and compare the final outcome. The comparison command exits non-zero if a case result or report hash drifts.
+
+The offline compare path includes four committed manifest families:
+
+- `smoke.json`: one end-to-end sample across migration, incident, repair, and regression stages;
+- `negative.json`: unsupported, insufficient-evidence, phase-leakage, replay-boundary, and safe-nonrecurrence controls;
+- `repair_cases.json`: during-repair replay/proof cases with explicit repair plans, bounded stores, invariant specs, and a manual-rollback boundary;
+- `semantic_regressions.json`: archive-only recurrence detection plus a scoped corrective non-recurrence case.
 
 The real-OSS public migration path is explicit because it fetches pinned public sources:
 
@@ -162,7 +175,7 @@ If a semantic change intentionally changes the benchmark outputs, refresh the fr
 make artifact-benchmark-refresh
 ```
 
-This command rewrites `benchmarks/expected/smoke-report.json`, `benchmarks/expected/negative-report.json`, `benchmarks/expected/public-migrations-report.json`, and `benchmarks/expected/public-incidents-report.json`, then reruns `make artifact-benchmark-compare`, `make artifact-benchmark-public`, and `make artifact-benchmark-public-incidents`. Reviewers should use compare targets; refresh is a maintainer workflow for updating golden files after deliberate semantic changes.
+This command rewrites `benchmarks/expected/*-report.{json,md}`, then reruns `make artifact-benchmark-compare`, `make artifact-benchmark-public`, and `make artifact-benchmark-public-incidents`. Reviewers should use compare targets; refresh is a maintainer workflow for updating golden files after deliberate semantic changes.
 
 ## Canonical demo
 

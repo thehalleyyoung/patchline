@@ -1,0 +1,97 @@
+{
+  "version": "patchline.artifact-benchmark-run/v1",
+  "dataset_id": "patchline-repair-cases-v1",
+  "manifest": "benchmarks/manifests/repair_cases.json",
+  "ok": true,
+  "metrics": {
+    "total": 3,
+    "passed": 3,
+    "failed": 0,
+    "by_type": {
+      "repair": 3
+    },
+    "by_result": {
+      "cannot_prove": 1,
+      "verified": 2
+    },
+    "phase_guards": 0
+  },
+  "cases": [
+    {
+      "case_id": "billing-repair-replay",
+      "case_type": "repair",
+      "phase": "during_repair",
+      "fixture": "../../examples/repairs/repair-bad-invoice-backfill.json",
+      "ground_truth": "../ground_truth/repairs/billing-repair-replay.json",
+      "input_kind": "repair_plan",
+      "expected_result": "verified",
+      "actual_result": "verified",
+      "risk": "medium",
+      "ok": true,
+      "signals": [
+        "dry-run-matched-rows=1",
+        "dry-run-operations=1",
+        "invariant-checks=4",
+        "postconditions=1",
+        "preconditions=1",
+        "solver-checked=5",
+        "solver-engine=z3",
+        "solver-proved=2"
+      ],
+      "hashes": {
+        "repair_manifest": "cc4481c680bb59bfa6f74e4a0580bd979e6a32b7e00f1d7a06e50ecd259a9e8f",
+        "repair_replay": "ce2d84915f2a2ce9a2c44c363a4bfdb95daa754863f6e738945b5b7dcbb6d06b",
+        "solver": "638d90a2965f6dcaf47edeeaaec57f0dc5186d6dcb9378210e9b064103323a73",
+        "store": "d72595c337cc20ba5da9ded878efd4748a18c580b0a93ca2535790014a24e6dc"
+      }
+    },
+    {
+      "case_id": "billing-insert-delete-repair",
+      "case_type": "repair",
+      "phase": "during_repair",
+      "fixture": "../../examples/repairs/repair-insert-delete-invoices.json",
+      "ground_truth": "../ground_truth/repairs/billing-insert-delete-repair.json",
+      "input_kind": "repair_plan",
+      "expected_result": "verified",
+      "actual_result": "verified",
+      "risk": "medium",
+      "ok": true,
+      "signals": [
+        "dry-run-matched-rows=2",
+        "dry-run-operations=2",
+        "invariant-checks=4",
+        "postconditions=1",
+        "preconditions=1",
+        "solver-checked=7",
+        "solver-engine=z3",
+        "solver-proved=1"
+      ],
+      "hashes": {
+        "repair_manifest": "73eebd195cdfdb119e2e48d9a28b5276c182dcbe2bec77ae8c56efe914d88e0e",
+        "repair_replay": "b3a3473078972bafd6d553c93b1841fd727e4f7ba43205e0f6efe8dbd208133c",
+        "solver": "7c668adfe536ff048ef8cfbee21aef57f7b18117e8de38bdf115d1c95b941470",
+        "store": "d72595c337cc20ba5da9ded878efd4748a18c580b0a93ca2535790014a24e6dc"
+      }
+    },
+    {
+      "case_id": "append-only-ledger-manual-rollback",
+      "case_type": "repair",
+      "phase": "during_repair",
+      "fixture": "../../examples/repairs/repair-append-only-ledger.json",
+      "ground_truth": "../ground_truth/repairs/append-only-ledger-manual-rollback.json",
+      "input_kind": "repair_plan",
+      "expected_result": "cannot_prove",
+      "actual_result": "cannot_prove",
+      "risk": "medium",
+      "ok": true,
+      "signals": [
+        "repair:not-replayable-or-missing-snapshot"
+      ],
+      "hashes": {
+        "repair_manifest": "9d32f5e18a4b920e645966bd672a3c932ca04c6ec59148d0ebf9f512452f9670"
+      }
+    }
+  ],
+  "hash": "fad8c9074cfdabc88404d204ff02a8454ca540d70b296f6c36998b106fafab7c",
+  "markdown": "# Artifact benchmark report\n\n- dataset_id: `patchline-repair-cases-v1`\n- ok: `true`\n- hash: `fad8c9074cfdabc88404d204ff02a8454ca540d70b296f6c36998b106fafab7c`\n- total: `3`\n- passed: `3`\n- failed: `0`\n\n| case | type | phase | expected | actual | ok |\n| --- | --- | --- | --- | --- | ---: |\n| billing-repair-replay | repair | during_repair | verified | verified | true |\n| billing-insert-delete-repair | repair | during_repair | verified | verified | true |\n| append-only-ledger-manual-rollback | repair | during_repair | cannot_prove | cannot_prove | true |\n"
+}

@@ -61,6 +61,8 @@ type ManifestCase struct {
 	AvailableAt string `json:"available_at"`
 	InputKind   string `json:"input_kind,omitempty"`
 	Fixture     string `json:"fixture"`
+	Store       string `json:"store,omitempty"`
+	Invariants  string `json:"invariants,omitempty"`
 	GroundTruth string `json:"ground_truth"`
 }
 
@@ -213,14 +215,20 @@ func validateManifest(path string, manifest Manifest, groundTruthByPath map[stri
 		if manifestCase.InputKind != "" && !contains(gt.AllowedInputs, manifestCase.InputKind) {
 			add(manifestCase.CaseID, "manifest input_kind is not allowed by ground_truth")
 		}
-		if manifestCase.Fixture != "" && !strings.HasPrefix(manifestCase.Fixture, "inline:") {
-			fixturePath := filepath.Join(filepath.Dir(path), manifestCase.Fixture)
+		validateManifestPath := func(field, value string) {
+			if value == "" || strings.HasPrefix(value, "inline:") {
+				return
+			}
+			fixturePath := filepath.Join(filepath.Dir(path), value)
 			if _, err := os.Stat(fixturePath); err != nil {
 				if !manifest.RequiresFetch {
-					add(manifestCase.CaseID, "manifest fixture does not exist: "+manifestCase.Fixture)
+					add(manifestCase.CaseID, "manifest "+field+" does not exist: "+value)
 				}
 			}
 		}
+		validateManifestPath("fixture", manifestCase.Fixture)
+		validateManifestPath("store", manifestCase.Store)
+		validateManifestPath("invariants", manifestCase.Invariants)
 	}
 	return errs
 }

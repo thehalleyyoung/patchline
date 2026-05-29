@@ -71,15 +71,20 @@
       "risk": "medium",
       "ok": true,
       "signals": [
+        "dry-run-matched-rows=1",
+        "dry-run-operations=1",
+        "invariant-checks=4",
         "postconditions=1",
         "preconditions=1",
-        "solver-checked=1",
+        "solver-checked=5",
         "solver-engine=z3",
         "solver-proved=2"
       ],
       "hashes": {
         "repair_manifest": "cc4481c680bb59bfa6f74e4a0580bd979e6a32b7e00f1d7a06e50ecd259a9e8f",
-        "solver": "a32ccb0f847b1bb78312ab44f256e5d586693601db257d5d9e44124029991cc6"
+        "repair_replay": "ce2d84915f2a2ce9a2c44c363a4bfdb95daa754863f6e738945b5b7dcbb6d06b",
+        "solver": "638d90a2965f6dcaf47edeeaaec57f0dc5186d6dcb9378210e9b064103323a73",
+        "store": "d72595c337cc20ba5da9ded878efd4748a18c580b0a93ca2535790014a24e6dc"
       }
     },
     {
@@ -102,6 +107,6 @@
       }
     }
   ],
-  "hash": "c39bdbaed19f4f3e804a7784e0ed575d22c0da2033fa974fcbdb65008c533bd9",
-  "markdown": "# Artifact benchmark report\n\n- dataset_id: `patchline-smoke-v1`\n- ok: `true`\n- hash: `c39bdbaed19f4f3e804a7784e0ed575d22c0da2033fa974fcbdb65008c533bd9`\n- total: `4`\n- passed: `4`\n- failed: `0`\n\n| case | type | phase | expected | actual | ok |\n| --- | --- | --- | --- | --- | ---: |\n| billing-bad-backfill-migration | migration | pre_deploy | flag | flag | true |\n| gitlab-2017-destructive-primary-data | incident | postmortem | flag | flag | true |\n| billing-repair-replay | repair | during_repair | verified | verified | true |\n| billing-semantic-regression | regression | archive_only | flag | flag | true |\n"
+  "hash": "67396b1fa88d0ab28280298243d026d5c3e056472403c0f4105e49da848a8af9",
+  "markdown": "# Artifact benchmark report\n\n- dataset_id: `patchline-smoke-v1`\n- ok: `true`\n- hash: `67396b1fa88d0ab28280298243d026d5c3e056472403c0f4105e49da848a8af9`\n- total: `4`\n- passed: `4`\n- failed: `0`\n\n| case | type | phase | expected | actual | ok |\n| --- | --- | --- | --- | --- | ---: |\n| billing-bad-backfill-migration | migration | pre_deploy | flag | flag | true |\n| gitlab-2017-destructive-primary-data | incident | postmortem | flag | flag | true |\n| billing-repair-replay | repair | during_repair | verified | verified | true |\n| billing-semantic-regression | regression | archive_only | flag | flag | true |\n"
 }

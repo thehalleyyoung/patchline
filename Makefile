@@ -1,4 +1,4 @@
-.PHONY: build test demo gate fmt public-corpus verify-usefulness artifact-smoke artifact-demo artifact-ground-truth-check artifact-baselines artifact-ablations artifact-scale artifact-studies artifact-studies-expected artifact-studies-compare artifact-studies-refresh artifact-baselines-public artifact-ablations-public artifact-scale-public artifact-studies-public artifact-studies-public-expected artifact-studies-public-compare artifact-studies-all artifact-benchmark artifact-benchmark-public artifact-benchmark-public-incidents artifact-benchmark-refresh artifact-benchmark-compare artifact-negative-cases artifact-full artifact-clean
+.PHONY: build test demo gate fmt public-corpus verify-usefulness artifact-smoke artifact-demo artifact-ground-truth-check artifact-baselines artifact-ablations artifact-scale artifact-studies artifact-studies-expected artifact-studies-compare artifact-studies-refresh artifact-baselines-public artifact-ablations-public artifact-scale-public artifact-studies-public artifact-studies-public-expected artifact-studies-public-compare artifact-studies-all artifact-benchmark artifact-benchmark-repairs artifact-benchmark-regressions artifact-benchmark-public artifact-benchmark-public-incidents artifact-benchmark-refresh artifact-benchmark-compare artifact-negative-cases artifact-full artifact-clean
 
 build:
 	go build -o bin/patchline ./cmd/patchline
@@ -82,6 +82,14 @@ artifact-benchmark:
 	go run ./cmd/patchline artifact-benchmark validate benchmarks/manifests/negative.json
 	go run ./cmd/patchline artifact-benchmark run benchmarks/manifests/negative.json --out results/generated/artifact-benchmark/negative-report.json
 
+artifact-benchmark-repairs:
+	go run ./cmd/patchline artifact-benchmark validate benchmarks/manifests/repair_cases.json
+	go run ./cmd/patchline artifact-benchmark run benchmarks/manifests/repair_cases.json --out results/generated/artifact-benchmark/repair-cases-report.json
+
+artifact-benchmark-regressions:
+	go run ./cmd/patchline artifact-benchmark validate benchmarks/manifests/semantic_regressions.json
+	go run ./cmd/patchline artifact-benchmark run benchmarks/manifests/semantic_regressions.json --out results/generated/artifact-benchmark/semantic-regressions-report.json
+
 artifact-benchmark-public: public-corpus
 	go run ./cmd/patchline artifact-benchmark validate benchmarks/manifests/public_migrations.json
 	go run ./cmd/patchline artifact-benchmark run benchmarks/manifests/public_migrations.json --out results/generated/artifact-benchmark/public-migrations-report.json
@@ -98,9 +106,11 @@ artifact-benchmark-refresh:
 	$(MAKE) artifact-benchmark-public
 	$(MAKE) artifact-benchmark-public-incidents
 
-artifact-benchmark-compare: artifact-benchmark
+artifact-benchmark-compare: artifact-benchmark artifact-benchmark-repairs artifact-benchmark-regressions
 	go run ./cmd/patchline artifact-benchmark compare results/generated/artifact-benchmark/smoke-report.json benchmarks/expected/smoke-report.json
 	go run ./cmd/patchline artifact-benchmark compare results/generated/artifact-benchmark/negative-report.json benchmarks/expected/negative-report.json
+	go run ./cmd/patchline artifact-benchmark compare results/generated/artifact-benchmark/repair-cases-report.json benchmarks/expected/repair-cases-report.json
+	go run ./cmd/patchline artifact-benchmark compare results/generated/artifact-benchmark/semantic-regressions-report.json benchmarks/expected/semantic-regressions-report.json
 
 artifact-negative-cases:
 	bash scripts/artifact_negative_cases.sh

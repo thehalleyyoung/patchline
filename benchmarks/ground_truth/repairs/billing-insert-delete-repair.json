@@ -1,0 +1,28 @@
+{
+  "case_id": "billing-insert-delete-repair",
+  "case_type": "repair",
+  "phase": "during_repair",
+  "labels": {
+    "expected_result": "verified",
+    "risk": "medium"
+  },
+  "evidence": [
+    {
+      "kind": "file",
+      "locator": "examples/repairs/repair-insert-delete-invoices.json",
+      "rationale": "The repair plan combines insert and delete operations so the artifact checks row-shape replay, frame obligations, and invariant preservation beyond a single-row update."
+    },
+    {
+      "kind": "file",
+      "locator": "examples/snapshots/billing-bad-migration-before.json",
+      "rationale": "The bounded store supplies concrete during-repair rows for replay and row-count obligations."
+    },
+    {
+      "kind": "file",
+      "locator": "examples/invariants/billing-core.json",
+      "rationale": "The invariant spec turns the repair into a solver-backed semantic artifact rather than a syntax-only manifest."
+    }
+  ],
+  "allowed_inputs": ["repair_plan", "bounded_store", "invariants", "rollback_plan"],
+  "excluded_inputs": ["future_archive_entries", "private_production_data"]
+}

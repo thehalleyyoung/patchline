@@ -23,6 +23,8 @@
       "case_type": "repair",
       "available_at": "during_repair",
       "fixture": "../../examples/repairs/repair-bad-invoice-backfill.json",
+      "store": "../../examples/snapshots/billing-bad-migration-before.json",
+      "invariants": "../../examples/invariants/billing-core.json",
       "ground_truth": "../ground_truth/repairs/billing-repair-replay.json"
     },
     {

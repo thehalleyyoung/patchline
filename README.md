@@ -32,7 +32,9 @@ Start with [`ARTIFACT.md`](ARTIFACT.md) for the quick evaluator path, [`docs/pap
 
 `make artifact-studies-public-compare` is the explicit network-backed study path. It fetches the pinned Bytebase migration corpus, writes the same baseline/ablation/scale tables under `results/generated/artifact-studies/public-migrations/`, and checks their stable hashes against `benchmarks/expected/studies-public-migrations.json`. This public corpus measures migration detection and structural actionability only; it does not claim archive/proof gains for cases that do not declare those inputs.
 
-`make artifact-benchmark-compare` runs the committed smoke and negative benchmark manifests, emits deterministic reports under `results/generated/artifact-benchmark/`, and compares them against frozen expected outputs in `benchmarks/expected/`. This is the no-hindsight-leakage path: ground-truth labels validate the manifest and compare the final answer, while prediction uses only the fixture input kinds allowed for the case phase.
+`make artifact-benchmark-compare` runs the committed smoke, negative, repair, and regression benchmark manifests, emits deterministic reports under `results/generated/artifact-benchmark/`, and compares them against frozen expected outputs in `benchmarks/expected/`. This is the no-hindsight-leakage path: ground-truth labels validate the manifest and compare the final answer, while prediction uses only the fixture input kinds allowed for the case phase.
+
+The offline benchmark compare path now includes focused repair and regression datasets in addition to smoke and negative controls. `benchmarks/manifests/repair_cases.json` checks during-repair artifacts with explicit repair plans, bounded stores, invariants, replay hashes, solver hashes, and a manual-rollback boundary. `benchmarks/manifests/semantic_regressions.json` checks archive-only recurrence detection and a scoped corrective non-recurrence case.
 
 `make artifact-benchmark-public` explicitly fetches five pinned Bytebase migrations, verifies their SHA-256 hashes, runs the older benchmark-suite label/hash check, then runs the phase-aware artifact benchmark over `benchmarks/manifests/public_migrations.json`. It is the current real-OSS migration corpus path; it is kept out of the default smoke target so fresh-checkout review does not require network access.
 
@@ -57,7 +59,7 @@ Evidence -> Trace -> Transition -> Repair -> Proof -> Replay -> Archive -> Regre
 | Archive | `archive-index`, `archive-query` | deterministic incident index | turns incidents into queryable memory |
 | Regression | `semantic-regressions` | recurrence relations and invariants | detects repeated semantic failure shapes |
 | Artifact studies | `artifact-baselines`, `artifact-ablations`, `artifact-scale`, `artifact-study compare` | baseline, ablation, scale, and expected-hash reports | shows and drift-checks what each semantic layer contributes right now |
-| Artifact benchmark | `artifact-benchmark validate/run/compare` | phase-aware run report and golden comparison | verifies current usefulness against committed and pinned-public ground truth without label leakage |
+| Artifact benchmark | `artifact-benchmark validate/run/compare` | phase-aware migration, incident, repair, and regression reports with golden comparisons | verifies current usefulness against committed and pinned-public ground truth without label leakage |
 
 ## Verify the current usefulness claim
 

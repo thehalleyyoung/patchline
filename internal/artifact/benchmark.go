@@ -14,6 +14,7 @@ import (
 	"github.com/thehalleyyoung/patchline/internal/effects"
 	"github.com/thehalleyyoung/patchline/internal/evidence"
 	"github.com/thehalleyyoung/patchline/internal/historical"
+	"github.com/thehalleyyoung/patchline/internal/invariant"
 	"github.com/thehalleyyoung/patchline/internal/migration"
 	"github.com/thehalleyyoung/patchline/internal/provenance"
 	"github.com/thehalleyyoung/patchline/internal/repair"
@@ -324,16 +325,36 @@ func predictBenchmarkCase(baseDir string, c ManifestCase, gt GroundTruthCase) (s
 		if hasRepairErrors(diagnostics) || manifest.Rollback.Strategy != "snapshot" || !manifest.Rollback.SnapshotRequired {
 			return ResultCannotProve, inputKind, []string{"repair:not-replayable-or-missing-snapshot"}, map[string]string{"repair_manifest": canonical.Hash(manifest)}, nil
 		}
-		solverReport := solver.Analyze(manifest, demo.BillingStore(), nil)
+		store, err := benchmarkRepairStore(baseDir, c)
+		if err != nil {
+			return "", inputKind, nil, nil, err
+		}
+		spec, err := benchmarkInvariantSpec(baseDir, c)
+		if err != nil {
+			return "", inputKind, nil, nil, err
+		}
+		replayReport, err := replay.DryRun(manifest, nil, store)
+		if err != nil {
+			return ResultCannotProve, inputKind, []string{"repair:dry-run-failed=" + err.Error()}, map[string]string{"repair_manifest": canonical.Hash(manifest)}, nil
+		}
+		solverReport := solver.Analyze(manifest, store, spec)
 		actual := ResultVerified
 		signals := []string{
+			fmt.Sprintf("dry-run-operations=%d", len(replayReport.Operations)),
+			fmt.Sprintf("dry-run-matched-rows=%d", replayMatchedRows(replayReport)),
 			fmt.Sprintf("solver-engine=%s", solverReport.SolverEngine),
 			fmt.Sprintf("solver-checked=%d", solverReport.Summary.Checked),
 			fmt.Sprintf("solver-proved=%d", solverReport.Summary.Proved),
+			fmt.Sprintf("invariant-checks=%d", len(solverReport.InvariantChecks)),
 			fmt.Sprintf("preconditions=%d", len(manifest.Preconditions)),
 			fmt.Sprintf("postconditions=%d", len(manifest.Postconditions)),
 		}
-		return actual, inputKind, signals, map[string]string{"repair_manifest": canonical.Hash(manifest), "solver": solverReport.Hash}, nil
+		return actual, inputKind, signals, map[string]string{
+			"repair_manifest": canonical.Hash(manifest),
+			"repair_replay":   canonical.Hash(replayReport),
+			"solver":          solverReport.Hash,
+			"store":           store.Hash(),
+		}, nil
 	case "regression":
 		inputKind := regressionInputKind(c.Fixture)
 		if guard := phaseInputGuard(inputKind, gt); guard != "" {
@@ -431,6 +452,32 @@ func regressionInputKind(fixture string) string {
 		return "migration_text"
 	}
 	return "prior_archive"
+}
+
+func benchmarkRepairStore(baseDir string, c ManifestCase) (replay.Store, error) {
+	if c.Store == "" {
+		return demo.BillingStore(), nil
+	}
+	return readReplayStore(resolvePath(baseDir, c.Store))
+}
+
+func benchmarkInvariantSpec(baseDir string, c ManifestCase) (*invariant.Spec, error) {
+	if c.Invariants == "" {
+		return nil, nil
+	}
+	spec, err := readInvariantSpec(resolvePath(baseDir, c.Invariants))
+	if err != nil {
+		return nil, err
+	}
+	return &spec, nil
+}
+
+func replayMatchedRows(report replay.Report) int {
+	var total int
+	for _, op := range report.Operations {
+		total += op.MatchedRows
+	}
+	return total
 }
 
 func incidentInputKind(c ManifestCase) string {

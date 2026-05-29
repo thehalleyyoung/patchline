@@ -1,0 +1,21 @@
+{
+  "version": "patchline.artifact-benchmark/v1",
+  "dataset_id": "patchline-semantic-regressions-v1",
+  "description": "Archive-backed recurrence checks that distinguish recurring semantic shape from scoped corrective repairs.",
+  "cases": [
+    {
+      "case_id": "billing-semantic-regression",
+      "case_type": "regression",
+      "available_at": "archive_only",
+      "fixture": "../../examples/archive/bad-migration-corpus.json",
+      "ground_truth": "../ground_truth/regressions/billing-semantic-regression.json"
+    },
+    {
+      "case_id": "billing-corrective-repair-nonrecurrence",
+      "case_type": "regression",
+      "available_at": "archive_only",
+      "fixture": "../../demos/billing/migrations/003_corrective_repair.sql",
+      "ground_truth": "../ground_truth/regressions/billing-corrective-repair-nonrecurrence.json"
+    }
+  ]
+}

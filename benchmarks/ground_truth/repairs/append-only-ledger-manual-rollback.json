@@ -1,0 +1,18 @@
+{
+  "case_id": "append-only-ledger-manual-rollback",
+  "case_type": "repair",
+  "phase": "during_repair",
+  "labels": {
+    "expected_result": "cannot_prove",
+    "risk": "medium"
+  },
+  "evidence": [
+    {
+      "kind": "file",
+      "locator": "examples/repairs/repair-append-only-ledger.json",
+      "rationale": "The repair uses append-only compensating events but declares manual rollback without a required snapshot, so Patchline should surface an explicit proof/replay boundary instead of manufacturing a verification claim."
+    }
+  ],
+  "allowed_inputs": ["repair_plan", "bounded_store"],
+  "excluded_inputs": ["snapshot_rollback", "private_production_data"]
+}

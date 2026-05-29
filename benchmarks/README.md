@@ -36,9 +36,18 @@ The target writes generated reports to `results/generated/artifact-benchmark/` a
 ```text
 benchmarks/expected/smoke-report.json
 benchmarks/expected/negative-report.json
+benchmarks/expected/repair-cases-report.json
+benchmarks/expected/semantic-regressions-report.json
 ```
 
-The runner is phase-aware. It validates that each manifest case points to matching ground truth, enforces `allowed_inputs` and `excluded_inputs`, predicts from committed fixtures or explicit inline fixtures, and only then compares the result with the expected label. This keeps pre-deploy cases from using postmortem-only facts.
+The runner is phase-aware. It validates that each manifest case points to matching ground truth, enforces `allowed_inputs` and `excluded_inputs`, predicts from committed fixtures or explicit inline fixtures, and only then compares the result with the expected label. This keeps pre-deploy cases from using postmortem-only facts. Repair cases may also declare explicit bounded stores and invariant specs, which makes replay hashes, solver hashes, and invariant counts part of the benchmark result instead of hidden defaults.
+
+The offline compare target now covers:
+
+- `manifests/smoke.json` for a compact end-to-end artifact path;
+- `manifests/negative.json` for unsupported/insufficient/phase-boundary controls;
+- `manifests/repair_cases.json` for during-repair replay and proof checks;
+- `manifests/semantic_regressions.json` for archive-only recurrence and non-recurrence checks.
 
 Run the pinned public migration corpus with:
 
@@ -62,7 +71,7 @@ Expected reports are intentionally not refreshed by the compare target. After a 
 make artifact-benchmark-refresh
 ```
 
-That target rewrites the committed golden JSON/Markdown reports, including the public migration and public incident reports, and then runs the normal compare paths against the refreshed files.
+That target rewrites the committed golden JSON/Markdown reports, including repair, regression, public migration, and public incident reports, and then runs the normal compare paths against the refreshed files.
 
 ## Executable study outputs
 
@@ -96,8 +105,8 @@ The planned full benchmark families are:
 
 - public OSS migrations (currently five pinned Bytebase migrations);
 - public historical incidents (currently GitLab 2017 and GitHub 2018 source-observation cases plus an insufficient-evidence boundary);
-- repair/replay cases;
-- semantic regression archives;
+- repair/replay cases (currently three committed during-repair cases);
+- semantic regression archives (currently one recurrence and one non-recurrence case);
 - negative/limitation cases.
 
 Each case must have a ground-truth JSON file with source, phase, allowed inputs, excluded inputs, expected result, and evidence rationale.

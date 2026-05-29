@@ -7,18 +7,18 @@ This plan turns the ICSE-style review critique into an implementation roadmap fo
 Patchline now has the artifact-review scaffold and several executable evaluator paths in place:
 
 - `README.md`, `ARTIFACT.md`, `docs/paper-claim.md`, `docs/semantic-core.md`, `docs/semantic-pipeline.md`, and `docs/literature-positioning.md` frame the repository around the historical repair-semantics artifact claim.
-- `benchmarks/LABELING.md`, `benchmarks/manifests/smoke.json`, `benchmarks/manifests/negative.json`, `benchmarks/manifests/public_migrations.json`, `benchmarks/manifests/public_incidents.json`, and `benchmarks/ground_truth/**` provide phase-aware, source-grounded labels.
+- `benchmarks/LABELING.md`, `benchmarks/manifests/smoke.json`, `benchmarks/manifests/negative.json`, `benchmarks/manifests/repair_cases.json`, `benchmarks/manifests/semantic_regressions.json`, `benchmarks/manifests/public_migrations.json`, `benchmarks/manifests/public_incidents.json`, and `benchmarks/ground_truth/**` provide phase-aware, source-grounded labels.
 - `patchline artifact-ground-truth`, `artifact-baselines`, `artifact-ablations`, `artifact-scale`, `artifact-study summarize/compare`, and `artifact-benchmark validate/run/compare` are implemented.
 - `make artifact-studies` remains the offline strict-corpus study generation path, while `make artifact-studies-compare` checks those generated reports against committed expected hashes in `benchmarks/expected/studies-strict.json`.
 - `make artifact-studies-public` repeats baseline/ablation/scale reports on the pinned public Bytebase migration corpus, while `make artifact-studies-public-compare` checks them against `benchmarks/expected/studies-public-migrations.json`.
-- `make artifact-benchmark-compare` executes smoke and negative manifests, writes deterministic reports under `results/generated/artifact-benchmark/`, and compares them against committed golden reports in `benchmarks/expected/`.
+- `make artifact-benchmark-compare` executes smoke, negative, repair/replay, and semantic-regression manifests, writes deterministic reports under `results/generated/artifact-benchmark/`, and compares them against committed golden reports in `benchmarks/expected/`.
 - `make artifact-benchmark-public` fetches five pinned Bytebase migrations, verifies source hashes, runs the legacy benchmark-suite label/hash check, and compares the phase-aware artifact benchmark to a committed golden report.
 - `make artifact-benchmark-public-incidents` runs an offline public-incident corpus over GitLab 2017 and GitHub 2018 source-derived observations plus a too-thin-public-summary boundary, comparing against a committed golden report.
 - `make artifact-benchmark-refresh` and `make artifact-studies-refresh` are the explicit maintainer paths for regenerating committed golden reports/manifests after deliberate semantic changes.
 - `make artifact-full && make verify-usefulness` has passed after the executable benchmark runner, golden-refresh workflow, and public migration corpus were added.
 - `100_STEPS.md`, `PLAN.md`, and `NEW_PLAN.md` are untracked/ignored; this file remains the tracked implementation roadmap.
 
-The latest refinement makes artifact studies drift-detecting: Patchline now compares generated baseline, ablation, and scale report hashes against committed expected manifests while ignoring local timing noise in scale JSON. The next large step should expand the public corpora and add public cases that include repair/archive inputs, rather than adding isolated demos.
+The latest refinement expands the phase-aware benchmark protocol beyond migration/incident smoke cases: repair cases can now declare explicit bounded stores and invariant specs, and the default offline benchmark compare includes dedicated repair/replay and semantic-regression manifests with golden reports. The next large step should expand the public corpora and add public cases that include repair/archive inputs from external sources, rather than adding isolated demos.
 
 ## 0. Target Artifact Claim
 
@@ -50,15 +50,15 @@ Patchline should not claim to automatically understand arbitrary production syst
 | Reviewer concern | Current risk | Required repo response | Done when |
 | --- | --- | --- | --- |
 | Single artifact claim | Repo feels broad: provenance, replay, repair, solver, archive, policy, CI, benchmarking | Make all README, docs, examples, and commands converge on the historical repair semantics claim | README, `ARTIFACT.md`, and `docs/paper-claim.md` all state the same claim and map commands to it |
-| Real benchmark suite | Smoke/negative manifests plus first public migration/incident corpora are executable; corpus size is still small | Expand public benchmark datasets with machine-readable manifests, labels, expected outputs, and scale summaries | `make artifact-benchmark-public`, `make artifact-benchmark-public-incidents`, and `make artifact-studies-public` cover public corpora |
+| Real benchmark suite | Smoke/negative/repair/regression manifests plus first public migration/incident corpora are executable; corpus size is still small | Expand public benchmark datasets with machine-readable manifests, labels, expected outputs, and scale summaries | `make artifact-benchmark-compare`, `make artifact-benchmark-public`, `make artifact-benchmark-public-incidents`, and `make artifact-studies-public` cover current corpora |
 | Ground truth | Core protocol exists and validates | Store labels, evidence URLs, source snippets/hashes, labeling rules, and expected classifications | Every benchmark case has `ground_truth/*.json` with label provenance |
 | Baselines | DDL-grep, normalized SQL-rule, and effects-without-evidence baselines run on strict and public migration corpora with expected-hash drift checks | Add larger public corpus coverage | `make artifact-studies-compare` and `make artifact-studies-public-compare` emit and verify comparative tables |
-| Ablations | Strict and public migration study targets exist with expected-hash drift checks; public corpus intentionally measures only migration detection/actionability unless inputs declare proof/archive links | Add public cases with repair/archive inputs | `make artifact-studies-compare` and `make artifact-studies-public-compare` show added signal/actionability per component |
+| Ablations | Strict and public migration study targets exist with expected-hash drift checks; public corpus intentionally measures only migration detection/actionability unless inputs declare proof/archive links | Add public cases with repair/archive inputs | `make artifact-studies-compare`, `make artifact-studies-public-compare`, and `make artifact-benchmark-compare` show added signal/actionability per component |
 | Time realism | Phase-aware ground truth and benchmark runner enforce input availability | Add `available_at` phase annotations and enforce phase-limited evaluation | Pre-deploy claims only consume pre-deploy evidence |
 | Packaging | Docker/devcontainer, smoke/full targets, and artifact docs exist | Add Docker/devcontainer, `ARTIFACT.md`, smoke/full targets, cached data option | Fresh checkout can run smoke path under 5 minutes |
 | Scale | `artifact-scale` and `artifact-scale-public` emit corpus measurements; corpus size is still small | Add larger corpus-scale benchmark and report runtime/memory/query latency | study targets emit benchmark JSON and Markdown tables for strict and public corpora |
 | Trusted semantic core | `docs/semantic-core.md` exists and is linked from README | Define a small explicit core model and connect it to code and CLI commands | `docs/semantic-core.md` maps model terms to implementation files and tests |
-| Negative cases | Five executable negative controls are in the benchmark path | Add unsupported/ambiguous cases and explicit failure modes | `make artifact-negative-cases` and `make artifact-benchmark-compare` show boundary outcomes |
+| Negative cases | Five executable negative controls plus repair/regression boundary cases are in the benchmark path | Add more unsupported/ambiguous public cases and explicit failure modes | `make artifact-negative-cases` and `make artifact-benchmark-compare` show boundary outcomes |
 | Literature novelty | `docs/literature-positioning.md` exists | Add literature-positioning doc and paper-intro material | `docs/literature-positioning.md` contrasts Patchline with provenance, migration linting, repair, incident tools |
 | Killer demo | `make artifact-demo` exists; expected-output refresh still manual | Add one end-to-end demo over named public data | `make artifact-demo` emits a paper-ready bundle hash and result summary |
 
@@ -366,8 +366,8 @@ Manifest schema:
 
 ### Current status
 
-- Done: manifest structs, validation, runner, comparison, smoke/negative manifests, `public_migrations.json`, committed golden reports, hash-integrity comparison, `make artifact-benchmark-compare`, `make artifact-benchmark-public`, and `make artifact-benchmark-refresh`.
-- Next: expand from public migrations to `public_incidents.json` with pinned/cacheable public source-derived observations.
+- Done: manifest structs, validation, runner, comparison, smoke/negative/repair/regression manifests, `public_migrations.json`, `public_incidents.json`, committed golden reports, hash-integrity comparison, `make artifact-benchmark-compare`, `make artifact-benchmark-public`, `make artifact-benchmark-public-incidents`, and `make artifact-benchmark-refresh`.
+- Next: expand current public corpora with repair/archive cases derived from public incidents or OSS histories.
 
 ### Acceptance criteria
 
