@@ -14,6 +14,7 @@ echo "network=not-required"
 
 go test ./...
 go run ./cmd/patchline artifact-ground-truth benchmarks --json > "$OUT/artifact-ground-truth.json"
+go run ./cmd/patchline phase-check benchmarks/manifests/smoke.json --json > "$OUT/phase-check-smoke.json"
 bash scripts/validate-ground-truth.sh | tee "$OUT/ground-truth.txt"
 bash scripts/check-artifact-targets.sh | tee "$OUT/commands.txt"
 

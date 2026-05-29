@@ -14,6 +14,7 @@ commands=(
   "semantic-regressions"
   "benchmark-suite"
   "artifact-ground-truth"
+  "phase-check"
   "artifact-baselines"
   "artifact-ablations"
   "artifact-scale"

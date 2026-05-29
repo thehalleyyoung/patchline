@@ -1,4 +1,4 @@
-.PHONY: build test demo gate fmt public-corpus verify-usefulness artifact-smoke artifact-demo artifact-ground-truth-check artifact-baselines artifact-ablations artifact-scale artifact-studies artifact-studies-expected artifact-studies-compare artifact-studies-refresh artifact-baselines-public artifact-ablations-public artifact-scale-public artifact-studies-public artifact-studies-public-expected artifact-studies-public-compare artifact-studies-all artifact-tables artifact-benchmark artifact-benchmark-repairs artifact-benchmark-regressions artifact-benchmark-public artifact-benchmark-public-incidents artifact-benchmark-public-repairs artifact-benchmark-public-archive artifact-benchmark-refresh artifact-benchmark-compare artifact-negative-cases artifact-full artifact-clean
+.PHONY: build test demo gate fmt public-corpus verify-usefulness artifact-smoke artifact-demo artifact-ground-truth-check phase-check artifact-baselines artifact-ablations artifact-scale artifact-studies artifact-studies-expected artifact-studies-compare artifact-studies-refresh artifact-baselines-public artifact-ablations-public artifact-scale-public artifact-studies-public artifact-studies-public-expected artifact-studies-public-compare artifact-studies-all artifact-tables artifact-benchmark artifact-benchmark-repairs artifact-benchmark-regressions artifact-benchmark-public artifact-benchmark-public-incidents artifact-benchmark-public-repairs artifact-benchmark-public-archive artifact-benchmark-refresh artifact-benchmark-compare artifact-negative-cases artifact-full artifact-clean
 
 build:
 	go build -o bin/patchline ./cmd/patchline
@@ -35,6 +35,16 @@ artifact-demo:
 artifact-ground-truth-check:
 	go run ./cmd/patchline artifact-ground-truth benchmarks --json
 	bash scripts/validate-ground-truth.sh
+
+phase-check:
+	go run ./cmd/patchline phase-check benchmarks/manifests/smoke.json
+	go run ./cmd/patchline phase-check benchmarks/manifests/negative.json
+	go run ./cmd/patchline phase-check benchmarks/manifests/repair_cases.json
+	go run ./cmd/patchline phase-check benchmarks/manifests/semantic_regressions.json
+	go run ./cmd/patchline phase-check benchmarks/manifests/public_migrations.json
+	go run ./cmd/patchline phase-check benchmarks/manifests/public_incidents.json
+	go run ./cmd/patchline phase-check benchmarks/manifests/public_repairs.json
+	go run ./cmd/patchline phase-check benchmarks/manifests/public_archive.json
 
 artifact-baselines:
 	go run ./cmd/patchline artifact-baselines examples/benchmarks/strict-migration-corpus.json --out results/generated/artifact-studies
@@ -130,7 +140,7 @@ artifact-benchmark-compare: artifact-benchmark artifact-benchmark-repairs artifa
 artifact-negative-cases:
 	bash scripts/artifact_negative_cases.sh
 
-artifact-full: artifact-smoke artifact-demo artifact-studies-compare artifact-tables artifact-benchmark-compare artifact-benchmark-public-incidents artifact-benchmark-public-repairs artifact-benchmark-public-archive artifact-negative-cases verify-usefulness
+artifact-full: artifact-smoke artifact-demo artifact-ground-truth-check phase-check artifact-studies-compare artifact-tables artifact-benchmark-compare artifact-benchmark-public-incidents artifact-benchmark-public-repairs artifact-benchmark-public-archive artifact-negative-cases verify-usefulness
 
 artifact-clean:
 	rm -rf results/generated

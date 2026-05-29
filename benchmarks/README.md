@@ -42,6 +42,14 @@ benchmarks/expected/semantic-regressions-report.json
 
 The runner is phase-aware. It validates that each manifest case points to matching ground truth, checks `available_at` against the ground-truth phase, enforces `allowed_inputs` and `excluded_inputs`, rejects allowed inputs whose earliest availability is after the case phase, predicts from committed fixtures or explicit inline fixtures, and only then compares the result with the expected label. This keeps pre-deploy cases from using postmortem-only facts. Repair cases may also declare explicit bounded stores and invariant specs, which makes replay hashes, solver hashes, and invariant counts part of the benchmark result instead of hidden defaults.
 
+For a direct reviewer check of the no-hindsight contract without running case predictions, use:
+
+```bash
+make phase-check
+```
+
+This runs `patchline phase-check <manifest.json>` over every committed manifest and reports each case's declared phase and fixture input kind before applying the same ground-truth phase/input availability validation used by `artifact-benchmark validate`.
+
 The offline compare target now covers:
 
 - `manifests/smoke.json` for a compact end-to-end artifact path;

@@ -18,7 +18,8 @@ The current reviewer path is intentionally narrow and executable from a fresh ch
 6. Compare study report hashes and executable benchmark-manifest outputs against frozen expected reports.
 7. Optionally fetch pinned public OSS migrations and run the same study and phase-aware benchmark protocols against real migration SQL.
 8. Run an offline public-incident benchmark over source-derived GitLab/GitHub observations and an explicit insufficient-evidence boundary.
-9. Regenerate paper-facing corpus, detection/actionability, ablation, historical-counterfactual, and scale tables from the checked reports.
+9. Run a dedicated phase/input availability check over every benchmark manifest.
+10. Regenerate paper-facing corpus, detection/actionability, ablation, historical-counterfactual, and scale tables from the checked reports.
 
 The smoke path uses only committed fixtures and existing CLI commands. It does not require network access. Public-data targets are explicit and verify pinned hashes before using downloaded files.
 
@@ -64,6 +65,7 @@ It runs:
 
 - `go test ./...`
 - `artifact-ground-truth`
+- `phase-check` on the smoke manifest
 - command-presence checks for the artifact study commands
 - `scripts/validate-ground-truth.sh`
 - `scripts/check-artifact-targets.sh`
@@ -240,9 +242,10 @@ The final summary includes a deterministic `artifact_bundle_hash` computed from 
 
 ```bash
 make artifact-ground-truth-check
+make phase-check
 ```
 
-This validates every file under `benchmarks/ground_truth/` and every manifest under `benchmarks/manifests/`.
+This validates every file under `benchmarks/ground_truth/` and every manifest under `benchmarks/manifests/`. `make phase-check` additionally runs the first-class `patchline phase-check <manifest.json>` reviewer command across every committed manifest and prints each case's declared phase and input kind before failing on any availability violation.
 
 The Make target runs both the first-class Go validator:
 
@@ -278,7 +281,7 @@ These cases are part of the artifact, not merely prose limitations.
 
 ## Relationship to `make verify-usefulness`
 
-`make verify-usefulness` remains the broader project validation target. It includes network-backed public corpus fetching and source checks. `make artifact-smoke` is the artifact-review entry point: it is smaller, committed-fixture-only, and intended to be stable without network access. `make artifact-studies-compare` is the offline evaluator-facing measurement and drift-check entry point for current baseline/ablation/scale evidence, `make artifact-studies-public-compare` is the explicit public-data study drift check, `make artifact-tables` is the paper-facing table regeneration path, `make artifact-benchmark-compare` is the offline golden-output check for the executable manifest protocol, `make artifact-benchmark-public` is the explicit public-data benchmark check, `make artifact-benchmark-public-incidents`, `make artifact-benchmark-public-repairs`, and `make artifact-benchmark-public-archive` are offline public-source-derived checks, and the refresh targets are maintainer paths for rewriting expected outputs after intentional semantic changes.
+`make verify-usefulness` remains the broader project validation target. It includes network-backed public corpus fetching and source checks. `make artifact-smoke` is the artifact-review entry point: it is smaller, committed-fixture-only, and intended to be stable without network access. `make phase-check` is the direct no-hindsight-leakage command path over committed manifests. `make artifact-studies-compare` is the offline evaluator-facing measurement and drift-check entry point for current baseline/ablation/scale evidence, `make artifact-studies-public-compare` is the explicit public-data study drift check, `make artifact-tables` is the paper-facing table regeneration path, `make artifact-benchmark-compare` is the offline golden-output check for the executable manifest protocol, `make artifact-benchmark-public` is the explicit public-data benchmark check, `make artifact-benchmark-public-incidents`, `make artifact-benchmark-public-repairs`, and `make artifact-benchmark-public-archive` are offline public-source-derived checks, and the refresh targets are maintainer paths for rewriting expected outputs after intentional semantic changes.
 
 ## Data provenance
 

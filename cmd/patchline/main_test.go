@@ -3,6 +3,8 @@ package main
 import (
 	"errors"
 	"testing"
+
+	"github.com/thehalleyyoung/patchline/internal/artifact"
 )
 
 func TestExitCodeDefaultsToUsageOrGenericFailure(t *testing.T) {
@@ -22,5 +24,51 @@ func TestParseGateOptionsRejectsInvalidThresholds(t *testing.T) {
 	_, err := parseGateOptions([]string{"--min-precision", "1.5"})
 	if err == nil {
 		t.Fatal("expected invalid threshold error")
+	}
+}
+
+func TestPhaseCheckInputKindResolvesImplicitInputs(t *testing.T) {
+	tests := []struct {
+		name string
+		c    artifact.ManifestCase
+		want string
+	}{
+		{
+			name: "migration",
+			c:    artifact.ManifestCase{CaseType: "migration"},
+			want: "migration_text",
+		},
+		{
+			name: "incident override",
+			c:    artifact.ManifestCase{CaseType: "incident", InputKind: "source_observations"},
+			want: "source_observations",
+		},
+		{
+			name: "inline postmortem",
+			c:    artifact.ManifestCase{CaseType: "incident", Fixture: "inline:phase-guard"},
+			want: "postmortem_text",
+		},
+		{
+			name: "repair",
+			c:    artifact.ManifestCase{CaseType: "repair"},
+			want: "repair_plan",
+		},
+		{
+			name: "archive regression",
+			c:    artifact.ManifestCase{CaseType: "regression", Fixture: "archive.json"},
+			want: "prior_archive",
+		},
+		{
+			name: "migration regression",
+			c:    artifact.ManifestCase{CaseType: "regression", Fixture: "fix.sql"},
+			want: "migration_text",
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := phaseCheckInputKind(tt.c); got != tt.want {
+				t.Fatalf("phaseCheckInputKind() = %q, want %q", got, tt.want)
+			}
+		})
 	}
 }

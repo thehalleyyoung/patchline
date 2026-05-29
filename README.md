@@ -18,6 +18,7 @@ Patchline now has a reviewer-oriented artifact path in addition to its broader u
 make artifact-smoke
 make artifact-demo
 make artifact-ground-truth-check
+make phase-check
 make artifact-studies-compare
 make artifact-studies-public-compare
 make artifact-tables
@@ -37,7 +38,9 @@ Start with [`ARTIFACT.md`](ARTIFACT.md) for the quick evaluator path, [`docs/pap
 
 `make artifact-tables` emits paper-facing summaries under `results/generated/artifact-tables/summary.{json,md}`. The generator derives five deterministic ICSE-style tables from the checked benchmark reports and study specs: executable corpora, detection/actionability, semantic-evidence ablation, historical public-derived counterfactuals, and scale. It keeps the public-postmortem-derived boundary explicit and excludes machine-dependent timing from stable table claims.
 
-`make artifact-benchmark-compare` runs the committed smoke, negative, repair, and regression benchmark manifests, emits deterministic reports under `results/generated/artifact-benchmark/`, and compares them against frozen expected outputs in `benchmarks/expected/`. This is the no-hindsight-leakage path: ground-truth labels validate the manifest and compare the final answer, while prediction uses only the fixture input kinds allowed for the case phase.
+`make phase-check` runs the reviewer-facing `patchline phase-check` command over every committed benchmark manifest, printing each case's declared phase/input kind and failing on any phase/input availability violation. This is the quick no-hindsight-leakage check; it uses the same validation rules as the benchmark runner without executing predictions.
+
+`make artifact-benchmark-compare` runs the committed smoke, negative, repair, and regression benchmark manifests, emits deterministic reports under `results/generated/artifact-benchmark/`, and compares them against frozen expected outputs in `benchmarks/expected/`. Ground-truth labels validate the manifest and compare the final answer, while prediction uses only the fixture input kinds allowed for the case phase.
 
 The offline benchmark compare path now includes focused repair and regression datasets in addition to smoke and negative controls. `benchmarks/manifests/repair_cases.json` checks during-repair artifacts with explicit repair plans, bounded stores, invariants, replay hashes, solver hashes, and a manual-rollback boundary. `benchmarks/manifests/semantic_regressions.json` checks archive-only recurrence detection and a scoped corrective non-recurrence case.
 
@@ -69,6 +72,7 @@ Evidence -> Trace -> Transition -> Repair -> Proof -> Replay -> Archive -> Regre
 | Regression | `semantic-regressions` | recurrence relations and invariants | detects repeated semantic failure shapes |
 | Artifact studies | `artifact-baselines`, `artifact-ablations`, `artifact-scale`, `artifact-study compare` | baseline, ablation, scale, and expected-hash reports | shows and drift-checks what each semantic layer contributes right now |
 | Paper tables | `artifact-tables` | five deterministic ICSE-style result tables | turns checked reports into reviewer-facing corpus, detection, ablation, historical, and scale summaries |
+| Phase check | `phase-check` | per-manifest phase/input availability report | makes no-hindsight leakage a first-class reviewer command |
 | Artifact benchmark | `artifact-benchmark validate/run/compare` | phase-aware migration, incident, public-derived repair, paired public-archive, and regression reports with golden comparisons | verifies current usefulness against committed and pinned-public ground truth without label leakage |
 
 ## Verify the current usefulness claim

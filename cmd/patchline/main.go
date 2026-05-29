@@ -305,6 +305,11 @@ func run(args []string) error {
 			root = args[1]
 		}
 		return artifactGroundTruth(root, hasFlag(args[1:], "--json"))
+	case "phase-check":
+		if len(args) < 2 {
+			return errors.New("usage: patchline phase-check <manifest.json> [--json]")
+		}
+		return phaseCheck(args[1], hasFlag(args[2:], "--json"))
 	case "artifact-baselines":
 		if len(args) < 2 {
 			return errors.New("usage: patchline artifact-baselines <suite.json> [--out dir] [--json]")
@@ -421,6 +426,7 @@ Usage:
   patchline export-bundle <reproduce.json> <policy.json> <migration.sql> [--json]
   patchline benchmark-suite <suite.json> [--json]
   patchline artifact-ground-truth [benchmarks-dir] [--json]
+  patchline phase-check <manifest.json> [--json]
   patchline artifact-baselines <suite.json> [--out dir] [--json]
   patchline artifact-ablations <suite.json> [--out dir] [--json]
   patchline artifact-scale <suite.json> [--out dir] [--json]
@@ -3599,6 +3605,81 @@ func artifactScale(path string, outPath string, jsonOut bool) error {
 	}
 	fmt.Printf("artifact scale suite=%s hash=%s cases=%d statements=%d bytes=%d analyze_ms=%d\n", report.Suite, report.Hash, report.Totals.Cases, report.Totals.Statements, report.Totals.Bytes, report.Totals.AnalyzeMillis)
 	return nil
+}
+
+func phaseCheck(path string, jsonOut bool) error {
+	report, err := artifact.ValidateBenchmarkManifest(path)
+	if err != nil {
+		return err
+	}
+	manifest, err := readPhaseCheckManifest(path)
+	if err != nil {
+		return err
+	}
+	if jsonOut {
+		if err := writeJSON(os.Stdout, report); err != nil {
+			return err
+		}
+	} else {
+		fmt.Printf("phase check manifest=%s ok=%t cases=%d ground_truth_files=%d errors=%d\n", path, report.OK, len(manifest.Cases), report.GroundTruthFiles, len(report.Errors))
+		caseErrors := map[string]int{}
+		for _, validationErr := range report.Errors {
+			caseErrors[validationErr.CaseID]++
+		}
+		for _, c := range manifest.Cases {
+			fmt.Printf("  case=%s phase=%s input_kind=%s errors=%d\n", c.CaseID, c.AvailableAt, phaseCheckInputKind(c), caseErrors[c.CaseID])
+		}
+		for _, validationErr := range report.Errors {
+			fmt.Printf("  error case=%s file=%s message=%s\n", validationErr.CaseID, validationErr.File, validationErr.Message)
+		}
+	}
+	if !report.OK {
+		return errors.New("phase check failed")
+	}
+	return nil
+}
+
+func readPhaseCheckManifest(path string) (artifact.Manifest, error) {
+	f, err := os.Open(path)
+	if err != nil {
+		return artifact.Manifest{}, err
+	}
+	defer f.Close()
+	var manifest artifact.Manifest
+	if err := json.NewDecoder(f).Decode(&manifest); err != nil {
+		return artifact.Manifest{}, err
+	}
+	return manifest, nil
+}
+
+func phaseCheckInputKind(c artifact.ManifestCase) string {
+	if c.InputKind != "" {
+		return c.InputKind
+	}
+	if fixture, ok := phaseCheckInlineInputKinds[c.Fixture]; ok {
+		return fixture
+	}
+	switch c.CaseType {
+	case "migration":
+		return "migration_text"
+	case "incident":
+		return "evidence_jsonl"
+	case "repair":
+		return "repair_plan"
+	case "regression":
+		if strings.HasSuffix(c.Fixture, ".sql") {
+			return "migration_text"
+		}
+		return "prior_archive"
+	default:
+		return "unknown"
+	}
+}
+
+var phaseCheckInlineInputKinds = map[string]string{
+	"inline:procedural-sql":          "migration_text",
+	"inline:public-summary-too-thin": "postmortem_text",
+	"inline:phase-guard":             "postmortem_text",
 }
 
 func artifactBenchmark(args []string) error {
