@@ -1,0 +1,35 @@
+{
+  "version": "patchline.artifact-benchmark/v1",
+  "dataset_id": "patchline-smoke-v1",
+  "description": "Committed smoke cases for artifact review without network access.",
+  "cases": [
+    {
+      "case_id": "billing-bad-backfill-migration",
+      "case_type": "migration",
+      "available_at": "pre_deploy",
+      "fixture": "../../demos/billing/migrations/002_bad_backfill.sql",
+      "ground_truth": "../ground_truth/migrations/billing-bad-backfill.json"
+    },
+    {
+      "case_id": "gitlab-2017-destructive-primary-data",
+      "case_type": "incident",
+      "available_at": "postmortem",
+      "fixture": "../../examples/historical-failures/gitlab-2017/evidence.jsonl",
+      "ground_truth": "../ground_truth/incidents/gitlab-2017-destructive-primary-data.json"
+    },
+    {
+      "case_id": "billing-repair-replay",
+      "case_type": "repair",
+      "available_at": "during_repair",
+      "fixture": "../../examples/repairs/repair-bad-invoice-backfill.json",
+      "ground_truth": "../ground_truth/repairs/billing-repair-replay.json"
+    },
+    {
+      "case_id": "billing-semantic-regression",
+      "case_type": "regression",
+      "available_at": "archive_only",
+      "fixture": "../../examples/archive/bad-migration-corpus.json",
+      "ground_truth": "../ground_truth/regressions/billing-semantic-regression.json"
+    }
+  ]
+}

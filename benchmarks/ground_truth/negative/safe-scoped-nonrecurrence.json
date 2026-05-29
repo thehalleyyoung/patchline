@@ -1,0 +1,18 @@
+{
+  "case_id": "safe-scoped-nonrecurrence",
+  "case_type": "regression",
+  "phase": "archive_only",
+  "labels": {
+    "expected_result": "pass",
+    "risk": "low"
+  },
+  "evidence": [
+    {
+      "kind": "file",
+      "locator": "demos/billing/migrations/003_corrective_repair.sql",
+      "rationale": "A scoped corrective transition should be representable as a non-recurrence case once the full benchmark runner lands."
+    }
+  ],
+  "allowed_inputs": ["migration_text", "prior_archive"],
+  "excluded_inputs": ["postmortem_text"]
+}

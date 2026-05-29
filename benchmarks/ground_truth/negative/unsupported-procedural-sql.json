@@ -1,0 +1,18 @@
+{
+  "case_id": "unsupported-procedural-sql",
+  "case_type": "migration",
+  "phase": "pre_deploy",
+  "labels": {
+    "expected_result": "unsupported_fragment",
+    "risk": "unknown"
+  },
+  "evidence": [
+    {
+      "kind": "fixture",
+      "locator": "inline:procedural-sql",
+      "rationale": "A dialect-specific procedural migration outside the current relational fragment should be reported as unsupported rather than proved safe."
+    }
+  ],
+  "allowed_inputs": ["migration_text"],
+  "excluded_inputs": ["postmortem_text"]
+}

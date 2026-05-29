@@ -1,0 +1,7 @@
+.git
+bin
+dist
+coverage.out
+results/generated
+examples/public-corpus/downloads
+*.tmp

@@ -1,0 +1,16 @@
+{
+  "name": "Patchline Artifact",
+  "build": {
+    "dockerfile": "../Dockerfile",
+    "context": ".."
+  },
+  "customizations": {
+    "vscode": {
+      "extensions": [
+        "golang.go"
+      ]
+    }
+  },
+  "postCreateCommand": "make artifact-ground-truth-check",
+  "remoteUser": "root"
+}

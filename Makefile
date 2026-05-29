@@ -1,4 +1,4 @@
-.PHONY: build test demo gate fmt public-corpus verify-usefulness
+.PHONY: build test demo gate fmt public-corpus verify-usefulness artifact-smoke artifact-demo artifact-ground-truth-check artifact-negative-cases artifact-full artifact-clean
 
 build:
 	go build -o bin/patchline ./cmd/patchline
@@ -25,6 +25,24 @@ verify-usefulness: test gate public-corpus
 	go run ./cmd/patchline semantic-regressions examples/archive/bad-migration-corpus.json --json
 	go run ./cmd/patchline historical-failures examples/historical-failures/suite.json --json
 	bash scripts/verify-historical-sources.sh examples/historical-failures/suite.json
+
+artifact-smoke:
+	bash scripts/artifact_smoke.sh
+
+artifact-demo:
+	bash scripts/artifact_demo.sh
+
+artifact-ground-truth-check:
+	go run ./cmd/patchline artifact-ground-truth benchmarks --json
+	bash scripts/validate-ground-truth.sh
+
+artifact-negative-cases:
+	bash scripts/artifact_negative_cases.sh
+
+artifact-full: artifact-smoke artifact-demo artifact-negative-cases verify-usefulness
+
+artifact-clean:
+	rm -rf results/generated
 
 fmt:
 	gofmt -w cmd internal

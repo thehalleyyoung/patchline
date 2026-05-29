@@ -1,0 +1,25 @@
+{
+  "case_id": "billing-bad-backfill-migration",
+  "case_type": "migration",
+  "phase": "pre_deploy",
+  "labels": {
+    "expected_result": "flag",
+    "risk": "high",
+    "broad_update": true,
+    "destructive": false
+  },
+  "evidence": [
+    {
+      "kind": "file",
+      "locator": "demos/billing/migrations/002_bad_backfill.sql",
+      "rationale": "Committed fixture contains the unsafe invoice backfill used throughout the artifact smoke path."
+    },
+    {
+      "kind": "rule",
+      "locator": "migration-analysis:broad-update",
+      "rationale": "Pre-deploy migration text is sufficient to require review before execution."
+    }
+  ],
+  "allowed_inputs": ["migration_text", "schema", "policy", "prior_archive"],
+  "excluded_inputs": ["postmortem_text"]
+}

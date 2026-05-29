@@ -1,0 +1,18 @@
+{
+  "case_id": "insufficient-public-incident-evidence",
+  "case_type": "incident",
+  "phase": "postmortem",
+  "labels": {
+    "expected_result": "insufficient_evidence",
+    "risk": "unknown"
+  },
+  "evidence": [
+    {
+      "kind": "fixture",
+      "locator": "inline:public-summary-too-thin",
+      "rationale": "A public incident summary that lacks transition details should not support a stronger counterfactual claim."
+    }
+  ],
+  "allowed_inputs": ["postmortem_text"],
+  "excluded_inputs": ["private_production_data", "unstated_transition"]
+}

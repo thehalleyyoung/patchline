@@ -1,0 +1,23 @@
+{
+  "case_id": "billing-semantic-regression",
+  "case_type": "regression",
+  "phase": "archive_only",
+  "labels": {
+    "expected_result": "flag",
+    "risk": "high",
+    "expected_relations": [
+      "same_semantic_shape",
+      "shared_high_risk_table",
+      "damaged_derived_report_recurrence"
+    ]
+  },
+  "evidence": [
+    {
+      "kind": "archive",
+      "locator": "examples/archive/bad-migration-corpus.json",
+      "rationale": "The archive orders the bad backfill before the corrective repair and exposes recurrence relations over semantic shape, table, and derived report."
+    }
+  ],
+  "allowed_inputs": ["prior_archive", "current_archive_entry"],
+  "excluded_inputs": ["private_production_data"]
+}

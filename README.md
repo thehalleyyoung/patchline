@@ -1,12 +1,44 @@
 # Patchline
 
-Patchline is a deterministic repair-semantics workbench for production data incidents. Its core claim is that an outage, a migration, a row-change stream, a repair script, a backup decision, and a postmortem should not be separate narratives: they should compile into one typed transition system whose claims can be replayed, queried, proved, or refuted.
+Patchline converts historical production data-repair incidents into executable semantic artifacts that can replay repairs, prove scope and frame obligations, and detect recurrence across future migrations.
+
+It is a deterministic repair-semantics workbench for production data incidents. Its core claim is that an outage, a migration, a row-change stream, a repair script, a backup decision, and a postmortem should not be separate narratives: they should compile into one typed transition system whose claims can be replayed, queried, proved, or refuted.
 
 **Artifact-paper motivation.** Modern services routinely repair production state after bad migrations, unsafe deletes, divergent writes, failed backups, and stale derived outputs. The hard part is not writing one cleanup query; it is connecting the operational evidence, code/data transition, intended repair, rollback story, and future recurrence risk into a checkable object. Patchline makes that object explicit: public or local historical records become source-grounded observations; observations become typed traces and causal graphs; repairs become bounded state transformers; safety claims become Z3 obligations, replay hashes, policy decisions, and archive queries.
 
 **Promise today:** given incident evidence, migration SQL, a repair manifest, policy rules, benchmark fixtures, and public historical sources, Patchline reconstructs causal provenance, classifies risky data changes, proves repair scope obligations with Z3, replays the repair over a bounded store, checks invariants/workflow properties, emits signed/hashable artifacts, indexes incidents for recurrence analysis, and validates counterfactual failure-avoidance signals on source-verified public incidents.
 
 **No AI. No guesses.** Patchline is intentionally built from inspectable mechanisms: typed provenance, Z3-backed proof obligations, effect inference, invariant checks, replayable repair manifests, stable canonical output, source-manifest verification, and hash-chained audit records.
+
+## Artifact reviewer path
+
+Patchline now has a reviewer-oriented artifact path in addition to its broader utility validation:
+
+```bash
+make artifact-smoke
+make artifact-demo
+make artifact-ground-truth-check
+make artifact-negative-cases
+```
+
+Start with [`ARTIFACT.md`](ARTIFACT.md) for the quick evaluator path, [`docs/paper-claim.md`](docs/paper-claim.md) for the single paper-facing claim, [`docs/semantic-core.md`](docs/semantic-core.md) for the auditable semantic core, and [`benchmarks/LABELING.md`](benchmarks/LABELING.md) for the phase-aware ground-truth protocol.
+
+The central artifact object is:
+
+```text
+Evidence -> Trace -> Transition -> Repair -> Proof -> Replay -> Archive -> Regression
+```
+
+| Stage | Command | Artifact emitted | Why it matters |
+| --- | --- | --- | --- |
+| Evidence | `historical-failures`, `ingest-evidence`, `extract-sql` | source-grounded facts/events | prevents benchmark claims from floating free of public evidence |
+| Trace | `trace-reconstruct` | projection hash and event ordering | makes incident observations replayable |
+| Transition | `analyze-migration`, `migration-semantics` | migration risk/effect report | catches pre-deploy unsafe transitions |
+| Repair | `repair-semantics`, `dry-run` | repair step trace and row diffs | makes repair behavior executable |
+| Proof | `solver-obligations` | Z3-backed obligations or explicit downgrade | separates solver-backed claims from heuristics |
+| Replay | `repair-outcomes` | verification and rollback history | connects repair execution to archive memory |
+| Archive | `archive-index`, `archive-query` | deterministic incident index | turns incidents into queryable memory |
+| Regression | `semantic-regressions` | recurrence relations and invariants | detects repeated semantic failure shapes |
 
 ## Verify the current usefulness claim
 

@@ -1,0 +1,24 @@
+{
+  "case_id": "billing-repair-replay",
+  "case_type": "repair",
+  "phase": "during_repair",
+  "labels": {
+    "expected_result": "verified",
+    "risk": "medium",
+    "replay_required": true
+  },
+  "evidence": [
+    {
+      "kind": "file",
+      "locator": "examples/repairs/repair-bad-invoice-backfill.json",
+      "rationale": "The repair manifest is the executable repair transformer checked by dry-run, repair semantics, and solver obligations."
+    },
+    {
+      "kind": "file",
+      "locator": "examples/snapshots/billing-bad-migration-before.json",
+      "rationale": "The bounded store gives during-repair state for replay and frame checks."
+    }
+  ],
+  "allowed_inputs": ["repair_plan", "bounded_store", "invariants", "rollback_plan"],
+  "excluded_inputs": ["future_archive_entries"]
+}

@@ -11,6 +11,7 @@ import (
 	"strings"
 
 	"github.com/thehalleyyoung/patchline/internal/archive"
+	"github.com/thehalleyyoung/patchline/internal/artifact"
 	"github.com/thehalleyyoung/patchline/internal/attest"
 	"github.com/thehalleyyoung/patchline/internal/bench"
 	"github.com/thehalleyyoung/patchline/internal/bundle"
@@ -298,6 +299,12 @@ func run(args []string) error {
 			return errors.New("usage: patchline benchmark-suite <suite.json> [--json]")
 		}
 		return benchmarkSuite(args[1], hasFlag(args[2:], "--json"))
+	case "artifact-ground-truth":
+		root := "benchmarks"
+		if len(args) >= 2 && !strings.HasPrefix(args[1], "--") {
+			root = args[1]
+		}
+		return artifactGroundTruth(root, hasFlag(args[1:], "--json"))
 	case "ingest-evidence":
 		if len(args) < 2 {
 			return errors.New("usage: patchline ingest-evidence <events.jsonl> [--json] [--out graph.json]")
@@ -383,6 +390,7 @@ Usage:
   patchline evaluate-policy <policy.json> <repair.json> <migration.sql> [--json]
   patchline export-bundle <reproduce.json> <policy.json> <migration.sql> [--json]
   patchline benchmark-suite <suite.json> [--json]
+  patchline artifact-ground-truth [benchmarks-dir] [--json]
   patchline ingest-evidence <events.jsonl> [--json] [--out graph.json]
   patchline adapt-evidence <otlp|datadog|postgres|github|migration-runner> <input.json> [--json] [--out events.jsonl]
   patchline ci-gate <suite.json> [--min-precision 0.95] [--min-recall 0.95] [--json]
@@ -3417,6 +3425,24 @@ func benchmarkSuite(path string, jsonOut bool) error {
 	}
 	if !result.OK {
 		return errors.New("benchmark suite failed")
+	}
+	return nil
+}
+
+func artifactGroundTruth(root string, jsonOut bool) error {
+	report, err := artifact.ValidateGroundTruth(root)
+	if err != nil {
+		return err
+	}
+	if jsonOut {
+		return writeJSON(os.Stdout, report)
+	}
+	fmt.Printf("artifact_ground_truth ok=%t files=%d manifests=%d\n", report.OK, report.GroundTruthFiles, report.Manifests)
+	if len(report.Errors) > 0 {
+		for _, validationErr := range report.Errors {
+			fmt.Printf("  %s case=%s error=%s\n", validationErr.File, validationErr.CaseID, validationErr.Message)
+		}
+		return fmt.Errorf("artifact ground truth validation failed with %d error(s)", len(report.Errors))
 	}
 	return nil
 }

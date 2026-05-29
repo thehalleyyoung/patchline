@@ -1,0 +1,42 @@
+{
+  "version": "patchline.artifact-benchmark/v1",
+  "dataset_id": "patchline-negative-v1",
+  "description": "Committed limitation cases used by artifact-negative-cases.",
+  "cases": [
+    {
+      "case_id": "unsupported-procedural-sql",
+      "case_type": "migration",
+      "available_at": "pre_deploy",
+      "fixture": "inline:procedural-sql",
+      "ground_truth": "../ground_truth/negative/unsupported-procedural-sql.json"
+    },
+    {
+      "case_id": "insufficient-public-incident-evidence",
+      "case_type": "incident",
+      "available_at": "postmortem",
+      "fixture": "inline:public-summary-too-thin",
+      "ground_truth": "../ground_truth/negative/insufficient-public-incident-evidence.json"
+    },
+    {
+      "case_id": "predeploy-postmortem-leakage",
+      "case_type": "incident",
+      "available_at": "pre_deploy",
+      "fixture": "inline:phase-guard",
+      "ground_truth": "../ground_truth/negative/predeploy-postmortem-leakage.json"
+    },
+    {
+      "case_id": "non-replayable-missing-backup",
+      "case_type": "repair",
+      "available_at": "during_repair",
+      "fixture": "../../examples/historical-failures/gitlab-2017/no-snapshot-repair.json",
+      "ground_truth": "../ground_truth/negative/non-replayable-missing-backup.json"
+    },
+    {
+      "case_id": "safe-scoped-nonrecurrence",
+      "case_type": "regression",
+      "available_at": "archive_only",
+      "fixture": "../../demos/billing/migrations/003_corrective_repair.sql",
+      "ground_truth": "../ground_truth/negative/safe-scoped-nonrecurrence.json"
+    }
+  ]
+}

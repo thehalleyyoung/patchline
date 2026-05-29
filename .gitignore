@@ -3,4 +3,7 @@ bin/
 coverage.out
 dist/
 examples/public-corpus/downloads/
+results/generated/
 *.tmp
+100_STEPS.md
+*PLAN.md

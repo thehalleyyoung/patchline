@@ -1,0 +1,19 @@
+{
+  "case_id": "predeploy-postmortem-leakage",
+  "case_type": "incident",
+  "phase": "pre_deploy",
+  "labels": {
+    "expected_result": "cannot_prove",
+    "risk": "unknown",
+    "phase_guard": true
+  },
+  "evidence": [
+    {
+      "kind": "fixture",
+      "locator": "inline:phase-guard",
+      "rationale": "This case documents that pre-deploy claims must be rejected when they require postmortem-only facts."
+    }
+  ],
+  "allowed_inputs": ["migration_text", "schema", "policy", "prior_archive"],
+  "excluded_inputs": ["postmortem_text", "root_cause_report"]
+}

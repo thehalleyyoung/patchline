@@ -1,0 +1,18 @@
+{
+  "case_id": "non-replayable-missing-backup",
+  "case_type": "repair",
+  "phase": "during_repair",
+  "labels": {
+    "expected_result": "cannot_prove",
+    "risk": "high"
+  },
+  "evidence": [
+    {
+      "kind": "file",
+      "locator": "examples/historical-failures/gitlab-2017/no-snapshot-repair.json",
+      "rationale": "A repair that depends on unavailable snapshot evidence should surface a replay/rollback gap."
+    }
+  ],
+  "allowed_inputs": ["repair_plan", "available_backups", "bounded_store"],
+  "excluded_inputs": ["missing_backup_contents"]
+}
