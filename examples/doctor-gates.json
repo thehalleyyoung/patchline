@@ -1,0 +1,33 @@
+{
+  "version": "patchline.doctor-gates/v1",
+  "gates": [
+    {
+      "id": "forem-doctor",
+      "status": "implemented",
+      "real_repo": "forem/forem",
+      "subpath": "db/migrate",
+      "diagnosis_claim": "doctor preflight reports tool availability, cache state, scanned files, facts, and safe native checks before analysis"
+    },
+    {
+      "id": "bytebase-doctor",
+      "status": "implemented",
+      "real_repo": "bytebase/bytebase",
+      "subpath": "backend/migrator/migration",
+      "diagnosis_claim": "doctor preflight reports tool availability, cache state, scanned files, facts, and safe native checks before analysis"
+    },
+    {
+      "id": "mastodon-doctor",
+      "status": "implemented",
+      "real_repo": "mastodon/mastodon",
+      "subpath": "db/migrate",
+      "diagnosis_claim": "doctor preflight reports tool availability, cache state, scanned files, facts, and safe native checks before analysis"
+    },
+    {
+      "id": "lobsters-doctor",
+      "status": "implemented",
+      "real_repo": "lobsters/lobsters",
+      "subpath": "db/migrate",
+      "diagnosis_claim": "doctor preflight reports tool availability, cache state, scanned files, facts, and safe native checks before analysis"
+    }
+  ]
+}

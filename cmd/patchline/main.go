@@ -7,6 +7,7 @@ import (
 	"flag"
 	"fmt"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"regexp"
 	"sort"
@@ -84,6 +85,8 @@ func run(args []string) error {
 		fmt.Println("RiSE angle: program analysis + verifiable transformations + reproducible repair benchmarks, without AI.")
 	case "intake":
 		return currentIntake(args[1:])
+	case "doctor":
+		return repoDoctor(args[1:])
 	case "repo":
 		return repoCommand(args[1:])
 	case "semantics-contract":
@@ -395,6 +398,8 @@ func usage() {
 
 Usage:
   patchline about
+  patchline doctor [<path>|--github owner/repo] [--ref ref] [--subpath path] [--out dir] [--download-dir dir] [--json]
+  patchline repo doctor [<path>|--github owner/repo] [--ref ref] [--subpath path] [--out dir] [--download-dir dir] [--json]
   patchline repo fetch <owner/repo|github-url|path|archive> [--ref ref] [--subpath path] [--out dir] [--download-dir dir] [--json]
   patchline repo analyze [<path>|--github owner/repo] [--ref ref] [--subpath path] [--stages inventory,baseline,propose,compare,deep] [--proposal-kind tests|guards|instrumentation|repair|all] [--budget files=N,lines=N,tokens=N,changes=N] [--ci] [--redact] [--resume] [--no-llm] [--llm-command cmd] [--prompt-without-facts] [--out dir] [--json]
   patchline repo inventory <path> [--out dir] [--full] [--json]
@@ -490,9 +495,11 @@ Examples:
 
 func repoCommand(args []string) error {
 	if len(args) == 0 {
-		return errors.New("usage: patchline repo <fetch|analyze|inventory|baseline|propose|compare> ...")
+		return errors.New("usage: patchline repo <doctor|fetch|analyze|inventory|baseline|propose|compare> ...")
 	}
 	switch args[0] {
+	case "doctor":
+		return repoDoctor(args[1:])
 	case "fetch":
 		return repoFetch(args[1:])
 	case "analyze":
@@ -566,6 +573,48 @@ type repoAnalyzeDeepSummary struct {
 	Recurrences            int `json:"recurrences"`
 	RepairProofRefuted     int `json:"repair_proof_refuted"`
 	AblationSensitiveRisks int `json:"ablation_sensitive_risks"`
+}
+
+type repoDoctorReport struct {
+	Version      string            `json:"version"`
+	Input        string            `json:"input"`
+	Subpath      string            `json:"subpath,omitempty"`
+	Source       project.Source    `json:"source,omitempty"`
+	ScanRoot     string            `json:"scan_root"`
+	Tools        []repoDoctorTool  `json:"tools"`
+	Cache        repoDoctorCache   `json:"cache"`
+	NativeChecks []project.Command `json:"native_checks,omitempty"`
+	Summary      repoDoctorSummary `json:"summary"`
+	NextCommands []project.Command `json:"next_commands,omitempty"`
+	Hash         string            `json:"hash"`
+	Markdown     string            `json:"markdown,omitempty"`
+}
+
+type repoDoctorTool struct {
+	Name      string `json:"name"`
+	Found     bool   `json:"found"`
+	Path      string `json:"path,omitempty"`
+	Required  bool   `json:"required"`
+	Rationale string `json:"rationale"`
+}
+
+type repoDoctorCache struct {
+	DownloadDir string `json:"download_dir"`
+	Exists      bool   `json:"exists"`
+	CacheHit    bool   `json:"cache_hit,omitempty"`
+	ArchiveHash string `json:"archive_hash,omitempty"`
+	CachePath   string `json:"cache_path,omitempty"`
+}
+
+type repoDoctorSummary struct {
+	FilesScanned          int  `json:"files_scanned"`
+	Facts                 int  `json:"facts"`
+	ToolsFound            int  `json:"tools_found"`
+	ToolsMissing          int  `json:"tools_missing"`
+	RequiredToolsMissing  int  `json:"required_tools_missing"`
+	NativeChecksAvailable int  `json:"native_checks_available"`
+	ReadyForAnalyze       bool `json:"ready_for_analyze"`
+	NetworkFetchUsed      bool `json:"network_fetch_used"`
 }
 
 func repoAnalyze(args []string) error {
@@ -895,6 +944,239 @@ func repoFetch(args []string) error {
 	fmt.Println()
 	fmt.Printf("  source=%s\n", filepath.Join(result.Source.OutDir, "source.json"))
 	return nil
+}
+
+func repoDoctor(args []string) error {
+	fs := flag.NewFlagSet("repo doctor", flag.ContinueOnError)
+	fs.SetOutput(ioDiscard{})
+	githubRepo := fs.String("github", "", "GitHub owner/repo to fetch before diagnosis")
+	ref := fs.String("ref", "", "git ref")
+	subpath := fs.String("subpath", "", "subpath to focus on")
+	outPath := fs.String("out", filepath.Join("results", "generated", "repo-doctor"), "output directory")
+	downloadDir := fs.String("download-dir", "", "download/cache directory")
+	jsonOut := fs.Bool("json", false, "emit JSON")
+	input, flagArgs, err := onePositionalWithFlags(args, map[string]bool{"--json": true})
+	if err != nil {
+		return err
+	}
+	if err := fs.Parse(flagArgs); err != nil {
+		return err
+	}
+	if *githubRepo != "" {
+		input = *githubRepo
+	}
+	if input == "" || fs.NArg() != 0 {
+		return errors.New("usage: patchline repo doctor [<path>|--github owner/repo] [--ref ref] [--subpath path] [--out dir] [--download-dir dir] [--json]")
+	}
+	report, err := buildRepoDoctorReport(input, *githubRepo != "", *ref, *subpath, *outPath, *downloadDir)
+	if err != nil {
+		return err
+	}
+	if *outPath != "" {
+		if err := writeRepoDoctorReport(*outPath, report); err != nil {
+			return err
+		}
+	}
+	if *jsonOut {
+		return writeJSON(os.Stdout, report)
+	}
+	fmt.Printf("repo doctor input=%s files=%d facts=%d tools_found=%d native_checks=%d ready=%t hash=%s\n",
+		report.Input,
+		report.Summary.FilesScanned,
+		report.Summary.Facts,
+		report.Summary.ToolsFound,
+		report.Summary.NativeChecksAvailable,
+		report.Summary.ReadyForAnalyze,
+		report.Hash,
+	)
+	if *outPath != "" {
+		fmt.Printf("  out=%s\n", *outPath)
+	}
+	return nil
+}
+
+func buildRepoDoctorReport(input string, githubInput bool, ref, subpath, outDir, downloadDir string) (repoDoctorReport, error) {
+	report := repoDoctorReport{
+		Version: "patchline.repo-doctor/v1",
+		Input:   input,
+		Subpath: subpath,
+	}
+	scanRoot := input
+	if githubInput {
+		fetchOut := filepath.Join(outDir, "fetch")
+		fetchResult, err := project.Fetch(context.Background(), project.FetchOptions{Input: input, Ref: ref, Subpath: subpath, OutDir: fetchOut, DownloadDir: downloadDir})
+		if err != nil {
+			return repoDoctorReport{}, err
+		}
+		report.Source = fetchResult.Source
+		scanRoot = fetchResult.Source.ScannedRoot
+	}
+	report.ScanRoot = filepath.ToSlash(scanRoot)
+	if downloadDir == "" {
+		downloadDir = filepath.Join("results", "generated", "repo-downloads")
+	}
+	if info, err := os.Stat(downloadDir); err == nil && info.IsDir() {
+		report.Cache.Exists = true
+	}
+	report.Cache.DownloadDir = filepath.ToSlash(downloadDir)
+	report.Cache.CacheHit = report.Source.CacheHit
+	report.Cache.ArchiveHash = report.Source.ArchiveHash
+	report.Cache.CachePath = report.Source.CachePath
+
+	inv, err := project.InventoryPath(project.InventoryOptions{Path: scanRoot})
+	if err != nil {
+		return repoDoctorReport{}, err
+	}
+	report.NativeChecks = uniqueDoctorCommands(inv.TestCommands)
+	report.NextCommands = uniqueDoctorCommands(inv.NextCommands)
+	report.Tools = doctorTools(report.NativeChecks)
+	for _, tool := range report.Tools {
+		if tool.Found {
+			report.Summary.ToolsFound++
+		} else {
+			report.Summary.ToolsMissing++
+			if tool.Required {
+				report.Summary.RequiredToolsMissing++
+			}
+		}
+	}
+	report.Summary.FilesScanned = inv.FilesScanned
+	report.Summary.Facts = len(inv.Facts)
+	report.Summary.NativeChecksAvailable = len(report.NativeChecks)
+	report.Summary.ReadyForAnalyze = report.Summary.FilesScanned > 0 && report.Summary.RequiredToolsMissing == 0
+	report.Summary.NetworkFetchUsed = githubInput
+	report.Hash = repoDoctorHash(report)
+	report.Markdown = renderRepoDoctorMarkdown(report)
+	return report, nil
+}
+
+func doctorTools(nativeChecks []project.Command) []repoDoctorTool {
+	names := []string{"go", "git", "jq"}
+	for _, command := range nativeChecks {
+		fields := strings.Fields(command.Command)
+		if len(fields) > 0 {
+			names = append(names, fields[0])
+		}
+	}
+	names = uniqueDoctorStrings(names)
+	sort.Strings(names)
+	var tools []repoDoctorTool
+	for _, name := range names {
+		path, err := exec.LookPath(name)
+		tools = append(tools, repoDoctorTool{
+			Name:      name,
+			Found:     err == nil,
+			Path:      filepath.ToSlash(path),
+			Required:  name == "go",
+			Rationale: doctorToolRationale(name),
+		})
+	}
+	return tools
+}
+
+func doctorToolRationale(name string) string {
+	switch name {
+	case "go":
+		return "required for go run ./cmd/patchline and Go native checks"
+	case "git":
+		return "useful for local resolved-commit metadata and maintainer workflows"
+	case "jq":
+		return "useful for inspecting JSON outputs in copied commands and gates"
+	default:
+		return "discovered native project check command"
+	}
+}
+
+func uniqueDoctorStrings(values []string) []string {
+	seen := map[string]bool{}
+	var out []string
+	for _, value := range values {
+		value = strings.TrimSpace(value)
+		if value == "" || seen[value] {
+			continue
+		}
+		seen[value] = true
+		out = append(out, value)
+	}
+	return out
+}
+
+func uniqueDoctorCommands(commands []project.Command) []project.Command {
+	seen := map[string]bool{}
+	var out []project.Command
+	for _, command := range commands {
+		key := strings.TrimSpace(command.Command)
+		if key == "" || seen[key] {
+			continue
+		}
+		seen[key] = true
+		out = append(out, command)
+	}
+	sort.Slice(out, func(i, j int) bool { return out[i].Command < out[j].Command })
+	return out
+}
+
+func writeRepoDoctorReport(outDir string, report repoDoctorReport) error {
+	if err := os.MkdirAll(outDir, 0o755); err != nil {
+		return err
+	}
+	copy := report
+	copy.Markdown = ""
+	data, err := json.MarshalIndent(copy, "", "  ")
+	if err != nil {
+		return err
+	}
+	if err := os.WriteFile(filepath.Join(outDir, "doctor.json"), append(data, '\n'), 0o644); err != nil {
+		return err
+	}
+	return os.WriteFile(filepath.Join(outDir, "doctor.md"), []byte(report.Markdown), 0o644)
+}
+
+func repoDoctorHash(report repoDoctorReport) string {
+	copy := report
+	copy.Hash = ""
+	copy.Markdown = ""
+	return canonical.Hash(copy)
+}
+
+func renderRepoDoctorMarkdown(report repoDoctorReport) string {
+	var b strings.Builder
+	fmt.Fprintf(&b, "# Patchline repo doctor\n\n")
+	fmt.Fprintf(&b, "- input: `%s`\n", report.Input)
+	fmt.Fprintf(&b, "- scan root: `%s`\n", report.ScanRoot)
+	fmt.Fprintf(&b, "- ready for analyze: `%t`\n", report.Summary.ReadyForAnalyze)
+	fmt.Fprintf(&b, "- hash: `%s`\n\n", report.Hash)
+	fmt.Fprintf(&b, "## Summary\n\n| area | count |\n| --- | ---: |\n")
+	fmt.Fprintf(&b, "| files scanned | %d |\n", report.Summary.FilesScanned)
+	fmt.Fprintf(&b, "| facts | %d |\n", report.Summary.Facts)
+	fmt.Fprintf(&b, "| tools found | %d |\n", report.Summary.ToolsFound)
+	fmt.Fprintf(&b, "| tools missing | %d |\n", report.Summary.ToolsMissing)
+	fmt.Fprintf(&b, "| required tools missing | %d |\n", report.Summary.RequiredToolsMissing)
+	fmt.Fprintf(&b, "| native checks available | %d |\n\n", report.Summary.NativeChecksAvailable)
+	fmt.Fprintf(&b, "## Cache\n\n| field | value |\n| --- | --- |\n")
+	fmt.Fprintf(&b, "| download dir | `%s` |\n", report.Cache.DownloadDir)
+	fmt.Fprintf(&b, "| exists | `%t` |\n", report.Cache.Exists)
+	fmt.Fprintf(&b, "| cache hit | `%t` |\n", report.Cache.CacheHit)
+	if report.Cache.ArchiveHash != "" {
+		fmt.Fprintf(&b, "| archive hash | `%s` |\n", report.Cache.ArchiveHash)
+	}
+	fmt.Fprintf(&b, "\n## Tools\n\n| tool | found | required | rationale |\n| --- | --- | --- | --- |\n")
+	for _, tool := range report.Tools {
+		fmt.Fprintf(&b, "| `%s` | %t | %t | %s |\n", tool.Name, tool.Found, tool.Required, tool.Rationale)
+	}
+	if len(report.NativeChecks) > 0 {
+		fmt.Fprintf(&b, "\n## Safe native checks discovered\n\n")
+		for _, command := range report.NativeChecks {
+			fmt.Fprintf(&b, "- `%s` — %s\n", command.Command, command.Reason)
+		}
+	}
+	if len(report.NextCommands) > 0 {
+		fmt.Fprintf(&b, "\n## Next commands\n\n")
+		for _, command := range report.NextCommands {
+			fmt.Fprintf(&b, "- `%s` — %s\n", command.Command, command.Reason)
+		}
+	}
+	return b.String()
 }
 
 func parseAnalyzeStages(value string) ([]string, error) {

@@ -138,7 +138,7 @@ Every addition to the repo should be judged by whether it makes that loop more a
 
 ## Stage 10: Make Patchline irresistible to real maintainers
 
-101. [ ] Add a `patchline doctor` command that diagnoses missing tools, cache state, network reachability, and safe native-test availability before a repo analysis run.
+101. [x] Add a `patchline doctor` command that diagnoses missing tools, cache state, network reachability, and safe native-test availability before a repo analysis run.
 102. [ ] Add an interactive-free `patchline quickstart --github owner/repo --subpath path` command that emits exactly the next three copy/paste commands and expected artifacts.
 103. [ ] Add a maintainer triage dashboard that groups findings by owner-relevant surfaces: migrations, app write paths, jobs, tests, incidents, runbooks, and generated interventions.
 104. [ ] Add stable finding IDs that survive file moves and line drift by hashing normalized evidence, table identifiers, operation families, and provenance slices.

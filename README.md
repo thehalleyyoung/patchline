@@ -15,6 +15,9 @@ If you want a reproducible local workspace first, fetch and inventory the repo b
 go run ./cmd/patchline repo fetch django/django \
   --subpath django/contrib/auth/migrations \
   --out results/generated/repos/django-auth
+go run ./cmd/patchline doctor --github django/django \
+  --subpath django/contrib/auth/migrations \
+  --out results/generated/repos/django-auth-doctor
 go run ./cmd/patchline repo analyze --github django/django \
   --subpath django/contrib/auth/migrations \
   --stages inventory,baseline,propose,compare,deep \
@@ -47,7 +50,7 @@ go run ./cmd/patchline repo compare \
   --out results/generated/repos/django-auth-compare
 ```
 
-Fetch writes `source.json` with source provenance, resolved GitHub commit, archive hash, timestamp, tool version, and cache metadata. Inventory writes `inventory.json`, `inventory.md`, `facts.jsonl`, and `project-map.md`. Baseline writes `baseline.json`, `baseline.md`, and `baseline.sarif`. Propose writes `prompt-context.json`, `prompt.txt`, `proposal.patch`, `proposal.json`, and generated untrusted artifacts under `patchline-proposals/`. Compare writes `compare.json` and `compare.md`.
+Doctor writes `doctor.json` and `doctor.md` with tool availability, cache state, scanned files, facts, and safe native checks before analysis. Fetch writes `source.json` with source provenance, resolved GitHub commit, archive hash, timestamp, tool version, and cache metadata. Inventory writes `inventory.json`, `inventory.md`, `facts.jsonl`, and `project-map.md`. Baseline writes `baseline.json`, `baseline.md`, and `baseline.sarif`. Propose writes `prompt-context.json`, `prompt.txt`, `proposal.patch`, `proposal.json`, and generated untrusted artifacts under `patchline-proposals/`. Compare writes `compare.json` and `compare.md`.
 
 `repo analyze` also writes `commands.md`, a copy/paste maintainer report with the equivalent one-command and staged command sequences plus the shareable bundle paths.
 
@@ -131,6 +134,7 @@ make nondeterministic-gate
 make public-command-gate
 make industrial-research-gate
 make development-cycle-gate
+make doctor-gate
 ```
 
 The demo downloads real GitHub project subpaths and writes:
@@ -164,6 +168,8 @@ The real-repo slice matrix is backed by `examples/real-repo-slices.json` and `ex
 `make industrial-research-gate` checks `examples/industrial-research-gates.json` by regenerating the four-repo matrix and proving each practical maintainer report field is paired with experiment-grade comparison, ablation, adjudication, and verification fields.
 
 `make development-cycle-gate` checks `examples/development-cycle-gates.json` by regenerating the four-repo capstone demo and proving generated interventions add covered risks before deterministic deep re-analysis.
+
+`make doctor-gate` checks `examples/doctor-gates.json` by running `patchline doctor` on four public repo slices and proving preflight diagnostics are emitted before analysis.
 
 Current default projects:
 

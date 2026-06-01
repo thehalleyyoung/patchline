@@ -2,6 +2,9 @@ package main
 
 import (
 	"errors"
+	"os"
+	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/thehalleyyoung/patchline/internal/artifact"
@@ -37,6 +40,36 @@ func TestOnePositionalWithFlagsAllowsFlagsAfterPath(t *testing.T) {
 	}
 	if len(flags) != 3 || flags[0] != "--subpath" || flags[1] != "django/contrib/auth/migrations" || flags[2] != "--json" {
 		t.Fatalf("unexpected flags %#v", flags)
+	}
+}
+
+func TestRepoDoctorReportsLocalPreflight(t *testing.T) {
+	root := t.TempDir()
+	writeMainTestFile(t, root, "go.mod", "module example.com/doctor\n\ngo 1.22\n")
+	writeMainTestFile(t, root, "db/migrate/001_create_accounts.sql", "create table accounts(id int);\n")
+
+	out := filepath.Join(t.TempDir(), "doctor")
+	report, err := buildRepoDoctorReport(root, false, "", "", out, "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if report.Version != "patchline.repo-doctor/v1" || report.Summary.FilesScanned == 0 || report.Summary.Facts == 0 || !report.Summary.ReadyForAnalyze {
+		t.Fatalf("unexpected doctor report: %#v", report)
+	}
+	if len(report.Tools) == 0 || report.Hash == "" || !strings.Contains(report.Markdown, "Patchline repo doctor") {
+		t.Fatalf("expected tools, hash, and markdown: %#v", report)
+	}
+	if err := writeRepoDoctorReport(out, report); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := os.Stat(filepath.Join(out, "doctor.json")); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestRepoDoctorRejectsMissingInput(t *testing.T) {
+	if err := repoDoctor([]string{"--json"}); err == nil {
+		t.Fatal("expected missing input usage error")
 	}
 }
 
@@ -83,5 +116,16 @@ func TestPhaseCheckInputKindResolvesImplicitInputs(t *testing.T) {
 				t.Fatalf("phaseCheckInputKind() = %q, want %q", got, tt.want)
 			}
 		})
+	}
+}
+
+func writeMainTestFile(t *testing.T, root, rel, content string) {
+	t.Helper()
+	path := filepath.Join(root, filepath.FromSlash(rel))
+	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(path, []byte(content), 0o644); err != nil {
+		t.Fatal(err)
 	}
 }
