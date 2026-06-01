@@ -758,6 +758,36 @@ func TestNative(t *testing.T) {}
 	}
 }
 
+func TestStableRiskIDIgnoresPathAndLineDrift(t *testing.T) {
+	left := BaselineRisk{
+		ID:        "risk:left",
+		Path:      "db/migrate/20240101010101_add_accounts.sql",
+		Statement: 3,
+		Kind:      "high-risk-sql",
+		Table:     "accounts",
+		Factors:   []ScoreFactor{{Name: "destructive-sql", Weight: 70}},
+		Identifiers: []Identifier{
+			{Kind: "table", Value: "accounts"},
+		},
+	}
+	right := left
+	right.ID = "risk:right"
+	right.Path = "eng/database/moved/999_add_accounts.sql"
+	right.Statement = 42
+	leftSlice := ProvenanceSlice{RiskID: left.ID, Table: "accounts", StagesPresent: []string{"migration", "source"}, Identifiers: []Identifier{{Kind: "table", Value: "accounts"}}}
+	rightSlice := leftSlice
+	rightSlice.RiskID = right.ID
+	rightSlice.MigrationPath = "another/path.sql"
+
+	if stableRiskID(left, leftSlice) != stableRiskID(right, rightSlice) {
+		t.Fatalf("expected stable IDs to survive path and line drift")
+	}
+	right.Table = "profiles"
+	if stableRiskID(left, leftSlice) == stableRiskID(right, rightSlice) {
+		t.Fatalf("expected table changes to produce a different stable ID")
+	}
+}
+
 func writeBaselineForTest(t *testing.T, baseline BaselineReport) string {
 	t.Helper()
 	dir := filepath.Join(t.TempDir(), "baseline")

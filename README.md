@@ -140,6 +140,7 @@ make development-cycle-gate
 make doctor-gate
 make quickstart-gate
 make triage-gate
+make stable-id-gate
 ```
 
 The demo downloads real GitHub project subpaths and writes:
@@ -179,6 +180,8 @@ The real-repo slice matrix is backed by `examples/real-repo-slices.json` and `ex
 `make quickstart-gate` checks `examples/quickstart-gates.json` by running emitted three-command quickstarts against four public repo slices and verifying the expected artifacts.
 
 `make triage-gate` checks `examples/triage-gates.json` by running analysis on four public repo slices and proving maintainer triage dashboards group findings by migrations, app write paths, jobs, tests, incidents, runbooks, and generated interventions.
+
+`make stable-id-gate` checks `examples/stable-id-gates.json` by running analysis on four public repo slices and proving ranked findings include path- and line-drift-resistant stable risk IDs.
 
 Current default projects:
 

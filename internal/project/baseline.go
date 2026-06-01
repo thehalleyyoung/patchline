@@ -81,6 +81,7 @@ type BaselineSummary struct {
 
 type BaselineRisk struct {
 	ID          string        `json:"id"`
+	StableID    string        `json:"stable_id,omitempty"`
 	Path        string        `json:"path"`
 	Statement   int           `json:"statement,omitempty"`
 	Kind        string        `json:"kind"`
@@ -260,6 +261,7 @@ func Baseline(inv Inventory, facts []Fact, intakeReport intake.Report) BaselineR
 	report.RepairClusters = clusterRepairCandidates(intakeReport.RepairCandidates, factIndex)
 	report.NativeChecks = uniqueCommands(append([]Command(nil), inv.TestCommands...))
 	report.Provenance = buildProvenanceSlices(inv, report.Risks, intakeReport, factIndex)
+	assignStableRiskIDs(report.Risks, report.Provenance)
 	report.DatalogQueries = buildDatalogQueries(report.Risks, report.Provenance)
 	report.AbstractEffects = buildAbstractEffectSummaries(report.Risks, report.Provenance)
 	report.SymbolicChecks = buildSymbolicChecks(report.Risks, report.AbstractEffects, report.Provenance)
@@ -472,6 +474,75 @@ func rankRisks(inv Inventory, report intake.Report, facts factIndex) []BaselineR
 		return risks[i].ID < risks[j].ID
 	})
 	return risks
+}
+
+func assignStableRiskIDs(risks []BaselineRisk, provenance []ProvenanceSlice) {
+	provenanceByRisk := map[string]ProvenanceSlice{}
+	for _, slice := range provenance {
+		provenanceByRisk[slice.RiskID] = slice
+	}
+	for i := range risks {
+		risks[i].StableID = stableRiskID(risks[i], provenanceByRisk[risks[i].ID])
+	}
+}
+
+func stableRiskID(risk BaselineRisk, slice ProvenanceSlice) string {
+	ids := make([]string, 0, len(risk.Identifiers)+len(slice.Identifiers))
+	for _, id := range append(append([]Identifier(nil), risk.Identifiers...), slice.Identifiers...) {
+		if key := canonicalIdentifier(id.Kind, id.Value); key != "" && !strings.HasPrefix(key, "path:") {
+			ids = append(ids, key)
+		}
+	}
+	sort.Strings(ids)
+	ids = uniqueStringsForStableID(ids)
+	factors := make([]string, 0, len(risk.Factors))
+	for _, factor := range risk.Factors {
+		if factor.Name != "" {
+			factors = append(factors, strings.ToLower(strings.TrimSpace(factor.Name)))
+		}
+	}
+	sort.Strings(factors)
+	stages := append([]string(nil), slice.StagesPresent...)
+	sort.Strings(stages)
+	payload := strings.Join([]string{
+		"stable-risk-v1",
+		operationFamily(risk.Kind),
+		strings.ToLower(strings.TrimSpace(risk.Table)),
+		strings.Join(ids, ","),
+		strings.Join(uniqueStringsForStableID(factors), ","),
+		strings.Join(uniqueStringsForStableID(stages), ","),
+	}, "\x00")
+	return "stable-risk:" + canonical.Hash(payload)[:16]
+}
+
+func operationFamily(kind string) string {
+	kind = strings.ToLower(strings.TrimSpace(kind))
+	switch {
+	case strings.Contains(kind, "delete"), strings.Contains(kind, "drop"), strings.Contains(kind, "truncate"):
+		return "destructive"
+	case strings.Contains(kind, "update"), strings.Contains(kind, "backfill"), strings.Contains(kind, "write"):
+		return "write"
+	case strings.Contains(kind, "schema"), strings.Contains(kind, "migration"):
+		return "schema"
+	case strings.Contains(kind, "sql"):
+		return "sql"
+	default:
+		return kind
+	}
+}
+
+func uniqueStringsForStableID(values []string) []string {
+	seen := map[string]bool{}
+	var out []string
+	for _, value := range values {
+		value = strings.TrimSpace(value)
+		if value == "" || seen[value] {
+			continue
+		}
+		seen[value] = true
+		out = append(out, value)
+	}
+	return out
 }
 
 func riskFromStatement(path, sourceKind string, statement migration.Statement) BaselineRisk {
@@ -2442,10 +2513,10 @@ func renderBaselineMarkdown(report BaselineReport) string {
 	fmt.Fprintf(&b, "| identifier-only links | %d |\n", report.Summary.IdentifierOnlyLinks)
 	fmt.Fprintf(&b, "| date-only links | %d |\n\n", report.Summary.DateOnlyLinks)
 	if len(report.Risks) > 0 {
-		fmt.Fprintf(&b, "## Top risks\n\n| score | severity | path | kind | table | rationale |\n| ---: | --- | --- | --- | --- | --- |\n")
+		fmt.Fprintf(&b, "## Top risks\n\n| stable id | score | severity | path | kind | table | rationale |\n| --- | ---: | --- | --- | --- | --- | --- |\n")
 		limit := minInt(len(report.Risks), 25)
 		for _, risk := range report.Risks[:limit] {
-			fmt.Fprintf(&b, "| %d | %s | %s | %s | %s | %s |\n", risk.Score, risk.Severity, risk.Path, risk.Kind, risk.Table, risk.Rationale)
+			fmt.Fprintf(&b, "| `%s` | %d | %s | %s | %s | %s | %s |\n", risk.StableID, risk.Score, risk.Severity, risk.Path, risk.Kind, risk.Table, risk.Rationale)
 		}
 		fmt.Fprintf(&b, "\n")
 	}

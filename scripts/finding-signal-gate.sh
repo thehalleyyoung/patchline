@@ -53,7 +53,7 @@ while IFS=$'\t' read -r id repo subpath report json_report max_reported minimum_
   reported_findings="$(awk '
     /^## Top risks$/ {in_section=1; next}
     /^## / && in_section {in_section=0}
-    in_section && /^\| [0-9]+ \|/ {count++}
+    in_section && /^\| / && $0 !~ /^\| stable id / && $0 !~ /^\| ---/ {count++}
     END {print count + 0}
   ' "$report_path")"
   jq -e --argjson minimum "$minimum_total" --argjson max "$max_reported" '

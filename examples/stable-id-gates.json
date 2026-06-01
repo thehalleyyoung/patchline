@@ -1,0 +1,33 @@
+{
+  "version": "patchline.stable-id-gates/v1",
+  "gates": [
+    {
+      "id": "forem-stable-risk-ids",
+      "status": "implemented",
+      "real_repo": "forem/forem",
+      "subpath": "db/migrate",
+      "stable_id_claim": "ranked findings include path- and line-drift-resistant stable IDs derived from normalized evidence"
+    },
+    {
+      "id": "bytebase-stable-risk-ids",
+      "status": "implemented",
+      "real_repo": "bytebase/bytebase",
+      "subpath": "backend/migrator/migration",
+      "stable_id_claim": "ranked findings include path- and line-drift-resistant stable IDs derived from normalized evidence"
+    },
+    {
+      "id": "mastodon-stable-risk-ids",
+      "status": "implemented",
+      "real_repo": "mastodon/mastodon",
+      "subpath": "db/migrate",
+      "stable_id_claim": "ranked findings include path- and line-drift-resistant stable IDs derived from normalized evidence"
+    },
+    {
+      "id": "lobsters-stable-risk-ids",
+      "status": "implemented",
+      "real_repo": "lobsters/lobsters",
+      "subpath": "db/migrate",
+      "stable_id_claim": "ranked findings include path- and line-drift-resistant stable IDs derived from normalized evidence"
+    }
+  ]
+}
