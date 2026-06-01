@@ -37,7 +37,7 @@ jq -s '{version:"patchline.four-repo-demo/v1", cases: .}' "${rows[@]}" > "$OUT/s
 
 jq -e '
   (.cases | length) >= 4 and
-  all(.cases[]; .inventory.files > 0 and .inventory.facts >= .inventory.files and .baseline.risks > 0)
+  all(.cases[]; .inventory.files > 0 and .inventory.facts >= .inventory.files and .baseline.risks > 0 and .proposal.files > 0 and .compare.checks_failed == 0)
 ' "$OUT/summary.json" > /dev/null
 
 {
@@ -45,11 +45,11 @@ jq -e '
   echo
   echo "Each row is a real external repository slice fetched, inventoried, converted to facts, checked by intake, and ranked by the baseline stage."
   echo
-  echo "| Project slice | Files | Facts | High-risk SQL | Problems | Baseline risks | Evidence links |"
-  echo "| --- | ---: | ---: | ---: | ---: | ---: | ---: |"
-  jq -r '.cases[] | "| \(.label) (`\(.repo):\(.subpath)`) | \(.inventory.files) | \(.inventory.facts) | \(.intake.high_risk) | \(.intake.problems) | \(.baseline.risks) | \(.baseline.evidence_links) |"' "$OUT/summary.json"
+  echo "| Project slice | Files | Facts | High-risk SQL | Problems | Baseline risks | Evidence links | Proposal files | Compare failures |"
+  echo "| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |"
+  jq -r '.cases[] | "| \(.label) (`\(.repo):\(.subpath)`) | \(.inventory.files) | \(.inventory.facts) | \(.intake.high_risk) | \(.intake.problems) | \(.baseline.risks) | \(.baseline.evidence_links) | \(.proposal.files) | \(.compare.checks_failed) |"' "$OUT/summary.json"
   echo
-  echo 'Each case directory contains fetch metadata, inventory outputs, `facts.jsonl`, `project-map.md`, intake outputs, and baseline JSON/Markdown/SARIF.'
+  echo 'Each case directory contains fetch metadata, inventory outputs, `facts.jsonl`, `project-map.md`, intake outputs, baseline JSON/Markdown/SARIF, isolated proposal artifacts, and compare reports.'
 } > "$OUT/summary.md"
 
 echo "four-repo analysis summary: $OUT/summary.md"

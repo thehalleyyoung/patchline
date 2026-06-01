@@ -6,6 +6,7 @@ import (
 	"context"
 	"encoding/json"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -260,6 +261,110 @@ func TestLoadInventoryAcceptsInventoryJSONPath(t *testing.T) {
 	if len(loaded.Facts) == 0 {
 		t.Fatalf("expected facts loaded from sibling facts.jsonl")
 	}
+}
+
+func TestProposeWritesIsolatedPatchAndMetadata(t *testing.T) {
+	baseline := BaselineReport{
+		Version:       BaselineVersion,
+		InventoryRoot: t.TempDir(),
+		IntakeSource:  "fixture",
+		Hash:          "baseline-hash",
+		Risks: []BaselineRisk{{
+			ID:        "risk:auth_user",
+			Path:      "db/migrate/001.sql",
+			Kind:      "update",
+			Table:     "auth_user",
+			Severity:  "high",
+			Score:     130,
+			Rationale: "unbounded update can rewrite an entire table",
+			Factors:   []ScoreFactor{{Name: "high-risk-sql", Weight: 100, Reason: "high risk"}},
+		}},
+		NativeChecks: []Command{{Command: "go test ./...", Reason: "Go tests"}},
+	}
+	baseline.Hash = baselineHash(baseline)
+	baselineDir := filepath.Join(t.TempDir(), "baseline")
+	if err := WriteBaseline(baselineDir, baseline); err != nil {
+		t.Fatal(err)
+	}
+	out := filepath.Join(t.TempDir(), "proposal")
+	proposal, err := Propose(ProposalOptions{BaselinePath: baselineDir, Kind: "all", OutDir: out, BudgetRisks: 1})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if proposal.Trust != "untrusted-generated-proposal" || len(proposal.GeneratedFiles) != 5 || proposal.ContextHash == "" || proposal.OutputHash == "" {
+		t.Fatalf("unexpected proposal metadata: %#v", proposal)
+	}
+	if err := WriteProposal(out, proposal); err != nil {
+		t.Fatal(err)
+	}
+	for _, rel := range []string{"proposal.json", "proposal.md", "proposal.patch", "prompt-context.json", "prompt.txt"} {
+		if _, err := os.Stat(filepath.Join(out, rel)); err != nil {
+			t.Fatalf("missing %s: %v", rel, err)
+		}
+	}
+	repo := filepath.Join(t.TempDir(), "repo")
+	if err := os.MkdirAll(repo, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := exec.Command("git", "-C", repo, "init", "--quiet").Run(); err != nil {
+		t.Fatal(err)
+	}
+	if output, err := exec.Command("git", "-C", repo, "apply", "--check", filepath.Join(out, "proposal.patch")).CombinedOutput(); err != nil {
+		t.Fatalf("proposal patch should apply cleanly: %v\n%s", err, string(output))
+	}
+}
+
+func TestProposeLLMCommandCapturesOutputAsUntrustedArtifact(t *testing.T) {
+	baseline := BaselineReport{Version: BaselineVersion, Hash: "baseline-hash", Risks: []BaselineRisk{{ID: "risk:1", Path: "db/migrate/001.sql", Table: "accounts", Severity: "high", Score: 100, Rationale: "risk"}}}
+	baseline.Hash = baselineHash(baseline)
+	baselineDir := filepath.Join(t.TempDir(), "baseline")
+	if err := WriteBaseline(baselineDir, baseline); err != nil {
+		t.Fatal(err)
+	}
+	proposal, err := Propose(ProposalOptions{BaselinePath: baselineDir, Kind: "tests", LLMCommand: "cat", BudgetRisks: 1})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if proposal.Generator != "llm-command" || len(proposal.GeneratedFiles) != 1 || proposal.GeneratedFiles[0].Kind != "llm-output" {
+		t.Fatalf("unexpected llm proposal: %#v", proposal)
+	}
+}
+
+func TestCompareChecksGeneratedProposalCoverage(t *testing.T) {
+	baseline := BaselineReport{
+		Version: BaselineVersion,
+		Hash:    "baseline-hash",
+		Risks: []BaselineRisk{{
+			ID:        "risk:accounts",
+			Path:      "db/migrate/001.sql",
+			Kind:      "update",
+			Table:     "accounts",
+			Severity:  "high",
+			Score:     130,
+			Rationale: "unbounded update",
+		}},
+	}
+	baseline.Hash = baselineHash(baseline)
+	proposal, err := Propose(ProposalOptions{BaselinePath: writeBaselineForTest(t, baseline), Kind: "all", BudgetRisks: 1})
+	if err != nil {
+		t.Fatal(err)
+	}
+	compare := Compare(baseline, proposal)
+	if compare.Summary.GeneratedFiles != 5 || compare.Summary.RisksWithCoverage != 1 || compare.Summary.PatchlineChecksFailed != 0 || compare.Summary.NewHighRiskSQL != 0 {
+		t.Fatalf("unexpected compare summary: %#v", compare.Summary)
+	}
+	if !strings.Contains(compare.Markdown, "Patchline repo compare") {
+		t.Fatalf("expected compare markdown, got %q", compare.Markdown)
+	}
+}
+
+func writeBaselineForTest(t *testing.T, baseline BaselineReport) string {
+	t.Helper()
+	dir := filepath.Join(t.TempDir(), "baseline")
+	if err := WriteBaseline(dir, baseline); err != nil {
+		t.Fatal(err)
+	}
+	return dir
 }
 
 type migrationStatementForTest struct {

@@ -396,6 +396,8 @@ Usage:
   patchline repo fetch <owner/repo|github-url|path|archive> [--ref ref] [--subpath path] [--out dir] [--json]
   patchline repo inventory <path> [--out dir] [--full] [--json]
   patchline repo baseline --inventory inventory-dir --intake intake-dir [--out dir] [--json]
+  patchline repo propose --from-report baseline-dir --kind tests|guards|instrumentation|repair|explain|all [--out dir] [--json]
+  patchline repo compare --before baseline-dir --after proposal-dir [--out dir] [--json]
   patchline intake <path> [--out results/generated/intake] [--json]
   patchline intake --github owner/repo [--ref ref] [--subpath path] [--out results/generated/intake] [--json]
   patchline semantics-contract [--json]
@@ -470,6 +472,8 @@ Examples:
   patchline repo fetch bytebase/bytebase --subpath backend/migrator/migration --out results/generated/repos/bytebase-migrations
   patchline repo inventory results/generated/repos/bytebase-migrations --out results/generated/repos/bytebase-migrations/inventory
   patchline repo baseline --inventory results/generated/repos/bytebase-migrations/inventory --intake results/generated/intake --out results/generated/repos/bytebase-migrations/baseline
+  patchline repo propose --from-report results/generated/repos/bytebase-migrations/baseline --kind all --out results/generated/repos/bytebase-migrations/proposal
+  patchline repo compare --before results/generated/repos/bytebase-migrations/baseline --after results/generated/repos/bytebase-migrations/proposal --out results/generated/repos/bytebase-migrations/compare
   patchline intake . --out results/generated/intake
   patchline intake --github bytebase/bytebase --subpath store/migration --out results/generated/intake
   patchline explain record:invoices/inv_1002
@@ -482,7 +486,7 @@ Examples:
 
 func repoCommand(args []string) error {
 	if len(args) == 0 {
-		return errors.New("usage: patchline repo <fetch|inventory> ...")
+		return errors.New("usage: patchline repo <fetch|inventory|baseline|propose|compare> ...")
 	}
 	switch args[0] {
 	case "fetch":
@@ -491,6 +495,10 @@ func repoCommand(args []string) error {
 		return repoInventory(args[1:])
 	case "baseline":
 		return repoBaseline(args[1:])
+	case "propose":
+		return repoPropose(args[1:])
+	case "compare":
+		return repoCompare(args[1:])
 	default:
 		return fmt.Errorf("unknown repo subcommand %q", args[0])
 	}
@@ -636,6 +644,96 @@ func repoBaseline(args []string) error {
 	}
 	for _, command := range report.NativeChecks {
 		fmt.Printf("  native: %s # %s\n", command.Command, command.Reason)
+	}
+	return nil
+}
+
+func repoPropose(args []string) error {
+	fs := flag.NewFlagSet("repo propose", flag.ContinueOnError)
+	fs.SetOutput(ioDiscard{})
+	baselinePath := fs.String("from-report", "", "baseline directory or baseline.json")
+	kind := fs.String("kind", "all", "proposal kind: tests|guards|instrumentation|repair|explain|all")
+	outPath := fs.String("out", "", "output directory")
+	llmCommand := fs.String("llm-command", "", "optional user-provided generator command; prompt is passed on stdin")
+	budgetRisks := fs.Int("budget-risks", 3, "maximum ranked risks to include")
+	jsonOut := fs.Bool("json", false, "emit JSON")
+	if err := fs.Parse(args); err != nil {
+		return err
+	}
+	if *baselinePath == "" {
+		return errors.New("usage: patchline repo propose --from-report baseline-dir --kind tests|guards|instrumentation|repair|explain|all --out dir [--json]")
+	}
+	report, err := project.Propose(project.ProposalOptions{
+		BaselinePath: *baselinePath,
+		Kind:         *kind,
+		OutDir:       *outPath,
+		LLMCommand:   *llmCommand,
+		BudgetRisks:  *budgetRisks,
+	})
+	if err != nil {
+		return err
+	}
+	if *outPath != "" {
+		if err := project.WriteProposal(*outPath, report); err != nil {
+			return err
+		}
+	}
+	if *jsonOut {
+		return writeJSON(os.Stdout, report)
+	}
+	fmt.Printf("proposal baseline=%s kind=%s generator=%s files=%d output_hash=%s\n",
+		report.BaselineHash,
+		report.Kind,
+		report.Generator,
+		len(report.GeneratedFiles),
+		report.OutputHash,
+	)
+	if *outPath != "" {
+		fmt.Printf("  out=%s\n", *outPath)
+	}
+	return nil
+}
+
+func repoCompare(args []string) error {
+	fs := flag.NewFlagSet("repo compare", flag.ContinueOnError)
+	fs.SetOutput(ioDiscard{})
+	beforePath := fs.String("before", "", "baseline directory or baseline.json")
+	afterPath := fs.String("after", "", "proposal directory or proposal.json")
+	outPath := fs.String("out", "", "output directory")
+	jsonOut := fs.Bool("json", false, "emit JSON")
+	if err := fs.Parse(args); err != nil {
+		return err
+	}
+	if *beforePath == "" || *afterPath == "" {
+		return errors.New("usage: patchline repo compare --before baseline-dir --after proposal-dir [--out dir] [--json]")
+	}
+	baseline, err := project.LoadBaseline(*beforePath)
+	if err != nil {
+		return err
+	}
+	proposal, err := project.LoadProposal(*afterPath)
+	if err != nil {
+		return err
+	}
+	report := project.Compare(baseline, proposal)
+	if *outPath != "" {
+		if err := project.WriteCompare(*outPath, report); err != nil {
+			return err
+		}
+	}
+	if *jsonOut {
+		return writeJSON(os.Stdout, report)
+	}
+	fmt.Printf("compare baseline=%s proposal=%s generated=%d covered=%d failed=%d hash=%s\n",
+		report.BaselineHash,
+		report.ProposalHash,
+		report.Summary.GeneratedFiles,
+		report.Summary.RisksWithCoverage,
+		report.Summary.PatchlineChecksFailed,
+		report.Hash,
+	)
+	if *outPath != "" {
+		fmt.Printf("  out=%s\n", *outPath)
 	}
 	return nil
 }

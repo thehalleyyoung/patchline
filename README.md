@@ -28,9 +28,19 @@ go run ./cmd/patchline repo baseline \
   --inventory results/generated/repos/django-auth-inventory \
   --intake results/generated/repos/django-auth-intake \
   --out results/generated/repos/django-auth-baseline
+
+go run ./cmd/patchline repo propose \
+  --from-report results/generated/repos/django-auth-baseline \
+  --kind all \
+  --out results/generated/repos/django-auth-proposal
+
+go run ./cmd/patchline repo compare \
+  --before results/generated/repos/django-auth-baseline \
+  --after results/generated/repos/django-auth-proposal \
+  --out results/generated/repos/django-auth-compare
 ```
 
-Inventory writes `inventory.json`, `inventory.md`, `facts.jsonl`, and `project-map.md`. Baseline writes `baseline.json`, `baseline.md`, and `baseline.sarif`.
+Inventory writes `inventory.json`, `inventory.md`, `facts.jsonl`, and `project-map.md`. Baseline writes `baseline.json`, `baseline.md`, and `baseline.sarif`. Propose writes `prompt-context.json`, `prompt.txt`, `proposal.patch`, `proposal.json`, and generated untrusted artifacts under `patchline-proposals/`. Compare writes `compare.json` and `compare.md`.
 
 ## Why this is useful
 
@@ -115,6 +125,8 @@ PATCHLINE_PLUGPLAY_CASES=$'My app|owner/repo|path/to/migrations\nOther app|owner
 | Risky data-changing SQL | `.sql`, `.psql`, `.ddl`, and SQL snippets in text/source files |
 | Project facts | `facts.jsonl` from repo inventory: files, languages, migrations, docs, evidence exports, identifiers, and next commands |
 | Baseline ranking | `baseline.json`, `baseline.md`, and `baseline.sarif` from repo baseline: ranked risks, evidence links, native checks, and ablation counts |
+| Bounded proposals | `proposal.patch` plus isolated untrusted tests, guards, instrumentation notes, repair manifests, and explain SQL from repo propose |
+| Proposal checks | `compare.json` and `compare.md` from repo compare: generated-artifact checks, coverage, risky generated SQL, and review status |
 | Embedded/source SQL | Go, Python, Ruby, JavaScript/TypeScript, Java, C#, shell, and SQL files |
 | Cause candidates | risky migrations, deploy/trace/commit/migration signals, incident-like notes, export fields |
 | Repair candidates | repair manifests, rollback/revert/restore/backfill/reconcile/fix clues in SQL/docs/scripts |

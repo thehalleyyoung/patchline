@@ -15,6 +15,8 @@ FETCH_OUT="$OUT/fetched"
 INVENTORY_OUT="$OUT/inventory"
 INTAKE_OUT="$OUT/intake"
 BASELINE_OUT="$OUT/baseline"
+PROPOSAL_OUT="$OUT/proposal"
+COMPARE_OUT="$OUT/compare"
 
 go run ./cmd/patchline repo fetch "$REPO" --subpath "$SUBPATH" --out "$FETCH_OUT" --json > "$OUT/fetch.json"
 SCAN_ROOT="$(jq -r '.source.scanned_root' "$OUT/fetch.json")"
@@ -22,6 +24,8 @@ SCAN_ROOT="$(jq -r '.source.scanned_root' "$OUT/fetch.json")"
 go run ./cmd/patchline repo inventory "$SCAN_ROOT" --out "$INVENTORY_OUT" --json > "$OUT/inventory.json"
 go run ./cmd/patchline intake "$SCAN_ROOT" --out "$INTAKE_OUT" --json > "$OUT/intake.json"
 go run ./cmd/patchline repo baseline --inventory "$INVENTORY_OUT" --intake "$INTAKE_OUT" --out "$BASELINE_OUT" --json > "$OUT/baseline.json"
+go run ./cmd/patchline repo propose --from-report "$BASELINE_OUT" --kind all --out "$PROPOSAL_OUT" --json > "$OUT/proposal.json"
+go run ./cmd/patchline repo compare --before "$BASELINE_OUT" --after "$PROPOSAL_OUT" --out "$COMPARE_OUT" --json > "$OUT/compare.json"
 FACT_COUNT="$(wc -l < "$INVENTORY_OUT/facts.jsonl" | tr -d ' ')"
 
 jq -n \
@@ -29,6 +33,8 @@ jq -n \
   --slurpfile inventory "$OUT/inventory.json" \
   --slurpfile intake "$OUT/intake.json" \
   --slurpfile baseline "$OUT/baseline.json" \
+  --slurpfile proposal "$OUT/proposal.json" \
+  --slurpfile compare "$OUT/compare.json" \
   --argjson fact_count "$FACT_COUNT" \
   '{
     version: "patchline.repo-demo/v1",
@@ -57,6 +63,20 @@ jq -n \
       grep_only: $baseline[0].summary.grep_only_matches,
       sql_only: $baseline[0].summary.sql_only_ranked_risks,
       identifier_only_links: $baseline[0].summary.identifier_only_links
+    },
+    proposal: {
+      kind: $proposal[0].kind,
+      generator: $proposal[0].generator,
+      trust: $proposal[0].trust,
+      files: ($proposal[0].generated_files | length),
+      output_hash: $proposal[0].output_hash
+    },
+    compare: {
+      generated_files: $compare[0].summary.generated_files,
+      risks_with_coverage: $compare[0].summary.risks_with_coverage,
+      checks_passed: $compare[0].summary.patchline_checks_passed,
+      checks_failed: $compare[0].summary.patchline_checks_failed,
+      rejected: $compare[0].summary.rejected
     }
   }' > "$OUT/summary.json"
 
@@ -74,10 +94,13 @@ jq -n \
   echo "| intake | \`$INTAKE_OUT/summary.md\` |"
   echo "| baseline | \`$BASELINE_OUT/baseline.md\` |"
   echo "| baseline SARIF | \`$BASELINE_OUT/baseline.sarif\` |"
+  echo "| proposal | \`$PROPOSAL_OUT/proposal.md\` |"
+  echo "| proposal patch | \`$PROPOSAL_OUT/proposal.patch\` |"
+  echo "| compare | \`$COMPARE_OUT/compare.md\` |"
   echo
   echo "## Summary"
   echo
-  jq -r '"- files inventoried: \(.inventory.files)\n- project facts: \(.inventory.facts)\n- intake high-risk SQL: \(.intake.high_risk)\n- problem candidates: \(.intake.problems)\n- candidate links: \(.intake.links)\n- baseline ranked risks: \(.baseline.risks)\n- baseline evidence links: \(.baseline.evidence_links)"' "$OUT/summary.json"
+  jq -r '"- files inventoried: \(.inventory.files)\n- project facts: \(.inventory.facts)\n- intake high-risk SQL: \(.intake.high_risk)\n- problem candidates: \(.intake.problems)\n- candidate links: \(.intake.links)\n- baseline ranked risks: \(.baseline.risks)\n- baseline evidence links: \(.baseline.evidence_links)\n- generated proposal files: \(.proposal.files)\n- proposal output hash: \(.proposal.output_hash)\n- compare checks passed: \(.compare.checks_passed)\n- compare checks failed: \(.compare.checks_failed)"' "$OUT/summary.json"
 } > "$OUT/summary.md"
 
 echo "repo analysis summary: $OUT/summary.md"

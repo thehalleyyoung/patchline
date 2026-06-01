@@ -8,81 +8,81 @@ Every addition to the repo should be judged by whether it makes that loop more a
 
 ## Stage 0: Keep the promise sharp
 
-1. [ ] Define Patchline as deterministic data/code repair analysis for existing projects, not as a labeling framework.
-2. [ ] Treat arbitrary GitHub repos, local checkouts, archives, and project exports as first-class inputs.
-3. [ ] Keep LLMs optional and bounded: generated code is a proposed artifact to analyze, not a trusted oracle.
-4. [ ] Make every high-level finding traceable to file paths, line ranges, identifiers, timestamps, and hashes.
-5. [ ] Prefer outputs maintainers can act on today: commands, patches, SARIF, Markdown summaries, JSON facts, and risk rankings.
-6. [ ] Preserve the research novelty: combine project-native mining, repair synthesis, provenance, semantic checks, and ablation-driven evaluation.
-7. [ ] Add only features that improve real-repo analysis quality, generated-change safety, or before/after explanatory power.
-8. [ ] Avoid demo-only features that work only on curated fixtures.
-9. [ ] Keep outputs stable enough for CI, artifact bundles, and comparative experiments.
-10. [ ] Maintain a one-command path from public repo URL to actionable report.
+1. [x] Define Patchline as deterministic data/code repair analysis for existing projects, not as a labeling framework.
+2. [x] Treat arbitrary GitHub repos, local checkouts, archives, and project exports as first-class inputs.
+3. [x] Keep LLMs optional and bounded: generated code is a proposed artifact to analyze, not a trusted oracle.
+4. [x] Make every high-level finding traceable to file paths, line ranges, identifiers, timestamps, and hashes.
+5. [x] Prefer outputs maintainers can act on today: commands, patches, SARIF, Markdown summaries, JSON facts, and risk rankings.
+6. [x] Preserve the research novelty: combine project-native mining, repair synthesis, provenance, semantic checks, and ablation-driven evaluation.
+7. [x] Add only features that improve real-repo analysis quality, generated-change safety, or before/after explanatory power.
+8. [x] Avoid demo-only features that work only on curated fixtures.
+9. [x] Keep outputs stable enough for CI, artifact bundles, and comparative experiments.
+10. [x] Maintain a one-command path from public repo URL to actionable report.
 
 ## Stage 1: Download real repositories reproducibly
 
-11. [ ] Add `patchline repo fetch owner/repo --ref <ref> --out <dir>` with normalized source metadata.
-12. [ ] Support GitHub URLs, `owner/repo`, local paths, tarballs, zip archives, and pre-existing worktrees.
+11. [x] Add `patchline repo fetch owner/repo --ref <ref> --out <dir>` with normalized source metadata.
+12. [x] Support GitHub URLs, `owner/repo`, local paths, tarballs, zip archives, and pre-existing worktrees.
 13. [ ] Record repo owner, name, ref, resolved commit SHA, subpath, archive hash, fetch timestamp, and tool version.
 14. [ ] Cache downloads by content hash so repeated experiments reuse the same source.
-15. [ ] Add safe subpath extraction for scanning only migrations, services, docs, or exports inside large repos.
-16. [ ] Emit `source.json` for every run so reports can be reproduced or cited.
-17. [ ] Detect ignored/generated/vendor directories and explain what was skipped.
-18. [ ] Provide a `--full` mode for exhaustive scans and a default mode optimized for maintainer signal.
-19. [ ] Add public-repo smoke cases across Rails, Django, Alembic, Flyway, Prisma, TypeORM, Go services, and mixed monorepos.
-20. [ ] Make the fetch stage independent from later analysis so failures are easy to isolate.
+15. [x] Add safe subpath extraction for scanning only migrations, services, docs, or exports inside large repos.
+16. [x] Emit `source.json` for every run so reports can be reproduced or cited.
+17. [x] Detect ignored/generated/vendor directories and explain what was skipped.
+18. [x] Provide a `--full` mode for exhaustive scans and a default mode optimized for maintainer signal.
+19. [x] Add public-repo smoke cases across Rails, Django, Alembic, Flyway, Prisma, TypeORM, Go services, and mixed monorepos.
+20. [x] Make the fetch stage independent from later analysis so failures are easy to isolate.
 
 ## Stage 2: Build a project-native fact layer
 
-21. [ ] Add `patchline repo inventory <path>` for languages, frameworks, migration systems, DB engines, CI, test commands, and deploy config.
-22. [ ] Classify files as migrations, source SQL, ORM/schema declarations, tests, fixtures, incidents, runbooks, repair scripts, logs, traces, configs, or unknown.
+21. [x] Add `patchline repo inventory <path>` for languages, frameworks, migration systems, DB engines, CI, test commands, and deploy config.
+22. [x] Classify files as migrations, source SQL, ORM/schema declarations, tests, fixtures, incidents, runbooks, repair scripts, logs, traces, configs, or unknown.
 23. [ ] Extract tables, columns, models, endpoints, queues, jobs, reports, incidents, commits, PRs, deploy IDs, timestamps, and error names.
 24. [ ] Infer schema evolution from migrations and ORM declarations without requiring a Patchline schema.
-25. [ ] Extract embedded SQL and persistence calls from common languages.
+25. [x] Extract embedded SQL and persistence calls from common languages.
 26. [ ] Detect migration frameworks and native commands such as `rails db:migrate`, `manage.py migrate`, `prisma migrate`, `alembic`, `flyway`, and `go test`.
 27. [ ] Preserve unknown JSON/YAML/TOML/log fields as searchable evidence rather than discarding them.
-28. [ ] Emit `facts.jsonl` as the stable low-level interface for later stages.
-29. [ ] Emit `project-map.md` showing where data-change evidence lives in the repo.
-30. [ ] Hash every fact with provenance so generated prompts and reports can cite exact context.
+28. [x] Emit `facts.jsonl` as the stable low-level interface for later stages.
+29. [x] Emit `project-map.md` showing where data-change evidence lives in the repo.
+30. [x] Hash every fact with provenance so generated prompts and reports can cite exact context.
 
 ## Stage 3: Do real baseline analysis before generation
 
-31. [ ] Rank risky migrations and SQL snippets by destructive operation, breadth, reversibility, guard presence, transaction use, and affected table importance.
+31. [x] Rank risky migrations and SQL snippets by destructive operation, breadth, reversibility, guard presence, transaction use, and affected table importance.
 32. [ ] Rank risky code paths by persistent write breadth, missing idempotency, missing transaction boundaries, retry hazards, and weak rollback behavior.
-33. [ ] Link risk candidates to nearby tests, docs, incidents, commits, deploy notes, and repair scripts using identifiers and time signals.
-34. [ ] Detect cause clusters around shared tables, dates, incidents, deploys, commits, error names, and changed files.
-35. [ ] Detect repair clusters around rollback scripts, fix migrations, reconciliation jobs, backfills, runbooks, and generated/manual data patches.
-36. [ ] Emit top findings as problem/cause/repair hypotheses with evidence, confidence, and specific next commands.
-37. [ ] Emit SARIF for high-risk data changes so existing code-scanning systems can display results.
-38. [ ] Emit "native checks to run" based on detected project tooling.
-39. [ ] Compare findings to simple baselines: grep-only SQL risk, SQL-only scanning, identifier-only linking, and date-only linking.
-40. [ ] Store a baseline report that later generated-code analysis must improve or explain.
+33. [x] Link risk candidates to nearby tests, docs, incidents, commits, deploy notes, and repair scripts using identifiers and time signals.
+34. [x] Detect cause clusters around shared tables, dates, incidents, deploys, commits, error names, and changed files.
+35. [x] Detect repair clusters around rollback scripts, fix migrations, reconciliation jobs, backfills, runbooks, and generated/manual data patches.
+36. [x] Emit top findings as problem/cause/repair hypotheses with evidence, confidence, and specific next commands.
+37. [x] Emit SARIF for high-risk data changes so existing code-scanning systems can display results.
+38. [x] Emit "native checks to run" based on detected project tooling.
+39. [x] Compare findings to simple baselines: grep-only SQL risk, SQL-only scanning, identifier-only linking, and date-only linking.
+40. [x] Store a baseline report that later generated-code analysis must improve or explain.
 
 ## Stage 4: Create bounded LLM-generated interventions
 
-41. [ ] Add `patchline propose --from-report <baseline> --kind tests|guards|instrumentation|repair --out <worktree>`.
-42. [ ] Build prompt context only from deterministic facts, top-ranked evidence, relevant file excerpts, and explicit constraints.
-43. [ ] Record model name, prompt hash, context hash, output hash, generated files, and target risk IDs.
-44. [ ] Generate tests that exercise risky migrations, ORM paths, repair scripts, or data invariants.
-45. [ ] Generate migration guards for row counts, table existence, transaction safety, reversibility, dry-run behavior, and bounded scope.
-46. [ ] Generate instrumentation patches that expose metrics, structured logs, or trace attributes for risky data changes.
-47. [ ] Generate repair candidates as patches plus manifests containing scope, preconditions, postconditions, rollback, and validation commands.
-48. [ ] Generate SQL explain/dry-run scripts for maintainers who cannot run full production-like tests.
-49. [ ] Apply generated code only in an isolated worktree or patch file, never silently in the user's active tree.
-50. [ ] Label generated code as untrusted until deterministic re-analysis and project-native checks complete.
+41. [x] Add `patchline repo propose --from-report <baseline> --kind tests|guards|instrumentation|repair --out <worktree>`.
+42. [x] Build prompt context only from deterministic facts, top-ranked evidence, relevant file excerpts, and explicit constraints.
+43. [x] Record model name, prompt hash, context hash, output hash, generated files, and target risk IDs.
+44. [x] Generate tests that exercise risky migrations, ORM paths, repair scripts, or data invariants.
+45. [x] Generate migration guards for row counts, table existence, transaction safety, reversibility, dry-run behavior, and bounded scope.
+46. [x] Generate instrumentation patches that expose metrics, structured logs, or trace attributes for risky data changes.
+47. [x] Generate repair candidates as patches plus manifests containing scope, preconditions, postconditions, rollback, and validation commands.
+48. [x] Generate SQL explain/dry-run scripts for maintainers who cannot run full production-like tests.
+49. [x] Apply generated code only in an isolated worktree or patch file, never silently in the user's active tree.
+50. [x] Label generated code as untrusted until deterministic re-analysis and project-native checks complete.
 
 ## Stage 5: Re-analyze generated code more deeply
 
-51. [ ] Add `patchline compare --before <repo> --after <generated-worktree>` for deterministic before/after analysis.
-52. [ ] Detect new risky SQL, broader writes, destructive DDL, missing guards, and non-idempotent generated changes.
-53. [ ] Check whether generated tests cover the exact tables, code paths, and risk IDs they claim to cover.
-54. [ ] Check whether generated guards fail closed when assumptions or database metadata are unavailable.
-55. [ ] Check whether generated repairs preserve scope and include rollback/validation obligations.
+51. [x] Add `patchline repo compare --before <repo> --after <generated-worktree>` for deterministic before/after analysis.
+52. [x] Detect new risky SQL, broader writes, destructive DDL, missing guards, and non-idempotent generated changes.
+53. [x] Check whether generated tests cover the exact tables, code paths, and risk IDs they claim to cover.
+54. [x] Check whether generated guards fail closed when assumptions or database metadata are unavailable.
+55. [x] Check whether generated repairs preserve scope and include rollback/validation obligations.
 56. [ ] Run safe native tests when discovered, recording commands, exit status, logs, and hashes.
-57. [ ] Run Patchline semantic checks even when native tests are unavailable.
-58. [ ] Emit a before/after delta: risks reduced, risks added, coverage added, evidence strengthened, and unresolved risks.
-59. [ ] Reject or flag generated changes that improve documentation while making data safety worse.
-60. [ ] Produce a maintainer-ready patch review: what changed, why it was proposed, how it was checked, and what remains uncertain.
+57. [x] Run Patchline semantic checks even when native tests are unavailable.
+58. [x] Emit a before/after delta: risks reduced, risks added, coverage added, evidence strengthened, and unresolved risks.
+59. [x] Reject or flag generated changes that improve documentation while making data safety worse.
+60. [x] Produce a maintainer-ready patch review: what changed, why it was proposed, how it was checked, and what remains uncertain.
 
 ## Stage 6: Add semantic depth that is research-worthy
 
