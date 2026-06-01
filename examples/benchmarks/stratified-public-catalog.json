@@ -1,0 +1,10 @@
+{
+  "version": "patchline.stratified-benchmark-spec/v1",
+  "source_catalog": "examples/real-repo-catalog.json",
+  "dimensions": [
+    "ecosystem",
+    "migration_framework"
+  ],
+  "case_command": "go run ./cmd/patchline repo analyze --github {repo} --ref {ref} --subpath {subpath} --stages inventory,baseline,propose,compare --no-llm --out results/generated/stratified/{id}",
+  "reporting_claim": "Experiments can report per-ecosystem and per-framework results instead of only aggregate metrics."
+}
