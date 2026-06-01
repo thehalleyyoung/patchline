@@ -150,6 +150,7 @@ make public-gallery-gate
 make real-repo-catalog-gate
 make non-github-source-gate
 make dataset-card-gate
+make corpus-fairness-gate
 ```
 
 The demo downloads real GitHub project subpaths and writes:
@@ -209,6 +210,8 @@ The real-repo slice matrix is backed by `examples/real-repo-slices.json` and `ex
 `make non-github-source-gate` checks `examples/non-github-source-gates.json` by fetching GitLab, Bitbucket, SourceHut, and release/archive tarball sources through the same provenance and content-addressed cache path.
 
 `make dataset-card-gate` generates dataset cards for every public catalog slice with license, commit, ecosystem, migration framework, evidence types, limitations, and reproducibility commands.
+
+`make corpus-fairness-gate` audits the public catalog for ecosystem, framework, and source-host coverage and reports over-reliance flags with recommendations.
 
 Current default projects:
 
