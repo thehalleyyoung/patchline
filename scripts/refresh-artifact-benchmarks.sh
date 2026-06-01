@@ -7,6 +7,12 @@ cd "$ROOT"
 OUT="benchmarks/expected"
 mkdir -p "$OUT"
 
+if [[ "${PATCHLINE_ACCEPT_EXPECTED_REFRESH:-0}" != "1" ]]; then
+  echo "Refusing to rewrite benchmark expected outputs without PATCHLINE_ACCEPT_EXPECTED_REFRESH=1" >&2
+  echo "Reviewer validation uses make artifact-benchmark-compare; refresh is maintainer-only after reviewing an intentional semantic change." >&2
+  exit 1
+fi
+
 echo "Refreshing Patchline artifact benchmark golden reports"
 echo "output_dir=$OUT"
 
@@ -29,14 +35,5 @@ go run ./cmd/patchline artifact-benchmark validate benchmarks/manifests/public_r
 go run ./cmd/patchline artifact-benchmark run benchmarks/manifests/public_repairs.json --out "$OUT/public-repairs-report.json"
 go run ./cmd/patchline artifact-benchmark validate benchmarks/manifests/public_archive.json
 go run ./cmd/patchline artifact-benchmark run benchmarks/manifests/public_archive.json --out "$OUT/public-archive-report.json"
-
-go run ./cmd/patchline artifact-benchmark compare "$OUT/smoke-report.json" "$OUT/smoke-report.json"
-go run ./cmd/patchline artifact-benchmark compare "$OUT/negative-report.json" "$OUT/negative-report.json"
-go run ./cmd/patchline artifact-benchmark compare "$OUT/repair-cases-report.json" "$OUT/repair-cases-report.json"
-go run ./cmd/patchline artifact-benchmark compare "$OUT/semantic-regressions-report.json" "$OUT/semantic-regressions-report.json"
-go run ./cmd/patchline artifact-benchmark compare "$OUT/public-migrations-report.json" "$OUT/public-migrations-report.json"
-go run ./cmd/patchline artifact-benchmark compare "$OUT/public-incidents-report.json" "$OUT/public-incidents-report.json"
-go run ./cmd/patchline artifact-benchmark compare "$OUT/public-repairs-report.json" "$OUT/public-repairs-report.json"
-go run ./cmd/patchline artifact-benchmark compare "$OUT/public-archive-report.json" "$OUT/public-archive-report.json"
 
 echo "golden_reports_refreshed=$OUT"

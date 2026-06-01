@@ -1,0 +1,173 @@
+{
+  "version": "patchline.corpus-protocol/v1",
+  "description": "Executable benchmark selection and fairness protocol for the ICSE artifact. It records the candidate pools used by committed benchmark manifests, the evidence requirements that keep public-data claims source-grounded, and reviewer commands that validate the suite without rewriting expected outputs.",
+  "inclusion_policy": "Include committed cases only when their fixture is deterministic, their ground-truth file states phase availability and allowed inputs, and their evidence is either source-pinned public material, a committed local repair artifact, or an explicit negative-control fixture.",
+  "exclusion_policy": "Exclude candidates that require private production data, live network access during reviewer validation, unsupported dialect semantics beyond the stated fragment, or postmortem evidence for a pre-deploy claim. Excluded candidates must be recorded with a reason before being used to justify a result.",
+  "required_manifests": [
+    {
+      "dataset_id": "patchline-smoke-v1",
+      "manifest": "benchmarks/manifests/smoke.json",
+      "min_cases": 4,
+      "min_results": {
+        "flag": 3,
+        "verified": 1
+      },
+      "required_evidence_any": ["file", "archive", "rule", "public_source", "postmortem"],
+      "allow_inline": false
+    },
+    {
+      "dataset_id": "patchline-negative-v1",
+      "manifest": "benchmarks/manifests/negative.json",
+      "min_cases": 5,
+      "min_boundary_cases": 3,
+      "boundary_results": ["cannot_prove", "insufficient_evidence", "unsupported_fragment"],
+      "min_results": {
+        "cannot_prove": 2,
+        "insufficient_evidence": 1,
+        "unsupported_fragment": 1,
+        "pass": 1
+      },
+      "required_evidence_any": ["fixture", "file", "rule", "postmortem"],
+      "allow_inline": true
+    },
+    {
+      "dataset_id": "patchline-repair-cases-v1",
+      "manifest": "benchmarks/manifests/repair_cases.json",
+      "min_cases": 3,
+      "min_boundary_cases": 1,
+      "boundary_results": ["cannot_prove"],
+      "min_results": {
+        "verified": 2,
+        "cannot_prove": 1
+      },
+      "required_evidence_any": ["file", "derived_artifact"],
+      "allow_inline": false
+    },
+    {
+      "dataset_id": "patchline-semantic-regressions-v1",
+      "manifest": "benchmarks/manifests/semantic_regressions.json",
+      "min_cases": 2,
+      "min_results": {
+        "flag": 1,
+        "pass": 1
+      },
+      "required_evidence_any": ["file", "archive", "rule"],
+      "allow_inline": false
+    },
+    {
+      "dataset_id": "patchline-public-migrations-v1",
+      "manifest": "benchmarks/manifests/public_migrations.json",
+      "min_cases": 5,
+      "min_results": {
+        "flag": 4,
+        "pass": 1
+      },
+      "required_evidence_all": ["public_source", "sha256"],
+      "allow_inline": false,
+      "requires_fetch": true
+    },
+    {
+      "dataset_id": "patchline-public-incidents-v1",
+      "manifest": "benchmarks/manifests/public_incidents.json",
+      "min_cases": 3,
+      "min_boundary_cases": 1,
+      "boundary_results": ["insufficient_evidence"],
+      "min_results": {
+        "flag": 2,
+        "insufficient_evidence": 1
+      },
+      "required_evidence_any": ["postmortem", "public_issue", "fixture"],
+      "allow_inline": true
+    },
+    {
+      "dataset_id": "patchline-public-derived-repairs-v1",
+      "manifest": "benchmarks/manifests/public_repairs.json",
+      "min_cases": 1,
+      "min_boundary_cases": 1,
+      "boundary_results": ["cannot_prove"],
+      "min_results": {
+        "cannot_prove": 1
+      },
+      "required_evidence_any": ["postmortem", "public_issue", "derived_artifact"],
+      "allow_inline": false
+    },
+    {
+      "dataset_id": "patchline-public-postmortem-derived-archive-v1",
+      "manifest": "benchmarks/manifests/public_archive.json",
+      "min_cases": 1,
+      "min_results": {
+        "flag": 1
+      },
+      "required_evidence_any": ["public_postmortem", "public_issue", "archive"],
+      "allow_inline": false
+    }
+  ],
+  "candidate_pools": [
+    {
+      "id": "committed-smoke-fixtures",
+      "description": "Small offline reviewer path covering migration risk, public-derived incident evidence, repair replay, and semantic recurrence.",
+      "source": "benchmarks/manifests/smoke.json",
+      "candidates": [
+        {"case_id": "billing-bad-backfill-migration", "disposition": "included", "manifest": "benchmarks/manifests/smoke.json", "source": "demos/billing/migrations/002_bad_backfill.sql", "rationale": "Committed migration fixture exercises high-risk broad update detection."},
+        {"case_id": "gitlab-2017-destructive-primary-data", "disposition": "included", "manifest": "benchmarks/manifests/smoke.json", "source": "examples/historical-failures/gitlab-2017/source-observations.jsonl", "rationale": "Committed public-source observations exercise postmortem-grounded incident review."},
+        {"case_id": "billing-repair-replay", "disposition": "included", "manifest": "benchmarks/manifests/smoke.json", "source": "examples/repairs/repair-bad-invoice-backfill.json", "rationale": "Committed repair manifest exercises replay-backed verification."},
+        {"case_id": "billing-semantic-regression", "disposition": "included", "manifest": "benchmarks/manifests/smoke.json", "source": "examples/archive/bad-migration-corpus.json", "rationale": "Committed archive fixture exercises recurrence detection."}
+      ]
+    },
+    {
+      "id": "negative-boundary-controls",
+      "description": "Explicit limitation cases that must not be counted as Patchline wins.",
+      "source": "benchmarks/manifests/negative.json",
+      "candidates": [
+        {"case_id": "unsupported-procedural-sql", "disposition": "included", "manifest": "benchmarks/manifests/negative.json", "source": "inline:procedural-sql", "rationale": "Procedural SQL is outside the current relational fragment and must be reported unsupported."},
+        {"case_id": "insufficient-public-incident-evidence", "disposition": "included", "manifest": "benchmarks/manifests/negative.json", "source": "inline:public-summary-too-thin", "rationale": "Thin public summaries must not be upgraded into causal claims."},
+        {"case_id": "predeploy-postmortem-leakage", "disposition": "included", "manifest": "benchmarks/manifests/negative.json", "source": "inline:phase-guard", "rationale": "Postmortem-only evidence must not be available to pre-deploy claims."},
+        {"case_id": "non-replayable-missing-backup", "disposition": "included", "manifest": "benchmarks/manifests/negative.json", "source": "examples/historical-failures/gitlab-2017/no-snapshot-repair.json", "rationale": "Missing replay/backup evidence must remain cannot_prove."},
+        {"case_id": "safe-scoped-nonrecurrence", "disposition": "included", "manifest": "benchmarks/manifests/negative.json", "source": "demos/billing/migrations/003_corrective_repair.sql", "rationale": "A safe corrective repair should remain a pass/non-recurrence control."}
+      ]
+    },
+    {
+      "id": "committed-repair-and-regression-fixtures",
+      "description": "Offline repair and semantic-regression cases used to separate detection from proof/replay/archive enrichment.",
+      "source": "benchmarks/manifests/repair_cases.json and benchmarks/manifests/semantic_regressions.json",
+      "candidates": [
+        {"case_id": "billing-repair-replay", "disposition": "included", "manifest": "benchmarks/manifests/repair_cases.json", "source": "examples/repairs/repair-bad-invoice-backfill.json", "rationale": "Snapshot-backed repair should be replay-verifiable."},
+        {"case_id": "billing-insert-delete-repair", "disposition": "included", "manifest": "benchmarks/manifests/repair_cases.json", "source": "examples/repairs/repair-insert-delete-invoice.json", "rationale": "Delete repair exercises non-backfill repair semantics."},
+        {"case_id": "append-only-ledger-manual-rollback", "disposition": "included", "manifest": "benchmarks/manifests/repair_cases.json", "source": "examples/repairs/repair-append-only-ledger.json", "rationale": "Manual rollback should remain cannot_prove."},
+        {"case_id": "billing-semantic-regression", "disposition": "included", "manifest": "benchmarks/manifests/semantic_regressions.json", "source": "examples/archive/bad-migration-corpus.json", "rationale": "Historical bad migration archive should flag recurring semantics."},
+        {"case_id": "billing-corrective-repair-nonrecurrence", "disposition": "included", "manifest": "benchmarks/manifests/semantic_regressions.json", "source": "demos/billing/migrations/003_corrective_repair.sql", "rationale": "Corrective repair should not be mislabeled as recurrence."}
+      ]
+    },
+    {
+      "id": "pinned-bytebase-public-migrations",
+      "description": "All five SHA-pinned Bytebase migrations currently declared in examples/public-corpus/sources.json.",
+      "source": "examples/public-corpus/sources.json",
+      "candidates": [
+        {"case_id": "bytebase-sheet-blob", "disposition": "included", "manifest": "benchmarks/manifests/public_migrations.json", "source": "examples/public-corpus/sources.json#bytebase-sheet-blob", "rationale": "Pinned public migration contains a broad data rewrite over sheet rows."},
+        {"case_id": "bytebase-replica-heartbeat", "disposition": "included", "manifest": "benchmarks/manifests/public_migrations.json", "source": "examples/public-corpus/sources.json#bytebase-replica-heartbeat", "rationale": "Pinned public migration contains nontrivial system-table mutation."},
+        {"case_id": "bytebase-workspace", "disposition": "included", "manifest": "benchmarks/manifests/public_migrations.json", "source": "examples/public-corpus/sources.json#bytebase-workspace", "rationale": "Pinned public migration contains workspace data movement requiring review."},
+        {"case_id": "bytebase-drop-sheet-table", "disposition": "included", "manifest": "benchmarks/manifests/public_migrations.json", "source": "examples/public-corpus/sources.json#bytebase-drop-sheet-table", "rationale": "Pinned public migration drops a data-bearing table."},
+        {"case_id": "bytebase-drop-unused-id-columns", "disposition": "included", "manifest": "benchmarks/manifests/public_migrations.json", "source": "examples/public-corpus/sources.json#bytebase-drop-unused-id-columns", "rationale": "Pinned public migration provides a lower-risk public control."}
+      ]
+    },
+    {
+      "id": "public-incident-and-derived-fixtures",
+      "description": "Public postmortem-derived incident, repair, and archive cases with one explicit insufficient-evidence boundary.",
+      "source": "examples/historical-failures/suite.json and examples/archive/public-postmortem-derived-paired-archive.json",
+      "candidates": [
+        {"case_id": "gitlab-2017-public-source-observations", "disposition": "included", "manifest": "benchmarks/manifests/public_incidents.json", "source": "examples/historical-failures/gitlab-2017/source-observations.jsonl", "rationale": "Public GitLab incident observations establish destructive primary-data transition and remediation obligations."},
+        {"case_id": "github-2018-public-source-observations", "disposition": "included", "manifest": "benchmarks/manifests/public_incidents.json", "source": "examples/historical-failures/github-2018/source-observations.jsonl", "rationale": "Public GitHub incident observations establish split-brain conflicting writes and manual reconciliation."},
+        {"case_id": "public-incident-summary-too-thin", "disposition": "included", "manifest": "benchmarks/manifests/public_incidents.json", "source": "inline:public-summary-too-thin", "rationale": "Boundary case prevents treating thin public summaries as sufficient evidence."},
+        {"case_id": "gitlab-2017-counterfactual-no-snapshot-repair", "disposition": "included", "manifest": "benchmarks/manifests/public_repairs.json", "source": "examples/historical-failures/gitlab-2017/no-snapshot-repair.json", "rationale": "Public-derived counterfactual repair must remain cannot_prove without snapshot rollback evidence."},
+        {"case_id": "public-postmortem-derived-paired-archive", "disposition": "included", "manifest": "benchmarks/manifests/public_archive.json", "source": "examples/archive/public-postmortem-derived-paired-archive.json", "rationale": "Paired public-derived archive exercises recurrence over incident-derived repair artifacts."}
+      ]
+    }
+  ],
+  "reviewer_commands": [
+    {"id": "artifact-smoke", "command": "make artifact-smoke", "expected_exit": 0, "mode": "reviewer"},
+    {"id": "artifact-full", "command": "make artifact-full", "expected_exit": 0, "mode": "reviewer"},
+    {"id": "artifact-corpus-audit", "command": "make artifact-corpus-audit", "expected_exit": 0, "mode": "reviewer"},
+    {"id": "artifact-benchmark-refresh", "command": "PATCHLINE_ACCEPT_EXPECTED_REFRESH=1 make artifact-benchmark-refresh", "expected_exit": 0, "mode": "maintainer"},
+    {"id": "artifact-studies-refresh", "command": "PATCHLINE_ACCEPT_EXPECTED_REFRESH=1 make artifact-studies-refresh", "expected_exit": 0, "mode": "maintainer"}
+  ]
+}

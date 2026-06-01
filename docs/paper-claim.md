@@ -1,10 +1,14 @@
 # Patchline artifact claim
 
-Patchline's paper-facing claim is:
+Patchline's product-facing claim is:
 
-> Patchline converts historical production data-repair incidents into executable semantic artifacts that can replay repairs, prove scope and frame obligations, and detect recurrence across future migrations.
+> Patchline can be pointed at existing repos, GitHub projects, migration directories, source trees, telemetry/deploy exports, JSON logs, incident docs, and repair artifacts to produce immediate deterministic problem/cause/repair findings before a team adopts Patchline-specific labels or schemas.
 
-The claim is deliberately narrower than “incident automation.” Patchline does not guess root causes or generate repairs. It packages available operational evidence, migrations, repair plans, policies, bounded stores, solver obligations, replay traces, and archive entries into deterministic artifacts that can be inspected and rerun.
+Patchline's paper-facing validation claim is:
+
+> Those immediate findings can progressively compile into executable semantic artifacts that replay repairs, prove scope and frame obligations, and detect recurrence across future migrations when the corresponding evidence, repair, store, policy, or invariant inputs are present.
+
+The claim is deliberately narrower than “incident automation.” Patchline does not guess root causes or generate repairs. It first inventories and checks current data with `patchline intake`, deriving candidate problems/causes/repairs only from concrete findings and shared identifiers such as tables, incidents, or commits; then, where richer inputs exist, it packages available operational evidence, migrations, repair plans, policies, bounded stores, solver obligations, replay traces, and archive entries into deterministic artifacts that can be inspected and rerun.
 
 ## Central object
 
@@ -16,6 +20,7 @@ Evidence -> Trace -> Transition -> Repair -> Proof -> Replay -> Archive -> Regre
 
 | Term | Meaning in Patchline | Reviewer-visible command |
 | --- | --- | --- |
+| Intake | Format-agnostic scan of local or GitHub project data for SQL, source SQL, telemetry/export/evidence signals, incident docs, repair manifests, unknown JSON, problem/cause/repair candidates, and runnable next commands. | `intake` |
 | Evidence | Source-grounded events, observations, public incident facts, SQL files, and repair manifests. | `ingest-evidence`, `historical-failures`, `extract-sql` |
 | Trace | A normalized event projection with stable ordering, confidence, and hash. | `trace-reconstruct` |
 | Transition | A migration or state-changing operation classified by relational effect and risk. | `analyze-migration`, `migration-semantics` |

@@ -1,312 +1,151 @@
 # Patchline
 
-Patchline converts historical production data-repair incidents into executable semantic artifacts that can replay repairs, prove scope and frame obligations, and detect recurrence across future migrations.
+Patchline is a deterministic checker for the data-change material teams already have: GitHub repos, migration directories, service source trees, telemetry exports, JSON logs, incident notes, and repair scripts.
 
-It is a deterministic repair-semantics workbench for production data incidents. Its core claim is that an outage, a migration, a row-change stream, a repair script, a backup decision, and a postmortem should not be separate narratives: they should compile into one typed transition system whose claims can be replayed, queried, proved, or refuted.
-
-**Artifact-paper motivation.** Modern services routinely repair production state after bad migrations, unsafe deletes, divergent writes, failed backups, and stale derived outputs. The hard part is not writing one cleanup query; it is connecting the operational evidence, code/data transition, intended repair, rollback story, and future recurrence risk into a checkable object. Patchline makes that object explicit: public or local historical records become source-grounded observations; observations become typed traces and causal graphs; repairs become bounded state transformers; safety claims become Z3 obligations, replay hashes, policy decisions, and archive queries.
-
-**Promise today:** given incident evidence, migration SQL, a repair manifest, policy rules, benchmark fixtures, and public historical sources, Patchline reconstructs causal provenance, classifies risky data changes, proves repair scope obligations with Z3, replays the repair over a bounded store, checks invariants/workflow properties, emits signed/hashable artifacts, indexes incidents for recurrence analysis, and validates counterfactual failure-avoidance signals on source-verified public incidents.
-
-**No AI. No guesses.** Patchline is intentionally built from inspectable mechanisms: typed provenance, Z3-backed proof obligations, effect inference, invariant checks, replayable repair manifests, stable canonical output, source-manifest verification, and hash-chained audit records.
-
-## Artifact reviewer path
-
-Patchline now has a reviewer-oriented artifact path in addition to its broader utility validation:
+It is not an AI tool, and it does not require you to label data or adopt a Patchline-specific format first. Point it at existing files; it inventories what is there, finds risky SQL and operational clues, and prints the next commands that can run immediately.
 
 ```bash
-make artifact-smoke
-make artifact-demo
-make artifact-ground-truth-check
-make phase-check
-make artifact-studies-compare
-make artifact-studies-public-compare
-make artifact-tables
-make artifact-benchmark-compare
-make artifact-benchmark-public
-make artifact-benchmark-public-incidents
-make artifact-benchmark-public-repairs
-make artifact-benchmark-public-archive
-make artifact-negative-cases
+go run ./cmd/patchline intake . --out results/generated/intake
+go run ./cmd/patchline intake --github owner/repo --subpath path/to/migrations --out results/generated/intake
 ```
 
-Start with [`ARTIFACT.md`](ARTIFACT.md) for the quick evaluator path, [`docs/paper-claim.md`](docs/paper-claim.md) for the single paper-facing claim, [`docs/semantic-core.md`](docs/semantic-core.md) for the auditable semantic core, and [`benchmarks/LABELING.md`](benchmarks/LABELING.md) for the phase-aware ground-truth protocol.
+## Why this is useful
 
-`make artifact-studies-compare` writes `baselines.{json,md}`, `ablations.{json,md}`, and `scale.{json,md}` under `results/generated/artifact-studies/` for the committed strict corpus, then compares their stable report hashes against `benchmarks/expected/studies-strict.json`. These reports make the current claim sharper: Patchline is not merely detecting bad SQL; it shows, case by case, which semantic layers add tables/effects/reasons, ground-truth links, archive links, Z3-backed repair obligations, stable hashes, and reviewer-actionable evidence beyond DDL-grep, normalized SQL-rule, and effects-only baselines.
+Real production data problems often start as ordinary files: a broad migration, a risky backfill, a rollback note, a deploy export, a trace dump, or an ad hoc repair script. Those files are usually scattered across repos and tools. Patchline gives you a first pass over them without asking you to prepare a special dataset.
 
-`make artifact-studies-public-compare` is the explicit network-backed study path. It fetches the pinned Bytebase migration corpus, writes the same baseline/ablation/scale tables under `results/generated/artifact-studies/public-migrations/`, and checks their stable hashes against `benchmarks/expected/studies-public-migrations.json`. This public corpus measures migration detection and structural actionability only; it does not claim archive/proof gains for cases that do not declare those inputs.
+On the public Bytebase repository, this command downloads the repo and checks its real migration directory:
 
-`make artifact-tables` emits paper-facing summaries under `results/generated/artifact-tables/summary.{json,md}`. The generator derives five deterministic ICSE-style tables from the checked benchmark reports and study specs: executable corpora, detection/actionability, semantic-evidence ablation, historical public-derived counterfactuals, and scale. It keeps the public-postmortem-derived boundary explicit and excludes machine-dependent timing from stable table claims.
+```bash
+go run ./cmd/patchline intake \
+  --github bytebase/bytebase \
+  --subpath backend/migrator/migration \
+  --out results/generated/intake
+```
 
-`make phase-check` runs the reviewer-facing `patchline phase-check` command over every committed benchmark manifest, printing each case's declared phase/input kind and failing on any phase/input availability violation. This is the quick no-hindsight-leakage check; it uses the same validation rules as the benchmark runner without executing predictions.
-
-`make artifact-benchmark-compare` runs the committed smoke, negative, repair, and regression benchmark manifests, emits deterministic reports under `results/generated/artifact-benchmark/`, and compares them against frozen expected outputs in `benchmarks/expected/`. Ground-truth labels validate the manifest and compare the final answer, while prediction uses only the fixture input kinds allowed for the case phase.
-
-The offline benchmark compare path now includes focused repair and regression datasets in addition to smoke and negative controls. `benchmarks/manifests/repair_cases.json` checks during-repair artifacts with explicit repair plans, bounded stores, invariants, replay hashes, solver hashes, and a manual-rollback boundary. `benchmarks/manifests/semantic_regressions.json` checks archive-only recurrence detection and a scoped corrective non-recurrence case.
-
-`make artifact-benchmark-public` explicitly fetches five pinned Bytebase migrations, verifies their SHA-256 hashes, runs the older benchmark-suite label/hash check, then runs the phase-aware artifact benchmark over `benchmarks/manifests/public_migrations.json`. It is the current real-OSS migration corpus path; it is kept out of the default smoke target so fresh-checkout review does not require network access.
-
-`make artifact-benchmark-public-incidents` is the offline public-incident counterpart: it runs GitLab 2017 and GitHub 2018 source-observation fixtures plus a too-thin public-summary boundary through the same phase-aware manifest protocol and compares the result to `benchmarks/expected/public-incidents-report.json`.
-
-`make artifact-benchmark-public-repairs` adds the first public-derived repair benchmark case. It checks a Patchline-authored counterfactual repair manifest derived from the GitLab 2017 public postmortem and follow-up issues, and verifies that Patchline returns `cannot_prove` rather than certifying a repair plan with no snapshot rollback evidence. This is intentionally a one-case public-derived benchmark, not a full public repair corpus.
-
-`make artifact-benchmark-public-archive` adds the first paired public-postmortem-derived archive case. It uses GitLab 2017 and GitHub 2018 public source observations with Patchline-authored migration, repair, and replay-store reconstructions; the archive distinguishes GitLab's no-snapshot repair as `cannot_prove`, verifies the scoped GitHub reconciliation, and flags the later broad `issues` transition as a shared high-risk-table recurrence.
-
-If a semantic change intentionally updates expected benchmark outputs, run `make artifact-benchmark-refresh`. If it intentionally updates study report hashes, run `make artifact-studies-refresh`. Refresh targets rewrite committed expected files and immediately rerun compare targets, keeping the default reviewer path drift-detecting rather than self-updating.
-
-The central artifact object is:
+Recent output from that command:
 
 ```text
-Evidence -> Trace -> Transition -> Repair -> Proof -> Replay -> Archive -> Regression
+files=251 sql_files=251 high_risk=378 medium_risk=725
+problems=339 causes=339 repair_candidates=16 links=10243
 ```
 
-| Stage | Command | Artifact emitted | Why it matters |
-| --- | --- | --- | --- |
-| Evidence | `historical-failures`, `ingest-evidence`, `extract-sql` | source-grounded facts/events | prevents benchmark claims from floating free of public evidence |
-| Trace | `trace-reconstruct` | projection hash and event ordering | makes incident observations replayable |
-| Transition | `analyze-migration`, `migration-semantics` | migration risk/effect report | catches pre-deploy unsafe transitions |
-| Repair | `repair-semantics`, `dry-run` | repair step trace and row diffs | makes repair behavior executable |
-| Proof | `solver-obligations` | Z3-backed obligations or explicit downgrade | separates solver-backed claims from heuristics |
-| Replay | `repair-outcomes` | verification and rollback history | connects repair execution to archive memory |
-| Archive | `archive-index`, `archive-query` | deterministic incident index | turns incidents into queryable memory |
-| Regression | `semantic-regressions` | recurrence relations and invariants | detects repeated semantic failure shapes |
-| Artifact studies | `artifact-baselines`, `artifact-ablations`, `artifact-scale`, `artifact-study compare` | baseline, ablation, scale, and expected-hash reports | shows and drift-checks what each semantic layer contributes right now |
-| Paper tables | `artifact-tables` | five deterministic ICSE-style result tables | turns checked reports into reviewer-facing corpus, detection, ablation, historical, and scale summaries |
-| Phase check | `phase-check` | per-manifest phase/input availability report | makes no-hindsight leakage a first-class reviewer command |
-| Artifact benchmark | `artifact-benchmark validate/run/compare` | phase-aware migration, incident, public-derived repair, paired public-archive, and regression reports with golden comparisons | verifies current usefulness against committed and pinned-public ground truth without label leakage |
+One concrete finding was a high-risk update in Bytebase's real migration history:
 
-## Verify the current usefulness claim
+```text
+3.1/0000##sheet_blob.sql
+table=sheet
+update sheet set sha256 = sha256(convert_to(sheet.statement, ?)) where statement is not null
+```
 
-The repo already has a reproducible validation path for the kind of cross-layer incident review a large observability or infrastructure company needs: it checks a historical-style bad migration fixture end to end, fetches pinned public migration files from an open-source migration platform to validate analyzer behavior against real SQL, and validates public incident counterfactuals against source phrases, linked public issue data, source-derived observations, and Patchline semantic signals.
-
-Prerequisites: Go 1.22+, `curl`, `jq`, and Z3. This repository was validated with `Z3 version 4.15.8 - 64 bit`.
+Patchline also emits runnable follow-up commands such as:
 
 ```bash
-z3 --version
-make verify-usefulness
+patchline analyze-migration .../backend/migrator/migration/3.1/0000##sheet_blob.sql --json
 ```
 
-That target runs the unit suite, strict CI gate, a SHA-verified public migration corpus benchmark, Z3-backed solver obligations, the semantic audit, the incident archive index, deterministic historical archive queries, repair outcome history, semantic regression detection, the historical-failure suite, and public-source phrase checks. The public corpus is downloaded into `examples/public-corpus/downloads/` from pinned raw URLs and checked against `examples/public-corpus/sources.json`; the SQL files are not vendored. The GitLab 2017 case now verifies the postmortem plus linked public issue/API documents for backup monitoring, point-in-time recovery, hourly snapshots, backup-restore testing, staging migration rollback tooling, environment differentiation, and hard-delete policy gaps.
+That is the core value: before you write custom labels, manifests, or benchmark cases, Patchline can already tell you where risky data transitions, possible causes, and possible repair/rollback evidence are hiding in a real project.
 
-The expected default semantic audit result is `20` conforming artifacts and `0` counterexamples. The expected historical-failure result includes a primary-data destructive-operation case and a split-brain conflicting-write case, both backed by public postmortem source checks. If Z3 is missing, Patchline does not pretend to prove solver obligations: the solver report records the Z3 failure and downgrades those claims instead of using a handwritten SMT substitute.
+## What intake finds
 
-## Why this is novel
+`patchline intake` produces `summary.json` and `summary.md` with:
 
-Patchline's research claim is not "another migration linter" or "another incident tracker." The novel premise is a non-ML, proof-carrying bridge between operational telemetry, relational program semantics, repair execution, CI gates, and historical incident knowledge. Existing systems usually cover one slice: provenance, SQL equivalence, database testing, workflow model checking, repair synthesis, or incident management. Patchline makes those artifacts compose into a single reproducible evidence object: source-grounded observations plus a causal graph plus a repair transformer plus proof obligations plus replay hashes plus archive buckets. That is the unifying promise: Patchline evaluates production repair as a historical program-semantics problem, not as a bag of independent checks.
-
-See [`docs/literature-positioning.md`](docs/literature-positioning.md) for the prior-art matrix and [`docs/usefulness-validation.md`](docs/usefulness-validation.md) for the validation protocol.
-
-## Why this repo exists
-
-Production data failures rarely stay inside one layer. A bad migration corrupts rows, a queue replay duplicates ledger entries, a deploy changes validation, and a dashboard quietly reports the wrong number. Patchline treats those failures as software-engineering incidents with causal evidence, not as one-off SQL cleanups.
-
-The first scaffold in this repo focuses on a small but real core:
-
-| Area | What exists now |
+| Finds | From |
 | --- | --- |
-| Provenance graph | Typed entities and edges plus deterministic cause reports, minimal explanations, blast radius, incident-shape diffing, and causal certificates |
-| Evidence ingestion | JSONL operational evidence ingest plus deterministic trace reconstruction with confidence and clock uncertainty |
-| Repair manifests | JSON repair DSL with semantic validation, Hoare-style proof obligations, frame checks, and SQL refinement checks |
-| Solver obligations | Z3-backed scope implication proofs plus finite-store frame, row-count, and invariant-preservation checks with explicit downgrade if Z3 is unavailable |
-| Symbolic execution | Bounded repair-program row paths with guard constraints, symbolic assignments, and stuck-step hashes |
-| Workflow model checking | Bounded ingest/explain/approve/dry-run/apply/verify/rollback/audit/archive state exploration with temporal properties, proof holes, and counterexample fixtures |
-| CEGAR refinement | Counterexample/proof-hole guided reruns that refine coarse repair abstractions with invariant specs and incident workflow models |
-| Incident archive | Deterministic archive index and historical queries over evidence, migrations, repair manifests, policies, benchmark results, repair outcome hashes, rollback availability, recurrence candidates, and semantic regressions |
-| Historical failures | Public counterfactual suite that checks postmortems, linked public issue/API records, source-derived observations, destructive primary-data mutations, rollback gaps, damaged reports, and split-brain conflicting writes |
-| Effect inference | A deterministic effect lattice and abstract interpreter over replay diffs |
-| Migration analysis | SQL migration triage plus schema-state diffing, typed relational-signature semantics, and source-code SQL extraction |
-| Replay sandbox | In-memory and imported-snapshot dry-run engine that emits stable row diffs, compensating-action semantics, and snapshot drift reports |
-| Attestation checks | Executable checks for row diffs, operation effects, blast radius, downstream impact, hashes, plus Ed25519 signatures over semantic artifacts |
-| Reproducibility artifacts | Benchmark-style manifests that pin dry-run hashes and ledger checkpoints |
-| Strict benchmark suites | Frozen corpora with labels, pinned analyzer hashes, precision, and recall |
-| CI gate | PR-friendly benchmark gate with precision/recall floors, GitHub Actions summaries, and annotations |
-| Policy gates and bundles | Deterministic review policies plus proof-carrying incident bundle manifests for handoff |
-| Audit ledger | Hash-chained repair ledger with checkpoint verification |
-| Semantic contract | Hashable state/observation/repair contract plus conformance audit over historical artifacts |
-| CLI | Commands for explanation, validation, dry-run replay, graph slicing, policy evaluation, bundles, benchmarks, and ledger verification |
+| Risky data-changing SQL | `.sql`, `.psql`, `.ddl`, and SQL snippets in text/source files |
+| Embedded/source SQL | Go, Python, Ruby, JavaScript/TypeScript, Java, C#, shell, and SQL files |
+| Cause candidates | risky migrations, deploy/trace/commit/migration signals, incident-like notes, export fields |
+| Repair candidates | repair manifests, rollback/revert/restore/backfill/reconcile/fix clues in SQL/docs/scripts |
+| Existing evidence | JSONL evidence, Datadog/OTLP/GitHub/Postgres/migration-runner exports when recognizable |
+| Unknown JSON signals | generic SQL/trace/deploy/commit/record fields without requiring a known schema |
+| Next commands | exact commands that should run on discovered files |
 
-See [`docs/rise-research-agenda.md`](docs/rise-research-agenda.md) for the research positioning.
-See [`docs/current-operations.md`](docs/current-operations.md) for the current SRE and CI workflow positioning.
-See [`docs/evidence-jsonl.md`](docs/evidence-jsonl.md) for the telemetry bridge format.
-See [`docs/repair-manifests.md`](docs/repair-manifests.md) for migration, template, and lint tooling.
-See [`docs/effect-lattice.md`](docs/effect-lattice.md) for the deterministic effect lattice and abstraction relation.
-See [`docs/invariants.md`](docs/invariants.md) for invariant declarations, before/after checks, and candidate discovery.
-See [`docs/solver-obligations.md`](docs/solver-obligations.md) for Z3-backed proof obligations.
-See [`docs/symbolic-execution.md`](docs/symbolic-execution.md) for bounded repair-program path constraints.
-See [`docs/workflow-model-checking.md`](docs/workflow-model-checking.md) for temporal incident workflow checks and proof holes.
-See [`docs/refinement-and-attestations.md`](docs/refinement-and-attestations.md) for CEGAR-style refinement and signed artifact verification.
-See [`docs/archive-index.md`](docs/archive-index.md) for semantic incident archives over historical evidence and repairs.
-See [`docs/historical-failures.md`](docs/historical-failures.md) for public postmortem counterfactual validation.
-See [`docs/replay-semantics.md`](docs/replay-semantics.md) for small-step traces, commutativity/confluence checks, and isolation hazards.
-See [`docs/migration-analysis.md`](docs/migration-analysis.md) for generic and dialect-specific SQL migration analysis.
-See [`docs/schema-semantics.md`](docs/schema-semantics.md) for schema diffs and relational-signature migration semantics.
-See [`docs/source-sql-extraction.md`](docs/source-sql-extraction.md) for embedded SQL and ORM/query-builder extraction.
-See [`docs/migration-outcomes.md`](docs/migration-outcomes.md) for migration outcome histories and semantic changelogs.
-See [`docs/semantics.md`](docs/semantics.md) for the semantic contract, state model, observation model, and conformance audit.
+Candidate links are conservative: Patchline links problems, causes, and repairs only through shared identifiers such as table names, incident IDs, or commits. A link is a lead to inspect, not proof of causality.
 
-## Quick start
+## Common commands
+
+```bash
+# Build
+go build -o bin/patchline ./cmd/patchline
+
+# Scan current repo/export data
+go run ./cmd/patchline intake . --out results/generated/intake
+
+# Scan part of a public GitHub repo
+go run ./cmd/patchline intake --github bytebase/bytebase --subpath backend/migrator/migration --out results/generated/intake
+
+# Analyze one migration directly
+go run ./cmd/patchline analyze-migration path/to/migration.sql --json
+
+# Extract embedded SQL from a source tree
+go run ./cmd/patchline extract-sql path/to/source --json
+
+# Adapt existing observability/deploy exports when they match known formats
+go run ./cmd/patchline adapt-evidence datadog export.json --json
+go run ./cmd/patchline adapt-evidence otlp export.json --json
+go run ./cmd/patchline adapt-evidence postgres logical-decoding.json --json
+go run ./cmd/patchline adapt-evidence github deployments.json --json
+go run ./cmd/patchline adapt-evidence migration-runner migrations.json --json
+
+# Lint or replay richer repair artifacts if you already have them
+go run ./cmd/patchline lint-repair repair.json --json
+go run ./cmd/patchline dry-run repair.json --store store.json --json
+```
+
+## What deeper checks add
+
+The intake command is the front door. If your tree also contains richer inputs, Patchline can go further:
+
+| If you have | Patchline can check |
+| --- | --- |
+| repair manifests | operation scope, dependency cycles, rollback requirements, generated SQL |
+| bounded before/after stores | replayed row diffs and repair effects |
+| invariants | row-count/frame/invariant obligations, with Z3 when available |
+| event JSONL or adapted exports | provenance graphs, trace reconstruction, blast radius |
+| prior incident archives | recurring risky tables, missing rollback patterns, repeated repair shapes |
+
+Patchline always records when it cannot prove something. Missing evidence becomes an explicit downgrade, not a made-up success.
+
+## Validation
+
+Run the normal test suite:
 
 ```bash
 go test ./...
-go run ./cmd/patchline about
-go run ./cmd/patchline semantics-contract
-go run ./cmd/patchline semantics-audit
-go run ./cmd/patchline trace-reconstruct examples/incidents/bad-migration.jsonl
-go run ./cmd/patchline provenance certificate record:invoices/inv_1002 --evidence examples/incidents/bad-migration.jsonl
-go run ./cmd/patchline explain record:invoices/inv_1002
-go run ./cmd/patchline validate-repair examples/repairs/repair-bad-invoice-backfill.json
-go run ./cmd/patchline lint-repair examples/repairs/repair-bad-invoice-backfill.json --proof
-go run ./cmd/patchline solver-obligations examples/repairs/repair-bad-invoice-backfill.json --invariants examples/invariants/billing-core.json
-go run ./cmd/patchline symbolic-exec examples/repairs/repair-bad-invoice-backfill.json
-go run ./cmd/patchline model-check-workflow examples/workflows/bad-migration-approved.json
-go run ./cmd/patchline cegar-refine examples/repairs/repair-bad-invoice-backfill.json --store examples/snapshots/billing-bad-migration-before.json --invariants examples/invariants/billing-core.json --workflow examples/workflows/bad-migration-approved.json
-go run ./cmd/patchline archive-index examples/archive/bad-migration-corpus.json
-go run ./cmd/patchline archive-query examples/archive/bad-migration-corpus.json --json
-go run ./cmd/patchline repair-outcomes examples/archive/bad-migration-corpus.json --json
-go run ./cmd/patchline semantic-regressions examples/archive/bad-migration-corpus.json --json
-go run ./cmd/patchline historical-failures examples/historical-failures/suite.json --json
-go run ./cmd/patchline attestation-keygen --json
-go run ./cmd/patchline analyze-migration demos/billing/migrations/002_bad_backfill.sql
-go run ./cmd/patchline analyze-migration examples/migrations/sqlserver-top-delete.sql --dialect sqlserver
-go run ./cmd/patchline schema-diff demos/billing/migrations/001_schema.sql examples/schemas/empty.json examples/schemas/billing-v1.json
-go run ./cmd/patchline migration-semantics demos/billing/migrations/001_schema.sql examples/schemas/empty.json
-go run ./cmd/patchline extract-sql examples/source-sql
-go run ./cmd/patchline migration-outcomes examples/incidents/bad-migration.jsonl demos/billing/migrations/002_bad_backfill.sql --repair examples/repairs/repair-bad-invoice-backfill.json --policy examples/policies/review-required.json --benchmark examples/benchmarks/strict-migration-corpus.json --source-sql examples/source-sql
-go run ./cmd/patchline dry-run examples/repairs/repair-bad-invoice-backfill.json --json
-go run ./cmd/patchline repair-semantics examples/repairs/repair-bad-invoice-backfill.json
-go run ./cmd/patchline repair-semantics examples/repairs/repair-bad-invoice-backfill.json --store examples/snapshots/billing-bad-migration-before.json
-go run ./cmd/patchline snapshot-drift examples/repairs/repair-bad-invoice-backfill.json examples/snapshots/billing-bad-migration-before.json examples/snapshots/billing-bad-migration-before.json
-go run ./cmd/patchline effect-summary examples/repairs/repair-bad-invoice-backfill.json
-go run ./cmd/patchline check-invariants examples/repairs/repair-bad-invoice-backfill.json examples/invariants/billing-core.json
-go run ./cmd/patchline reproduce examples/reproduce/bad-migration-billing.json
-go run ./cmd/patchline evaluate-policy examples/policies/review-required.json examples/repairs/repair-bad-invoice-backfill.json demos/billing/migrations/002_bad_backfill.sql
-go run ./cmd/patchline benchmark-suite examples/benchmarks/strict-migration-corpus.json
-go run ./cmd/patchline artifact-benchmark run benchmarks/manifests/smoke.json
-go run ./cmd/patchline adapt-evidence otlp examples/evidence/otlp-span-export.json --out /tmp/patchline-events.jsonl
-go run ./cmd/patchline adapt-evidence postgres examples/evidence/postgres-logical-decoding.json --out /tmp/patchline-events.jsonl
-go run ./cmd/patchline ingest-evidence examples/incidents/bad-migration.jsonl
-go run ./cmd/patchline ingest-evidence examples/incidents/bad-migration.jsonl --out /tmp/patchline-graph.json
-go run ./cmd/patchline explain report:monthly_revenue --graph /tmp/patchline-graph.json
-go run ./cmd/patchline ci-gate examples/benchmarks/strict-migration-corpus.json --min-precision 0.95 --min-recall 0.95
-go run ./cmd/patchline ledger-verify --json
 ```
 
-Or:
+Run the small intake demo bundled with this repo:
 
 ```bash
-make test
-make demo
+make intake-demo
 ```
 
-## Example dry run
-
-The included billing scenario models a faulty invoice backfill. Patchline can trace the bad row back to the migration and compute the deterministic repair diff:
+Run the broader deterministic validation suite when you want to exercise the benchmark, provenance, baseline, ablation, and public-corpus checks:
 
 ```bash
-go run ./cmd/patchline explain record:invoices/inv_1002
-go run ./cmd/patchline analyze-migration demos/billing/migrations/002_bad_backfill.sql
-go run ./cmd/patchline dry-run examples/repairs/repair-bad-invoice-backfill.json
-go run ./cmd/patchline benchmark examples/reproduce/bad-migration-billing.json
-go run ./cmd/patchline benchmark-suite examples/benchmarks/strict-migration-corpus.json
+PATCHLINE_PUBLIC_CORPUS_OFFLINE=1 make artifact-full
 ```
 
-The benchmark artifact pins the expected dry-run hash and ledger checkpoint, then verifies invariant-style checks such as changed row values, max changed rows, operation effect, downstream impact, and scoped updates.
-
-The benchmark suite adds a stricter corpus-level signal: every case has a human label and pinned migration-analysis hash, and the runner reports precision and recall. See [`docs/strict-benchmarking.md`](docs/strict-benchmarking.md) for the real-world validation protocol.
-
-For current SRE/platform workflows, Patchline can also ingest incident evidence JSONL and run as a PR gate:
+`artifact-full` is intentionally separate from live source checks and maintainer refresh targets. Expected-output refresh commands require explicit opt-in:
 
 ```bash
-go run ./cmd/patchline adapt-evidence otlp examples/evidence/otlp-span-export.json --out /tmp/patchline-events.jsonl
-go run ./cmd/patchline adapt-evidence github examples/evidence/github-deployments.json --out /tmp/patchline-deploys.jsonl
-go run ./cmd/patchline adapt-evidence migration-runner examples/evidence/migration-runner.json --out /tmp/patchline-migrations.jsonl
-go run ./cmd/patchline ingest-evidence /tmp/patchline-events.jsonl --out /tmp/patchline-adapted-graph.json
-go run ./cmd/patchline ingest-evidence examples/incidents/bad-migration.jsonl --out /tmp/patchline-graph.json
-go run ./cmd/patchline trace-reconstruct examples/incidents/bad-migration.jsonl
-go run ./cmd/patchline trace-equivalence examples/incidents/bad-migration.jsonl examples/incidents/bad-migration.jsonl
-go run ./cmd/patchline provenance cause record:invoices/inv_1002 --evidence examples/incidents/bad-migration.jsonl
-go run ./cmd/patchline provenance blast record:invoices/inv_1002 --evidence examples/incidents/bad-migration.jsonl
-go run ./cmd/patchline provenance diff examples/incidents/bad-migration.jsonl examples/incidents/bad-migration.jsonl
-go run ./cmd/patchline provenance archive examples/incidents/bad-migration.jsonl examples/incidents/bad-migration.jsonl
-go run ./cmd/patchline slice record:invoices/inv_1002 --graph /tmp/patchline-graph.json --json
-go run ./cmd/patchline lint-repair examples/repairs/repair-bad-invoice-backfill.json
-go run ./cmd/patchline lint-repair examples/repairs/repair-bad-invoice-backfill.json --proof --json
-go run ./cmd/patchline generate-sql examples/repairs/repair-bad-invoice-backfill.json
-go run ./cmd/patchline repair-semantics examples/repairs/repair-bad-invoice-backfill.json --json
-go run ./cmd/patchline cegar-refine examples/repairs/repair-bad-invoice-backfill.json --store examples/snapshots/billing-bad-migration-before.json --invariants examples/invariants/billing-core.json --workflow examples/workflows/bad-migration-approved.json --json > /tmp/patchline-refinement.json
-go run ./cmd/patchline archive-index examples/archive/bad-migration-corpus.json --json > /tmp/patchline-archive.json
-go run ./cmd/patchline repair-outcomes examples/archive/bad-migration-corpus.json --json | jq '.[] | {incident_id, dry_run_hash, applied_sql_hash, verification_result, rollback_available, later_recurrences}'
-go run ./cmd/patchline semantic-regressions examples/archive/bad-migration-corpus.json --json | jq '.[] | {incident_id, prior_incident_id, relation, severity, learned_invariant, evidence}'
-go run ./cmd/patchline sign-artifact /tmp/patchline-refinement.json --subject cegar:billing-bad-migration --seed-hex "$PATCHLINE_ATTESTATION_SEED" --out /tmp/patchline-refinement.attestation.json
-go run ./cmd/patchline verify-artifact /tmp/patchline-refinement.attestation.json --artifact /tmp/patchline-refinement.json
-go run ./cmd/patchline effect-summary examples/repairs/repair-bad-invoice-backfill.json --json
-go run ./cmd/patchline discover-invariants examples/repairs/repair-bad-invoice-backfill.json --json
-go run ./cmd/patchline rollback-plan examples/repairs/repair-bad-invoice-backfill.json
-go run ./cmd/patchline transaction-plan examples/repairs/repair-bad-invoice-backfill.json
-go run ./cmd/patchline ci-gate examples/benchmarks/strict-migration-corpus.json --min-precision 0.95 --min-recall 0.95
+PATCHLINE_ACCEPT_EXPECTED_REFRESH=1 make artifact-benchmark-refresh
+PATCHLINE_ACCEPT_EXPECTED_REFRESH=1 make artifact-studies-refresh
 ```
 
-The adapter path converts current span exports, Postgres logical decoding, GitHub deployment/release, and migration-runner JSON exports into Patchline evidence JSONL. Ingest intentionally accepts extra source-system fields while validating required Patchline evidence fields, so operational exports can be converted without losing auditability.
-
-`trace-reconstruct` turns those same JSONL files into a typed trace projection with source confidence, clock confidence, normalized event-time intervals, and a semantic projection hash. `trace-equivalence` compares two imports by reconstructed projection instead of by raw line order or JSON field order.
-
-The `provenance` subcommands turn historical traces into immediately reviewable artifacts: minimal causes, common ancestors, affected observations, semiring evidence summaries, smallest causal slices, differential provenance between incidents, recurring shape buckets, blast-radius summaries, and causal certificates with missing-evidence holes.
-
-## The Patchline semantics story, as a 60-second demo
-
-Patchline's semantics angle is not just vocabulary. The same fixture can be viewed as a typed transition story: operational evidence reconstructs the damaged state; SQL is classified as a relational transition; the repair is replayed as a bounded state transformer; Z3 checks scope/frame obligations; the archive turns the result into recurrence knowledge.
-
-```bash
-go run ./cmd/patchline trace-reconstruct examples/incidents/bad-migration.jsonl --json | jq '{projection_hash, observation_count, source_summary, clock_summary}'
-go run ./cmd/patchline analyze-migration demos/billing/migrations/002_bad_backfill.sql --json | jq '{report_hash:.summary.report_hash, high_risk:.summary.high_risk, statements:[.statements[] | {kind, table, risk, effect, fingerprint}]}'
-go run ./cmd/patchline repair-semantics examples/repairs/repair-bad-invoice-backfill.json --json | jq '{hash, steps:(.step_trace|length), confluence_status:.confluence.status, isolation_levels:(.isolation.levels|length)}'
-go run ./cmd/patchline solver-obligations examples/repairs/repair-bad-invoice-backfill.json --invariants examples/invariants/billing-core.json --json | jq '{hash, solver_engine, solver_version, scope:[.scope_implications[] | {operation_id, status}]}'
-go run ./cmd/patchline semantic-regressions examples/archive/bad-migration-corpus.json --json | jq '.[] | {incident_id, prior_incident_id, relation, severity, learned_invariant}'
-```
-
-The last command is the "instant usability" payoff: it turns a prior incident archive into an executable semantic memory. A later transition is compared to earlier shape hashes, risky table transitions, and damaged derived-report paths, then returned with learned invariant candidates that can be reviewed or gated in CI.
-
-Repair manifests also have operational tooling:
-
-```bash
-go run ./cmd/patchline migrate-repair examples/repairs/legacy-v0-repair.json
-go run ./cmd/patchline template-repair row-restore
-go run ./cmd/patchline lint-repair examples/repairs/repair-bad-invoice-backfill.json --json
-go run ./cmd/patchline lint-repair examples/repairs/repair-bad-invoice-backfill.json --proof --json
-go run ./cmd/patchline generate-sql examples/repairs/repair-bad-invoice-backfill.json --json
-go run ./cmd/patchline rollback-plan examples/repairs/repair-bad-invoice-backfill.json --json
-go run ./cmd/patchline transaction-plan examples/repairs/repair-bad-invoice-backfill.json --json
-```
-
-The linter emits deterministic severity, code, reference, and remediation fields so repair review can be automated without making the manifest format loose. With `--proof`, it also emits a hashable Hoare-triple view, weakest preconditions, syntactic frame conditions, and SQL refinement checks, separating checked facts from assumed database obligations. SQL, rollback-plan, and transaction-plan generation are hashable and require the manifest to pass lint before producing executable statements, including scoped insert/delete repairs.
-
-## Repository layout
+## Repository map
 
 ```text
-cmd/patchline/          CLI entrypoint
-internal/provenance/   Typed causal graph and deterministic incident analysis
-internal/evidence/     Operational evidence ingestion, adapters, and trace reconstruction
-internal/effects/      Deterministic repair-effect inference
-internal/migration/    SQL migration lexical analyzer and risk classifier
-internal/repair/       Repair manifest parser and validator
-internal/replay/       Dry-run state model and canonical reports
-internal/attest/       Executable reproducibility and invariant checks
-internal/refinement/   Counterexample-guided semantic refinement reports
-internal/archive/      Historical incident archive indexes and semantic buckets
-internal/historical/   Public postmortem counterfactual validation
-internal/ledger/       Hash-chained audit ledger
-internal/reproduce/    Benchmark/reproducibility runner
-internal/bench/        Strict corpus benchmark runner
-internal/gate/         CI threshold gate over benchmark suites
-internal/policy/       Deterministic repair policy gates
-internal/bundle/       Incident bundle manifests
-internal/semantics/    Semantic contract and conformance audit artifacts
-internal/demo/         Reproducible billing incident fixture
-examples/              Incident and repair manifests
-demos/billing/         SQL migration scenario
-docs/                  Architecture, DSL, provenance, and RiSE research notes
+cmd/patchline/          CLI entry point
+internal/intake/       current-data scanner and GitHub project intake
+internal/migration/    SQL and embedded-source-SQL analysis
+internal/evidence/     JSONL ingest plus Datadog/OTLP/GitHub/Postgres adapters
+internal/repair/       repair manifests, linting, SQL generation, dry-run support
+internal/artifact/     deterministic validation reports and benchmark checks
+examples/              small runnable examples and public-source-derived fixtures
+benchmarks/            frozen validation inputs and expected outputs
+docs/                  deeper design notes
 ```
 
-## Status
+## Current limits
 
-This is a working deterministic core and demo harness, not yet the full production system. The next natural expansions are richer repair outcome histories, organization-local benchmark generation, redaction-preserving proof artifacts, reusable GitHub Action packaging, and a web incident cockpit.
+Patchline is useful as a deterministic first pass and audit trail, not as an automatic incident resolver. It does not infer private production data, prove arbitrary SQL, synthesize repairs from prose, or replace operator review. It gives you grounded leads and runnable checks from the data already in front of you.

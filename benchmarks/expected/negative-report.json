@@ -54,7 +54,7 @@
       "ok": true,
       "signals": [
         "inline-bytes=89",
-        "insufficient:missing-transition-and-repair-facts"
+        "insufficient:missing-transition-repair-or-rollback-facts"
       ],
       "hashes": {
         "inline": "b903afd66c8408954ce420c2448b568bbbd4f13229466ad2f48ff20e4547301c"
@@ -72,8 +72,12 @@
       "risk": "unknown",
       "ok": true,
       "signals": [
+        "inline-bytes=74",
         "phase-guard:input-not-available=postmortem_text"
-      ]
+      ],
+      "hashes": {
+        "inline": "bcc1f4a1d48e8d46a71396cf2ef94103ef144f00c66893eceef1231001c82aff"
+      }
     },
     {
       "case_id": "non-replayable-missing-backup",
@@ -112,6 +116,6 @@
       }
     }
   ],
-  "hash": "142aaba102b1244049db63e5caca8342332f297702a511341aa1cdbf82a825ae",
-  "markdown": "# Artifact benchmark report\n\n- dataset_id: `patchline-negative-v1`\n- ok: `true`\n- hash: `142aaba102b1244049db63e5caca8342332f297702a511341aa1cdbf82a825ae`\n- total: `5`\n- passed: `5`\n- failed: `0`\n\n| case | type | phase | expected | actual | ok |\n| --- | --- | --- | --- | --- | ---: |\n| unsupported-procedural-sql | migration | pre_deploy | unsupported_fragment | unsupported_fragment | true |\n| insufficient-public-incident-evidence | incident | postmortem | insufficient_evidence | insufficient_evidence | true |\n| predeploy-postmortem-leakage | incident | pre_deploy | cannot_prove | cannot_prove | true |\n| non-replayable-missing-backup | repair | during_repair | cannot_prove | cannot_prove | true |\n| safe-scoped-nonrecurrence | regression | archive_only | pass | pass | true |\n"
+  "hash": "807a45b284870ccb0fc93a215c3b3adb644a174e0d23bb1b66a56113f9f37d36",
+  "markdown": "# Artifact benchmark report\n\n- dataset_id: `patchline-negative-v1`\n- ok: `true`\n- hash: `807a45b284870ccb0fc93a215c3b3adb644a174e0d23bb1b66a56113f9f37d36`\n- total: `5`\n- passed: `5`\n- failed: `0`\n\n| case | type | phase | expected | actual | ok |\n| --- | --- | --- | --- | --- | ---: |\n| unsupported-procedural-sql | migration | pre_deploy | unsupported_fragment | unsupported_fragment | true |\n| insufficient-public-incident-evidence | incident | postmortem | insufficient_evidence | insufficient_evidence | true |\n| predeploy-postmortem-leakage | incident | pre_deploy | cannot_prove | cannot_prove | true |\n| non-replayable-missing-backup | repair | during_repair | cannot_prove | cannot_prove | true |\n| safe-scoped-nonrecurrence | regression | archive_only | pass | pass | true |\n"
 }

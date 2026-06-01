@@ -87,8 +87,6 @@ type BenchmarkCompareMismatch struct {
 type inlineFixture struct {
 	InputKind string
 	Content   string
-	Result    string
-	Signal    string
 }
 
 type benchmarkArchiveRegressionSpec struct {
@@ -109,20 +107,14 @@ var inlineFixtures = map[string]inlineFixture{
 	"inline:procedural-sql": {
 		InputKind: "migration_text",
 		Content:   "DO $$ BEGIN EXECUTE 'UPDATE invoices SET status = overdue'; END $$;",
-		Result:    ResultUnsupportedFragment,
-		Signal:    "unsupported:procedural-sql",
 	},
 	"inline:public-summary-too-thin": {
 		InputKind: "postmortem_text",
 		Content:   "A public summary says data was wrong, but gives no transition, repair, or rollback facts.",
-		Result:    ResultInsufficientEvidence,
-		Signal:    "insufficient:missing-transition-and-repair-facts",
 	},
 	"inline:phase-guard": {
 		InputKind: "postmortem_text",
 		Content:   "A postmortem-only root cause would be needed to make the pre-deploy claim.",
-		Result:    ResultCannotProve,
-		Signal:    "phase-guard:postmortem-input-required",
 	},
 }
 
@@ -274,10 +266,7 @@ func runBenchmarkCase(baseDir string, c ManifestCase) (BenchmarkCaseResult, erro
 
 func predictBenchmarkCase(baseDir string, c ManifestCase, gt GroundTruthCase) (string, string, []string, map[string]string, error) {
 	if fixture, ok := inlineFixtures[c.Fixture]; ok {
-		if guard := phaseInputGuard(fixture.InputKind, gt); guard != "" {
-			return guard, fixture.InputKind, []string{"phase-guard:input-not-available=" + fixture.InputKind}, nil, nil
-		}
-		return fixture.Result, fixture.InputKind, []string{fixture.Signal, "inline-bytes=" + fmt.Sprintf("%d", len(fixture.Content))}, map[string]string{"inline": canonical.HashBytes([]byte(fixture.Content))}, nil
+		return predictInlineBenchmarkCase(c, gt, fixture)
 	}
 
 	switch c.CaseType {
@@ -286,6 +275,7 @@ func predictBenchmarkCase(baseDir string, c ManifestCase, gt GroundTruthCase) (s
 		if guard := phaseInputGuard(inputKind, gt); guard != "" {
 			return guard, inputKind, []string{"phase-guard:input-not-available=" + inputKind}, nil, nil
 		}
+
 		report, err := migration.AnalyzeFile(resolvePath(baseDir, c.Fixture))
 		if err != nil {
 			return "", inputKind, nil, nil, err
@@ -393,6 +383,64 @@ func predictBenchmarkCase(baseDir string, c ManifestCase, gt GroundTruthCase) (s
 	default:
 		return ResultUnsupportedFragment, "unknown", []string{"unsupported:case-type=" + c.CaseType}, nil, nil
 	}
+}
+
+func predictInlineBenchmarkCase(c ManifestCase, gt GroundTruthCase, fixture inlineFixture) (string, string, []string, map[string]string, error) {
+	inputKind := fixture.InputKind
+	content := []byte(fixture.Content)
+	inputHash := canonical.HashBytes(content)
+	if guard := phaseInputGuard(inputKind, gt); guard != "" {
+		return guard, inputKind, []string{"phase-guard:input-not-available=" + inputKind, fmt.Sprintf("inline-bytes=%d", len(content))}, map[string]string{"inline": inputHash}, nil
+	}
+	switch c.CaseType {
+	case "migration":
+		if unsupportedSQLFragment(fixture.Content) {
+			return ResultUnsupportedFragment, inputKind, []string{"unsupported:procedural-sql", fmt.Sprintf("inline-bytes=%d", len(content))}, map[string]string{"inline": inputHash}, nil
+		}
+		report, err := migration.AnalyzeBytes(c.Fixture, content)
+		if err != nil {
+			return "", inputKind, nil, nil, err
+		}
+		actual := ResultPass
+		if report.Summary.HighRisk > 0 {
+			actual = ResultFlag
+		}
+		return actual, inputKind, []string{
+			fmt.Sprintf("high-risk-statements=%d", report.Summary.HighRisk),
+			fmt.Sprintf("inline-bytes=%d", len(content)),
+		}, map[string]string{"inline": inputHash, "migration_report": report.Summary.ReportHash}, nil
+	case "incident":
+		if inputKind != "postmortem_text" {
+			return ResultUnsupportedFragment, inputKind, []string{"unsupported:inline-incident-input-kind=" + inputKind}, map[string]string{"inline": inputHash}, nil
+		}
+		signals := postmortemSummarySignals(fixture.Content)
+		if len(signals) < 3 {
+			return ResultInsufficientEvidence, inputKind, []string{"insufficient:missing-transition-repair-or-rollback-facts", fmt.Sprintf("inline-bytes=%d", len(content))}, map[string]string{"inline": inputHash}, nil
+		}
+		return ResultFlag, inputKind, append(signals, fmt.Sprintf("inline-bytes=%d", len(content))), map[string]string{"inline": inputHash, "postmortem_signals": canonical.Hash(signals)}, nil
+	default:
+		return ResultUnsupportedFragment, inputKind, []string{"unsupported:inline-case-type=" + c.CaseType}, map[string]string{"inline": inputHash}, nil
+	}
+}
+
+func unsupportedSQLFragment(content string) bool {
+	lower := strings.ToLower(content)
+	return strings.Contains(lower, "do $$") || strings.Contains(lower, "execute '") || strings.Contains(lower, "begin execute")
+}
+
+func postmortemSummarySignals(content string) []string {
+	lower := strings.ToLower(content)
+	var signals []string
+	for _, token := range []string{"transition", "repair", "rollback"} {
+		if strings.Contains(lower, token) &&
+			!strings.Contains(lower, "no "+token) &&
+			!strings.Contains(lower, "no concrete "+token) &&
+			!strings.Contains(lower, "without "+token) &&
+			!strings.Contains(lower, "missing "+token) {
+			signals = append(signals, "postmortem-mentions-"+token)
+		}
+	}
+	return signals
 }
 
 func benchmarkArchiveSignals(report archive.Report) []string {

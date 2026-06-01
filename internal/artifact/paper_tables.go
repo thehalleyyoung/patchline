@@ -71,8 +71,7 @@ func GeneratePaperTables(root string) (PaperTablesReport, error) {
 		return PaperTablesReport{}, err
 	}
 
-	expectedDir := filepath.Join(root, "benchmarks/expected")
-	benchmarks, err := readPaperBenchmarkReports(expectedDir)
+	benchmarks, benchmarkHashes, err := readVerifiedPaperBenchmarkReports(root)
 	if err != nil {
 		return PaperTablesReport{}, err
 	}
@@ -93,6 +92,9 @@ func GeneratePaperTables(root string) (PaperTablesReport, error) {
 		"negative-controls":    benchmarks["negative"].Hash,
 		"artifact-smoke":       benchmarks["smoke"].Hash,
 	}
+	for key, hash := range benchmarkHashes {
+		sourceHashes[key] = hash
+	}
 	report := PaperTablesReport{
 		Version:      PaperTablesVersion,
 		SourceRoot:   root,
@@ -105,7 +107,8 @@ func GeneratePaperTables(root string) (PaperTablesReport, error) {
 			scaleTable(strictScale, publicScale),
 		},
 		Notes: []string{
-			"Tables are deterministic summaries of checked artifact reports and benchmark specs; they are not new experimental claims beyond those inputs.",
+			"Tables are deterministic summaries of checked artifact reports and regenerated benchmark reports; they are not new experimental claims beyond those inputs.",
+			"Benchmark table rows use generated reports only after their hashes match the committed expected reports.",
 			"Public incident and archive rows are public-postmortem-derived semantic reconstructions, not verbatim production datasets.",
 			"Scale rows omit wall-clock timing from the stable table because artifact-machine timing is environment-dependent.",
 		},
@@ -138,7 +141,7 @@ func readBenchSpec(path string) (bench.Spec, error) {
 	return bench.Read(file)
 }
 
-func readPaperBenchmarkReports(expectedDir string) (map[string]BenchmarkRunReport, error) {
+func readVerifiedPaperBenchmarkReports(root string) (map[string]BenchmarkRunReport, map[string]string, error) {
 	paths := map[string]string{
 		"smoke":                "smoke-report.json",
 		"negative":             "negative-report.json",
@@ -150,14 +153,26 @@ func readPaperBenchmarkReports(expectedDir string) (map[string]BenchmarkRunRepor
 		"semantic-regressions": "semantic-regressions-report.json",
 	}
 	reports := map[string]BenchmarkRunReport{}
+	hashes := map[string]string{}
 	for name, rel := range paths {
-		report, err := readBenchmarkRunReport(filepath.Join(expectedDir, rel))
+		actualPath := filepath.Join(root, "results", "generated", "artifact-benchmark", rel)
+		report, err := readBenchmarkReport(actualPath)
 		if err != nil {
-			return nil, err
+			return nil, nil, err
+		}
+		expectedPath := filepath.Join(root, "benchmarks", "expected", rel)
+		expected, err := readBenchmarkReport(expectedPath)
+		if err != nil {
+			return nil, nil, err
+		}
+		if report.Hash != expected.Hash {
+			return nil, nil, fmt.Errorf("%s: generated benchmark hash %s does not match expected hash %s", rel, report.Hash, expected.Hash)
 		}
 		reports[name] = report
+		hashes[name+"-actual"] = report.Hash
+		hashes[name+"-expected"] = expected.Hash
 	}
-	return reports, nil
+	return reports, hashes, nil
 }
 
 func corpusTable(reports map[string]BenchmarkRunReport) PaperTable {

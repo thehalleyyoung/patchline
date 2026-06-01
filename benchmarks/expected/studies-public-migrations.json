@@ -7,13 +7,13 @@
       "name": "baselines",
       "path": "baselines.json",
       "version": "patchline.artifact-baselines/v1",
-      "hash": "ddf5dac7dc716d7cbf0dd2429a6c5ac06cecf11b9cdf45a8e6956108015efb2c"
+      "hash": "3e62961541ebc2a37a6f2c0df8a5222d216de41e97e1e3dc244646f4626c7827"
     },
     {
       "name": "ablations",
       "path": "ablations.json",
       "version": "patchline.artifact-ablations/v1",
-      "hash": "96e8c6cfd94e8e542f3b32f1506c347d168622a6ded07103e244a7e2816fbd30"
+      "hash": "07685562c7d58cfca280e1e5019acbbeb8ea791f02d5b50d636fb7190bcdaf25"
     },
     {
       "name": "scale",
@@ -22,5 +22,5 @@
       "hash": "05a6e04c3be9f6a235d904a2150ca2ad942b8d1c256ed5380f49bccfce4f9b81"
     }
   ],
-  "hash": "c2af0ee2de19ed78e1fe44373905b6368bdfbd4ca9e0fb33c4695cb84502b173"
+  "hash": "18ca43aad1ccf217bc07914884d5c892b32aa9a9bc26365428f8dc7587bc60b9"
 }

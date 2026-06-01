@@ -9,6 +9,7 @@ import (
 	"strings"
 	"time"
 
+	artifactbaselines "github.com/thehalleyyoung/patchline/internal/artifact/baselines"
 	"github.com/thehalleyyoung/patchline/internal/bench"
 	"github.com/thehalleyyoung/patchline/internal/canonical"
 	"github.com/thehalleyyoung/patchline/internal/demo"
@@ -40,6 +41,8 @@ type BaselineReport struct {
 type Baseline struct {
 	Name        string               `json:"name"`
 	Description string               `json:"description"`
+	RuleVersion string               `json:"rule_version,omitempty"`
+	RuleHash    string               `json:"rule_hash,omitempty"`
 	Metrics     StudyMetrics         `json:"metrics"`
 	Cases       []BaselineCaseResult `json:"cases"`
 }
@@ -49,7 +52,8 @@ type BaselineCaseResult struct {
 	Label        string   `json:"label"`
 	Prediction   string   `json:"prediction"`
 	MatchedRules []string `json:"matched_rules,omitempty"`
-	ReportHash   string   `json:"report_hash"`
+	ReportHash   string   `json:"report_hash,omitempty"`
+	InputHash    string   `json:"input_hash,omitempty"`
 }
 
 type StudyMetrics struct {
@@ -132,6 +136,13 @@ type ScaleTotals struct {
 	AnalyzeMillis      int64 `json:"analyze_millis"`
 }
 
+type baselineInput struct {
+	ID    string
+	Label string
+	Path  string
+	Scan  artifactbaselines.ScanReport
+}
+
 func EvaluateBaselines(spec bench.Spec, baseDir string) (BaselineReport, error) {
 	patchlineResult, err := bench.Run(spec, baseDir)
 	if err != nil {
@@ -141,19 +152,24 @@ func EvaluateBaselines(spec bench.Spec, baseDir string) (BaselineReport, error) 
 	if err != nil {
 		return BaselineReport{}, err
 	}
-	lexicalDDL := ddlDestructiveBaseline(analyses)
-	sqlRules := sqlRuleBaseline(analyses)
+	baselineInputs, err := scanBaselineInputs(spec, baseDir)
+	if err != nil {
+		return BaselineReport{}, err
+	}
+	lexicalDDL := ddlDestructiveBaseline(baselineInputs)
+	sqlRules := sqlRuleBaseline(baselineInputs)
+	guardrailRules := guardrailLinterBaseline(baselineInputs)
 	effectsOnly := semanticEffectsBaseline(analyses)
 	report := BaselineReport{
 		Version:      BaselineVersion,
 		Suite:        spec.Name,
 		SuiteHash:    patchlineResult.SuiteHash,
 		Patchline:    metricsFromAnalyses(analyses),
-		Baselines:    []Baseline{lexicalDDL, sqlRules, effectsOnly},
+		Baselines:    []Baseline{lexicalDDL, sqlRules, guardrailRules, effectsOnly},
 		CaseAnalyses: analyses,
 		Findings: []string{
 			"Patchline emits semantic context (tables, effects, risk reasons, hashes, ground-truth links, and optional Z3-backed repair proof links) that narrower transparent baselines do not expose.",
-			"Baselines are deliberately local and deterministic: DDL grep, normalized SQL rules, and semantic effects without evidence/proof/archive links. Detection parity remains visible instead of being hidden by aggregate scores.",
+			"Lexical and guardrail baselines read raw SQL bytes independently of Patchline's migration analyzer; the effects-only row is labeled as a Patchline analyzer ablation rather than an independent competitor.",
 		},
 	}
 	report.Markdown = renderBaselineMarkdown(report)
@@ -351,7 +367,7 @@ func analyzeCases(spec bench.Spec, baseDir string) ([]CaseAnalysis, error) {
 			}
 			analysis.SolverEngine = solverReport.SolverEngine
 			analysis.SolverHash = solverReport.Hash
-			analysis.ProofBacked = solverReport.Summary.Proved > 0 || solverReport.Summary.Checked > 0
+			analysis.ProofBacked = solverReport.Summary.Proved > 0
 			if analysis.ProofBacked {
 				analysis.ActionabilitySignals = append(analysis.ActionabilitySignals, "z3-repair-obligations="+solverReport.Hash)
 				analysis.ActionabilityScore = len(analysis.ActionabilitySignals)
@@ -362,16 +378,35 @@ func analyzeCases(spec bench.Spec, baseDir string) ([]CaseAnalysis, error) {
 	return analyses, nil
 }
 
-func ddlDestructiveBaseline(analyses []CaseAnalysis) Baseline {
+func scanBaselineInputs(spec bench.Spec, baseDir string) ([]baselineInput, error) {
+	var inputs []baselineInput
+	for _, c := range spec.Cases {
+		content, err := os.ReadFile(resolvePath(baseDir, c.Path))
+		if err != nil {
+			return nil, err
+		}
+		inputs = append(inputs, baselineInput{
+			ID:    c.ID,
+			Label: c.Label,
+			Path:  c.Path,
+			Scan:  artifactbaselines.ScanSQL(content),
+		})
+	}
+	return inputs, nil
+}
+
+func ddlDestructiveBaseline(inputs []baselineInput) Baseline {
 	var results []BaselineCaseResult
-	for _, analysis := range analyses {
+	for _, input := range inputs {
 		rules := map[string]bool{}
-		for _, kind := range analysis.StatementKinds {
-			switch kind {
-			case "drop":
-				rules["statement-kind-drop"] = true
-			case "truncate":
-				rules["statement-kind-truncate"] = true
+		for _, stmt := range input.Scan.Statements {
+			for _, rule := range stmt.Rules {
+				switch rule {
+				case "ddl:drop":
+					rules["statement-kind-drop"] = true
+				case "ddl:truncate":
+					rules["statement-kind-truncate"] = true
+				}
 			}
 		}
 		matched := sortedKeys(rules)
@@ -380,40 +415,70 @@ func ddlDestructiveBaseline(analyses []CaseAnalysis) Baseline {
 			prediction = "unsafe"
 		}
 		results = append(results, BaselineCaseResult{
-			ID:           analysis.ID,
-			Label:        analysis.Label,
+			ID:           input.ID,
+			Label:        input.Label,
 			Prediction:   prediction,
 			MatchedRules: matched,
-			ReportHash:   analysis.ReportHash,
+			InputHash:    input.Scan.SourceHash,
 		})
 	}
 	return Baseline{
 		Name:        "grep-ddl-destructive",
-		Description: "DDL-only transparent baseline: flags normalized DROP/TRUNCATE statement kinds and ignores repair semantics, broad DML, proof, archive, and ground-truth evidence.",
+		Description: "DDL-only transparent baseline over raw SQL bytes: flags DROP/TRUNCATE tokens and ignores repair semantics, broad DML, proof, archive, and ground-truth evidence.",
+		RuleVersion: artifactbaselines.LexicalRuleVersion,
+		RuleHash:    artifactbaselines.RuleHash(),
 		Metrics:     metricsFromBaseline(results, nil),
 		Cases:       results,
 	}
 }
 
-func sqlRuleBaseline(analyses []CaseAnalysis) Baseline {
+func sqlRuleBaseline(inputs []baselineInput) Baseline {
 	var results []BaselineCaseResult
-	for _, analysis := range analyses {
-		rules := simpleRules(analysis)
+	for _, input := range inputs {
+		rules := prefixedRules(input.Scan, "sql:")
 		prediction := "safe"
 		if len(rules) > 0 {
 			prediction = "unsafe"
 		}
 		results = append(results, BaselineCaseResult{
-			ID:           analysis.ID,
-			Label:        analysis.Label,
+			ID:           input.ID,
+			Label:        input.Label,
 			Prediction:   prediction,
 			MatchedRules: rules,
-			ReportHash:   analysis.ReportHash,
+			InputHash:    input.Scan.SourceHash,
 		})
 	}
 	return Baseline{
 		Name:        "normalized-sql-rules",
-		Description: "Transparent non-semantic rule baseline over normalized migration statements.",
+		Description: "Transparent non-semantic rule baseline over raw normalized SQL bytes; it does not consume Patchline analyzer effects, reasons, labels, proofs, archives, or ground truth.",
+		RuleVersion: artifactbaselines.LexicalRuleVersion,
+		RuleHash:    artifactbaselines.RuleHash(),
+		Metrics:     metricsFromBaseline(results, nil),
+		Cases:       results,
+	}
+}
+
+func guardrailLinterBaseline(inputs []baselineInput) Baseline {
+	var results []BaselineCaseResult
+	for _, input := range inputs {
+		rules := prefixedRules(input.Scan, "guardrail:")
+		prediction := "safe"
+		if len(rules) > 0 {
+			prediction = "unsafe"
+		}
+		results = append(results, BaselineCaseResult{
+			ID:           input.ID,
+			Label:        input.Label,
+			Prediction:   prediction,
+			MatchedRules: rules,
+			InputHash:    input.Scan.SourceHash,
+		})
+	}
+	return Baseline{
+		Name:        "migration-guardrail-linter",
+		Description: "Externally grounded static migration guardrail baseline over raw SQL bytes: flags broad data rewrites, destructive drops/truncates, and persistent seed/backfill inserts while deliberately omitting Patchline provenance, solver, replay, archive, and ground-truth links.",
+		RuleVersion: artifactbaselines.LexicalRuleVersion,
+		RuleHash:    artifactbaselines.RuleHash(),
 		Metrics:     metricsFromBaseline(results, nil),
 		Cases:       results,
 	}
@@ -455,25 +520,20 @@ func semanticEffectsBaseline(analyses []CaseAnalysis) Baseline {
 		})
 	}
 	return Baseline{
-		Name:        "semantic-effects-no-evidence",
+		Name:        "patchline-effects-only-ablation",
 		Description: "Patchline analyzer effects without provenance, ground-truth, solver, archive, or replay links; this isolates detection-style semantic enrichment from the full artifact.",
 		Metrics:     metricsFromBaseline(results, nil),
 		Cases:       results,
 	}
 }
 
-func simpleRules(analysis CaseAnalysis) []string {
+func prefixedRules(scan artifactbaselines.ScanReport, prefix string) []string {
 	rules := map[string]bool{}
-	for _, reason := range analysis.RiskReasons {
-		switch {
-		case strings.Contains(reason, "unbounded update"):
-			rules["update-without-where"] = true
-		case strings.Contains(reason, "unbounded delete"):
-			rules["delete-without-where"] = true
-		case strings.Contains(reason, "destructive"):
-			rules["destructive-ddl"] = true
-		case strings.Contains(reason, "broad update"):
-			rules["broad-update-predicate"] = true
+	for _, stmt := range scan.Statements {
+		for _, rule := range stmt.Rules {
+			if strings.HasPrefix(rule, prefix) {
+				rules[rule] = true
+			}
 		}
 	}
 	return sortedKeys(rules)
@@ -493,10 +553,6 @@ func modeFromAnalyses(name, description string, analyses []CaseAnalysis, level i
 			modeAnalysis.GroundTruthLinked = false
 		case 1:
 			modeAnalysis.ActionabilitySignals = filterSignals(analysis.ActionabilitySignals, "tables=", "effects=", "risk-reasons=")
-			if analysis.Prediction == "unsafe" {
-				modeAnalysis.ActionabilitySignals = append(modeAnalysis.ActionabilitySignals, "review-gate-candidate")
-				sort.Strings(modeAnalysis.ActionabilitySignals)
-			}
 			modeAnalysis.ProofBacked = false
 			modeAnalysis.ArchiveLinked = false
 			modeAnalysis.GroundTruthLinked = false
@@ -524,7 +580,7 @@ func modeFromAnalyses(name, description string, analyses []CaseAnalysis, level i
 	return AblationMode{Name: name, Description: description, Metrics: metricsFromAnalyses(adjusted), Cases: cases, Notes: dedupeSorted(notes)}
 }
 
-func actionabilitySignals(analysis CaseAnalysis, c bench.Case) []string {
+func actionabilitySignals(analysis CaseAnalysis, _ bench.Case) []string {
 	var signals []string
 	if len(analysis.Tables) > 0 {
 		signals = append(signals, "tables="+strings.Join(analysis.Tables, ","))
@@ -534,18 +590,6 @@ func actionabilitySignals(analysis CaseAnalysis, c bench.Case) []string {
 	}
 	if len(analysis.RiskReasons) > 0 {
 		signals = append(signals, fmt.Sprintf("risk-reasons=%d", len(analysis.RiskReasons)))
-	}
-	if c.ExpectedReportHash != "" {
-		signals = append(signals, "report-hash-pinned")
-	}
-	if c.GroundTruth != "" {
-		signals = append(signals, "ground-truth="+c.GroundTruth)
-	}
-	if c.ArchiveSpec != "" {
-		signals = append(signals, "archive-spec="+c.ArchiveSpec)
-	}
-	if analysis.Prediction == "unsafe" {
-		signals = append(signals, "review-gate-candidate")
 	}
 	sort.Strings(signals)
 	return signals

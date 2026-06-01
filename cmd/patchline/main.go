@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -21,6 +22,7 @@ import (
 	"github.com/thehalleyyoung/patchline/internal/evidence"
 	"github.com/thehalleyyoung/patchline/internal/gate"
 	"github.com/thehalleyyoung/patchline/internal/historical"
+	"github.com/thehalleyyoung/patchline/internal/intake"
 	"github.com/thehalleyyoung/patchline/internal/invariant"
 	"github.com/thehalleyyoung/patchline/internal/ledger"
 	"github.com/thehalleyyoung/patchline/internal/migration"
@@ -73,9 +75,11 @@ func run(args []string) error {
 
 	switch args[0] {
 	case "about":
-		fmt.Println("Patchline is a deterministic repair control plane for production data incidents.")
-		fmt.Println("It uses typed provenance, repair-effect analysis, replayable manifests, and hash-chained ledgers.")
+		fmt.Println("Patchline is a deterministic checker for the migration SQL, source SQL, telemetry exports, deploy metadata, and repair artifacts you already have.")
+		fmt.Println("Start with: patchline intake <repo-or-export-dir> --out results/generated/intake")
 		fmt.Println("RiSE angle: program analysis + verifiable transformations + reproducible repair benchmarks, without AI.")
+	case "intake":
+		return currentIntake(args[1:])
 	case "semantics-contract":
 		return semanticsContract(hasFlag(args[1:], "--json"))
 	case "semantics-audit":
@@ -340,6 +344,14 @@ func run(args []string) error {
 		return artifactStudy(args[1:])
 	case "artifact-tables":
 		return artifactTables(args[1:])
+	case "artifact-numbers":
+		return artifactNumbers(args[1:])
+	case "artifact-subtasks":
+		return artifactSubtasks(args[1:])
+	case "artifact-corpus-audit":
+		return artifactCorpusAudit(args[1:])
+	case "artifact-provenance":
+		return artifactProvenance(args[1:])
 	case "ingest-evidence":
 		if len(args) < 2 {
 			return errors.New("usage: patchline ingest-evidence <events.jsonl> [--json] [--out graph.json]")
@@ -377,6 +389,8 @@ func usage() {
 
 Usage:
   patchline about
+  patchline intake <path> [--out results/generated/intake] [--json]
+  patchline intake --github owner/repo [--ref ref] [--subpath path] [--out results/generated/intake] [--json]
   patchline semantics-contract [--json]
   patchline semantics-audit [--json] [--evidence events.jsonl] [--repair manifest.json] [--migration migration.sql] [--benchmark suite.json] [--policy policy.json] [--workflow workflow.json] [--archive archive-spec.json] [--snapshot-before store.json] [--snapshot-after store.json]
   patchline trace-reconstruct <evidence.jsonl> [--json]
@@ -433,6 +447,10 @@ Usage:
   patchline artifact-study summarize <report-dir> [--out expected.json] [--json]
   patchline artifact-study compare <report-dir> <expected.json> [--json]
   patchline artifact-tables [--root repo-root] [--out results/generated/artifact-tables] [--json]
+  patchline artifact-numbers [--root repo-root] [--out results/generated/artifact-numbers] [--json]
+  patchline artifact-subtasks [--root repo-root] [--out results/generated/artifact-subtasks] [--json]
+  patchline artifact-corpus-audit [--root repo-root] [--protocol benchmarks/corpus_protocol.json] [--out results/generated/artifact-corpus-audit] [--json]
+  patchline artifact-provenance [--root repo-root] [--out results/generated/artifact-provenance] [--json]
   patchline artifact-benchmark validate <manifest.json> [--json]
   patchline artifact-benchmark run <manifest.json> [--out report.json] [--json]
   patchline artifact-benchmark compare <actual.json> <expected.json> [--json]
@@ -442,12 +460,70 @@ Usage:
   patchline ledger-verify [--json]
 
 Examples:
+  patchline intake . --out results/generated/intake
+  patchline intake --github bytebase/bytebase --subpath store/migration --out results/generated/intake
   patchline explain record:invoices/inv_1002
   patchline semantics-audit --json
   patchline trace-reconstruct examples/incidents/bad-migration.jsonl
   patchline provenance certificate record:invoices/inv_1002 --evidence examples/incidents/bad-migration.jsonl
   patchline analyze-migration demos/billing/migrations/002_bad_backfill.sql
   patchline reproduce examples/reproduce/bad-migration-billing.json --json`)
+}
+
+func currentIntake(args []string) error {
+	githubRepo, _ := flagValue(args, "--github")
+	ref, _ := flagValue(args, "--ref")
+	subpath, _ := flagValue(args, "--subpath")
+	outPath, _ := flagValue(args, "--out")
+	downloadDir, _ := flagValue(args, "--download-dir")
+	positionals := positionalArgs(args)
+	path := ""
+	if len(positionals) > 0 {
+		path = positionals[0]
+	}
+	if githubRepo == "" && path == "" {
+		return errors.New("usage: patchline intake <path> [--out dir] [--json] or patchline intake --github owner/repo [--ref ref] [--subpath path] [--out dir] [--json]")
+	}
+	report, err := intake.Run(context.Background(), intake.Options{
+		Path:        path,
+		GitHub:      githubRepo,
+		Ref:         ref,
+		Subpath:     subpath,
+		DownloadDir: downloadDir,
+	})
+	if err != nil {
+		return err
+	}
+	if outPath != "" {
+		if err := intake.WriteReport(outPath, report); err != nil {
+			return err
+		}
+	}
+	if hasFlag(args, "--json") {
+		return writeJSON(os.Stdout, report)
+	}
+	fmt.Printf("intake source=%s files=%d sql_files=%d loose_sql=%d high_risk=%d evidence_files=%d generic_signals=%d repairs=%d problems=%d causes=%d repair_candidates=%d links=%d hash=%s\n",
+		report.Source.Input,
+		report.Summary.FilesScanned,
+		report.Summary.SQLFiles,
+		report.Summary.LooseSQLSnippets,
+		report.Summary.HighRiskSQLStatements,
+		report.Summary.EvidenceFiles,
+		report.Summary.GenericEvidenceSignals,
+		report.Summary.RepairManifests,
+		report.Summary.ProblemCandidates,
+		report.Summary.CauseCandidates,
+		report.Summary.RepairCandidates,
+		report.Summary.LinkedCandidates,
+		report.Hash,
+	)
+	if outPath != "" {
+		fmt.Printf("  out=%s\n", outPath)
+	}
+	for _, suggestion := range report.Suggestions {
+		fmt.Printf("  next: %s # %s\n", suggestion.Command, suggestion.Reason)
+	}
+	return nil
 }
 
 type semanticAuditOptions struct {
@@ -3833,6 +3909,126 @@ func artifactTables(args []string) error {
 	fmt.Printf("artifact tables hash=%s tables=%d out=%s\n", report.Hash, len(report.Tables), outPath)
 	for _, table := range report.Tables {
 		fmt.Printf("  %s rows=%d\n", table.ID, len(table.Rows))
+	}
+	return nil
+}
+
+func artifactNumbers(args []string) error {
+	root, _ := flagValue(args, "--root")
+	if root == "" {
+		root = "."
+	}
+	outPath, _ := flagValue(args, "--out")
+	if outPath == "" {
+		outPath = filepath.Join("results", "generated", "artifact-numbers")
+	}
+	report, err := artifact.GenerateExperimentNumbers(root)
+	if err != nil {
+		return err
+	}
+	if outPath != "" {
+		if err := artifact.WriteExperimentNumbersReport(outPath, report); err != nil {
+			return err
+		}
+	}
+	if hasFlag(args, "--json") {
+		return writeJSON(os.Stdout, report)
+	}
+	fmt.Printf("artifact numbers hash=%s studies=%d benchmarks=%d inputs=%d out=%s\n", report.Hash, len(report.Studies), len(report.Benchmarks), len(report.Inputs), outPath)
+	for _, study := range report.Studies {
+		fmt.Printf("  %s cases=%d baselines=%d ablations=%d statements=%d\n", study.Name, study.Patchline.Total, len(study.Baselines), len(study.Ablations), study.Scale.Statements)
+	}
+	return nil
+}
+
+func artifactSubtasks(args []string) error {
+	root, _ := flagValue(args, "--root")
+	if root == "" {
+		root = "."
+	}
+	outPath, _ := flagValue(args, "--out")
+	if outPath == "" {
+		outPath = filepath.Join("results", "generated", "artifact-subtasks")
+	}
+	report, err := artifact.GenerateSubtaskComparisonReport(root)
+	if err != nil {
+		return err
+	}
+	if outPath != "" {
+		if err := artifact.WriteSubtaskComparisonReport(outPath, report); err != nil {
+			return err
+		}
+	}
+	if hasFlag(args, "--json") {
+		return writeJSON(os.Stdout, report)
+	}
+	fmt.Printf("artifact subtasks hash=%s subtasks=%d source_numbers=%s out=%s\n", report.Hash, len(report.Subtasks), report.SourceNumbersHash, outPath)
+	for _, subtask := range report.Subtasks {
+		fmt.Printf("  %s comparators=%d wins=%d\n", subtask.ID, len(subtask.Comparators), len(subtask.Wins))
+	}
+	return nil
+}
+
+func artifactCorpusAudit(args []string) error {
+	root, _ := flagValue(args, "--root")
+	if root == "" {
+		root = "."
+	}
+	protocol, _ := flagValue(args, "--protocol")
+	outPath, _ := flagValue(args, "--out")
+	if outPath == "" {
+		outPath = filepath.Join("results", "generated", "artifact-corpus-audit")
+	}
+	report, err := artifact.GenerateCorpusAudit(root, protocol)
+	if err != nil {
+		return err
+	}
+	if outPath != "" {
+		if err := artifact.WriteCorpusAuditReport(outPath, report); err != nil {
+			return err
+		}
+	}
+	if hasFlag(args, "--json") {
+		return writeJSON(os.Stdout, report)
+	}
+	fmt.Printf("artifact corpus audit hash=%s manifests=%d pools=%d commands=%d out=%s\n", report.Hash, len(report.Manifests), len(report.Pools), len(report.Commands), outPath)
+	for _, manifest := range report.Manifests {
+		fmt.Printf("  %s cases=%d boundary=%d ok=%t\n", manifest.DatasetID, manifest.Cases, manifest.BoundaryCases, manifest.OK)
+	}
+	if !report.OK {
+		return errors.New("artifact corpus audit failed")
+	}
+	return nil
+}
+
+func artifactProvenance(args []string) error {
+	root, _ := flagValue(args, "--root")
+	if root == "" {
+		root = "."
+	}
+	outPath, _ := flagValue(args, "--out")
+	if outPath == "" {
+		outPath = filepath.Join("results", "generated", "artifact-provenance")
+	}
+	report, err := artifact.GenerateArtifactProvenance(root)
+	if err != nil {
+		return err
+	}
+	if outPath != "" {
+		if err := artifact.WriteArtifactProvenanceReport(outPath, report); err != nil {
+			return err
+		}
+	}
+	if hasFlag(args, "--json") {
+		return writeJSON(os.Stdout, report)
+	}
+	fmt.Printf("artifact provenance hash=%s files=%d checks=%d out=%s\n", report.Hash, len(report.Files), len(report.Checks), outPath)
+	for _, check := range report.Checks {
+		result := "pass"
+		if !check.OK {
+			result = "fail"
+		}
+		fmt.Printf("  %s=%s %s\n", check.ID, result, check.Summary)
 	}
 	return nil
 }

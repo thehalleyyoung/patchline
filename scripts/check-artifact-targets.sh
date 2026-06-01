@@ -18,6 +18,11 @@ commands=(
   "artifact-baselines"
   "artifact-ablations"
   "artifact-scale"
+  "artifact-tables"
+  "artifact-numbers"
+  "artifact-subtasks"
+  "artifact-corpus-audit"
+  "artifact-provenance"
   "artifact-benchmark"
 )
 

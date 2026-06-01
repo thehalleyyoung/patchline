@@ -2,8 +2,42 @@
 set -euo pipefail
 
 root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-out_dir="$root/examples/public-corpus/downloads"
-mkdir -p "$out_dir"
+sources="${PATCHLINE_PUBLIC_CORPUS_SOURCES:-$root/examples/public-corpus/sources.json}"
+out_dir="${PATCHLINE_PUBLIC_CORPUS_OUT:-$root/examples/public-corpus/downloads}"
+report_dir="${PATCHLINE_PUBLIC_CORPUS_REPORT_DIR:-$root/results/generated/public-corpus}"
+offline="${PATCHLINE_PUBLIC_CORPUS_OFFLINE:-0}"
+
+if ! command -v jq >/dev/null 2>&1; then
+  echo "fetch-public-corpus requires jq" >&2
+  exit 1
+fi
+
+mkdir -p "$out_dir" "$report_dir"
+
+source_hash="$(shasum -a 256 "$sources" | awk '{print $1}')"
+files_jsonl="$(mktemp)"
+trap 'rm -f "$files_jsonl"' EXIT
+
+relative_path() {
+  local path="$1"
+  case "$path" in
+    "$root"/*) printf '%s\n' "${path#$root/}" ;;
+    *) printf '%s\n' "$path" ;;
+  esac
+}
+
+verify_hash() {
+  local id="$1"
+  local expected="$2"
+  local path="$3"
+  local actual
+  actual="$(shasum -a 256 "$path" | awk '{print $1}')"
+  if [[ "$actual" != "$expected" ]]; then
+    echo "sha256 mismatch for $id: expected $expected got $actual" >&2
+    return 1
+  fi
+  printf '%s\n' "$actual"
+}
 
 fetch_one() {
   local id="$1"
@@ -11,43 +45,66 @@ fetch_one() {
   local sha="$3"
   local out="$4"
   local path="$out_dir/$out"
+  local status="downloaded"
+  local actual=""
 
-  curl -fsSL "$url" -o "$path"
-  local actual
-  actual="$(shasum -a 256 "$path" | awk '{print $1}')"
-  if [[ "$actual" != "$sha" ]]; then
-    echo "sha256 mismatch for $id: expected $sha got $actual" >&2
+  if [[ -f "$path" ]]; then
+    actual="$(shasum -a 256 "$path" | awk '{print $1}')"
+    if [[ "$actual" == "$sha" ]]; then
+      status="cached"
+    elif [[ "$offline" == "1" ]]; then
+      echo "cached file hash mismatch for $id in offline mode: expected $sha got $actual" >&2
+      exit 1
+    else
+      status="refetched"
+      curl -fsSL "$url" -o "$path"
+      actual="$(verify_hash "$id" "$sha" "$path")"
+    fi
+  elif [[ "$offline" == "1" ]]; then
+    echo "missing cached public corpus file for $id in offline mode: $path" >&2
     exit 1
+  else
+    curl -fsSL "$url" -o "$path"
+    actual="$(verify_hash "$id" "$sha" "$path")"
   fi
-  echo "$id $actual $path"
+
+  if [[ -z "$actual" ]]; then
+    actual="$(verify_hash "$id" "$sha" "$path")"
+  fi
+
+  jq -n \
+    --arg id "$id" \
+    --arg url "$url" \
+    --arg expected_sha256 "$sha" \
+    --arg actual_sha256 "$actual" \
+    --arg status "$status" \
+    --arg path "$(relative_path "$path")" \
+    '{id: $id, url: $url, path: $path, status: $status, expected_sha256: $expected_sha256, actual_sha256: $actual_sha256, ok: ($expected_sha256 == $actual_sha256)}' \
+    >> "$files_jsonl"
+
+  echo "$id $status $actual $path"
 }
 
-fetch_one \
-  "bytebase-sheet-blob" \
-  "https://raw.githubusercontent.com/bytebase/bytebase/47d2522552ce44271680424bf31a4cddd8a50ab1/backend/migrator/migration/3.1/0000%23%23sheet_blob.sql" \
-  "3ea36a1d57832319f241a32f361e32c53e85bba34f67350ba3cd7512f1c40fa5" \
-  "bytebase-sheet-blob.sql"
+while IFS=$'\t' read -r id url sha out; do
+  fetch_one "$id" "$url" "$sha" "$out"
+done < <(jq -r '.sources[] | [.id, .url, .sha256, .out] | @tsv' "$sources")
 
-fetch_one \
-  "bytebase-replica-heartbeat" \
-  "https://raw.githubusercontent.com/bytebase/bytebase/47d2522552ce44271680424bf31a4cddd8a50ab1/backend/migrator/migration/3.14/0027%23%23replica_heartbeat.sql" \
-  "1ab807c25f64eec2c05cfe3e0d4af218ff5f469bcaeb8c199d9559f6d0058c83" \
-  "bytebase-replica-heartbeat.sql"
+report_path="$report_dir/fetch-report.json"
+jq -s \
+  --arg version "patchline.public-corpus-fetch/v1" \
+  --arg source_manifest "$(relative_path "$sources")" \
+  --arg source_manifest_sha256 "$source_hash" \
+  --arg output_dir "$(relative_path "$out_dir")" \
+  --arg offline "$offline" \
+  '{
+    version: $version,
+    source_manifest: $source_manifest,
+    source_manifest_sha256: $source_manifest_sha256,
+    output_dir: $output_dir,
+    offline: ($offline == "1"),
+    files: .,
+    ok: all(.[]; .ok)
+  }' "$files_jsonl" > "$report_path"
 
-fetch_one \
-  "bytebase-workspace" \
-  "https://raw.githubusercontent.com/bytebase/bytebase/47d2522552ce44271680424bf31a4cddd8a50ab1/backend/migrator/migration/3.17/0009%23%23add_workspace_table.sql" \
-  "276ad1148252ce21849054acf1d6ac62db5d72df3f88c9c2b4b42c28e7f5e98c" \
-  "bytebase-workspace.sql"
-
-fetch_one \
-  "bytebase-drop-sheet-table" \
-  "https://raw.githubusercontent.com/bytebase/bytebase/47d2522552ce44271680424bf31a4cddd8a50ab1/backend/migrator/migration/3.15/0007%23%23drop_sheet_table.sql" \
-  "456248872b099828f958143f0ee5ce5d006d9705c7e85345486ad3430d140f13" \
-  "bytebase-drop-sheet-table.sql"
-
-fetch_one \
-  "bytebase-drop-unused-id-columns" \
-  "https://raw.githubusercontent.com/bytebase/bytebase/47d2522552ce44271680424bf31a4cddd8a50ab1/backend/migrator/migration/3.16/0002%23%23drop_unused_id_columns.sql" \
-  "e9d46ecb1e229aa55b02426b052891783dd637492655b22c8ce385d5b0ac5492" \
-  "bytebase-drop-unused-id-columns.sql"
+jq -e '.ok == true' "$report_path" >/dev/null
+echo "public corpus fetch report $(relative_path "$report_path")"

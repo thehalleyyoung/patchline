@@ -1,37 +1,48 @@
-# NEWEST_PLAN: Making Patchline Artifact-Paper Ready
+# NEWEST_PLAN: Making Patchline Useful on Current Data
 
-This plan turns the ICSE-style review critique into an implementation roadmap for making Patchline credible as the focus of a software engineering artifact paper. The north star is to move Patchline from a rich semantics-first prototype into a reproducible artifact with a single claim, public data, ground truth, baselines, ablations, and reviewer-friendly execution paths.
+This plan turns Patchline from an artifact-first prototype into a tool whose first appeal is immediate use on existing code and operational data. The north star is: a team can point Patchline at a local repo, an arbitrary GitHub project, a migrations subdirectory, source code, telemetry/deploy exports, JSON logs, incident docs, or repair artifacts and get deterministic problem/cause/repair findings before adopting Patchline-specific labels or schemas. The ICSE artifact machinery remains as validation evidence, not the premise a user must satisfy before Patchline is useful.
 
 ## Current State Snapshot (2026-05-29)
 
-Patchline now has the artifact-review scaffold and several executable evaluator paths in place:
+Patchline now has a current-data intake path plus the artifact-review scaffold:
 
-- `README.md`, `ARTIFACT.md`, `docs/paper-claim.md`, `docs/semantic-core.md`, `docs/semantic-pipeline.md`, and `docs/literature-positioning.md` frame the repository around the historical repair-semantics artifact claim.
+- `patchline intake <path>` scans arbitrary local project/export data; `patchline intake --github owner/repo --ref ref --subpath path` downloads a public GitHub project and checks only the requested portion.
+- Intake does not require labels. It analyzes plain SQL, extracts embedded/source SQL, recognizes known telemetry/deploy/export formats when present, extracts generic SQL/trace/deploy/commit signals from unknown JSON/JSONL, scans incident-like docs/logs/scripts for root-cause and repair/rollback clues, derives problem/cause/repair candidates, links candidates only through shared identifiers, writes `results/generated/intake/summary.{json,md}`, and prints runnable next commands.
+- `README.md`, `ARTIFACT.md`, `docs/paper-claim.md`, `docs/semantic-core.md`, `docs/semantic-pipeline.md`, and `docs/literature-positioning.md` now frame artifact benchmarks as validation of the current-data checker and progressive semantic pipeline.
 - `benchmarks/LABELING.md`, `benchmarks/manifests/smoke.json`, `benchmarks/manifests/negative.json`, `benchmarks/manifests/repair_cases.json`, `benchmarks/manifests/semantic_regressions.json`, `benchmarks/manifests/public_migrations.json`, `benchmarks/manifests/public_incidents.json`, `benchmarks/manifests/public_repairs.json`, `benchmarks/manifests/public_archive.json`, and `benchmarks/ground_truth/**` provide phase-aware, source-grounded labels.
-- `patchline artifact-ground-truth`, `phase-check`, `artifact-baselines`, `artifact-ablations`, `artifact-scale`, `artifact-study summarize/compare`, `artifact-tables`, and `artifact-benchmark validate/run/compare` are implemented.
+- `patchline artifact-ground-truth`, `phase-check`, `artifact-baselines`, `artifact-ablations`, `artifact-scale`, `artifact-study summarize/compare`, `artifact-tables`, `artifact-numbers`, `artifact-subtasks`, `artifact-provenance`, and `artifact-benchmark validate/run/compare` are implemented.
 - `make artifact-studies` remains the offline strict-corpus study generation path, while `make artifact-studies-compare` checks those generated reports against committed expected hashes in `benchmarks/expected/studies-strict.json`.
 - `make artifact-studies-public` repeats baseline/ablation/scale reports on the pinned public Bytebase migration corpus, while `make artifact-studies-public-compare` checks them against `benchmarks/expected/studies-public-migrations.json`.
 - `make artifact-benchmark-compare` executes smoke, negative, repair/replay, and semantic-regression manifests, writes deterministic reports under `results/generated/artifact-benchmark/`, and compares them against committed golden reports in `benchmarks/expected/`.
 - `make artifact-benchmark-public` fetches five pinned Bytebase migrations, verifies source hashes, runs the legacy benchmark-suite label/hash check, and compares the phase-aware artifact benchmark to a committed golden report.
+- Public corpus fetching now reads `examples/public-corpus/sources.json` as the single source manifest, writes `results/generated/public-corpus/fetch-report.json`, and supports `PATCHLINE_PUBLIC_CORPUS_OFFLINE=1` for hash-checked cache-only reruns.
 - `make artifact-benchmark-public-incidents` runs an offline public-incident corpus over GitLab 2017 and GitHub 2018 source-derived observations plus a too-thin-public-summary boundary, comparing against a committed golden report.
 - `make artifact-benchmark-public-repairs` runs an offline public-derived repair boundary over a Patchline-authored GitLab 2017 counterfactual no-snapshot repair manifest and compares against a committed golden report.
 - `make artifact-benchmark-public-archive` runs an offline paired public-postmortem-derived archive over GitLab 2017 and GitHub 2018 source observations plus explicit Patchline reconstructions, comparing against a committed golden report.
-- `make artifact-tables` regenerates five paper-facing tables under `results/generated/artifact-tables/summary.{json,md}` from the checked reports and study specs.
+- `make artifact-tables` regenerates five paper-facing tables under `results/generated/artifact-tables/summary.{json,md}` from checked study specs and regenerated benchmark reports whose hashes match the frozen expected reports.
+- `make artifact-numbers` regenerates a complete hashed experiment-number ledger under `results/generated/artifact-numbers/summary.{json,md}`, including per-case baselines, ablations, scale rows, regenerated benchmark outcomes, matching expected-report hashes, and input hashes.
+- `make artifact-subtasks` regenerates a focused defined-subtask comparison report under `results/generated/artifact-subtasks/summary.{json,md}` and fails if the public migration-risk or strict repair-review win conditions no longer hold.
+- `make artifact-provenance` regenerates an artifact-wide reproducibility receipt under `results/generated/artifact-provenance/summary.{json,md}`, hashing checked inputs and generated outputs while independently validating the public corpus cache, demo bundle manifest, and frozen benchmark report matches.
+- `make artifact-demo` now emits a canonical bundle under `results/generated/artifact-demo/` that combines the local trace/migration/proof/replay/archive fixture with the offline public-postmortem-derived archive benchmark, writes a per-file SHA-256 `bundle-manifest.json`, and summarizes the deterministic bundle hash plus public archive expected/actual result.
 - `make phase-check` runs a dedicated reviewer-facing no-hindsight command over every committed benchmark manifest, reporting each case's declared phase/input kind and failing on phase/input availability violations.
 - Ground-truth validation now enforces a fixed phase/input availability model, so an `allowed_inputs` entry cannot first become available after the case's declared phase.
-- `make artifact-benchmark-refresh` and `make artifact-studies-refresh` are the explicit maintainer paths for regenerating committed golden reports/manifests after deliberate semantic changes.
+- `make artifact-benchmark-refresh` and `make artifact-studies-refresh` are the explicit maintainer paths for regenerating committed golden reports/manifests after deliberate semantic changes; compare targets remain separate so refresh is not presented as validation.
 - `make artifact-full && make verify-usefulness` has passed after the executable benchmark runner, golden-refresh workflow, and public migration corpus were added.
 - `100_STEPS.md`, `PLAN.md`, and `NEW_PLAN.md` are untracked/ignored; this file remains the tracked implementation roadmap.
 
-The latest refinement exposes time-realistic validation as a first-class evaluator command. `artifact-ground-truth` rejects unknown phases, unknown allowed input kinds, and allowed inputs that are only available after the case phase, while preserving the explicit pre-deploy exclusion of postmortem text; `phase-check` applies the same rules per manifest and prints the case-level phase/input declarations reviewers need to audit no-hindsight claims quickly.
+The latest refinement adds an artifact-wide provenance receipt on top of the anti-cheating fixes. Independent baselines read raw SQL bytes through a fixed lexical rule pack instead of Patchline analyzer summaries; evaluation-only metadata such as expected hashes and ground-truth paths no longer inflates actionability; `artifact-numbers` and `artifact-tables` record regenerated benchmark reports only after their hashes match the frozen expected reports; and `artifact-provenance` independently re-hashes public corpus cache files and rejects stale or incomplete generated bundles.
 
-## 0. Target Artifact Claim
+## 0. Target Product Claim
 
-Patchline should be organized around one memorable claim:
+Patchline should be organized around one memorable product claim:
 
-> Patchline converts historical production data-repair incidents into executable semantic artifacts that can replay repairs, prove scope and frame obligations, and detect recurrence across future migrations.
+> Patchline can be pointed at existing repos, GitHub projects, migration directories, source trees, telemetry/deploy exports, JSON logs, incident docs, and repair artifacts to produce immediate deterministic problem/cause/repair findings before a team adopts Patchline-specific labels or schemas.
 
-Everything in the repo should support this claim. Features that do not directly support it should either be reframed as supporting infrastructure or moved out of the primary artifact path.
+The artifact claim becomes the progressive-enhancement and validation claim:
+
+> When richer evidence, repair, store, policy, or invariant inputs are present, Patchline compiles those current-data findings into executable semantic artifacts that replay repairs, prove scope/frame obligations, and detect recurrence across future migrations.
+
+Everything in the repo should support this flow. Features that require labels or benchmark manifests should be presented as reproducibility/validation infrastructure, not as prerequisites for first use.
 
 ### What this claim commits us to prove
 
@@ -55,18 +66,18 @@ Patchline should not claim to automatically understand arbitrary production syst
 | Reviewer concern | Current risk | Required repo response | Done when |
 | --- | --- | --- | --- |
 | Single artifact claim | Repo feels broad: provenance, replay, repair, solver, archive, policy, CI, benchmarking | Make all README, docs, examples, and commands converge on the historical repair semantics claim | README, `ARTIFACT.md`, and `docs/paper-claim.md` all state the same claim and map commands to it |
-| Real benchmark suite | Smoke/negative/repair/regression manifests plus first public migration/incident/repair/archive-derived corpora are executable; corpus size is still small | Expand public benchmark datasets with machine-readable manifests, labels, expected outputs, and scale summaries | `make artifact-benchmark-compare`, `make artifact-benchmark-public`, `make artifact-benchmark-public-incidents`, `make artifact-benchmark-public-repairs`, `make artifact-benchmark-public-archive`, and `make artifact-studies-public` cover current corpora |
+| Real benchmark suite | Smoke/negative/repair/regression manifests plus first public migration/incident/repair/archive-derived corpora are executable; corpus size is still small; public migration fetching has a cache-only mode and provenance report | Expand public benchmark datasets with machine-readable manifests, labels, expected outputs, and scale summaries | `make artifact-benchmark-compare`, `make artifact-benchmark-public`, `make artifact-benchmark-public-incidents`, `make artifact-benchmark-public-repairs`, `make artifact-benchmark-public-archive`, and `make artifact-studies-public` cover current corpora |
 | Ground truth | Core protocol exists and validates | Store labels, evidence URLs, source snippets/hashes, labeling rules, and expected classifications | Every benchmark case has `ground_truth/*.json` with label provenance |
-| Baselines | DDL-grep, normalized SQL-rule, and effects-without-evidence baselines run on strict and public migration corpora with expected-hash drift checks | Add larger public corpus coverage | `make artifact-studies-compare` and `make artifact-studies-public-compare` emit and verify comparative tables |
+| Baselines | Raw-SQL DDL-grep, raw-SQL normalized SQL-rule, migration-guardrail-linter, and Patchline effects-only ablation rows run on strict and public migration corpora with expected-hash drift checks | Add larger public corpus coverage | `make artifact-studies-compare` and `make artifact-studies-public-compare` emit and verify comparative tables |
 | Ablations | Strict and public migration study targets exist with expected-hash drift checks; public corpus intentionally measures only migration detection/actionability unless inputs declare proof/archive links | Add public cases with repair/archive inputs | `make artifact-studies-compare`, `make artifact-studies-public-compare`, and `make artifact-benchmark-compare` show added signal/actionability per component |
-| Paper-facing tables | `artifact-tables` emits five deterministic result tables with source hashes | Expand table rows as corpora grow | `make artifact-tables` writes `results/generated/artifact-tables/summary.{json,md}` |
+| Paper-facing tables | `artifact-tables` emits five deterministic result tables with generated/expected benchmark source hashes; `artifact-numbers` emits the exhaustive reportable-number ledger; `artifact-subtasks` emits explicit win-condition reports for the public migration-risk and strict repair-review subtasks; `artifact-provenance` emits an artifact-wide reproducibility receipt | Expand table rows as corpora grow | `make artifact-tables`, `make artifact-numbers`, `make artifact-subtasks`, and `make artifact-provenance` write deterministic summaries under `results/generated/` |
 | Time realism | Phase-aware ground truth, `phase-check`, and benchmark runner enforce input availability with a fixed earliest-phase table | Expand phase coverage as new input kinds are added | Pre-deploy claims only consume pre-deploy evidence |
 | Packaging | Docker/devcontainer, smoke/full targets, and artifact docs exist | Add Docker/devcontainer, `ARTIFACT.md`, smoke/full targets, cached data option | Fresh checkout can run smoke path under 5 minutes |
 | Scale | `artifact-scale` and `artifact-scale-public` emit corpus measurements; corpus size is still small | Add larger corpus-scale benchmark and report runtime/memory/query latency | study targets emit benchmark JSON and Markdown tables for strict and public corpora |
 | Trusted semantic core | `docs/semantic-core.md` exists and is linked from README | Define a small explicit core model and connect it to code and CLI commands | `docs/semantic-core.md` maps model terms to implementation files and tests |
 | Negative cases | Five executable negative controls plus repair/regression boundary cases are in the benchmark path | Add more unsupported/ambiguous public cases and explicit failure modes | `make artifact-negative-cases` and `make artifact-benchmark-compare` show boundary outcomes |
 | Literature novelty | `docs/literature-positioning.md` exists | Add literature-positioning doc and paper-intro material | `docs/literature-positioning.md` contrasts Patchline with provenance, migration linting, repair, incident tools |
-| Killer demo | `make artifact-demo` exists; expected-output refresh still manual | Add one end-to-end demo over named public data | `make artifact-demo` emits a paper-ready bundle hash and result summary |
+| Killer demo | `make artifact-demo` emits local and public-derived stage outputs, validates the public archive benchmark against its frozen expected hash, and writes a per-file bundle manifest | Expand the same canonical bundle as larger public corpora are added | `make artifact-demo` emits a paper-ready bundle hash, result summary, and per-file SHA-256 manifest |
 
 ## 2. Workstream A: One Coherent Artifact Story
 
@@ -998,27 +1009,30 @@ make artifact-demo
 ### Desired output
 
 ```text
-Patchline artifact demo
-dataset: public-incidents-smoke-v1
-claim: historical repair semantics detects recurrence and proves repair obligations
+# Patchline artifact demo summary
 
-[1/7] verifying source evidence ... ok
-[2/7] reconstructing trace ... ok hash=...
-[3/7] analyzing bad transition ... gate=fail risk=high
-[4/7] generating Z3 obligations ... fail/sat/unsat summary=...
-[5/7] replaying repair ... verification=verified hash=...
-[6/7] updating archive ... entries=...
-[7/7] detecting semantic regression ... count=...
-
-artifact_bundle_hash=...
-paper_table=results/artifact-demo/summary.md
+- claim: historical repair semantics detects recurrence and proves repair obligations across local and public-derived archives
+- output_dir: `results/generated/artifact-demo`
+- artifact_bundle_hash: `...`
+- bundle_file_count: `14`
+- trace_projection_hash: `...`
+- migration_report_hash: `...`
+- solver_engine: `z3`
+- solver_report_hash: `...`
+- repair_trace_hash: `...`
+- semantic_regression_count: `3`
+- public_archive_relation_count: `1`
+- public_archive_benchmark_hash: `c93acc2c5244f52414e160b6d7271dda98a4f299046b2b611143cb2617e84452`
+- public_archive_benchmark_cases: `1`
+- public_archive_result: `flag`
 ```
 
 ### Demo requirements
 
-- Uses public or committed smoke data.
+- Uses committed smoke data and an offline public-postmortem-derived archive case.
 - Emits JSON and Markdown.
-- Has stable expected outputs.
+- Writes a per-file `bundle-manifest.json` with SHA-256 hashes.
+- Checks the public archive benchmark against stable expected outputs before including it in the bundle.
 - Demonstrates:
   - source grounding,
   - transition risk,
