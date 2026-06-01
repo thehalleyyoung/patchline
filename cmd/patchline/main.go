@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"regexp"
 	"sort"
 	"strconv"
 	"strings"
@@ -395,7 +396,7 @@ func usage() {
 Usage:
   patchline about
   patchline repo fetch <owner/repo|github-url|path|archive> [--ref ref] [--subpath path] [--out dir] [--download-dir dir] [--json]
-  patchline repo analyze [<path>|--github owner/repo] [--ref ref] [--subpath path] [--stages inventory,baseline,propose,compare,deep] [--proposal-kind tests|guards|instrumentation|repair|all] [--budget files=N,lines=N,tokens=N,changes=N] [--resume] [--no-llm] [--llm-command cmd] [--out dir] [--json]
+  patchline repo analyze [<path>|--github owner/repo] [--ref ref] [--subpath path] [--stages inventory,baseline,propose,compare,deep] [--proposal-kind tests|guards|instrumentation|repair|all] [--budget files=N,lines=N,tokens=N,changes=N] [--redact] [--resume] [--no-llm] [--llm-command cmd] [--out dir] [--json]
   patchline repo inventory <path> [--out dir] [--full] [--json]
   patchline repo baseline --inventory inventory-dir --intake intake-dir [--out dir] [--json]
   patchline repo propose --from-report baseline-dir --proposal-kind tests|guards|instrumentation|repair|all [--budget files=N,lines=N,tokens=N,changes=N] [--no-llm] [--llm-command cmd] [--out dir] [--json]
@@ -518,6 +519,7 @@ type repoAnalyzeReport struct {
 	Source       project.Source         `json:"source,omitempty"`
 	Resume       bool                   `json:"resume"`
 	ReusedStages []string               `json:"reused_stages,omitempty"`
+	Redact       bool                   `json:"redact"`
 	Summary      repoAnalyzeSummary     `json:"summary"`
 	DeepAnalysis repoAnalyzeDeepSummary `json:"deep_analysis,omitempty"`
 	NextCommands []project.Command      `json:"next_commands,omitempty"`
@@ -568,9 +570,10 @@ func repoAnalyze(args []string) error {
 	budgetRisks := fs.Int("budget-risks", 3, "maximum ranked risks to include")
 	noLLM := fs.Bool("no-llm", false, "force deterministic template proposals and reject LLM generation")
 	resume := fs.Bool("resume", false, "reuse existing fetch, inventory, intake, baseline, proposal, and compare artifacts when present")
+	redact := fs.Bool("redact", false, "write stable-token redacted analysis-bundle artifacts")
 	runNativeTests := fs.Bool("run-native-tests", false, "run safe allowlisted native test commands during compare")
 	jsonOut := fs.Bool("json", false, "emit JSON")
-	input, flagArgs, err := onePositionalWithFlags(args, map[string]bool{"--json": true, "--no-llm": true, "--resume": true, "--run-native-tests": true})
+	input, flagArgs, err := onePositionalWithFlags(args, map[string]bool{"--json": true, "--no-llm": true, "--redact": true, "--resume": true, "--run-native-tests": true})
 	if err != nil {
 		return err
 	}
@@ -581,7 +584,7 @@ func repoAnalyze(args []string) error {
 		input = *githubRepo
 	}
 	if input == "" || fs.NArg() != 0 {
-		return errors.New("usage: patchline repo analyze [<path>|--github owner/repo] [--ref ref] [--subpath path] [--stages inventory,baseline,propose,compare,deep] [--proposal-kind kind] [--budget files=N,lines=N,tokens=N,changes=N] [--resume] [--no-llm] [--llm-command cmd] [--out dir] [--json]")
+		return errors.New("usage: patchline repo analyze [<path>|--github owner/repo] [--ref ref] [--subpath path] [--stages inventory,baseline,propose,compare,deep] [--proposal-kind kind] [--budget files=N,lines=N,tokens=N,changes=N] [--redact] [--resume] [--no-llm] [--llm-command cmd] [--out dir] [--json]")
 	}
 	stages, err := parseAnalyzeStages(*stagesValue)
 	if err != nil {
@@ -598,6 +601,7 @@ func repoAnalyze(args []string) error {
 		Stages:  stages,
 		Outputs: map[string]string{},
 		Resume:  *resume,
+		Redact:  *redact,
 	}
 	stageSet := analyzeStageSet(stages)
 	scanRoot := input
@@ -768,9 +772,10 @@ func repoAnalyze(args []string) error {
 		Outputs      map[string]string      `json:"outputs"`
 		Resume       bool                   `json:"resume"`
 		ReusedStages []string               `json:"reused_stages,omitempty"`
+		Redact       bool                   `json:"redact"`
 		Summary      repoAnalyzeSummary     `json:"summary"`
 		Deep         repoAnalyzeDeepSummary `json:"deep_analysis,omitempty"`
-	}{report.Version, report.Input, report.Subpath, report.Stages, report.Outputs, report.Resume, report.ReusedStages, report.Summary, report.DeepAnalysis})
+	}{report.Version, report.Input, report.Subpath, report.Stages, report.Outputs, report.Resume, report.ReusedStages, report.Redact, report.Summary, report.DeepAnalysis})
 	if err := writeRepoAnalyzeReport(*outPath, report); err != nil {
 		return err
 	}
@@ -907,6 +912,7 @@ func writeRepoAnalyzeReport(outDir string, report repoAnalyzeReport) error {
 	fmt.Fprintf(&b, "- input: `%s`\n", report.Input)
 	fmt.Fprintf(&b, "- stages: `%s`\n", strings.Join(report.Stages, ","))
 	fmt.Fprintf(&b, "- resume: `%t`\n", report.Resume)
+	fmt.Fprintf(&b, "- redact: `%t`\n", report.Redact)
 	if len(report.ReusedStages) > 0 {
 		fmt.Fprintf(&b, "- reused_stages: `%s`\n", strings.Join(report.ReusedStages, ","))
 	}
@@ -946,6 +952,7 @@ func writeAnalysisBundle(outDir string, report repoAnalyzeReport) error {
 	if err := os.MkdirAll(bundleDir, 0o755); err != nil {
 		return err
 	}
+	redactor := newBundleRedactor()
 	copyIfExists := func(src, name string) error {
 		if src == "" {
 			return nil
@@ -956,17 +963,23 @@ func writeAnalysisBundle(outDir string, report repoAnalyzeReport) error {
 			}
 			return err
 		}
-		return copyFile(src, filepath.Join(bundleDir, name))
+		return copyBundleFile(src, filepath.Join(bundleDir, name), report.Redact, redactor)
 	}
 	if fetchOut := report.Outputs["fetch"]; fetchOut != "" {
 		if err := copyIfExists(filepath.Join(fetchOut, "source.json"), "source.json"); err != nil {
 			return err
 		}
 	} else {
-		source := map[string]any{"input": report.Input, "subpath": report.Subpath}
+		source := map[string]any{"input": report.Input, "subpath": report.Subpath, "redacted_source": report.Redact}
 		data, err := json.MarshalIndent(source, "", "  ")
 		if err != nil {
 			return err
+		}
+		if report.Redact {
+			data, err = redactor.redactJSONBytes(data)
+			if err != nil {
+				return err
+			}
 		}
 		if err := os.WriteFile(filepath.Join(bundleDir, "source.json"), append(data, '\n'), 0o644); err != nil {
 			return err
@@ -998,12 +1011,190 @@ func writeAnalysisBundle(outDir string, report repoAnalyzeReport) error {
 	return copyIfExists(filepath.Join(outDir, "analyze.md"), "summary.md")
 }
 
-func copyFile(src, dst string) error {
+func copyBundleFile(src, dst string, redact bool, redactor *bundleRedactor) error {
 	data, err := os.ReadFile(src)
 	if err != nil {
 		return err
 	}
+	if redact {
+		data, err = redactor.redactFileBytes(src, data)
+		if err != nil {
+			return err
+		}
+	}
 	return os.WriteFile(dst, data, 0o644)
+}
+
+type bundleRedactor struct {
+	tokenByValue map[string]string
+	wordPattern  *regexp.Regexp
+	emailPattern *regexp.Regexp
+	quotePattern *regexp.Regexp
+}
+
+func newBundleRedactor() *bundleRedactor {
+	return &bundleRedactor{
+		tokenByValue: map[string]string{},
+		wordPattern:  regexp.MustCompile(`[A-Za-z_][A-Za-z0-9_./:@-]{2,}`),
+		emailPattern: regexp.MustCompile(`[A-Za-z0-9._%+\-]+@[A-Za-z0-9.\-]+\.[A-Za-z]{2,}`),
+		quotePattern: regexp.MustCompile(`'[^']{1,120}'|"[^"\n]{1,120}"`),
+	}
+}
+
+func (r *bundleRedactor) redactFileBytes(path string, data []byte) ([]byte, error) {
+	switch {
+	case strings.HasSuffix(path, ".json"), strings.HasSuffix(path, ".sarif"):
+		return r.redactJSONBytes(data)
+	case strings.HasSuffix(path, ".jsonl"):
+		lines := strings.Split(strings.TrimSuffix(string(data), "\n"), "\n")
+		for i, line := range lines {
+			if strings.TrimSpace(line) == "" {
+				continue
+			}
+			redacted, err := r.redactJSONBytes([]byte(line))
+			if err != nil {
+				lines[i] = r.redactText(line)
+				continue
+			}
+			lines[i] = strings.TrimSuffix(string(redacted), "\n")
+		}
+		return []byte(strings.Join(lines, "\n") + "\n"), nil
+	default:
+		return []byte(r.redactText(string(data))), nil
+	}
+}
+
+func (r *bundleRedactor) redactJSONBytes(data []byte) ([]byte, error) {
+	var value any
+	if err := json.Unmarshal(data, &value); err != nil {
+		return nil, err
+	}
+	value = r.redactJSONValue("", value)
+	out, err := json.MarshalIndent(value, "", "  ")
+	if err != nil {
+		return nil, err
+	}
+	return append(out, '\n'), nil
+}
+
+func (r *bundleRedactor) redactJSONValue(key string, value any) any {
+	switch v := value.(type) {
+	case map[string]any:
+		out := make(map[string]any, len(v))
+		for childKey, childValue := range v {
+			out[childKey] = r.redactJSONValue(childKey, childValue)
+		}
+		return out
+	case []any:
+		for i := range v {
+			v[i] = r.redactJSONValue(key, v[i])
+		}
+		return v
+	case string:
+		if preserveRedactionValue(key, v) {
+			return v
+		}
+		if shouldRedactString(key, v) {
+			return r.token(redactionKind(key, v), v)
+		}
+		return r.redactText(v)
+	default:
+		return v
+	}
+}
+
+func preserveRedactionValue(key, value string) bool {
+	lowerKey := strings.ToLower(key)
+	lowerValue := strings.ToLower(value)
+	if strings.Contains(lowerKey, "hash") || lowerKey == "version" || lowerKey == "status" || lowerKey == "severity" || lowerKey == "level" {
+		return true
+	}
+	switch lowerValue {
+	case "", "true", "false", "pass", "fail", "warn", "high", "medium", "low", "checked", "conditional", "open", "refuted":
+		return true
+	default:
+		return false
+	}
+}
+
+func shouldRedactString(key, value string) bool {
+	lowerKey := strings.ToLower(key)
+	lowerValue := strings.ToLower(value)
+	if strings.Contains(lowerKey, "hash") {
+		return false
+	}
+	if containsAny(lowerKey, "id", "path", "uri", "input", "repo", "owner", "subpath", "table", "column", "identifier", "name", "email", "customer", "literal", "secret", "token", "password", "authorization", "command", "rationale", "reason", "message", "source", "target", "expr", "expect") {
+		return strings.TrimSpace(value) != ""
+	}
+	return containsAny(lowerValue, "secret", "token", "password", "authorization", "bearer", "api_key", "apikey") || strings.Contains(value, "@")
+}
+
+func redactionKind(key, value string) string {
+	lower := strings.ToLower(key + " " + value)
+	switch {
+	case containsAny(lower, "secret", "token", "password", "authorization", "bearer", "api_key", "apikey"):
+		return "secret"
+	case containsAny(lower, "customer", "email") || strings.Contains(value, "@"):
+		return "customer"
+	case containsAny(lower, "table", "column", "identifier", "id", "name"):
+		return "identifier"
+	case containsAny(lower, "literal", "expr", "expect"):
+		return "literal"
+	default:
+		return "value"
+	}
+}
+
+func (r *bundleRedactor) redactText(text string) string {
+	text = r.emailPattern.ReplaceAllStringFunc(text, func(value string) string {
+		return r.token("customer", value)
+	})
+	text = r.quotePattern.ReplaceAllStringFunc(text, func(value string) string {
+		return r.token("literal", value)
+	})
+	return r.wordPattern.ReplaceAllStringFunc(text, func(value string) string {
+		if preserveTextToken(value) {
+			return value
+		}
+		if containsAny(strings.ToLower(value), "secret", "token", "password", "authorization", "bearer", "api_key", "apikey") {
+			return r.token("secret", value)
+		}
+		if strings.Contains(value, "/") || strings.Contains(value, ".") || strings.Contains(value, "_") || strings.Contains(value, "-") {
+			return r.token("identifier", value)
+		}
+		return value
+	})
+}
+
+func preserveTextToken(value string) bool {
+	lower := strings.ToLower(value)
+	if len(value) <= 3 || strings.HasPrefix(lower, "sha256:") || regexp.MustCompile(`^[0-9a-f]{12,64}$`).MatchString(lower) {
+		return true
+	}
+	switch lower {
+	case "patchline", "repo", "analyze", "baseline", "proposal", "compare", "summary", "sarif", "json", "true", "false", "pass", "fail", "warn", "high", "medium", "low", "risk", "risks", "files", "facts", "stage", "stages", "hash", "version", "generated", "checks", "redact", "resume":
+		return true
+	default:
+		return false
+	}
+}
+
+func (r *bundleRedactor) token(kind, value string) string {
+	if existing := r.tokenByValue[kind+"\x00"+value]; existing != "" {
+		return existing
+	}
+	token := "[redacted:" + kind + ":" + canonical.Hash(value)[:12] + "]"
+	r.tokenByValue[kind+"\x00"+value] = token
+	return token
+}
+
+func containsAny(text string, needles ...string) bool {
+	for _, needle := range needles {
+		if strings.Contains(text, needle) {
+			return true
+		}
+	}
+	return false
 }
 
 func fileExists(path string) bool {

@@ -19,6 +19,7 @@ go run ./cmd/patchline repo analyze --github django/django \
   --subpath django/contrib/auth/migrations \
   --stages inventory,baseline,propose,compare,deep \
   --budget files=15,lines=120,tokens=50000,changes=3 \
+  --redact \
   --no-llm \
   --out results/generated/repos/django-auth-analysis
 go run ./cmd/patchline repo inventory \
@@ -53,6 +54,8 @@ To plug in a local or hosted generator, pass `--llm-command '<cmd>'`; Patchline 
 Use `--budget files=N,lines=N,tokens=N,changes=N` to bound generated scope before a patch is written. `changes` limits targeted risks, `files` limits generated artifacts, `lines` limits each artifact, and `tokens` limits approximate generated output tokens.
 
 Rerun `repo analyze --resume --out <same-dir>` to reuse existing fetch, inventory, intake, baseline, proposal, and compare artifacts while changing later experiment settings.
+
+Add `--redact` to write `analysis-bundle/` copies with stable redaction tokens for identifiers, literals, customer-like strings, and secret-like values while preserving joins and existing artifact hashes.
 
 For example, with an OpenAI key already exported as `OPENAI_API_KEY` or `openai_api_key`, you can pass a command that reads Patchline's prompt from stdin and writes generated text to stdout:
 
