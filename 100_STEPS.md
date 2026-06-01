@@ -117,7 +117,7 @@ Every addition to the repo should be judged by whether it makes that loop more a
 83. [x] Compare against grep-only risk detection.
 84. [x] Compare against SQL-only analysis without code/docs/evidence links.
 85. [x] Compare against identifier-only linking without temporal signals.
-86. [ ] Compare against temporal-only linking without identifiers.
+86. [x] Compare against temporal-only linking without identifiers.
 87. [ ] Compare fact-grounded generated code against prompt-without-facts generated code.
 88. [ ] Compare deterministic re-analysis against trusting generated code without verification.
 89. [ ] Track false positives and false negatives with sampled public findings and explicit adjudication notes.
