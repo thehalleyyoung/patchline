@@ -1,0 +1,33 @@
+{
+  "version": "patchline.explain-finding-gates/v1",
+  "gates": [
+    {
+      "id": "forem-explain-finding",
+      "status": "implemented",
+      "real_repo": "forem/forem",
+      "subpath": "db/migrate",
+      "explain_claim": "patchline explain prints evidence, ranking factors, alternatives, proof holes, and verification commands for a finding"
+    },
+    {
+      "id": "bytebase-explain-finding",
+      "status": "implemented",
+      "real_repo": "bytebase/bytebase",
+      "subpath": "backend/migrator/migration",
+      "explain_claim": "patchline explain prints evidence, ranking factors, alternatives, proof holes, and verification commands for a finding"
+    },
+    {
+      "id": "mastodon-explain-finding",
+      "status": "implemented",
+      "real_repo": "mastodon/mastodon",
+      "subpath": "db/migrate",
+      "explain_claim": "patchline explain prints evidence, ranking factors, alternatives, proof holes, and verification commands for a finding"
+    },
+    {
+      "id": "lobsters-explain-finding",
+      "status": "implemented",
+      "real_repo": "lobsters/lobsters",
+      "subpath": "db/migrate",
+      "explain_claim": "patchline explain prints evidence, ranking factors, alternatives, proof holes, and verification commands for a finding"
+    }
+  ]
+}

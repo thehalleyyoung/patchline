@@ -145,6 +145,7 @@ make suppression-gate
 make why-now-gate
 make run-change-gate
 make notify-summary-gate
+make explain-finding-gate
 ```
 
 The demo downloads real GitHub project subpaths and writes:
@@ -194,6 +195,8 @@ The real-repo slice matrix is backed by `examples/real-repo-slices.json` and `ex
 `make run-change-gate` checks `examples/run-change-gates.json` by comparing stored analysis runs across four public repo slices and proving changed facts, ranked risks, evidence links, generated artifacts, and deterministic check outcomes are reported.
 
 `make notify-summary-gate` checks `examples/notify-summary-gates.json` by emitting Slack/GitHub-friendly summaries with only the top maintainer action, top risk, reproduction command, and bundle link across four public repo slices.
+
+`make explain-finding-gate` checks `examples/explain-finding-gates.json` by explaining stable finding IDs from four public repo slices with evidence, ranking factors, alternatives considered, proof holes, and verification commands.
 
 Current default projects:
 

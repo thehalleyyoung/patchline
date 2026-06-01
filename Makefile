@@ -1,4 +1,4 @@
-.PHONY: build test demo intake-demo plug-and-play-demo repo-demo four-repo-demo repo-slice-matrix impact-gate parser-fact-gate generated-code-gate report-section-gate metric-impact-gate finding-signal-gate nondeterministic-gate public-command-gate industrial-research-gate development-cycle-gate doctor-gate quickstart-gate triage-gate stable-id-gate suppression-gate why-now-gate run-change-gate notify-summary-gate gate fmt public-corpus verify-usefulness artifact-smoke artifact-demo artifact-ground-truth-check phase-check artifact-baselines artifact-ablations artifact-scale artifact-studies artifact-studies-expected artifact-studies-compare artifact-studies-refresh artifact-baselines-public artifact-ablations-public artifact-scale-public artifact-studies-public-expected artifact-studies-public-compare artifact-studies-all artifact-tables artifact-numbers artifact-subtasks artifact-corpus-audit artifact-provenance artifact-benchmark artifact-benchmark-repairs artifact-benchmark-regressions artifact-benchmark-public artifact-benchmark-public-incidents artifact-benchmark-public-repairs artifact-benchmark-public-archive artifact-benchmark-refresh artifact-benchmark-compare artifact-negative-cases artifact-full artifact-clean
+.PHONY: build test demo intake-demo plug-and-play-demo repo-demo four-repo-demo repo-slice-matrix impact-gate parser-fact-gate generated-code-gate report-section-gate metric-impact-gate finding-signal-gate nondeterministic-gate public-command-gate industrial-research-gate development-cycle-gate doctor-gate quickstart-gate triage-gate stable-id-gate suppression-gate why-now-gate run-change-gate notify-summary-gate explain-finding-gate gate fmt public-corpus verify-usefulness artifact-smoke artifact-demo artifact-ground-truth-check phase-check artifact-baselines artifact-ablations artifact-scale artifact-studies artifact-studies-expected artifact-studies-compare artifact-studies-refresh artifact-baselines-public artifact-ablations-public artifact-scale-public artifact-studies-public-expected artifact-studies-public-compare artifact-studies-all artifact-tables artifact-numbers artifact-subtasks artifact-corpus-audit artifact-provenance artifact-benchmark artifact-benchmark-repairs artifact-benchmark-regressions artifact-benchmark-public artifact-benchmark-public-incidents artifact-benchmark-public-repairs artifact-benchmark-public-archive artifact-benchmark-refresh artifact-benchmark-compare artifact-negative-cases artifact-full artifact-clean
 
 build:
 	go build -o bin/patchline ./cmd/patchline
@@ -77,6 +77,9 @@ run-change-gate:
 
 notify-summary-gate:
 	bash scripts/notify-summary-gate.sh
+
+explain-finding-gate:
+	bash scripts/explain-finding-gate.sh
 
 gate:
 	go run ./cmd/patchline ci-gate examples/benchmarks/strict-migration-corpus.json --min-precision 0.95 --min-recall 0.95

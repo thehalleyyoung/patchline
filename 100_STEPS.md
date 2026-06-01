@@ -146,7 +146,7 @@ Every addition to the repo should be judged by whether it makes that loop more a
 106. [x] Add a "why now" report that highlights newly introduced risks relative to a previous commit, release tag, or stored baseline bundle.
 107. [x] Add a "what changed since last run" report that compares facts, ranked risks, links, generated artifacts, and deterministic check outcomes.
 108. [x] Add Slack/GitHub-friendly summaries with only the top maintainer action, top risk, reproduction command, and bundle link.
-109. [ ] Add `patchline explain <finding-id>` to print evidence, ranking factors, alternatives considered, proof holes, and the exact commands that verify the finding.
+109. [x] Add `patchline explain <finding-id>` to print evidence, ranking factors, alternatives considered, proof holes, and the exact commands that verify the finding.
 110. [ ] Add a public gallery of real-repo analysis bundles with redacted identifiers, pinned commits, expected hashes, and maintainer-facing screenshots.
 
 ## Stage 11: Become the best public corpus for data-change repair

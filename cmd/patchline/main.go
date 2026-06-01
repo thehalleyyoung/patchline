@@ -144,13 +144,9 @@ func run(args []string) error {
 		return writeJSON(os.Stdout, graphDTO(demo.Graph()))
 	case "explain", "trace-row":
 		if len(args) < 2 {
-			return errors.New("usage: patchline explain <entity-id> [--graph graph.json]")
+			return errors.New("usage: patchline explain <entity-id> [--graph graph.json] [--analysis analysis-dir] [--json]")
 		}
-		g, err := graphFor(args[2:])
-		if err != nil {
-			return err
-		}
-		return explain(g, args[1])
+		return explainCommand(args[1:])
 	case "slice":
 		if len(args) < 2 {
 			return errors.New("usage: patchline slice <entity-id> [--json] [--graph graph.json]")
@@ -431,7 +427,7 @@ Usage:
   patchline semantic-regressions <archive-spec.json> [--json]
   patchline historical-failures <suite.json> [--json]
   patchline demo-graph
-  patchline explain <entity-id> [--graph graph.json]
+  patchline explain <entity-id> [--graph graph.json] [--analysis analysis-dir] [--json]
   patchline slice <entity-id> [--json] [--graph graph.json]
   patchline validate-repair <manifest.json> [--json]
   patchline migrate-repair <manifest.json>
@@ -5244,6 +5240,247 @@ func replaySemanticsStatus(status string) semantics.ClaimStatus {
 	default:
 		return semantics.ClaimUnsupported
 	}
+}
+
+type findingExplainReport struct {
+	Version            string                       `json:"version"`
+	FindingID          string                       `json:"finding_id"`
+	Analysis           string                       `json:"analysis"`
+	Risk               project.BaselineRisk         `json:"risk"`
+	Evidence           []project.EvidenceLink       `json:"evidence"`
+	Facts              []project.Fact               `json:"facts"`
+	RankingFactors     []project.ScoreFactor        `json:"ranking_factors"`
+	RankingExplanation project.RankingExplanation   `json:"ranking_explanation,omitempty"`
+	Alternatives       []findingExplainAlternative  `json:"alternatives_considered,omitempty"`
+	ProofHoles         []string                     `json:"proof_holes,omitempty"`
+	PolicyChecks       []project.PolicyCheck        `json:"policy_checks,omitempty"`
+	SymbolicChecks     []project.SymbolicCheck      `json:"symbolic_checks,omitempty"`
+	RepairProofs       []project.RepairProofSummary `json:"repair_proof_summaries,omitempty"`
+	Verification       []findingExplainVerification `json:"verification_commands"`
+	Hash               string                       `json:"hash"`
+	Markdown           string                       `json:"markdown,omitempty"`
+}
+
+type findingExplainAlternative struct {
+	ID       string `json:"id"`
+	StableID string `json:"stable_id,omitempty"`
+	Severity string `json:"severity"`
+	Score    int    `json:"score"`
+	Reason   string `json:"reason,omitempty"`
+}
+
+type findingExplainVerification struct {
+	Command string `json:"command"`
+	Reason  string `json:"reason"`
+}
+
+func explainCommand(args []string) error {
+	id := args[0]
+	if analysis, ok := flagValue(args[1:], "--analysis"); ok {
+		report, err := buildFindingExplainReport(id, analysis)
+		if err != nil {
+			return err
+		}
+		if hasFlag(args[1:], "--json") {
+			return writeJSON(os.Stdout, report)
+		}
+		fmt.Print(report.Markdown)
+		return nil
+	}
+	g, err := graphFor(args[1:])
+	if err != nil {
+		return err
+	}
+	return explain(g, id)
+}
+
+func buildFindingExplainReport(findingID, analysisPath string) (findingExplainReport, error) {
+	baseline, err := project.LoadBaseline(filepath.Join(analysisPath, "baseline"))
+	if err != nil {
+		return findingExplainReport{}, err
+	}
+	facts, err := project.LoadFacts(filepath.Join(analysisPath, "inventory", "facts.jsonl"))
+	if err != nil {
+		return findingExplainReport{}, err
+	}
+	riskIndex := -1
+	for i, risk := range baseline.Risks {
+		if risk.ID == findingID || risk.StableID == findingID {
+			riskIndex = i
+			break
+		}
+	}
+	if riskIndex < 0 {
+		return findingExplainReport{}, fmt.Errorf("finding %q not found in %s", findingID, analysisPath)
+	}
+	risk := baseline.Risks[riskIndex]
+	factsByID := map[string]project.Fact{}
+	for _, fact := range facts {
+		factsByID[fact.ID] = fact
+	}
+	report := findingExplainReport{
+		Version:        "patchline.finding-explain/v1",
+		FindingID:      findingID,
+		Analysis:       filepath.ToSlash(analysisPath),
+		Risk:           risk,
+		RankingFactors: append([]project.ScoreFactor(nil), risk.Factors...),
+		Verification:   findingVerificationCommands(risk, analysisPath),
+		Alternatives:   findingAlternatives(baseline.Risks, riskIndex),
+		PolicyChecks:   matchingPolicyChecks(baseline.PolicyChecks, risk.ID),
+		SymbolicChecks: matchingSymbolicChecks(baseline.SymbolicChecks, risk.ID),
+		RepairProofs:   matchingRepairProofs(baseline.RepairProofs, risk.ID),
+	}
+	for _, explanation := range baseline.Rankings {
+		if explanation.RiskID == risk.ID {
+			report.RankingExplanation = explanation
+			break
+		}
+	}
+	for _, link := range baseline.EvidenceLinks {
+		if link.RiskID == risk.ID || link.RiskID == risk.StableID {
+			report.Evidence = append(report.Evidence, link)
+			if fact, ok := factsByID[link.FactID]; ok {
+				report.Facts = append(report.Facts, fact)
+			}
+		}
+	}
+	report.ProofHoles = findingProofHoles(report.SymbolicChecks, report.RepairProofs)
+	report.Hash = findingExplainHash(report)
+	report.Markdown = renderFindingExplainMarkdown(report)
+	return report, nil
+}
+
+func findingAlternatives(risks []project.BaselineRisk, riskIndex int) []findingExplainAlternative {
+	var alternatives []findingExplainAlternative
+	for i, risk := range risks {
+		if i == riskIndex {
+			continue
+		}
+		alternatives = append(alternatives, findingExplainAlternative{ID: risk.ID, StableID: risk.StableID, Severity: risk.Severity, Score: risk.Score, Reason: risk.Rationale})
+		if len(alternatives) == 3 {
+			break
+		}
+	}
+	return alternatives
+}
+
+func matchingPolicyChecks(checks []project.PolicyCheck, riskID string) []project.PolicyCheck {
+	var out []project.PolicyCheck
+	for _, check := range checks {
+		if check.RiskID == riskID {
+			out = append(out, check)
+		}
+	}
+	return out
+}
+
+func matchingSymbolicChecks(checks []project.SymbolicCheck, riskID string) []project.SymbolicCheck {
+	var out []project.SymbolicCheck
+	for _, check := range checks {
+		if check.RiskID == riskID {
+			out = append(out, check)
+		}
+	}
+	return out
+}
+
+func matchingRepairProofs(proofs []project.RepairProofSummary, riskID string) []project.RepairProofSummary {
+	var out []project.RepairProofSummary
+	for _, proof := range proofs {
+		if proof.RiskID == riskID {
+			out = append(out, proof)
+		}
+	}
+	return out
+}
+
+func findingProofHoles(symbolic []project.SymbolicCheck, proofs []project.RepairProofSummary) []string {
+	seen := map[string]bool{}
+	var holes []string
+	for _, check := range symbolic {
+		if check.Status == "fail" || check.Status == "warn" {
+			value := check.Property + ": " + check.Reason
+			if !seen[value] {
+				seen[value] = true
+				holes = append(holes, value)
+			}
+		}
+	}
+	for _, proof := range proofs {
+		for _, hole := range proof.ProofHoles {
+			if !seen[hole] {
+				seen[hole] = true
+				holes = append(holes, hole)
+			}
+		}
+	}
+	sort.Strings(holes)
+	return holes
+}
+
+func findingVerificationCommands(risk project.BaselineRisk, analysisPath string) []findingExplainVerification {
+	var commands []findingExplainVerification
+	if strings.TrimSpace(risk.NextCommand) != "" {
+		commands = append(commands, findingExplainVerification{Command: risk.NextCommand, Reason: "re-run the exact command attached to the ranked finding"})
+	}
+	commands = append(commands, findingExplainVerification{Command: "go run ./cmd/patchline repo baseline --inventory " + shellArg(filepath.Join(analysisPath, "inventory")) + " --intake " + shellArg(filepath.Join(analysisPath, "intake")) + " --out results/generated/explain-baseline --json", Reason: "regenerate the ranked baseline and confirm the finding is still present"})
+	if strings.TrimSpace(risk.StableID) != "" {
+		commands = append(commands, findingExplainVerification{Command: "go run ./cmd/patchline explain " + shellArg(risk.StableID) + " --analysis " + shellArg(analysisPath) + " --json", Reason: "verify this explanation report by stable finding ID"})
+	}
+	return commands
+}
+
+func findingExplainHash(report findingExplainReport) string {
+	copy := report
+	copy.Hash = ""
+	copy.Markdown = ""
+	return canonical.Hash(copy)
+}
+
+func renderFindingExplainMarkdown(report findingExplainReport) string {
+	var b strings.Builder
+	fmt.Fprintf(&b, "# Patchline finding explanation\n\n")
+	fmt.Fprintf(&b, "- finding: `%s`\n", report.FindingID)
+	fmt.Fprintf(&b, "- risk: `%s`\n", report.Risk.ID)
+	if report.Risk.StableID != "" {
+		fmt.Fprintf(&b, "- stable_id: `%s`\n", report.Risk.StableID)
+	}
+	fmt.Fprintf(&b, "- severity: `%s`\n", report.Risk.Severity)
+	fmt.Fprintf(&b, "- score: `%d`\n", report.Risk.Score)
+	fmt.Fprintf(&b, "- path: `%s`\n", report.Risk.Path)
+	fmt.Fprintf(&b, "- hash: `%s`\n\n", report.Hash)
+	fmt.Fprintf(&b, "## Evidence\n\n")
+	for _, link := range firstNEvidenceLinks(report.Evidence, 8) {
+		fmt.Fprintf(&b, "- `%s` %s `%s` confidence=%s\n", link.FactID, link.FactKind, link.Path, link.Confidence)
+	}
+	fmt.Fprintf(&b, "\n## Ranking factors\n\n")
+	for _, factor := range report.RankingFactors {
+		fmt.Fprintf(&b, "- %s %+d: %s\n", factor.Name, factor.Weight, factor.Reason)
+	}
+	fmt.Fprintf(&b, "\n## Alternatives considered\n\n")
+	for _, alt := range report.Alternatives {
+		fmt.Fprintf(&b, "- `%s` score=%d severity=%s\n", alt.ID, alt.Score, alt.Severity)
+	}
+	fmt.Fprintf(&b, "\n## Proof holes\n\n")
+	if len(report.ProofHoles) == 0 {
+		fmt.Fprintf(&b, "- none recorded for this finding\n")
+	} else {
+		for _, hole := range report.ProofHoles {
+			fmt.Fprintf(&b, "- %s\n", hole)
+		}
+	}
+	fmt.Fprintf(&b, "\n## Verification commands\n\n")
+	for _, command := range report.Verification {
+		fmt.Fprintf(&b, "- `%s` — %s\n", command.Command, command.Reason)
+	}
+	return b.String()
+}
+
+func firstNEvidenceLinks(values []project.EvidenceLink, n int) []project.EvidenceLink {
+	if len(values) < n {
+		n = len(values)
+	}
+	return append([]project.EvidenceLink(nil), values[:n]...)
 }
 
 func explain(g *provenance.Graph, entityID string) error {

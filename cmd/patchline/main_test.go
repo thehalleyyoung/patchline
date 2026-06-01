@@ -202,6 +202,45 @@ func TestBuildNotifySummaryReportKeepsSlackAndGitHubCompact(t *testing.T) {
 	}
 }
 
+func TestBuildFindingExplainReportJoinsEvidenceAndProofHoles(t *testing.T) {
+	root := t.TempDir()
+	writeMainTestFile(t, root, "inventory/facts.jsonl", `{"id":"fact-risk","kind":"sql","path":"db/migrate/001.sql","confidence":"high"}`+"\n")
+	writeMainTestFile(t, root, "baseline/baseline.json", `{
+  "version": "patchline.baseline/v1",
+  "risks": [
+    {
+      "id":"risk:top",
+      "stable_id":"stable-risk:top0000000000000",
+      "path":"db/migrate/001.sql",
+      "kind":"sql",
+      "table":"accounts",
+      "severity":"high",
+      "score":99,
+      "rationale":"broad update",
+      "next_command":"patchline analyze-migration db/migrate/001.sql --json",
+      "factors":[{"name":"write_breadth","weight":40,"reason":"broad write"}]
+    },
+    {"id":"risk:alt","stable_id":"stable-risk:alt0000000000000","severity":"medium","score":50}
+  ],
+  "ranking_explanations": [{"risk_id":"risk:top","score":99,"severity":"high","top_feature":"write_breadth","rationale":"top-ranked broad write"}],
+  "evidence_links": [{"risk_id":"risk:top","fact_id":"fact-risk","fact_kind":"sql","path":"db/migrate/001.sql","confidence":"high"}],
+  "symbolic_checks": [{"id":"sym:1","risk_id":"risk:top","property":"scope","status":"fail","expression":"where required","reason":"missing concrete row bounds"}],
+  "repair_proof_summaries": [{"id":"proof:1","risk_id":"risk:top","table":"accounts","status":"open","scope_status":"fail","frame_status":"warn","obligations":["scope"],"proof_holes":["no rollback witness"],"rationale":"needs repair"}],
+  "hash": "baseline"
+}
+`)
+	report, err := buildFindingExplainReport("stable-risk:top0000000000000", root)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if report.Risk.ID != "risk:top" || len(report.Evidence) != 1 || len(report.RankingFactors) != 1 || len(report.Alternatives) != 1 || len(report.ProofHoles) < 2 {
+		t.Fatalf("unexpected finding explanation: %#v", report)
+	}
+	if len(report.Verification) == 0 || !strings.Contains(report.Markdown, "Verification commands") || report.Hash == "" {
+		t.Fatalf("expected verification commands and markdown: %#v", report)
+	}
+}
+
 func writeAnalysisSnapshotForTest(t *testing.T, root, factID, stableID, generatedPath, generatedHash string, failures, passed int) {
 	t.Helper()
 	writeMainTestFile(t, root, "inventory/facts.jsonl", `{"id":"`+factID+`","kind":"sql","path":"db/migrate/001.sql"}`+"\n")
