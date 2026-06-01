@@ -396,7 +396,7 @@ func usage() {
 Usage:
   patchline about
   patchline repo fetch <owner/repo|github-url|path|archive> [--ref ref] [--subpath path] [--out dir] [--download-dir dir] [--json]
-  patchline repo analyze [<path>|--github owner/repo] [--ref ref] [--subpath path] [--stages inventory,baseline,propose,compare,deep] [--proposal-kind tests|guards|instrumentation|repair|all] [--budget files=N,lines=N,tokens=N,changes=N] [--redact] [--resume] [--no-llm] [--llm-command cmd] [--out dir] [--json]
+  patchline repo analyze [<path>|--github owner/repo] [--ref ref] [--subpath path] [--stages inventory,baseline,propose,compare,deep] [--proposal-kind tests|guards|instrumentation|repair|all] [--budget files=N,lines=N,tokens=N,changes=N] [--ci] [--redact] [--resume] [--no-llm] [--llm-command cmd] [--out dir] [--json]
   patchline repo inventory <path> [--out dir] [--full] [--json]
   patchline repo baseline --inventory inventory-dir --intake intake-dir [--out dir] [--json]
   patchline repo propose --from-report baseline-dir --proposal-kind tests|guards|instrumentation|repair|all [--budget files=N,lines=N,tokens=N,changes=N] [--no-llm] [--llm-command cmd] [--out dir] [--json]
@@ -517,6 +517,8 @@ type repoAnalyzeReport struct {
 	Stages       []string               `json:"stages"`
 	Outputs      map[string]string      `json:"outputs"`
 	Source       project.Source         `json:"source,omitempty"`
+	CI           bool                   `json:"ci"`
+	CIArtifacts  repoAnalyzeCIArtifacts `json:"ci_artifacts,omitempty"`
 	Resume       bool                   `json:"resume"`
 	ReusedStages []string               `json:"reused_stages,omitempty"`
 	Redact       bool                   `json:"redact"`
@@ -546,6 +548,16 @@ type repoAnalyzeSummary struct {
 	CompareHash          string `json:"compare_hash,omitempty"`
 }
 
+type repoAnalyzeCIArtifacts struct {
+	SummaryPath       string `json:"summary_path,omitempty"`
+	SARIFPath         string `json:"sarif_path,omitempty"`
+	BundlePath        string `json:"bundle_path,omitempty"`
+	ActionsSnippet    string `json:"actions_snippet,omitempty"`
+	ArtifactName      string `json:"artifact_name,omitempty"`
+	CodeScanningTool  string `json:"code_scanning_tool,omitempty"`
+	GitHubStepSummary bool   `json:"github_step_summary"`
+}
+
 type repoAnalyzeDeepSummary struct {
 	AbstractEffects        int `json:"abstract_effects"`
 	SymbolicChecks         int `json:"symbolic_checks"`
@@ -571,9 +583,10 @@ func repoAnalyze(args []string) error {
 	noLLM := fs.Bool("no-llm", false, "force deterministic template proposals and reject LLM generation")
 	resume := fs.Bool("resume", false, "reuse existing fetch, inventory, intake, baseline, proposal, and compare artifacts when present")
 	redact := fs.Bool("redact", false, "write stable-token redacted analysis-bundle artifacts")
+	ciMode := fs.Bool("ci", false, "write CI metadata for SARIF upload and analysis-bundle artifact storage")
 	runNativeTests := fs.Bool("run-native-tests", false, "run safe allowlisted native test commands during compare")
 	jsonOut := fs.Bool("json", false, "emit JSON")
-	input, flagArgs, err := onePositionalWithFlags(args, map[string]bool{"--json": true, "--no-llm": true, "--redact": true, "--resume": true, "--run-native-tests": true})
+	input, flagArgs, err := onePositionalWithFlags(args, map[string]bool{"--ci": true, "--json": true, "--no-llm": true, "--redact": true, "--resume": true, "--run-native-tests": true})
 	if err != nil {
 		return err
 	}
@@ -584,7 +597,7 @@ func repoAnalyze(args []string) error {
 		input = *githubRepo
 	}
 	if input == "" || fs.NArg() != 0 {
-		return errors.New("usage: patchline repo analyze [<path>|--github owner/repo] [--ref ref] [--subpath path] [--stages inventory,baseline,propose,compare,deep] [--proposal-kind kind] [--budget files=N,lines=N,tokens=N,changes=N] [--redact] [--resume] [--no-llm] [--llm-command cmd] [--out dir] [--json]")
+		return errors.New("usage: patchline repo analyze [<path>|--github owner/repo] [--ref ref] [--subpath path] [--stages inventory,baseline,propose,compare,deep] [--proposal-kind kind] [--budget files=N,lines=N,tokens=N,changes=N] [--ci] [--redact] [--resume] [--no-llm] [--llm-command cmd] [--out dir] [--json]")
 	}
 	stages, err := parseAnalyzeStages(*stagesValue)
 	if err != nil {
@@ -600,6 +613,7 @@ func repoAnalyze(args []string) error {
 		Subpath: *subpath,
 		Stages:  stages,
 		Outputs: map[string]string{},
+		CI:      *ciMode,
 		Resume:  *resume,
 		Redact:  *redact,
 	}
@@ -770,17 +784,44 @@ func repoAnalyze(args []string) error {
 		Subpath      string                 `json:"subpath,omitempty"`
 		Stages       []string               `json:"stages"`
 		Outputs      map[string]string      `json:"outputs"`
+		CI           bool                   `json:"ci"`
 		Resume       bool                   `json:"resume"`
 		ReusedStages []string               `json:"reused_stages,omitempty"`
 		Redact       bool                   `json:"redact"`
 		Summary      repoAnalyzeSummary     `json:"summary"`
 		Deep         repoAnalyzeDeepSummary `json:"deep_analysis,omitempty"`
-	}{report.Version, report.Input, report.Subpath, report.Stages, report.Outputs, report.Resume, report.ReusedStages, report.Redact, report.Summary, report.DeepAnalysis})
+	}{report.Version, report.Input, report.Subpath, report.Stages, report.Outputs, report.CI, report.Resume, report.ReusedStages, report.Redact, report.Summary, report.DeepAnalysis})
 	if err := writeRepoAnalyzeReport(*outPath, report); err != nil {
 		return err
 	}
 	if err := writeAnalysisBundle(*outPath, report); err != nil {
 		return err
+	}
+	if report.CI {
+		ciArtifacts, err := writeRepoAnalyzeCIArtifacts(*outPath, report)
+		if err != nil {
+			return err
+		}
+		report.CIArtifacts = ciArtifacts
+		report.Outputs["ci"] = filepath.Join(*outPath, "ci")
+		report.Hash = canonical.Hash(struct {
+			Version     string                 `json:"version"`
+			Input       string                 `json:"input"`
+			Subpath     string                 `json:"subpath,omitempty"`
+			Stages      []string               `json:"stages"`
+			Outputs     map[string]string      `json:"outputs"`
+			CI          bool                   `json:"ci"`
+			CIArtifacts repoAnalyzeCIArtifacts `json:"ci_artifacts,omitempty"`
+			Resume      bool                   `json:"resume"`
+			Redact      bool                   `json:"redact"`
+			Summary     repoAnalyzeSummary     `json:"summary"`
+		}{report.Version, report.Input, report.Subpath, report.Stages, report.Outputs, report.CI, report.CIArtifacts, report.Resume, report.Redact, report.Summary})
+		if err := writeRepoAnalyzeReport(*outPath, report); err != nil {
+			return err
+		}
+		if err := writeAnalysisBundle(*outPath, report); err != nil {
+			return err
+		}
 	}
 	if *jsonOut {
 		return writeJSON(os.Stdout, report)
@@ -911,8 +952,12 @@ func writeRepoAnalyzeReport(outDir string, report repoAnalyzeReport) error {
 	fmt.Fprintf(&b, "# Patchline repo analyze\n\n")
 	fmt.Fprintf(&b, "- input: `%s`\n", report.Input)
 	fmt.Fprintf(&b, "- stages: `%s`\n", strings.Join(report.Stages, ","))
+	fmt.Fprintf(&b, "- ci: `%t`\n", report.CI)
 	fmt.Fprintf(&b, "- resume: `%t`\n", report.Resume)
 	fmt.Fprintf(&b, "- redact: `%t`\n", report.Redact)
+	if report.CIArtifacts.ActionsSnippet != "" {
+		fmt.Fprintf(&b, "- ci_upload_snippet: `%s`\n", report.CIArtifacts.ActionsSnippet)
+	}
 	if len(report.ReusedStages) > 0 {
 		fmt.Fprintf(&b, "- reused_stages: `%s`\n", strings.Join(report.ReusedStages, ","))
 	}
@@ -1009,6 +1054,59 @@ func writeAnalysisBundle(outDir string, report repoAnalyzeReport) error {
 		}
 	}
 	return copyIfExists(filepath.Join(outDir, "analyze.md"), "summary.md")
+}
+
+func writeRepoAnalyzeCIArtifacts(outDir string, report repoAnalyzeReport) (repoAnalyzeCIArtifacts, error) {
+	ciDir := filepath.Join(outDir, "ci")
+	if err := os.MkdirAll(ciDir, 0o755); err != nil {
+		return repoAnalyzeCIArtifacts{}, err
+	}
+	artifacts := repoAnalyzeCIArtifacts{
+		SummaryPath:      filepath.Join(ciDir, "summary.md"),
+		SARIFPath:        filepath.Join(outDir, "analysis-bundle", "summary.sarif"),
+		BundlePath:       filepath.Join(outDir, "analysis-bundle"),
+		ActionsSnippet:   filepath.Join(ciDir, "github-actions-upload.yml"),
+		ArtifactName:     "patchline-analysis-bundle",
+		CodeScanningTool: "patchline",
+	}
+	var summary strings.Builder
+	fmt.Fprintf(&summary, "# Patchline CI analysis\n\n")
+	fmt.Fprintf(&summary, "- risks: %d\n", report.Summary.RankedRisks)
+	fmt.Fprintf(&summary, "- generated files: %d\n", report.Summary.GeneratedFiles)
+	fmt.Fprintf(&summary, "- intervention loops: %d\n", report.Summary.InterventionLoops)
+	fmt.Fprintf(&summary, "- SARIF: `%s`\n", artifacts.SARIFPath)
+	fmt.Fprintf(&summary, "- bundle: `%s`\n", artifacts.BundlePath)
+	if err := os.WriteFile(artifacts.SummaryPath, []byte(summary.String()), 0o644); err != nil {
+		return repoAnalyzeCIArtifacts{}, err
+	}
+	snippet := fmt.Sprintf(`- name: Upload Patchline SARIF
+  uses: github/codeql-action/upload-sarif@v3
+  with:
+    sarif_file: %s
+- name: Store Patchline analysis bundle
+  uses: actions/upload-artifact@v4
+  with:
+    name: %s
+    path: %s
+`, artifacts.SARIFPath, artifacts.ArtifactName, artifacts.BundlePath)
+	if err := os.WriteFile(artifacts.ActionsSnippet, []byte(snippet), 0o644); err != nil {
+		return repoAnalyzeCIArtifacts{}, err
+	}
+	if stepSummary := os.Getenv("GITHUB_STEP_SUMMARY"); stepSummary != "" {
+		file, err := os.OpenFile(stepSummary, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0o644)
+		if err != nil {
+			return repoAnalyzeCIArtifacts{}, err
+		}
+		if _, err := file.WriteString(summary.String() + "\n"); err != nil {
+			_ = file.Close()
+			return repoAnalyzeCIArtifacts{}, err
+		}
+		if err := file.Close(); err != nil {
+			return repoAnalyzeCIArtifacts{}, err
+		}
+		artifacts.GitHubStepSummary = true
+	}
+	return artifacts, nil
 }
 
 func copyBundleFile(src, dst string, redact bool, redactor *bundleRedactor) error {

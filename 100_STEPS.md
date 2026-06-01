@@ -107,7 +107,7 @@ Every addition to the repo should be judged by whether it makes that loop more a
 76. [x] Emit `analysis-bundle/` containing `source.json`, `facts.jsonl`, `baseline.json`, `proposal.patch`, `compare.json`, `summary.md`, and `summary.sarif`.
 77. [x] Add resume mode so fetch, inventory, and baseline stages are reused across experiments.
 78. [x] Add redaction mode for identifiers, literals, customer names, and secrets while preserving joins and hashes.
-79. [ ] Add CI mode that uploads SARIF and stores the analysis bundle as an artifact.
+79. [x] Add CI mode that uploads SARIF and stores the analysis bundle as an artifact.
 80. [ ] Add a clean "copy these commands" report for maintainers evaluating a repo for the first time.
 
 ## Stage 8: Evaluate novelty on real projects
