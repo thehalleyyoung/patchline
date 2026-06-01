@@ -518,6 +518,9 @@ func TestBaselineBuildsProvenanceSlices(t *testing.T) {
 	if baseline.Summary.ProvenanceSlices == 0 {
 		t.Fatalf("expected provenance slices: %#v", baseline)
 	}
+	if baseline.Summary.DatalogQueries != 4 || baseline.Summary.DatalogRows == 0 {
+		t.Fatalf("expected datalog-style query rows: %#v", baseline.Summary)
+	}
 	var fullSlice ProvenanceSlice
 	for _, slice := range baseline.Provenance {
 		if slice.Table == "accounts" {
@@ -532,6 +535,9 @@ func TestBaselineBuildsProvenanceSlices(t *testing.T) {
 		if !stringSliceContains(fullSlice.StagesPresent, stage) {
 			t.Fatalf("expected stage %q in %#v", stage, fullSlice)
 		}
+	}
+	if !hasDatalogRow(baseline.DatalogQueries, "repair_lineage") {
+		t.Fatalf("expected repair lineage query row: %#v", baseline.DatalogQueries)
 	}
 }
 
@@ -687,6 +693,15 @@ func writeBaselineForTest(t *testing.T, baseline BaselineReport) string {
 func stringSliceContains(values []string, want string) bool {
 	for _, value := range values {
 		if value == want {
+			return true
+		}
+	}
+	return false
+}
+
+func hasDatalogRow(queries []DatalogQuery, name string) bool {
+	for _, query := range queries {
+		if query.Name == name && len(query.Rows) > 0 {
 			return true
 		}
 	}

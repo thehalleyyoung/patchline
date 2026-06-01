@@ -26,6 +26,7 @@ type BaselineReport struct {
 	CauseClusters  []EvidenceCluster `json:"cause_clusters,omitempty"`
 	RepairClusters []EvidenceCluster `json:"repair_clusters,omitempty"`
 	Provenance     []ProvenanceSlice `json:"provenance_slices,omitempty"`
+	DatalogQueries []DatalogQuery    `json:"datalog_queries,omitempty"`
 	NativeChecks   []Command         `json:"native_checks,omitempty"`
 	Hash           string            `json:"hash"`
 	Markdown       string            `json:"markdown,omitempty"`
@@ -38,6 +39,8 @@ type BaselineSummary struct {
 	CauseClusters       int `json:"cause_clusters"`
 	RepairClusters      int `json:"repair_clusters"`
 	ProvenanceSlices    int `json:"provenance_slices"`
+	DatalogQueries      int `json:"datalog_queries"`
+	DatalogRows         int `json:"datalog_rows"`
 	GrepOnlyMatches     int `json:"grep_only_matches"`
 	SQLOnlyRankedRisks  int `json:"sql_only_ranked_risks"`
 	IdentifierOnlyLinks int `json:"identifier_only_links"`
@@ -101,6 +104,18 @@ type ProvenanceSlice struct {
 	Rationale      string         `json:"rationale"`
 }
 
+type DatalogQuery struct {
+	Name string       `json:"name"`
+	Rule string       `json:"rule"`
+	Rows []DatalogRow `json:"rows,omitempty"`
+}
+
+type DatalogRow struct {
+	Bindings   map[string]string `json:"bindings"`
+	Evidence   []string          `json:"evidence,omitempty"`
+	Confidence string            `json:"confidence"`
+}
+
 func Baseline(inv Inventory, facts []Fact, intakeReport intake.Report) BaselineReport {
 	report := BaselineReport{Version: BaselineVersion, InventoryRoot: inv.Root, IntakeSource: intakeReport.Source.Input}
 	factIndex := indexFacts(facts)
@@ -110,6 +125,7 @@ func Baseline(inv Inventory, facts []Fact, intakeReport intake.Report) BaselineR
 	report.RepairClusters = clusterRepairCandidates(intakeReport.RepairCandidates, factIndex)
 	report.NativeChecks = uniqueCommands(append([]Command(nil), inv.TestCommands...))
 	report.Provenance = buildProvenanceSlices(inv, report.Risks, intakeReport, factIndex)
+	report.DatalogQueries = buildDatalogQueries(report.Risks, report.Provenance)
 	report.Summary = BaselineSummary{
 		RankedRisks:         len(report.Risks),
 		CodePathRankedRisks: countCodePathRisks(report.Risks),
@@ -117,6 +133,8 @@ func Baseline(inv Inventory, facts []Fact, intakeReport intake.Report) BaselineR
 		CauseClusters:       len(report.CauseClusters),
 		RepairClusters:      len(report.RepairClusters),
 		ProvenanceSlices:    len(report.Provenance),
+		DatalogQueries:      len(report.DatalogQueries),
+		DatalogRows:         countDatalogRows(report.DatalogQueries),
 		GrepOnlyMatches:     grepOnlyMatches(inv.Root),
 		SQLOnlyRankedRisks:  sqlOnlyRankedRisks(intakeReport),
 		IdentifierOnlyLinks: countLinksByIdentifierKind(report.EvidenceLinks, false),
@@ -886,6 +904,173 @@ func capStrings(in []string, n int) []string {
 	return in[:n]
 }
 
+func buildDatalogQueries(risks []BaselineRisk, slices []ProvenanceSlice) []DatalogQuery {
+	return []DatalogQuery{
+		{
+			Name: "minimal_cause_sets",
+			Rule: "minimal_cause_set(Risk, Table, Incident) :- risk(Risk, Table), provenance(Risk, Table, Incident), not smaller_identifier_set(Risk, Incident).",
+			Rows: datalogMinimalCauseRows(slices),
+		},
+		{
+			Name: "shared_ancestors",
+			Rule: "shared_ancestor(Table, RiskA, RiskB) :- risk(RiskA, Table), risk(RiskB, Table), RiskA != RiskB.",
+			Rows: datalogSharedAncestorRows(slices),
+		},
+		{
+			Name: "repair_lineage",
+			Rule: "repair_lineage(Risk, Table, Repair) :- risk(Risk, Table), provenance_repair(Risk, Repair), shares_identifier(Table, Repair).",
+			Rows: datalogRepairLineageRows(slices),
+		},
+		{
+			Name: "affected_outputs",
+			Rule: "affected_output(Risk, Output) :- risk(Risk, Table), output(Table); affected_output(Risk, SourcePath) :- provenance_source(Risk, SourcePath).",
+			Rows: datalogAffectedOutputRows(risks, slices),
+		},
+	}
+}
+
+func datalogMinimalCauseRows(slices []ProvenanceSlice) []DatalogRow {
+	var rows []DatalogRow
+	for _, slice := range slices {
+		for _, incident := range slice.IncidentPaths {
+			rows = append(rows, DatalogRow{
+				Bindings: map[string]string{
+					"risk":      slice.RiskID,
+					"table":     slice.Table,
+					"incident":  incident,
+					"migration": slice.MigrationPath,
+				},
+				Evidence:   provenanceEvidence(slice),
+				Confidence: "identifier-shared",
+			})
+		}
+	}
+	return capDatalogRows(rows, 100)
+}
+
+func datalogSharedAncestorRows(slices []ProvenanceSlice) []DatalogRow {
+	byTable := map[string][]ProvenanceSlice{}
+	for _, slice := range slices {
+		if slice.Table == "" {
+			continue
+		}
+		byTable[slice.Table] = append(byTable[slice.Table], slice)
+	}
+	var rows []DatalogRow
+	for table, group := range byTable {
+		sort.Slice(group, func(i, j int) bool { return group[i].RiskID < group[j].RiskID })
+		riskIDs := make([]string, 0, len(group))
+		paths := make([]string, 0, len(group))
+		for _, slice := range group {
+			riskIDs = append(riskIDs, slice.RiskID)
+			paths = append(paths, slice.MigrationPath)
+			paths = append(paths, slice.SourcePaths...)
+		}
+		rows = append(rows, DatalogRow{
+			Bindings: map[string]string{
+				"ancestor":      "table:" + table,
+				"table":         table,
+				"risk_count":    fmt.Sprintf("%d", len(uniqueSortedStrings(riskIDs))),
+				"sample_risks":  strings.Join(capStrings(uniqueSortedStrings(riskIDs), 5), ","),
+				"sample_paths":  strings.Join(capStrings(uniqueSortedStrings(paths), 5), ","),
+				"shared_by":     "risk",
+				"minimal_basis": "table",
+			},
+			Confidence: "identifier-shared",
+		})
+	}
+	sort.Slice(rows, func(i, j int) bool {
+		if rows[i].Bindings["risk_count"] != rows[j].Bindings["risk_count"] {
+			return rows[i].Bindings["risk_count"] > rows[j].Bindings["risk_count"]
+		}
+		return rows[i].Bindings["table"] < rows[j].Bindings["table"]
+	})
+	return capDatalogRows(rows, 100)
+}
+
+func datalogRepairLineageRows(slices []ProvenanceSlice) []DatalogRow {
+	var rows []DatalogRow
+	for _, slice := range slices {
+		for _, repair := range slice.RepairPaths {
+			rows = append(rows, DatalogRow{
+				Bindings: map[string]string{
+					"risk":      slice.RiskID,
+					"table":     slice.Table,
+					"migration": slice.MigrationPath,
+					"repair":    repair,
+				},
+				Evidence:   provenanceEvidence(slice),
+				Confidence: "identifier-shared",
+			})
+		}
+	}
+	return capDatalogRows(rows, 100)
+}
+
+func datalogAffectedOutputRows(risks []BaselineRisk, slices []ProvenanceSlice) []DatalogRow {
+	riskByID := map[string]BaselineRisk{}
+	for _, risk := range risks {
+		riskByID[risk.ID] = risk
+	}
+	var rows []DatalogRow
+	for _, slice := range slices {
+		risk := riskByID[slice.RiskID]
+		output := slice.Table
+		if output == "" {
+			output = risk.Table
+		}
+		rows = append(rows, DatalogRow{
+			Bindings: map[string]string{
+				"risk":             slice.RiskID,
+				"output":           output,
+				"severity":         risk.Severity,
+				"source_path_cnt":  fmt.Sprintf("%d", len(slice.SourcePaths)),
+				"native_check_cnt": fmt.Sprintf("%d", len(slice.NativeCommands)+len(slice.TestCommands)),
+			},
+			Evidence:   provenanceEvidence(slice),
+			Confidence: "identifier-shared",
+		})
+	}
+	return capDatalogRows(rows, 100)
+}
+
+func provenanceEvidence(slice ProvenanceSlice) []string {
+	var evidence []string
+	if slice.MigrationPath != "" {
+		evidence = append(evidence, "migration:"+slice.MigrationPath)
+	}
+	for _, path := range slice.SourcePaths {
+		evidence = append(evidence, "source:"+path)
+	}
+	for _, path := range slice.IncidentPaths {
+		evidence = append(evidence, "incident:"+path)
+	}
+	for _, path := range slice.RepairPaths {
+		evidence = append(evidence, "repair:"+path)
+	}
+	return capStrings(uniqueSortedStrings(evidence), 12)
+}
+
+func capDatalogRows(rows []DatalogRow, limit int) []DatalogRow {
+	sort.Slice(rows, func(i, j int) bool {
+		left := canonical.Hash(rows[i])
+		right := canonical.Hash(rows[j])
+		return left < right
+	})
+	if len(rows) <= limit {
+		return rows
+	}
+	return rows[:limit]
+}
+
+func countDatalogRows(queries []DatalogQuery) int {
+	var count int
+	for _, query := range queries {
+		count += len(query.Rows)
+	}
+	return count
+}
+
 func sharedIdentifiers(left, right []Identifier) []Identifier {
 	rightSet := map[string]Identifier{}
 	for _, id := range right {
@@ -1043,6 +1228,8 @@ func renderBaselineMarkdown(report BaselineReport) string {
 	fmt.Fprintf(&b, "| cause clusters | %d |\n", report.Summary.CauseClusters)
 	fmt.Fprintf(&b, "| repair clusters | %d |\n", report.Summary.RepairClusters)
 	fmt.Fprintf(&b, "| provenance slices | %d |\n", report.Summary.ProvenanceSlices)
+	fmt.Fprintf(&b, "| datalog-style queries | %d |\n", report.Summary.DatalogQueries)
+	fmt.Fprintf(&b, "| datalog-style rows | %d |\n", report.Summary.DatalogRows)
 	fmt.Fprintf(&b, "| grep-only matches | %d |\n", report.Summary.GrepOnlyMatches)
 	fmt.Fprintf(&b, "| SQL-only ranked risks | %d |\n", report.Summary.SQLOnlyRankedRisks)
 	fmt.Fprintf(&b, "| identifier-only links | %d |\n", report.Summary.IdentifierOnlyLinks)
@@ -1060,6 +1247,13 @@ func renderBaselineMarkdown(report BaselineReport) string {
 		limit := minInt(len(report.Provenance), 20)
 		for _, slice := range report.Provenance[:limit] {
 			fmt.Fprintf(&b, "| `%s` | %s | %s | %s | %d | %d | %d |\n", slice.RiskID, slice.Table, strings.Join(slice.StagesPresent, ", "), slice.MigrationPath, len(slice.SourcePaths), len(slice.IncidentPaths), len(slice.RepairPaths))
+		}
+		fmt.Fprintf(&b, "\n")
+	}
+	if len(report.DatalogQueries) > 0 {
+		fmt.Fprintf(&b, "## Datalog-style query results\n\n| query | rows | rule |\n| --- | ---: | --- |\n")
+		for _, query := range report.DatalogQueries {
+			fmt.Fprintf(&b, "| %s | %d | `%s` |\n", query.Name, len(query.Rows), query.Rule)
 		}
 		fmt.Fprintf(&b, "\n")
 	}
