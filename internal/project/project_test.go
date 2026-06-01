@@ -552,6 +552,9 @@ func TestBaselineBuildsProvenanceSlices(t *testing.T) {
 	if baseline.Summary.PolicyChecks == 0 || baseline.Summary.PolicyFailed == 0 {
 		t.Fatalf("expected failing policy obligations for high-risk changes: %#v", baseline.Summary)
 	}
+	if baseline.Summary.RepairProofs == 0 || baseline.Summary.RepairProofRefuted == 0 {
+		t.Fatalf("expected proof-carrying repair summaries with unresolved scope/frame obligations: %#v", baseline.Summary)
+	}
 	var fullSlice ProvenanceSlice
 	for _, slice := range baseline.Provenance {
 		if slice.Table == "accounts" {

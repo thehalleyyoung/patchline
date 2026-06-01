@@ -34,6 +34,7 @@ type BaselineReport struct {
 	TemporalWindows []TemporalWindow          `json:"temporal_windows,omitempty"`
 	Recurrences     []RecurrencePattern       `json:"recurrences,omitempty"`
 	PolicyChecks    []PolicyCheck             `json:"policy_checks,omitempty"`
+	RepairProofs    []RepairProofSummary      `json:"repair_proof_summaries,omitempty"`
 	NativeChecks    []Command                 `json:"native_checks,omitempty"`
 	Hash            string                    `json:"hash"`
 	Markdown        string                    `json:"markdown,omitempty"`
@@ -63,6 +64,11 @@ type BaselineSummary struct {
 	PolicyPassed        int `json:"policy_passed"`
 	PolicyWarnings      int `json:"policy_warnings"`
 	PolicyFailed        int `json:"policy_failed"`
+	RepairProofs        int `json:"repair_proof_summaries"`
+	RepairProofChecked  int `json:"repair_proof_checked"`
+	RepairProofCond     int `json:"repair_proof_conditional"`
+	RepairProofOpen     int `json:"repair_proof_open"`
+	RepairProofRefuted  int `json:"repair_proof_refuted"`
 	GrepOnlyMatches     int `json:"grep_only_matches"`
 	SQLOnlyRankedRisks  int `json:"sql_only_ranked_risks"`
 	IdentifierOnlyLinks int `json:"identifier_only_links"`
@@ -200,6 +206,22 @@ type PolicyCheck struct {
 	Rationale   string   `json:"rationale"`
 }
 
+type RepairProofSummary struct {
+	ID           string   `json:"id"`
+	RiskID       string   `json:"risk_id"`
+	RepairSource string   `json:"repair_source"`
+	RepairPaths  []string `json:"repair_paths,omitempty"`
+	Table        string   `json:"table"`
+	Status       string   `json:"status"`
+	ScopeStatus  string   `json:"scope_status"`
+	FrameStatus  string   `json:"frame_status"`
+	Obligations  []string `json:"obligations"`
+	ProofHoles   []string `json:"proof_holes,omitempty"`
+	Evidence     []string `json:"evidence,omitempty"`
+	NextCommand  string   `json:"next_command,omitempty"`
+	Rationale    string   `json:"rationale"`
+}
+
 func Baseline(inv Inventory, facts []Fact, intakeReport intake.Report) BaselineReport {
 	report := BaselineReport{Version: BaselineVersion, InventoryRoot: inv.Root, IntakeSource: intakeReport.Source.Input}
 	factIndex := indexFacts(facts)
@@ -215,6 +237,7 @@ func Baseline(inv Inventory, facts []Fact, intakeReport intake.Report) BaselineR
 	report.TemporalWindows = buildTemporalWindows(report.Risks, report.Provenance, intakeReport)
 	report.Recurrences = buildRecurrences(report.Risks, report.AbstractEffects, report.Provenance)
 	report.PolicyChecks = buildPolicyChecks(report.Risks, report.Provenance, report.SymbolicChecks)
+	report.RepairProofs = buildRepairProofSummaries(report.Risks, report.Provenance, report.AbstractEffects, report.SymbolicChecks)
 	report.Summary = BaselineSummary{
 		RankedRisks:         len(report.Risks),
 		CodePathRankedRisks: countCodePathRisks(report.Risks),
@@ -239,6 +262,11 @@ func Baseline(inv Inventory, facts []Fact, intakeReport intake.Report) BaselineR
 		PolicyPassed:        countPolicyStatus(report.PolicyChecks, "pass"),
 		PolicyWarnings:      countPolicyStatus(report.PolicyChecks, "warn"),
 		PolicyFailed:        countPolicyStatus(report.PolicyChecks, "fail"),
+		RepairProofs:        len(report.RepairProofs),
+		RepairProofChecked:  countRepairProofStatus(report.RepairProofs, "checked"),
+		RepairProofCond:     countRepairProofStatus(report.RepairProofs, "conditional"),
+		RepairProofOpen:     countRepairProofStatus(report.RepairProofs, "open"),
+		RepairProofRefuted:  countRepairProofStatus(report.RepairProofs, "refuted"),
 		GrepOnlyMatches:     grepOnlyMatches(inv.Root),
 		SQLOnlyRankedRisks:  sqlOnlyRankedRisks(intakeReport),
 		IdentifierOnlyLinks: countLinksByIdentifierKind(report.EvidenceLinks, false),
@@ -1959,6 +1987,133 @@ func countPolicyStatus(checks []PolicyCheck, status string) int {
 	return count
 }
 
+func buildRepairProofSummaries(risks []BaselineRisk, slices []ProvenanceSlice, summaries []effects.AbstractSummary, symbolic []SymbolicCheck) []RepairProofSummary {
+	riskByID := map[string]BaselineRisk{}
+	for _, risk := range risks {
+		riskByID[risk.ID] = risk
+	}
+	sliceByRisk := map[string]ProvenanceSlice{}
+	for _, slice := range slices {
+		sliceByRisk[slice.RiskID] = slice
+	}
+	checksByRisk := map[string]map[string]SymbolicCheck{}
+	for _, check := range symbolic {
+		if check.Property != "scope_preservation" && check.Property != "frame_condition" {
+			continue
+		}
+		if checksByRisk[check.RiskID] == nil {
+			checksByRisk[check.RiskID] = map[string]SymbolicCheck{}
+		}
+		checksByRisk[check.RiskID][check.Property] = check
+	}
+	var proofs []RepairProofSummary
+	for _, summary := range summaries {
+		for _, op := range summary.Operations {
+			checks := checksByRisk[op.OperationID]
+			scope, hasScope := checks["scope_preservation"]
+			frame, hasFrame := checks["frame_condition"]
+			if !hasScope || !hasFrame || firstNonEmpty(op.Table, scope.Table, frame.Table) == "" {
+				continue
+			}
+			risk := riskByID[op.OperationID]
+			slice := sliceByRisk[op.OperationID]
+			holes := repairProofHoles(op, summary)
+			status := repairProofStatus(scope.Status, frame.Status, holes)
+			repairPaths := capStrings(uniqueSortedStrings(slice.RepairPaths), 8)
+			source := "candidate-obligation"
+			if len(repairPaths) > 0 {
+				source = "repo-evidence"
+			}
+			proofs = append(proofs, RepairProofSummary{
+				ID:           "repair-proof:" + canonical.Hash(op.OperationID + "\x00" + scope.ID + "\x00" + frame.ID)[:16],
+				RiskID:       op.OperationID,
+				RepairSource: source,
+				RepairPaths:  repairPaths,
+				Table:        firstNonEmpty(op.Table, scope.Table, frame.Table, risk.Table),
+				Status:       status,
+				ScopeStatus:  scope.Status,
+				FrameStatus:  frame.Status,
+				Obligations:  repairProofObligations(scope, frame),
+				ProofHoles:   holes,
+				Evidence:     capStrings(uniqueSortedStrings(append(provenanceEvidence(slice), append(scope.Evidence, frame.Evidence...)...)), 12),
+				NextCommand:  risk.NextCommand,
+				Rationale:    "summary records the scope and frame obligations a repair must preserve; conditional and open statuses retain explicit proof holes instead of claiming full proof",
+			})
+		}
+	}
+	sort.Slice(proofs, func(i, j int) bool {
+		if proofs[i].Status != proofs[j].Status {
+			return repairProofStatusRank(proofs[i].Status) > repairProofStatusRank(proofs[j].Status)
+		}
+		if len(proofs[i].ProofHoles) != len(proofs[j].ProofHoles) {
+			return len(proofs[i].ProofHoles) > len(proofs[j].ProofHoles)
+		}
+		return proofs[i].ID < proofs[j].ID
+	})
+	if len(proofs) > 200 {
+		proofs = proofs[:200]
+	}
+	return proofs
+}
+
+func repairProofHoles(op effects.AbstractOperation, summary effects.AbstractSummary) []string {
+	holes := append([]string(nil), op.ProofHoles...)
+	for _, unsupported := range summary.Concretization.UnsupportedFacts {
+		if strings.Contains(unsupported, op.OperationID) || strings.Contains(unsupported, op.Table) {
+			holes = append(holes, unsupported)
+		}
+	}
+	if len(holes) == 0 && !op.BoundedRows {
+		holes = append(holes, "row bound unavailable")
+	}
+	return capStrings(uniqueSortedStrings(holes), 12)
+}
+
+func repairProofStatus(scopeStatus, frameStatus string, holes []string) string {
+	if scopeStatus == "fail" || frameStatus == "fail" {
+		return "refuted"
+	}
+	if scopeStatus == "warn" || frameStatus == "warn" {
+		return "open"
+	}
+	if len(holes) > 0 {
+		return "conditional"
+	}
+	return "checked"
+}
+
+func repairProofObligations(scope, frame SymbolicCheck) []string {
+	return uniqueSortedStrings([]string{
+		"scope_preservation:" + scope.Status + ":" + scope.Expression,
+		"frame_condition:" + frame.Status + ":" + frame.Expression,
+	})
+}
+
+func repairProofStatusRank(status string) int {
+	switch status {
+	case "refuted":
+		return 4
+	case "open":
+		return 3
+	case "conditional":
+		return 2
+	case "checked":
+		return 1
+	default:
+		return 0
+	}
+}
+
+func countRepairProofStatus(proofs []RepairProofSummary, status string) int {
+	var count int
+	for _, proof := range proofs {
+		if proof.Status == status {
+			count++
+		}
+	}
+	return count
+}
+
 func sharedIdentifiers(left, right []Identifier) []Identifier {
 	rightSet := map[string]Identifier{}
 	for _, id := range right {
@@ -2133,6 +2288,11 @@ func renderBaselineMarkdown(report BaselineReport) string {
 	fmt.Fprintf(&b, "| policy passed | %d |\n", report.Summary.PolicyPassed)
 	fmt.Fprintf(&b, "| policy warnings | %d |\n", report.Summary.PolicyWarnings)
 	fmt.Fprintf(&b, "| policy failed | %d |\n", report.Summary.PolicyFailed)
+	fmt.Fprintf(&b, "| repair proof summaries | %d |\n", report.Summary.RepairProofs)
+	fmt.Fprintf(&b, "| repair proof checked | %d |\n", report.Summary.RepairProofChecked)
+	fmt.Fprintf(&b, "| repair proof conditional | %d |\n", report.Summary.RepairProofCond)
+	fmt.Fprintf(&b, "| repair proof open | %d |\n", report.Summary.RepairProofOpen)
+	fmt.Fprintf(&b, "| repair proof refuted | %d |\n", report.Summary.RepairProofRefuted)
 	fmt.Fprintf(&b, "| grep-only matches | %d |\n", report.Summary.GrepOnlyMatches)
 	fmt.Fprintf(&b, "| SQL-only ranked risks | %d |\n", report.Summary.SQLOnlyRankedRisks)
 	fmt.Fprintf(&b, "| identifier-only links | %d |\n", report.Summary.IdentifierOnlyLinks)
@@ -2197,6 +2357,14 @@ func renderBaselineMarkdown(report BaselineReport) string {
 		limit := minInt(len(report.PolicyChecks), 25)
 		for _, check := range report.PolicyChecks[:limit] {
 			fmt.Fprintf(&b, "| %s | `%s` | %s | %s | %s |\n", check.Status, check.RiskID, check.RiskClass, strings.Join(check.Missing, ", "), check.ReviewLevel)
+		}
+		fmt.Fprintf(&b, "\n")
+	}
+	if len(report.RepairProofs) > 0 {
+		fmt.Fprintf(&b, "## Repair proof summaries\n\n| status | risk | table | source | scope | frame | holes |\n| --- | --- | --- | --- | --- | --- | ---: |\n")
+		limit := minInt(len(report.RepairProofs), 25)
+		for _, proof := range report.RepairProofs[:limit] {
+			fmt.Fprintf(&b, "| %s | `%s` | %s | %s | %s | %s | %d |\n", proof.Status, proof.RiskID, proof.Table, proof.RepairSource, proof.ScopeStatus, proof.FrameStatus, len(proof.ProofHoles))
 		}
 		fmt.Fprintf(&b, "\n")
 	}
