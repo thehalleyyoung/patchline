@@ -181,6 +181,33 @@ func TestInventoryDetectsNativeMigrationCommands(t *testing.T) {
 	}
 }
 
+func TestInventoryPreservesUnknownStructuredFields(t *testing.T) {
+	root := t.TempDir()
+	writeFile(t, root, "exports/event.json", `{"deploy":"prod-123","service":{"name":"billing"},"rows":42}`)
+	writeFile(t, root, ".github/workflows/ci.yml", "name: ci\non: push\njobs:\n  test:\n    runs-on: ubuntu-latest\n")
+	writeFile(t, root, "config/app.toml", "queue = \"billing.reconcile\"\nrollback_available = true\n")
+	writeFile(t, root, "logs/app.log", "time=2025-01-02T03:04:05Z level=error error=PaymentRepairError deploy=prod-123")
+	inv, err := InventoryPath(InventoryOptions{Path: root})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(inv.FieldEvidence) == 0 {
+		t.Fatalf("expected field evidence findings: %#v", inv)
+	}
+	expected := map[string]string{
+		"deploy":             "prod-123",
+		"service.name":       "billing",
+		"queue":              "billing.reconcile",
+		"rollback_available": "true",
+		"error":              "PaymentRepairError",
+	}
+	for field, preview := range expected {
+		if !hasFieldEvidence(inv.Facts, field, preview) {
+			t.Fatalf("missing field evidence %s=%s in %#v", field, preview, inv.Facts)
+		}
+	}
+}
+
 func TestWriteInventoryEmitsFactsAndProjectMap(t *testing.T) {
 	root := t.TempDir()
 	writeFile(t, root, "db/migrate/2025-01-01_fix_accounts.sql", "update accounts set disabled = false;")
@@ -607,6 +634,15 @@ func hasIdentifier(ids []Identifier, kind, value string) bool {
 func hasCommand(commands []Command, command string) bool {
 	for _, item := range commands {
 		if item.Command == command {
+			return true
+		}
+	}
+	return false
+}
+
+func hasFieldEvidence(facts []Fact, field, preview string) bool {
+	for _, fact := range facts {
+		if fact.Kind == "field_evidence" && fact.Properties["field"] == field && fact.Properties["value_preview"] == preview {
 			return true
 		}
 	}

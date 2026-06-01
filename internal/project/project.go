@@ -83,6 +83,7 @@ type Inventory struct {
 	NativeCommands    []Command      `json:"native_commands,omitempty"`
 	SourceSQLHints    []Finding      `json:"source_sql_hints,omitempty"`
 	SchemaEvolution   []Finding      `json:"schema_evolution,omitempty"`
+	FieldEvidence     []Finding      `json:"field_evidence,omitempty"`
 	OperationalDocs   []Finding      `json:"operational_docs,omitempty"`
 	EvidenceExports   []Finding      `json:"evidence_exports,omitempty"`
 	NextCommands      []Command      `json:"next_commands,omitempty"`
@@ -974,6 +975,8 @@ var (
 	identifierReportPattern = regexp.MustCompile(`(?i)\b(?:report|dashboard)\s*[:=]\s*["']?([A-Za-z0-9_.:/-]{3,})|([A-Za-z0-9_.-]*report[A-Za-z0-9_.-]*)`)
 	identifierDeployPattern = regexp.MustCompile(`(?i)\b(?:deploy(?:ment)?|release|build)\s*[:=#-]\s*["']?([A-Za-z0-9][A-Za-z0-9_.-]{2,})`)
 	identifierErrorPattern  = regexp.MustCompile(`(?i)\b([A-Za-z][A-Za-z0-9_]*(?:Error|Exception))\b|\b(?:error|exception|panic)\s*[:=]\s*["']?([A-Za-z_][A-Za-z0-9_.:-]+)`)
+	fieldLinePattern        = regexp.MustCompile(`^\s*([A-Za-z_][A-Za-z0-9_.-]*)\s*[:=]\s*(.+?)\s*$`)
+	logFieldPattern         = regexp.MustCompile(`\b([A-Za-z_][A-Za-z0-9_.-]*)=("[^"]*"|'[^']*'|[^\s,;]+)`)
 
 	djangoCreateModelPattern = regexp.MustCompile(`(?is)migrations\.CreateModel\(\s*name\s*=\s*['"]([A-Za-z_][A-Za-z0-9_]*)['"]`)
 	djangoAddFieldPattern    = regexp.MustCompile(`(?is)migrations\.AddField\([^)]*model_name\s*=\s*['"]([A-Za-z_][A-Za-z0-9_]*)['"][^)]*name\s*=\s*['"]([A-Za-z_][A-Za-z0-9_]*)['"]`)
@@ -1011,6 +1014,7 @@ func (inv *Inventory) addFileFact(file scanFile, language string) {
 	})
 	if prefix != "" {
 		inv.inferSchemaEvolution(file, prefix, language)
+		inv.preserveFieldEvidence(file, prefix)
 	}
 }
 
@@ -1125,6 +1129,169 @@ func prismaModelColumns(body string) []migration.SchemaColumn {
 		columns = append(columns, migration.SchemaColumn{Name: name, Type: strings.ToLower(fields[1])})
 	}
 	return columns
+}
+
+func (inv *Inventory) preserveFieldEvidence(file scanFile, text string) {
+	lower := strings.ToLower(file.Rel)
+	switch filepath.Ext(lower) {
+	case ".json":
+		inv.preserveJSONFields(file.Rel, text, "json")
+	case ".jsonl":
+		for lineNo, line := range strings.Split(text, "\n") {
+			line = strings.TrimSpace(line)
+			if line == "" {
+				continue
+			}
+			inv.preserveJSONFieldsAtLine(file.Rel, line, "jsonl", lineNo+1)
+		}
+	case ".yaml", ".yml":
+		inv.preserveLineFields(file.Rel, text, "yaml")
+	case ".toml":
+		inv.preserveLineFields(file.Rel, text, "toml")
+	case ".log":
+		inv.preserveLogFields(file.Rel, text, "log")
+	}
+}
+
+func (inv *Inventory) preserveJSONFields(path, text, format string) {
+	inv.preserveJSONFieldsAtLine(path, text, format, 0)
+}
+
+func (inv *Inventory) preserveJSONFieldsAtLine(path, text, format string, lineNo int) {
+	var value any
+	decoder := json.NewDecoder(strings.NewReader(text))
+	decoder.UseNumber()
+	if err := decoder.Decode(&value); err != nil {
+		return
+	}
+	count := 0
+	var walk func(prefix string, current any)
+	walk = func(prefix string, current any) {
+		if count >= 50 {
+			return
+		}
+		switch v := current.(type) {
+		case map[string]any:
+			keys := make([]string, 0, len(v))
+			for key := range v {
+				keys = append(keys, key)
+			}
+			sort.Strings(keys)
+			for _, key := range keys {
+				next := key
+				if prefix != "" {
+					next = prefix + "." + key
+				}
+				walk(next, v[key])
+			}
+		case []any:
+			for i, item := range v {
+				if i >= 10 {
+					break
+				}
+				walk(fmt.Sprintf("%s[]", prefix), item)
+			}
+		default:
+			inv.addFieldEvidenceFact(path, format, prefix, fieldValuePreview(v), lineNo)
+			count++
+		}
+	}
+	walk("", value)
+}
+
+func (inv *Inventory) preserveLineFields(path, text, format string) {
+	for lineNo, line := range strings.Split(text, "\n") {
+		line = strings.TrimSpace(line)
+		if line == "" || strings.HasPrefix(line, "#") || strings.HasPrefix(line, "//") || strings.HasPrefix(line, "[") {
+			continue
+		}
+		match := fieldLinePattern.FindStringSubmatch(line)
+		if len(match) < 3 {
+			continue
+		}
+		key := match[1]
+		value := strings.Trim(strings.TrimSpace(match[2]), `"'`)
+		inv.addFieldEvidenceFact(path, format, key, value, lineNo+1)
+	}
+}
+
+func (inv *Inventory) preserveLogFields(path, text, format string) {
+	for lineNo, line := range strings.Split(text, "\n") {
+		for _, match := range logFieldPattern.FindAllStringSubmatch(line, -1) {
+			if len(match) < 3 {
+				continue
+			}
+			inv.addFieldEvidenceFact(path, format, match[1], strings.Trim(match[2], `"'`), lineNo+1)
+		}
+	}
+}
+
+func (inv *Inventory) addFieldEvidenceFact(path, format, key, value string, lineNo int) {
+	key = normalizeFieldKey(key)
+	if key == "" {
+		return
+	}
+	value = strings.TrimSpace(value)
+	if value == "" || strings.EqualFold(value, "{}") || strings.EqualFold(value, "[]") {
+		return
+	}
+	props := map[string]string{
+		"format":        format,
+		"field":         key,
+		"value_preview": truncate(value, 160),
+	}
+	if lineNo > 0 {
+		props["line"] = fmt.Sprintf("%d", lineNo)
+	}
+	inv.FieldEvidence = append(inv.FieldEvidence, Finding{Kind: format + ":" + key, Path: path, Confidence: "observed", Rationale: "unknown structured field preserved as searchable evidence"})
+	ids := append([]Identifier{{Kind: "field", Value: key}}, identifiersFromText(key+"\n"+value)...)
+	inv.addFact(Fact{
+		Version:     Version,
+		Kind:        "field_evidence",
+		Path:        path,
+		Confidence:  "observed",
+		Rationale:   "unknown structured/log field preserved without requiring a known schema",
+		Identifiers: ids,
+		Properties:  props,
+	})
+}
+
+func normalizeFieldKey(value string) string {
+	value = strings.TrimSpace(strings.ToLower(value))
+	value = strings.Trim(value, `"'[](),;`)
+	if len(value) > 120 {
+		value = value[:120]
+	}
+	return value
+}
+
+func fieldValuePreview(value any) string {
+	switch v := value.(type) {
+	case nil:
+		return ""
+	case string:
+		return v
+	case json.Number:
+		return v.String()
+	case bool:
+		if v {
+			return "true"
+		}
+		return "false"
+	default:
+		data, err := json.Marshal(v)
+		if err != nil {
+			return fmt.Sprintf("%v", v)
+		}
+		return string(data)
+	}
+}
+
+func truncate(value string, limit int) string {
+	if limit <= 0 || len(value) <= limit {
+		return value
+	}
+	return value[:limit]
 }
 
 func (inv *Inventory) addCommandFact(kind string, command Command) {
@@ -1306,6 +1473,7 @@ func (inv *Inventory) finalize() {
 	inv.EvidenceExports = capFindings(uniqueFindings(inv.EvidenceExports), 50)
 	inv.TestCommands = uniqueCommands(inv.TestCommands)
 	inv.NativeCommands = uniqueCommands(inv.NativeCommands)
+	inv.FieldEvidence = capFindings(uniqueFindings(inv.FieldEvidence), 100)
 	inv.NextCommands = append(inv.NextCommands, Command{Command: fmt.Sprintf("patchline intake %s --out results/generated/intake", shellPath(inv.Root)), Reason: "run deterministic data/code repair intake on this project"})
 	if len(inv.TestCommands) > 0 {
 		inv.NextCommands = append(inv.NextCommands, inv.TestCommands...)
@@ -1336,6 +1504,7 @@ func (inv *Inventory) finalize() {
 		"ci":                len(inv.CI),
 		"deploy_config":     len(inv.DeployConfig),
 		"evidence_exports":  len(inv.EvidenceExports),
+		"field_evidence":    len(inv.FieldEvidence),
 		"frameworks":        len(inv.Frameworks),
 		"migration_roots":   len(inv.MigrationRoots),
 		"migration_systems": len(inv.MigrationSystems),
@@ -1376,6 +1545,7 @@ func renderMarkdown(inv Inventory) string {
 	writeFindings("Migration systems", inv.MigrationSystems)
 	writeFindings("Migration roots", inv.MigrationRoots)
 	writeFindings("Schema evolution", inv.SchemaEvolution)
+	writeFindings("Field evidence", inv.FieldEvidence)
 	writeFindings("CI", inv.CI)
 	writeFindings("Deploy config", inv.DeployConfig)
 	writeFindings("Operational docs", inv.OperationalDocs)
@@ -1410,6 +1580,7 @@ func renderProjectMap(inv Inventory) string {
 	fmt.Fprintf(&b, "| schema evolution | %d |\n", len(inv.SchemaEvolution))
 	fmt.Fprintf(&b, "| source SQL hints | %d |\n", len(inv.SourceSQLHints))
 	fmt.Fprintf(&b, "| operational docs | %d |\n", len(inv.OperationalDocs))
+	fmt.Fprintf(&b, "| field evidence | %d |\n", len(inv.FieldEvidence))
 	fmt.Fprintf(&b, "| evidence exports | %d |\n\n", len(inv.EvidenceExports))
 	writePaths := func(title string, findings []Finding) {
 		if len(findings) == 0 {
@@ -1424,6 +1595,7 @@ func renderProjectMap(inv Inventory) string {
 	writePaths("Migration roots", inv.MigrationRoots)
 	writePaths("Migration systems", inv.MigrationSystems)
 	writePaths("Schema evolution", inv.SchemaEvolution)
+	writePaths("Field evidence", inv.FieldEvidence)
 	writePaths("Source SQL candidates", inv.SourceSQLHints)
 	writePaths("Operational docs", inv.OperationalDocs)
 	writePaths("Evidence exports", inv.EvidenceExports)
