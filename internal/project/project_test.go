@@ -430,6 +430,57 @@ func TestBaselineRanksRisksAndLinksFactsWithUnderscores(t *testing.T) {
 	}
 }
 
+func TestBaselineRanksPersistentWriteCodePaths(t *testing.T) {
+	root := t.TempDir()
+	writeFile(t, root, "app/jobs/repair.rb", `class RepairJob
+  def perform
+    Account.update_all(disabled: false)
+  end
+end`)
+	inv := Inventory{
+		Root: filepath.ToSlash(root),
+		Facts: []Fact{
+			{Version: Version, ID: "fact:account", Kind: "file", Path: "app/jobs/repair.rb", Confidence: "observed", Identifiers: []Identifier{{Kind: "table", Value: "accounts"}}},
+		},
+	}
+	report := intake.Report{
+		Source: intake.Source{Input: "fixture"},
+		SourceSQL: migration.SourceSQLReport{
+			Root: filepath.ToSlash(root),
+			Observations: []migration.SourceSQLObservation{{
+				Path:        "app/jobs/repair.rb",
+				Language:    "Ruby",
+				Detector:    "ruby.rails-active-record",
+				Line:        3,
+				Kind:        "orm_query",
+				Framework:   "rails",
+				Operation:   "update",
+				Table:       "accounts",
+				Confidence:  "medium",
+				SnippetHash: "snippet-hash",
+			}},
+		},
+	}
+	baseline := Baseline(inv, inv.Facts, report)
+	if baseline.Summary.CodePathRankedRisks == 0 {
+		t.Fatalf("expected code path risks: %#v", baseline)
+	}
+	var sawMissingTransaction bool
+	for _, risk := range baseline.Risks {
+		if !strings.HasPrefix(risk.Kind, "code-path:") {
+			continue
+		}
+		for _, factor := range risk.Factors {
+			if factor.Name == "missing-transaction-boundary" {
+				sawMissingTransaction = true
+			}
+		}
+	}
+	if !sawMissingTransaction {
+		t.Fatalf("expected missing transaction factor: %#v", baseline.Risks)
+	}
+}
+
 func TestLoadInventoryAcceptsInventoryJSONPath(t *testing.T) {
 	root := t.TempDir()
 	writeFile(t, root, "db/migrate/001.sql", "update auth_user set is_active = false;")

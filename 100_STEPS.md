@@ -48,7 +48,7 @@ Every addition to the repo should be judged by whether it makes that loop more a
 ## Stage 3: Do real baseline analysis before generation
 
 31. [x] Rank risky migrations and SQL snippets by destructive operation, breadth, reversibility, guard presence, transaction use, and affected table importance.
-32. [ ] Rank risky code paths by persistent write breadth, missing idempotency, missing transaction boundaries, retry hazards, and weak rollback behavior.
+32. [x] Rank risky code paths by persistent write breadth, missing idempotency, missing transaction boundaries, retry hazards, and weak rollback behavior.
 33. [x] Link risk candidates to nearby tests, docs, incidents, commits, deploy notes, and repair scripts using identifiers and time signals.
 34. [x] Detect cause clusters around shared tables, dates, incidents, deploys, commits, error names, and changed files.
 35. [x] Detect repair clusters around rollback scripts, fix migrations, reconciliation jobs, backfills, runbooks, and generated/manual data patches.

@@ -32,6 +32,7 @@ type BaselineReport struct {
 
 type BaselineSummary struct {
 	RankedRisks         int `json:"ranked_risks"`
+	CodePathRankedRisks int `json:"code_path_ranked_risks"`
 	EvidenceLinks       int `json:"evidence_links"`
 	CauseClusters       int `json:"cause_clusters"`
 	RepairClusters      int `json:"repair_clusters"`
@@ -84,13 +85,14 @@ type EvidenceCluster struct {
 func Baseline(inv Inventory, facts []Fact, intakeReport intake.Report) BaselineReport {
 	report := BaselineReport{Version: BaselineVersion, InventoryRoot: inv.Root, IntakeSource: intakeReport.Source.Input}
 	factIndex := indexFacts(facts)
-	report.Risks = rankRisks(intakeReport, factIndex)
+	report.Risks = rankRisks(inv, intakeReport, factIndex)
 	report.EvidenceLinks = linkRisks(report.Risks, factIndex)
 	report.CauseClusters = clusterCandidates("cause", intakeReport.Causes, factIndex)
 	report.RepairClusters = clusterRepairCandidates(intakeReport.RepairCandidates, factIndex)
 	report.NativeChecks = uniqueCommands(append([]Command(nil), inv.TestCommands...))
 	report.Summary = BaselineSummary{
 		RankedRisks:         len(report.Risks),
+		CodePathRankedRisks: countCodePathRisks(report.Risks),
 		EvidenceLinks:       len(report.EvidenceLinks),
 		CauseClusters:       len(report.CauseClusters),
 		RepairClusters:      len(report.RepairClusters),
@@ -219,7 +221,7 @@ func indexFacts(facts []Fact) factIndex {
 	return idx
 }
 
-func rankRisks(report intake.Report, facts factIndex) []BaselineRisk {
+func rankRisks(inv Inventory, report intake.Report, facts factIndex) []BaselineRisk {
 	var risks []BaselineRisk
 	for _, finding := range report.SQL {
 		for _, statement := range finding.Statements {
@@ -254,6 +256,8 @@ func rankRisks(report intake.Report, facts factIndex) []BaselineRisk {
 		addEvidenceFactors(&risk, facts)
 		risks = append(risks, risk)
 	}
+	risks = append(risks, rankSourceCodePathRisks(inv.Root, report.SourceSQL, facts)...)
+	risks = append(risks, rankSchemaEvolutionCodeRisks(inv.Facts, facts)...)
 	risks = uniqueRisks(risks)
 	sort.Slice(risks, func(i, j int) bool {
 		if risks[i].Score != risks[j].Score {
@@ -320,6 +324,204 @@ func identifiersFromIntake(raw []string, table string) []Identifier {
 		}
 	}
 	return uniqueIdentifiers(ids)
+}
+
+func rankSourceCodePathRisks(inventoryRoot string, sourceSQL migration.SourceSQLReport, facts factIndex) []BaselineRisk {
+	root := firstNonEmpty(sourceSQL.Root, inventoryRoot)
+	var risks []BaselineRisk
+	for _, obs := range sourceSQL.Observations {
+		if !isPersistentCodeObservation(obs) {
+			continue
+		}
+		window := sourceWindowForObservation(root, obs)
+		risk := codePathRiskFromObservation(obs, window)
+		addEvidenceFactors(&risk, facts)
+		risks = append(risks, risk)
+	}
+	return risks
+}
+
+func isPersistentCodeObservation(obs migration.SourceSQLObservation) bool {
+	switch obs.Kind {
+	case "orm_query":
+		return isPersistentWriteOperation(obs.Operation)
+	case "migration_framework":
+		return isSchemaWriteOperation(obs.Operation)
+	default:
+		return false
+	}
+}
+
+func isPersistentWriteOperation(operation string) bool {
+	switch strings.ToLower(operation) {
+	case "update", "delete", "insert":
+		return true
+	default:
+		return false
+	}
+}
+
+func isSchemaWriteOperation(operation string) bool {
+	switch strings.ToLower(operation) {
+	case "create_table", "drop_table", "add_column", "remove_column", "drop_column", "create", "alter", "drop":
+		return true
+	default:
+		return false
+	}
+}
+
+func codePathRiskFromObservation(obs migration.SourceSQLObservation, window string) BaselineRisk {
+	operation := strings.ToLower(obs.Operation)
+	kind := "code-path:" + operation
+	risk := BaselineRisk{
+		ID:          "risk:" + canonical.Hash(fmt.Sprintf("code-path\x00%s\x00%d\x00%s\x00%s", obs.Path, obs.Line, operation, obs.SnippetHash))[:16],
+		Path:        obs.Path,
+		Statement:   obs.Line,
+		Kind:        kind,
+		Table:       obs.Table,
+		Severity:    "medium",
+		Identifiers: identifiersFromSourceObservation(obs),
+		Rationale:   "project-native source path performs a persistent write; review breadth, idempotency, transaction, retry, and rollback behavior",
+		NextCommand: fmt.Sprintf("patchline extract-sql %s --json", shellPath(obs.Path)),
+	}
+	addFactor(&risk, "persistent-write-code-path", 45, "source or migration framework observation writes persistent data")
+	switch operation {
+	case "delete", "drop_table", "remove_column", "drop_column", "drop":
+		addFactor(&risk, "destructive-code-path", 45, "operation can delete rows or remove schema/data surfaces")
+	case "update", "alter", "add_column":
+		addFactor(&risk, "write-breadth-unknown", 35, "operation mutates existing persistent records or schema")
+	case "insert", "create_table", "create":
+		addFactor(&risk, "persistent-create-path", 20, "operation creates persistent records or schema")
+	}
+	lower := strings.ToLower(window)
+	if window == "" {
+		addFactor(&risk, "source-window-unavailable", 5, "source window was unavailable; risk remains based on extracted operation metadata")
+	} else {
+		if (operation == "update" || operation == "delete") && !hasScopedWriteMarker(lower) {
+			addFactor(&risk, "broad-write", 20, "write path lacks an obvious where/filter/id/limit scope marker in nearby source")
+		}
+		if !containsAny(lower, "transaction", "atomic", "begin", "commit") {
+			addFactor(&risk, "missing-transaction-boundary", 15, "nearby source lacks an obvious transaction boundary")
+		}
+		if !containsAny(lower, "idempot", "upsert", "on conflict", "unique", "retry-safe", "retry_safe") {
+			addFactor(&risk, "missing-idempotency", 10, "nearby source lacks an obvious idempotency or uniqueness marker")
+		}
+		if !containsAny(lower, "rollback", "revert", "dry_run", "dry-run", "dryrun") {
+			addFactor(&risk, "weak-rollback-signal", 10, "nearby source lacks an obvious rollback, revert, or dry-run marker")
+		}
+		if containsAny(lower, "worker", "job", "retry", "cron", "background") && !containsAny(lower, "idempot", "upsert", "unique", "retry-safe", "retry_safe") {
+			addFactor(&risk, "retry-hazard", 10, "write appears near retry/background execution signals without obvious idempotency")
+		}
+	}
+	risk.Severity = severityForScore(risk.Score)
+	return risk
+}
+
+func identifiersFromSourceObservation(obs migration.SourceSQLObservation) []Identifier {
+	var ids []Identifier
+	if obs.Table != "" {
+		ids = append(ids, Identifier{Kind: "table", Value: obs.Table}, Identifier{Kind: "model", Value: obs.Table})
+	}
+	if obs.Framework != "" {
+		ids = append(ids, Identifier{Kind: "framework", Value: obs.Framework})
+	}
+	if obs.Operation != "" {
+		ids = append(ids, Identifier{Kind: "operation", Value: obs.Operation})
+	}
+	return uniqueIdentifiers(ids)
+}
+
+func sourceWindowForObservation(root string, obs migration.SourceSQLObservation) string {
+	if root == "" || obs.Path == "" {
+		return ""
+	}
+	path := obs.Path
+	if !filepath.IsAbs(path) {
+		path = filepath.Join(root, filepath.FromSlash(obs.Path))
+	}
+	text, err := readTextPrefix(path, factContentLimit)
+	if err != nil || text == "" {
+		return ""
+	}
+	lines := strings.Split(text, "\n")
+	if obs.Line <= 0 || obs.Line > len(lines) {
+		return ""
+	}
+	start := obs.Line - 4
+	if start < 0 {
+		start = 0
+	}
+	end := obs.Line + 4
+	if end > len(lines) {
+		end = len(lines)
+	}
+	return strings.Join(lines[start:end], "\n")
+}
+
+func hasScopedWriteMarker(lower string) bool {
+	for _, marker := range []string{".where", "where(", "filter(", "find_by", "limit(", "where ", " id ", "_id", ".id"} {
+		if strings.Contains(lower, marker) {
+			return true
+		}
+	}
+	return false
+}
+
+func rankSchemaEvolutionCodeRisks(facts []Fact, index factIndex) []BaselineRisk {
+	var risks []BaselineRisk
+	for _, fact := range facts {
+		if fact.Kind != "schema_evolution" {
+			continue
+		}
+		operation := strings.ToLower(fact.Properties["operation"])
+		if !isSchemaWriteOperation(operation) && operation != "create_model" && operation != "add_field" && operation != "model" && operation != "field" {
+			continue
+		}
+		table := firstNonEmpty(fact.Properties["table"], firstIdentifierValue(fact.Identifiers, "table"), firstIdentifierValue(fact.Identifiers, "model"))
+		risk := BaselineRisk{
+			ID:          "risk:" + canonical.Hash("schema-code-path\x00" + fact.ID)[:16],
+			Path:        fact.Path,
+			Kind:        "code-path:schema:" + operation,
+			Table:       table,
+			Severity:    "medium",
+			Identifiers: fact.Identifiers,
+			Rationale:   "project-native migration or ORM declaration changes persistent schema without requiring a pre-authored schema",
+			NextCommand: fmt.Sprintf("patchline repo inventory %s --json", shellPath(fact.Path)),
+		}
+		addFactor(&risk, "schema-code-path", 35, "project-native migration or ORM declaration changes persistent schema")
+		switch operation {
+		case "drop_table", "remove_column", "drop_column", "drop":
+			addFactor(&risk, "destructive-schema-change", 45, "schema change removes persistent data surface")
+		case "alter_table", "add_column", "add_field", "field":
+			addFactor(&risk, "schema-write-breadth", 20, "schema change can affect existing records or code paths")
+		default:
+			addFactor(&risk, "schema-create-path", 10, "schema declaration creates a persistent data surface")
+		}
+		addEvidenceFactors(&risk, index)
+		risk.Severity = severityForScore(risk.Score)
+		risks = append(risks, risk)
+	}
+	return risks
+}
+
+func firstIdentifierValue(ids []Identifier, kind string) string {
+	for _, id := range ids {
+		if id.Kind == kind {
+			return id.Value
+		}
+	}
+	return ""
+}
+
+func severityForScore(score int) string {
+	switch {
+	case score >= 90:
+		return "high"
+	case score >= 50:
+		return "medium"
+	default:
+		return "low"
+	}
 }
 
 func addEvidenceFactors(risk *BaselineRisk, facts factIndex) {
@@ -531,6 +733,16 @@ func uniqueRisks(in []BaselineRisk) []BaselineRisk {
 	return out
 }
 
+func countCodePathRisks(risks []BaselineRisk) int {
+	var count int
+	for _, risk := range risks {
+		if strings.HasPrefix(risk.Kind, "code-path:") {
+			count++
+		}
+	}
+	return count
+}
+
 func sqlOnlyRankedRisks(report intake.Report) int {
 	var count int
 	for _, finding := range report.SQL {
@@ -592,6 +804,7 @@ func renderBaselineMarkdown(report BaselineReport) string {
 	fmt.Fprintf(&b, "- hash: `%s`\n\n", report.Hash)
 	fmt.Fprintf(&b, "## Summary\n\n| area | count |\n| --- | ---: |\n")
 	fmt.Fprintf(&b, "| ranked risks | %d |\n", report.Summary.RankedRisks)
+	fmt.Fprintf(&b, "| code-path ranked risks | %d |\n", report.Summary.CodePathRankedRisks)
 	fmt.Fprintf(&b, "| evidence links | %d |\n", report.Summary.EvidenceLinks)
 	fmt.Fprintf(&b, "| cause clusters | %d |\n", report.Summary.CauseClusters)
 	fmt.Fprintf(&b, "| repair clusters | %d |\n", report.Summary.RepairClusters)

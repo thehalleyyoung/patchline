@@ -62,6 +62,7 @@ jq -n \
     },
     baseline: {
       risks: $baseline[0].summary.ranked_risks,
+      code_path_risks: ($baseline[0].summary.code_path_ranked_risks // 0),
       evidence_links: $baseline[0].summary.evidence_links,
       grep_only: $baseline[0].summary.grep_only_matches,
       sql_only: $baseline[0].summary.sql_only_ranked_risks,
@@ -103,7 +104,7 @@ jq -n \
   echo
   echo "## Summary"
   echo
-  jq -r '"- files inventoried: \(.inventory.files)\n- project facts: \(.inventory.facts)\n- schema evolution findings: \(.inventory.schema_evolution)\n- native commands: \(.inventory.native_commands)\n- field evidence: \(.inventory.field_evidence)\n- intake high-risk SQL: \(.intake.high_risk)\n- problem candidates: \(.intake.problems)\n- candidate links: \(.intake.links)\n- baseline ranked risks: \(.baseline.risks)\n- baseline evidence links: \(.baseline.evidence_links)\n- generated proposal files: \(.proposal.files)\n- proposal output hash: \(.proposal.output_hash)\n- compare checks passed: \(.compare.checks_passed)\n- compare checks failed: \(.compare.checks_failed)"' "$OUT/summary.json"
+  jq -r '"- files inventoried: \(.inventory.files)\n- project facts: \(.inventory.facts)\n- schema evolution findings: \(.inventory.schema_evolution)\n- native commands: \(.inventory.native_commands)\n- field evidence: \(.inventory.field_evidence)\n- intake high-risk SQL: \(.intake.high_risk)\n- problem candidates: \(.intake.problems)\n- candidate links: \(.intake.links)\n- baseline ranked risks: \(.baseline.risks)\n- baseline code-path risks: \(.baseline.code_path_risks)\n- baseline evidence links: \(.baseline.evidence_links)\n- generated proposal files: \(.proposal.files)\n- proposal output hash: \(.proposal.output_hash)\n- compare checks passed: \(.compare.checks_passed)\n- compare checks failed: \(.compare.checks_failed)"' "$OUT/summary.json"
 } > "$OUT/summary.md"
 
 echo "repo analysis summary: $OUT/summary.md"
