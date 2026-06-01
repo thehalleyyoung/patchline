@@ -705,6 +705,7 @@ func repoAnalyze(args []string) error {
 		report.Summary.NativeChecksSkipped = compare.Summary.NativeChecksSkipped
 		report.Summary.CompareHash = compare.Hash
 	}
+	report.Outputs["analysis_bundle"] = filepath.Join(*outPath, "analysis-bundle")
 	report.Hash = canonical.Hash(struct {
 		Version string                 `json:"version"`
 		Input   string                 `json:"input"`
@@ -715,6 +716,9 @@ func repoAnalyze(args []string) error {
 		Deep    repoAnalyzeDeepSummary `json:"deep_analysis,omitempty"`
 	}{report.Version, report.Input, report.Subpath, report.Stages, report.Outputs, report.Summary, report.DeepAnalysis})
 	if err := writeRepoAnalyzeReport(*outPath, report); err != nil {
+		return err
+	}
+	if err := writeAnalysisBundle(*outPath, report); err != nil {
 		return err
 	}
 	if *jsonOut {
@@ -875,6 +879,71 @@ func writeRepoAnalyzeReport(outDir string, report repoAnalyzeReport) error {
 		fmt.Fprintf(&b, "| %s | `%s` |\n", key, report.Outputs[key])
 	}
 	return os.WriteFile(filepath.Join(outDir, "analyze.md"), []byte(b.String()), 0o644)
+}
+
+func writeAnalysisBundle(outDir string, report repoAnalyzeReport) error {
+	bundleDir := filepath.Join(outDir, "analysis-bundle")
+	if err := os.MkdirAll(bundleDir, 0o755); err != nil {
+		return err
+	}
+	copyIfExists := func(src, name string) error {
+		if src == "" {
+			return nil
+		}
+		if _, err := os.Stat(src); err != nil {
+			if errors.Is(err, os.ErrNotExist) {
+				return nil
+			}
+			return err
+		}
+		return copyFile(src, filepath.Join(bundleDir, name))
+	}
+	if fetchOut := report.Outputs["fetch"]; fetchOut != "" {
+		if err := copyIfExists(filepath.Join(fetchOut, "source.json"), "source.json"); err != nil {
+			return err
+		}
+	} else {
+		source := map[string]any{"input": report.Input, "subpath": report.Subpath}
+		data, err := json.MarshalIndent(source, "", "  ")
+		if err != nil {
+			return err
+		}
+		if err := os.WriteFile(filepath.Join(bundleDir, "source.json"), append(data, '\n'), 0o644); err != nil {
+			return err
+		}
+	}
+	if inventoryOut := report.Outputs["inventory"]; inventoryOut != "" {
+		if err := copyIfExists(filepath.Join(inventoryOut, "facts.jsonl"), "facts.jsonl"); err != nil {
+			return err
+		}
+	}
+	if baselineOut := report.Outputs["baseline"]; baselineOut != "" {
+		if err := copyIfExists(filepath.Join(baselineOut, "baseline.json"), "baseline.json"); err != nil {
+			return err
+		}
+		if err := copyIfExists(filepath.Join(baselineOut, "baseline.sarif"), "summary.sarif"); err != nil {
+			return err
+		}
+	}
+	if proposalOut := report.Outputs["proposal"]; proposalOut != "" {
+		if err := copyIfExists(filepath.Join(proposalOut, "proposal.patch"), "proposal.patch"); err != nil {
+			return err
+		}
+	}
+	if compareOut := report.Outputs["compare"]; compareOut != "" {
+		if err := copyIfExists(filepath.Join(compareOut, "compare.json"), "compare.json"); err != nil {
+			return err
+		}
+	}
+	return copyIfExists(filepath.Join(outDir, "analyze.md"), "summary.md")
+}
+
+func copyFile(src, dst string) error {
+	data, err := os.ReadFile(src)
+	if err != nil {
+		return err
+	}
+	return os.WriteFile(dst, data, 0o644)
 }
 
 func repoInventory(args []string) error {

@@ -104,7 +104,7 @@ Every addition to the repo should be judged by whether it makes that loop more a
 73. [x] Support `--llm-command <cmd>` so users can plug in local or hosted code generation without coupling Patchline to one provider.
 74. [x] Support `--proposal-kind tests|guards|instrumentation|repair|all`.
 75. [x] Support `--budget files=N,lines=N,tokens=N,changes=N` to bound generated-code scope.
-76. [ ] Emit `analysis-bundle/` containing `source.json`, `facts.jsonl`, `baseline.json`, `proposal.patch`, `compare.json`, `summary.md`, and `summary.sarif`.
+76. [x] Emit `analysis-bundle/` containing `source.json`, `facts.jsonl`, `baseline.json`, `proposal.patch`, `compare.json`, `summary.md`, and `summary.sarif`.
 77. [ ] Add resume mode so fetch, inventory, and baseline stages are reused across experiments.
 78. [ ] Add redaction mode for identifiers, literals, customer names, and secrets while preserving joins and hashes.
 79. [ ] Add CI mode that uploads SARIF and stores the analysis bundle as an artifact.
