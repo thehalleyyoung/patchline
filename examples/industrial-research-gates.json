@@ -1,0 +1,25 @@
+{
+  "version": "patchline.industrial-research-gates/v1",
+  "gates": [
+    {
+      "id": "four-repo-matrix-dual-use",
+      "status": "implemented",
+      "minimum_public_repos": 4,
+      "practical_fields": [
+        "performance.maintainer_review_burden",
+        "ranked_risks",
+        "linked_candidates",
+        "generated_artifacts",
+        "cache_hit"
+      ],
+      "experiment_fields": [
+        "grep_only_comparison.ranked_risk_delta",
+        "sql_only_comparison.ranked_risk_delta",
+        "generation_comparison",
+        "verification_comparison",
+        "sampled_adjudications"
+      ],
+      "alignment_claim": "the public slice matrix helps maintainers decide what to review while preserving baseline, ablation, adjudication, and verification fields needed for rigorous experiments"
+    }
+  ]
+}

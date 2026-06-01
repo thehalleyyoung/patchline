@@ -129,6 +129,7 @@ make metric-impact-gate
 make finding-signal-gate
 make nondeterministic-gate
 make public-command-gate
+make industrial-research-gate
 ```
 
 The demo downloads real GitHub project subpaths and writes:
@@ -158,6 +159,8 @@ The real-repo slice matrix is backed by `examples/real-repo-slices.json` and `ex
 `make nondeterministic-gate` checks `examples/nondeterministic-gates.json` by proving generator-backed proposals are optional, budgeted, hash-audited, and followed by deterministic compare analysis across four public repo slices.
 
 `make public-command-gate` checks `examples/public-command-gates.json` by fetching four public repo slices and proving the analysis workflow runs from downloaded local paths in short shell sequences.
+
+`make industrial-research-gate` checks `examples/industrial-research-gates.json` by regenerating the four-repo matrix and proving each practical maintainer report field is paired with experiment-grade comparison, ablation, adjudication, and verification fields.
 
 Current default projects:
 

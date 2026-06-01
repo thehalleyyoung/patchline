@@ -133,5 +133,135 @@ Every addition to the repo should be judged by whether it makes that loop more a
 96. [x] Prefer fewer, stronger findings over exhaustive low-signal output.
 97. [x] Keep non-deterministic steps optional, bounded, auditable, and followed by deterministic analysis.
 98. [x] Make every new command runnable on a downloaded public repo in a few shell commands.
-99. [ ] Keep industrial value and research novelty aligned: practical reports should also support rigorous experiments.
+99. [x] Keep industrial value and research novelty aligned: practical reports should also support rigorous experiments.
 100. [ ] End each development cycle with a real-repo demonstration where baseline analysis, generated intervention, and deeper re-analysis produce a better result than the previous version.
+
+## Stage 10: Make Patchline irresistible to real maintainers
+
+101. [ ] Add a `patchline doctor` command that diagnoses missing tools, cache state, network reachability, and safe native-test availability before a repo analysis run.
+102. [ ] Add an interactive-free `patchline quickstart --github owner/repo --subpath path` command that emits exactly the next three copy/paste commands and expected artifacts.
+103. [ ] Add a maintainer triage dashboard that groups findings by owner-relevant surfaces: migrations, app write paths, jobs, tests, incidents, runbooks, and generated interventions.
+104. [ ] Add stable finding IDs that survive file moves and line drift by hashing normalized evidence, table identifiers, operation families, and provenance slices.
+105. [ ] Add suppression files with expiry dates, rationale, owner, evidence hash, and automatic stale-suppression detection.
+106. [ ] Add a "why now" report that highlights newly introduced risks relative to a previous commit, release tag, or stored baseline bundle.
+107. [ ] Add a "what changed since last run" report that compares facts, ranked risks, links, generated artifacts, and deterministic check outcomes.
+108. [ ] Add Slack/GitHub-friendly summaries with only the top maintainer action, top risk, reproduction command, and bundle link.
+109. [ ] Add `patchline explain <finding-id>` to print evidence, ranking factors, alternatives considered, proof holes, and the exact commands that verify the finding.
+110. [ ] Add a public gallery of real-repo analysis bundles with redacted identifiers, pinned commits, expected hashes, and maintainer-facing screenshots.
+
+## Stage 11: Become the best public corpus for data-change repair
+
+111. [ ] Expand the real-repo catalog from 4 slices to at least 25 pinned slices across Rails, Django, Alembic, Flyway, Liquibase, Prisma, TypeORM, EF Core, Go, Java, Node, and monorepos.
+112. [ ] Add non-GitHub sources from GitLab, Bitbucket, SourceHut, and release tarballs with the same provenance and cache semantics.
+113. [ ] Add dataset cards for every public slice covering license, commit, ecosystem, migration framework, evidence types, known limitations, and reproducibility commands.
+114. [ ] Add a corpus fairness audit that reports language/framework/source-host coverage and flags over-reliance on any one ecosystem.
+115. [ ] Add stratified benchmark manifests so experiments can report per-ecosystem results instead of only aggregate numbers.
+116. [ ] Add automatic stale-ref detection that checks whether pinned public repos still download and whether expected hashes still match.
+117. [ ] Add a public issue template for users to nominate real repos and failure modes that Patchline should support.
+118. [ ] Add a corpus minimizer that extracts the smallest public subpath preserving each finding, link, and generated-intervention behavior.
+119. [ ] Add cross-repo recurrence reports that identify repeated data-change failure modes across unrelated projects without leaking private code.
+120. [ ] Add corpus release artifacts with signed checksums, generated reports, and one-command reproduction instructions.
+
+## Stage 12: Add paper-grade evaluation methodology
+
+121. [ ] Define primary research questions for repo-native fact extraction, risk ranking, evidence linking, generated-intervention safety, and before/after re-analysis.
+122. [ ] Add experiment drivers that run every research question from a clean checkout and write immutable result ledgers.
+123. [ ] Add bootstrap confidence intervals for ranking, linking, generated-check, runtime, and review-burden metrics.
+124. [ ] Add paired statistical tests for Patchline versus grep-only, SQL-only, identifier-only, temporal-only, and no-facts-generation baselines.
+125. [ ] Add effect-size reporting so improvements are not presented only as p-values.
+126. [ ] Add sensitivity analysis over budgets, finding caps, link thresholds, temporal windows, and risk-weight settings.
+127. [ ] Add ablation dashboards that show which feature families matter for each ecosystem and failure mode.
+128. [ ] Add negative controls that run on documentation-only, vendor-only, and test-only slices where Patchline should avoid high-confidence repair claims.
+129. [ ] Add reviewer-mode scripts that rebuild all tables, figures, and claims from raw generated JSON without manual copying.
+130. [ ] Add an artifact consistency checker that fails when README claims, generated tables, expected hashes, and experiment outputs diverge.
+
+## Stage 13: Make generated interventions genuinely safer
+
+131. [ ] Add patch application in disposable worktrees so generated changes can be analyzed as real diffs rather than detached artifact files.
+132. [ ] Add language-aware generated-test placement for Rails, Django, Go, Java, Node, and Python projects.
+133. [ ] Add mutation testing for generated guards by deleting required checks and proving deterministic compare rejects the weakened artifact.
+134. [ ] Add sandboxed native-test execution profiles for common ecosystems with timeouts, file-system write constraints, and network-off defaults.
+135. [ ] Add generated-patch provenance comments that cite risk IDs, fact hashes, and evidence paths without exposing redacted secrets.
+136. [ ] Add repair-manifest schemas with machine-checkable preconditions, postconditions, rollback steps, validation commands, and owner review status.
+137. [ ] Add patch minimization that removes generated files or hunks that do not improve coverage, ranking, or deterministic check outcomes.
+138. [ ] Add generated-change risk budgeting that rejects interventions adding more new risk than they cover.
+139. [ ] Add a "safe to review" badge only when deterministic checks pass, native checks are either passed or explicitly unavailable, and proof holes are listed.
+140. [ ] Add generated-intervention replay so reviewers can reproduce prompt context, generation output, applied diff, compare results, and hashes.
+
+## Stage 14: Push semantic analysis beyond static heuristics
+
+141. [ ] Add dialect-aware SQL normalization for PostgreSQL, MySQL, SQLite, SQL Server, Oracle, and BigQuery migrations.
+142. [ ] Add ORM-aware write-effect extraction for Active Record, Django ORM, SQLAlchemy, Prisma, TypeORM, Hibernate, and GORM.
+143. [ ] Add transaction-boundary inference across migration DSLs, raw SQL, app code, jobs, and generated repairs.
+144. [ ] Add idempotency classification for migrations, backfills, repair jobs, generated scripts, and runbook commands.
+145. [ ] Add lock and concurrency hazard detection for data changes likely to block deploys or background jobs.
+146. [ ] Add data-retention and privacy hazard detection for broad deletes, anonymization changes, export scripts, and rollback gaps.
+147. [ ] Add invariant mining from tests, schema constraints, validations, fixtures, and production-like example data.
+148. [ ] Add trace-to-code linking for OpenTelemetry, Datadog-style span exports, structured logs, deploy markers, and incident timelines.
+149. [ ] Add approximate blast-radius estimation from table centrality, foreign-key reachability, code-path fanout, and query usage evidence.
+150. [ ] Add proof-hole minimization that ranks the smallest missing evidence needed to upgrade a warning into a checked claim.
+
+## Stage 15: Integrate where serious teams work
+
+151. [ ] Add a GitHub App or action workflow that comments on pull requests with only new or changed data-risk findings.
+152. [ ] Add GitLab CI and Bitbucket Pipelines examples with SARIF or equivalent code-quality artifacts.
+153. [ ] Add Datadog-style export adapters for deploy events, incidents, traces, logs, monitors, SLOs, and notebooks without depending on proprietary APIs.
+154. [ ] Add OpenTelemetry collector export ingestion for traces and logs linked to repo-native findings.
+155. [ ] Add Jira/Linear incident export adapters that preserve issue IDs, timestamps, owners, labels, and repair links.
+156. [ ] Add Kubernetes and Terraform scanners for database jobs, migration jobs, cron repairs, secrets references, and deploy ordering.
+157. [ ] Add database dry-run hooks for local Postgres/MySQL containers with schema-only execution and no production credentials.
+158. [ ] Add pre-commit and pre-push modes that run fast finding deltas without downloading external repos.
+159. [ ] Add CODEOWNERS-aware routing so findings and generated interventions identify likely reviewers.
+160. [ ] Add enterprise-safe offline mode that validates all cached repo inputs, adapters, and reports without network access.
+
+## Stage 16: Make the project delightful for contributors
+
+161. [ ] Add architecture docs that explain the fetch, inventory, intake, baseline, proposal, compare, deep-analysis, and gate layers.
+162. [ ] Add plugin interfaces for parsers, fact extractors, linkers, rankers, proposal generators, compare checks, and report renderers.
+163. [ ] Add golden-fixture generators that turn real-repo slices into minimal deterministic tests without vendoring entire repos.
+164. [ ] Add fuzz tests for parsers, fact normalization, redaction, SQL analysis, archive extraction, and report loading.
+165. [ ] Add performance benchmarks with budgets for large repos, monorepos, generated bundles, and four-repo matrix runs.
+166. [ ] Add structured logging and trace spans for Patchline itself so long analyses can be diagnosed.
+167. [ ] Add a contributor command that runs formatting, focused tests, fast gates, and forbidden-reference scans in one invocation.
+168. [ ] Add issue labels and triage templates for new ecosystem support, parser requests, false positives, false negatives, and artifact regressions.
+169. [ ] Add compatibility tests for macOS, Linux, and containerized execution with minimal tool assumptions.
+170. [ ] Add a changelog discipline that links each user-visible feature to a real-repo proof and a gate.
+
+## Stage 17: Strengthen trust, security, and privacy
+
+171. [ ] Add secret-scanning tests that prove reports, prompts, bundles, generated code, logs, and redacted artifacts do not leak secret-like values.
+172. [ ] Add prompt-context minimization that includes only evidence needed for selected risks and reports excluded context counts.
+173. [ ] Add redaction stability tests across repeated runs, resume mode, bundles, SARIF, generated prompts, and comparison reports.
+174. [ ] Add supply-chain provenance for binaries, release archives, generated experiment artifacts, and public corpus downloads.
+175. [ ] Add signed release checksums and reproducible build instructions.
+176. [ ] Add threat-model documentation for untrusted repos, archives, generated code, native tests, and adapter inputs.
+177. [ ] Add archive bomb, path traversal, symlink escape, and malformed tar/zip regression tests.
+178. [ ] Add generated-code quarantine rules that prevent execution unless a user explicitly enables safe native checks.
+179. [ ] Add privacy-preserving aggregate metrics so teams can compare risk trends without uploading source or raw evidence.
+180. [ ] Add security review gates that must pass before new adapters, generators, archive handlers, or execution features merge.
+
+## Stage 18: Produce Best Paper quality narratives
+
+181. [ ] Add generated case studies for at least eight public repos showing problem, evidence, generated intervention, deterministic rejection or acceptance, and maintainer action.
+182. [ ] Add a taxonomy of real data-change repair failure modes discovered across the public corpus.
+183. [ ] Add qualitative coding notes for false positives, false negatives, proof holes, and maintainer decisions.
+184. [ ] Add side-by-side examples where Patchline finds a cross-file repair clue that grep-only and SQL-only baselines miss.
+185. [ ] Add examples where Patchline rejects plausible generated code that would otherwise look useful in a normal code-review diff.
+186. [ ] Add examples where generated tests or guards improve reviewability without claiming to fully repair the underlying issue.
+187. [ ] Add a limitations ledger that distinguishes unsupported ecosystems, uncertain causality, missing runtime evidence, and intentionally conservative checks.
+188. [ ] Add claims-to-evidence mapping for every abstract, introduction, and evaluation claim expected in a future paper.
+189. [ ] Add figure-generation scripts for the repair-analysis loop, architecture, corpus composition, ablations, and before/after intervention outcomes.
+190. [ ] Add a reviewer walkthrough that starts from a fresh machine and ends with regenerated tables, figures, reports, and case-study bundles.
+
+## Stage 19: Build toward a 1000-star open-source project
+
+191. [ ] Add a polished landing README section with a 60-second demo, screenshots, badges, install commands, and real public-repo output.
+192. [ ] Add release binaries and package-manager installation paths for Homebrew, Docker, GitHub Releases, and Go install.
+193. [ ] Add a hosted documentation site with tutorials for maintainers, researchers, security reviewers, and contributors.
+194. [ ] Add short screencasts showing first-run analysis, generated intervention review, CI integration, and artifact reproduction.
+195. [ ] Add "awesome Patchline" examples contributed by users across ecosystems and source hosts.
+196. [ ] Add comparison pages against code scanning, SQL linters, migration tools, observability dashboards, and AI coding assistants.
+197. [ ] Add a public roadmap board where every planned feature links to a real-repo failure mode, gate, and expected artifact.
+198. [ ] Add monthly reproducibility reports that rerun public gates and publish cache status, failures, fixes, and benchmark trends.
+199. [ ] Add contributor recognition for new real-repo slices, ecosystem parsers, false-positive reductions, and artifact improvements.
+200. [ ] Add a release-quality capstone demo where a fresh user downloads four unfamiliar repos, finds high-signal repair risks, generates bounded interventions, rejects bad output, and regenerates experiment-ready evidence in one documented session.
