@@ -1,0 +1,29 @@
+{
+  "version": "patchline.feature-impact-gates/v1",
+  "features": [
+    {
+      "id": "real-repo-slice-matrix",
+      "status": "implemented",
+      "real_repo": "bytebase/bytebase",
+      "subpath": "backend/migrator/migration",
+      "real_repo_failure_mode": "migration-only SQL review misses repository context, cache provenance, and cross-slice comparability",
+      "feature": "public real-repo slice matrix with coverage, comparison, adjudication, and performance columns"
+    },
+    {
+      "id": "copy-commands-report",
+      "status": "implemented",
+      "real_repo": "lobsters/lobsters",
+      "subpath": "db/migrate",
+      "real_repo_failure_mode": "first-time maintainers cannot reliably reproduce staged analysis commands from generated artifacts alone",
+      "feature": "repo analyze commands.md with one-command and staged command sequences"
+    },
+    {
+      "id": "prompt-without-facts-ablation",
+      "status": "implemented",
+      "real_repo": "mastodon/mastodon",
+      "subpath": "db/migrate",
+      "real_repo_failure_mode": "generated-code evaluations can overclaim value without proving whether repository facts changed the generated intervention",
+      "feature": "fact-grounded versus prompt-without-facts generation comparison"
+    }
+  ]
+}
