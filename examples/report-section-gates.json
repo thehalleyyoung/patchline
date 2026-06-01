@@ -1,0 +1,35 @@
+{
+  "version": "patchline.report-section-gates/v1",
+  "sections": [
+    {
+      "id": "copy-commands",
+      "status": "implemented",
+      "real_repo": "lobsters/lobsters",
+      "subpath": "db/migrate",
+      "artifact": "commands.md",
+      "required_text": "repo analyze",
+      "report_section": "copy/paste maintainer commands",
+      "maintainer_decision": "decide whether a first-time evaluator can reproduce the analysis with one command or staged commands before trusting the bundle"
+    },
+    {
+      "id": "analysis-summary",
+      "status": "implemented",
+      "real_repo": "lobsters/lobsters",
+      "subpath": "db/migrate",
+      "artifact": "analyze.md",
+      "required_text": "ranked risks",
+      "report_section": "analysis summary counts",
+      "maintainer_decision": "decide whether the slice has enough ranked risks, generated artifacts, and compare loops to warrant deeper review"
+    },
+    {
+      "id": "intervention-loop",
+      "status": "implemented",
+      "real_repo": "lobsters/lobsters",
+      "subpath": "db/migrate",
+      "artifact": "compare/compare.md",
+      "required_text": "Intervention loop",
+      "report_section": "generated intervention acceptance or rejection",
+      "maintainer_decision": "decide whether generated artifacts passed deterministic checks and can move to human review or must be regenerated"
+    }
+  ]
+}
