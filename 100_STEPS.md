@@ -86,7 +86,7 @@ Every addition to the repo should be judged by whether it makes that loop more a
 
 ## Stage 6: Add semantic depth that is research-worthy
 
-61. [ ] Build provenance slices connecting migration -> table -> source path -> test -> incident -> repair.
+61. [x] Build provenance slices connecting migration -> table -> source path -> test -> incident -> repair.
 62. [ ] Add Datalog-style queries for minimal cause sets, shared ancestors, repair lineage, and affected outputs.
 63. [ ] Add abstract interpretation for SQL/data-change effects when concrete data is unavailable.
 64. [ ] Add symbolic checks for idempotency, reversibility, frame conditions, and scope preservation.

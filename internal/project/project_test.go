@@ -481,6 +481,60 @@ end`)
 	}
 }
 
+func TestBaselineBuildsProvenanceSlices(t *testing.T) {
+	root := t.TempDir()
+	inv := Inventory{
+		Root: filepath.ToSlash(root),
+		TestCommands: []Command{
+			{Command: "go test ./...", Reason: "Go tests"},
+		},
+		NativeCommands: []Command{
+			{Command: "go test ./...", Reason: "Go native check"},
+		},
+		Facts: []Fact{
+			{Version: Version, ID: "fact:migration", Kind: "schema_evolution", Path: "db/migrate/001_accounts.sql", Confidence: "derived", Identifiers: []Identifier{{Kind: "table", Value: "accounts"}}},
+			{Version: Version, ID: "fact:source", Kind: "file", Path: "app/jobs/account_repair.go", Confidence: "observed", Identifiers: []Identifier{{Kind: "table", Value: "accounts"}}, Properties: map[string]string{"language": "Go"}},
+			{Version: Version, ID: "fact:incident", Kind: "operational_doc", Path: "docs/inc-42.md", Confidence: "path", Identifiers: []Identifier{{Kind: "table", Value: "accounts"}, {Kind: "incident", Value: "incident 42"}}},
+			{Version: Version, ID: "fact:repair", Kind: "file", Path: "scripts/rollback_accounts.sql", Confidence: "observed", Identifiers: []Identifier{{Kind: "table", Value: "accounts"}}},
+		},
+	}
+	report := intake.Report{
+		Source: intake.Source{Input: "fixture"},
+		SQL: []intake.SQLFinding{{
+			Path:       "db/migrate/001_accounts.sql",
+			SourceKind: "sql_file",
+			Statements: migrationStatementsForTest{{
+				Index: 0, Kind: "update", Table: "accounts", Risk: "high", Reasons: []string{"unbounded update can rewrite an entire table"},
+			}}.asMigrationStatements(),
+		}},
+		Causes: []intake.CauseCandidate{{
+			ID: "cause:incident", Path: "docs/inc-42.md", Kind: "incident-or-postmortem-text", Identifiers: []string{"table:accounts", "incident:incident 42"}, Rationale: "incident text",
+		}},
+		RepairCandidates: []intake.RepairCandidate{{
+			ID: "repair:rollback", Path: "scripts/rollback_accounts.sql", Kind: "repair-like-sql", Table: "accounts", Identifiers: []string{"table:accounts"}, Rationale: "rollback SQL",
+		}},
+	}
+	baseline := Baseline(inv, inv.Facts, report)
+	if baseline.Summary.ProvenanceSlices == 0 {
+		t.Fatalf("expected provenance slices: %#v", baseline)
+	}
+	var fullSlice ProvenanceSlice
+	for _, slice := range baseline.Provenance {
+		if slice.Table == "accounts" {
+			fullSlice = slice
+			break
+		}
+	}
+	if fullSlice.ID == "" {
+		t.Fatalf("missing accounts provenance slice: %#v", baseline.Provenance)
+	}
+	for _, stage := range []string{"migration", "table", "source", "test", "native-check", "incident", "repair"} {
+		if !stringSliceContains(fullSlice.StagesPresent, stage) {
+			t.Fatalf("expected stage %q in %#v", stage, fullSlice)
+		}
+	}
+}
+
 func TestLoadInventoryAcceptsInventoryJSONPath(t *testing.T) {
 	root := t.TempDir()
 	writeFile(t, root, "db/migrate/001.sql", "update auth_user set is_active = false;")
@@ -628,6 +682,15 @@ func writeBaselineForTest(t *testing.T, baseline BaselineReport) string {
 		t.Fatal(err)
 	}
 	return dir
+}
+
+func stringSliceContains(values []string, want string) bool {
+	for _, value := range values {
+		if value == want {
+			return true
+		}
+	}
+	return false
 }
 
 type migrationStatementForTest struct {

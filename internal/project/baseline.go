@@ -25,6 +25,7 @@ type BaselineReport struct {
 	EvidenceLinks  []EvidenceLink    `json:"evidence_links,omitempty"`
 	CauseClusters  []EvidenceCluster `json:"cause_clusters,omitempty"`
 	RepairClusters []EvidenceCluster `json:"repair_clusters,omitempty"`
+	Provenance     []ProvenanceSlice `json:"provenance_slices,omitempty"`
 	NativeChecks   []Command         `json:"native_checks,omitempty"`
 	Hash           string            `json:"hash"`
 	Markdown       string            `json:"markdown,omitempty"`
@@ -36,6 +37,7 @@ type BaselineSummary struct {
 	EvidenceLinks       int `json:"evidence_links"`
 	CauseClusters       int `json:"cause_clusters"`
 	RepairClusters      int `json:"repair_clusters"`
+	ProvenanceSlices    int `json:"provenance_slices"`
 	GrepOnlyMatches     int `json:"grep_only_matches"`
 	SQLOnlyRankedRisks  int `json:"sql_only_ranked_risks"`
 	IdentifierOnlyLinks int `json:"identifier_only_links"`
@@ -82,6 +84,23 @@ type EvidenceCluster struct {
 	Rationale   string         `json:"rationale"`
 }
 
+type ProvenanceSlice struct {
+	ID             string         `json:"id"`
+	RiskID         string         `json:"risk_id"`
+	Table          string         `json:"table,omitempty"`
+	MigrationPath  string         `json:"migration_path,omitempty"`
+	SourcePaths    []string       `json:"source_paths,omitempty"`
+	TestCommands   []Command      `json:"test_commands,omitempty"`
+	NativeCommands []Command      `json:"native_commands,omitempty"`
+	IncidentPaths  []string       `json:"incident_paths,omitempty"`
+	RepairPaths    []string       `json:"repair_paths,omitempty"`
+	Identifiers    []Identifier   `json:"identifiers,omitempty"`
+	StagesPresent  []string       `json:"stages_present"`
+	Links          []EvidenceLink `json:"links,omitempty"`
+	Confidence     string         `json:"confidence"`
+	Rationale      string         `json:"rationale"`
+}
+
 func Baseline(inv Inventory, facts []Fact, intakeReport intake.Report) BaselineReport {
 	report := BaselineReport{Version: BaselineVersion, InventoryRoot: inv.Root, IntakeSource: intakeReport.Source.Input}
 	factIndex := indexFacts(facts)
@@ -90,12 +109,14 @@ func Baseline(inv Inventory, facts []Fact, intakeReport intake.Report) BaselineR
 	report.CauseClusters = clusterCandidates("cause", intakeReport.Causes, factIndex)
 	report.RepairClusters = clusterRepairCandidates(intakeReport.RepairCandidates, factIndex)
 	report.NativeChecks = uniqueCommands(append([]Command(nil), inv.TestCommands...))
+	report.Provenance = buildProvenanceSlices(inv, report.Risks, intakeReport, factIndex)
 	report.Summary = BaselineSummary{
 		RankedRisks:         len(report.Risks),
 		CodePathRankedRisks: countCodePathRisks(report.Risks),
 		EvidenceLinks:       len(report.EvidenceLinks),
 		CauseClusters:       len(report.CauseClusters),
 		RepairClusters:      len(report.RepairClusters),
+		ProvenanceSlices:    len(report.Provenance),
 		GrepOnlyMatches:     grepOnlyMatches(inv.Root),
 		SQLOnlyRankedRisks:  sqlOnlyRankedRisks(intakeReport),
 		IdentifierOnlyLinks: countLinksByIdentifierKind(report.EvidenceLinks, false),
@@ -652,6 +673,219 @@ func nonEmptyClusters(in []EvidenceCluster) []EvidenceCluster {
 	return out
 }
 
+func buildProvenanceSlices(inv Inventory, risks []BaselineRisk, report intake.Report, facts factIndex) []ProvenanceSlice {
+	var slices []ProvenanceSlice
+	for _, risk := range risks {
+		ids := provenanceSeedIdentifiers(risk)
+		if len(ids) == 0 {
+			continue
+		}
+		matches := matchingFacts(ids, facts)
+		slice := ProvenanceSlice{
+			ID:             "slice:" + canonical.Hash("provenance\x00" + risk.ID)[:16],
+			RiskID:         risk.ID,
+			Table:          firstNonEmpty(risk.Table, firstIdentifierValue(ids, "table"), firstIdentifierValue(ids, "model")),
+			MigrationPath:  provenanceMigrationPath(risk, matches),
+			SourcePaths:    provenanceSourcePaths(risk, matches),
+			TestCommands:   uniqueCommands(inv.TestCommands),
+			NativeCommands: uniqueCommands(inv.NativeCommands),
+			Identifiers:    ids,
+			Links:          provenanceLinks(risk, ids, matches),
+			Confidence:     "identifier-shared",
+			Rationale:      "slice groups repo evidence that co-references the same table or strong identifier; it is a navigation aid, not proof of causality",
+		}
+		slice.IncidentPaths = provenanceIncidentPaths(ids, report.Causes, matches)
+		slice.RepairPaths = provenanceRepairPaths(ids, report.RepairCandidates, matches)
+		slice.StagesPresent = provenanceStages(slice)
+		if len(slice.StagesPresent) < 2 || slice.Table == "" {
+			continue
+		}
+		slices = append(slices, slice)
+	}
+	slices = uniqueProvenanceSlices(slices)
+	sort.Slice(slices, func(i, j int) bool {
+		if len(slices[i].StagesPresent) != len(slices[j].StagesPresent) {
+			return len(slices[i].StagesPresent) > len(slices[j].StagesPresent)
+		}
+		return slices[i].ID < slices[j].ID
+	})
+	if len(slices) > 100 {
+		slices = slices[:100]
+	}
+	return slices
+}
+
+func provenanceSeedIdentifiers(risk BaselineRisk) []Identifier {
+	ids := append([]Identifier(nil), risk.Identifiers...)
+	if risk.Table != "" {
+		ids = append(ids, Identifier{Kind: "table", Value: risk.Table}, Identifier{Kind: "model", Value: risk.Table})
+	}
+	return strongIdentifiers(uniqueIdentifiers(ids))
+}
+
+func strongIdentifiers(ids []Identifier) []Identifier {
+	var out []Identifier
+	for _, id := range ids {
+		switch id.Kind {
+		case "date", "timestamp", "field":
+			continue
+		default:
+			out = append(out, id)
+		}
+	}
+	return uniqueIdentifiers(out)
+}
+
+func provenanceMigrationPath(risk BaselineRisk, facts []Fact) string {
+	if isMigrationLikePath(risk.Path) || strings.HasPrefix(risk.Kind, "code-path:schema:") || risk.Kind == "migration_framework" {
+		return risk.Path
+	}
+	for _, fact := range facts {
+		if fact.Path == "" {
+			continue
+		}
+		if fact.Kind == "schema_evolution" || fact.Kind == "migration_root" || fact.Kind == "migration_system" || isMigrationLikePath(fact.Path) {
+			return fact.Path
+		}
+	}
+	return ""
+}
+
+func provenanceSourcePaths(risk BaselineRisk, facts []Fact) []string {
+	var paths []string
+	if risk.Path != "" {
+		paths = append(paths, risk.Path)
+	}
+	for _, fact := range facts {
+		if fact.Path == "" {
+			continue
+		}
+		switch fact.Kind {
+		case "file", "source_sql_hint", "schema_evolution":
+			paths = append(paths, fact.Path)
+		}
+	}
+	return capStrings(uniqueSortedStrings(paths), 8)
+}
+
+func provenanceIncidentPaths(ids []Identifier, causes []intake.CauseCandidate, facts []Fact) []string {
+	var paths []string
+	for _, cause := range causes {
+		causeIDs := strongIdentifiers(identifiersFromIntake(cause.Identifiers, ""))
+		if cause.Path != "" && (containsAny(strings.ToLower(cause.Kind), "incident", "postmortem", "outage", "deploy", "trace") || len(sharedIdentifiers(ids, causeIDs)) > 0) {
+			paths = append(paths, cause.Path)
+		}
+	}
+	for _, fact := range facts {
+		if fact.Path == "" || len(sharedIdentifiers(ids, strongIdentifiers(fact.Identifiers))) == 0 {
+			continue
+		}
+		switch fact.Kind {
+		case "operational_doc", "evidence_export", "field_evidence":
+			if containsAny(strings.ToLower(fact.Path+" "+fact.Rationale), "incident", "postmortem", "outage", "deploy", "trace", "error") {
+				paths = append(paths, fact.Path)
+			}
+		}
+	}
+	return capStrings(uniqueSortedStrings(paths), 8)
+}
+
+func provenanceRepairPaths(ids []Identifier, repairs []intake.RepairCandidate, facts []Fact) []string {
+	var paths []string
+	for _, repair := range repairs {
+		repairIDs := strongIdentifiers(identifiersFromIntake(repair.Identifiers, repair.Table))
+		if repair.Path != "" && len(sharedIdentifiers(ids, repairIDs)) > 0 {
+			paths = append(paths, repair.Path)
+		}
+	}
+	for _, fact := range facts {
+		if fact.Path == "" || len(sharedIdentifiers(ids, strongIdentifiers(fact.Identifiers))) == 0 {
+			continue
+		}
+		if fact.Kind == "file" && containsAny(strings.ToLower(fact.Path+" "+fact.Rationale), "repair", "rollback", "revert", "backfill", "reconcile", "fix") {
+			paths = append(paths, fact.Path)
+		}
+	}
+	return capStrings(uniqueSortedStrings(paths), 8)
+}
+
+func provenanceLinks(risk BaselineRisk, ids []Identifier, facts []Fact) []EvidenceLink {
+	var links []EvidenceLink
+	for _, fact := range capFacts(facts, 12) {
+		shared := sharedIdentifiers(ids, fact.Identifiers)
+		if len(shared) == 0 {
+			continue
+		}
+		links = append(links, EvidenceLink{RiskID: risk.ID, FactID: fact.ID, FactKind: fact.Kind, Path: fact.Path, Identifiers: shared, Confidence: "identifier"})
+	}
+	return uniqueLinks(links)
+}
+
+func provenanceStages(slice ProvenanceSlice) []string {
+	var stages []string
+	if slice.MigrationPath != "" {
+		stages = append(stages, "migration")
+	}
+	if slice.Table != "" {
+		stages = append(stages, "table")
+	}
+	if len(slice.SourcePaths) > 0 {
+		stages = append(stages, "source")
+	}
+	if len(slice.TestCommands) > 0 {
+		stages = append(stages, "test")
+	}
+	if len(slice.NativeCommands) > 0 {
+		stages = append(stages, "native-check")
+	}
+	if len(slice.IncidentPaths) > 0 {
+		stages = append(stages, "incident")
+	}
+	if len(slice.RepairPaths) > 0 {
+		stages = append(stages, "repair")
+	}
+	return stages
+}
+
+func uniqueProvenanceSlices(in []ProvenanceSlice) []ProvenanceSlice {
+	seen := map[string]bool{}
+	var out []ProvenanceSlice
+	for _, slice := range in {
+		if seen[slice.ID] {
+			continue
+		}
+		seen[slice.ID] = true
+		out = append(out, slice)
+	}
+	return out
+}
+
+func isMigrationLikePath(path string) bool {
+	lower := strings.ToLower(filepath.ToSlash(path))
+	return containsAny(lower, "migration", "migrations", "db/migrate", ".sql", ".psql", ".ddl")
+}
+
+func uniqueSortedStrings(in []string) []string {
+	sort.Strings(in)
+	var out []string
+	var last string
+	for _, value := range in {
+		if value == "" || value == last {
+			continue
+		}
+		out = append(out, value)
+		last = value
+	}
+	return out
+}
+
+func capStrings(in []string, n int) []string {
+	if len(in) <= n {
+		return in
+	}
+	return in[:n]
+}
+
 func sharedIdentifiers(left, right []Identifier) []Identifier {
 	rightSet := map[string]Identifier{}
 	for _, id := range right {
@@ -808,6 +1042,7 @@ func renderBaselineMarkdown(report BaselineReport) string {
 	fmt.Fprintf(&b, "| evidence links | %d |\n", report.Summary.EvidenceLinks)
 	fmt.Fprintf(&b, "| cause clusters | %d |\n", report.Summary.CauseClusters)
 	fmt.Fprintf(&b, "| repair clusters | %d |\n", report.Summary.RepairClusters)
+	fmt.Fprintf(&b, "| provenance slices | %d |\n", report.Summary.ProvenanceSlices)
 	fmt.Fprintf(&b, "| grep-only matches | %d |\n", report.Summary.GrepOnlyMatches)
 	fmt.Fprintf(&b, "| SQL-only ranked risks | %d |\n", report.Summary.SQLOnlyRankedRisks)
 	fmt.Fprintf(&b, "| identifier-only links | %d |\n", report.Summary.IdentifierOnlyLinks)
@@ -817,6 +1052,14 @@ func renderBaselineMarkdown(report BaselineReport) string {
 		limit := minInt(len(report.Risks), 25)
 		for _, risk := range report.Risks[:limit] {
 			fmt.Fprintf(&b, "| %d | %s | %s | %s | %s | %s |\n", risk.Score, risk.Severity, risk.Path, risk.Kind, risk.Table, risk.Rationale)
+		}
+		fmt.Fprintf(&b, "\n")
+	}
+	if len(report.Provenance) > 0 {
+		fmt.Fprintf(&b, "## Provenance slices\n\n| risk | table | stages | migration | source paths | incidents | repairs |\n| --- | --- | --- | --- | ---: | ---: | ---: |\n")
+		limit := minInt(len(report.Provenance), 20)
+		for _, slice := range report.Provenance[:limit] {
+			fmt.Fprintf(&b, "| `%s` | %s | %s | %s | %d | %d | %d |\n", slice.RiskID, slice.Table, strings.Join(slice.StagesPresent, ", "), slice.MigrationPath, len(slice.SourcePaths), len(slice.IncidentPaths), len(slice.RepairPaths))
 		}
 		fmt.Fprintf(&b, "\n")
 	}
