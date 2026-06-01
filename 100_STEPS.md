@@ -129,7 +129,7 @@ Every addition to the repo should be judged by whether it makes that loop more a
 92. [x] Before adding a parser, show the new facts it extracts from at least one real project.
 93. [x] Before adding a generated-code feature, show the deterministic checks that can catch bad generated output.
 94. [x] Before adding a report section, show what maintainer decision it improves.
-95. [ ] Before adding a metric, show how it affects ranking, repair safety, or comparison against baselines.
+95. [x] Before adding a metric, show how it affects ranking, repair safety, or comparison against baselines.
 96. [ ] Prefer fewer, stronger findings over exhaustive low-signal output.
 97. [ ] Keep non-deterministic steps optional, bounded, auditable, and followed by deterministic analysis.
 98. [ ] Make every new command runnable on a downloaded public repo in a few shell commands.

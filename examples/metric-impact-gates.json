@@ -1,0 +1,32 @@
+{
+  "version": "patchline.metric-impact-gates/v1",
+  "metrics": [
+    {
+      "id": "ranking-feature-contributions",
+      "status": "implemented",
+      "real_repo": "lobsters/lobsters",
+      "subpath": "db/migrate",
+      "metric": "ranking_explanations[].contributions and ranking_explanations[].ablations",
+      "impact_area": "ranking",
+      "impact_claim": "shows which features move a risk score and whether removing a feature changes severity"
+    },
+    {
+      "id": "compare-check-failures",
+      "status": "implemented",
+      "real_repo": "lobsters/lobsters",
+      "subpath": "db/migrate",
+      "metric": "compare.summary.patchline_checks_failed",
+      "impact_area": "repair_safety",
+      "impact_claim": "controls whether generated artifacts are accepted for review or rejected by deterministic checks"
+    },
+    {
+      "id": "sql-only-risk-delta",
+      "status": "implemented",
+      "real_repo": "lobsters/lobsters",
+      "subpath": "db/migrate",
+      "metric": "baseline.summary.sql_only_ranked_risks",
+      "impact_area": "baseline_comparison",
+      "impact_claim": "quantifies how many ranked risks are found beyond SQL-only analysis without repository links"
+    }
+  ]
+}
