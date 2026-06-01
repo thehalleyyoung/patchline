@@ -23,6 +23,7 @@ type CompareReport struct {
 	BaselineHash    string           `json:"baseline_hash"`
 	ProposalHash    string           `json:"proposal_hash"`
 	Summary         CompareSummary   `json:"summary"`
+	Intervention    InterventionLoop `json:"intervention_loop"`
 	RiskDeltas      []RiskDelta      `json:"risk_deltas,omitempty"`
 	GeneratedChecks []GeneratedCheck `json:"generated_checks,omitempty"`
 	NativeChecks    []Command        `json:"native_checks,omitempty"`
@@ -47,6 +48,9 @@ type CompareSummary struct {
 	NativeChecksPassed    int `json:"native_checks_passed"`
 	NativeChecksFailed    int `json:"native_checks_failed"`
 	NativeChecksSkipped   int `json:"native_checks_skipped"`
+	InterventionLoops     int `json:"intervention_loops"`
+	InterventionAccepted  int `json:"intervention_accepted"`
+	InterventionRejected  int `json:"intervention_rejected"`
 	Rejected              int `json:"rejected"`
 	Warnings              int `json:"warnings"`
 }
@@ -72,6 +76,23 @@ type ReviewItem struct {
 	Severity string `json:"severity"`
 	Path     string `json:"path,omitempty"`
 	Message  string `json:"message"`
+}
+
+type InterventionLoop struct {
+	ID                  string   `json:"id"`
+	Status              string   `json:"status"`
+	BaselineHash        string   `json:"baseline_hash"`
+	ProposalHash        string   `json:"proposal_hash"`
+	ProposalStage       string   `json:"proposal_stage,omitempty"`
+	TargetRiskIDs       []string `json:"target_risk_ids,omitempty"`
+	GeneratedFiles      int      `json:"generated_files"`
+	RisksWithCoverage   int      `json:"risks_with_coverage"`
+	ChecksPassed        int      `json:"checks_passed"`
+	ChecksFailed        int      `json:"checks_failed"`
+	NativeChecksRun     int      `json:"native_checks_run"`
+	NativeChecksFailed  int      `json:"native_checks_failed"`
+	RequiredNextActions []string `json:"required_next_actions"`
+	Rationale           string   `json:"rationale"`
 }
 
 type CompareOptions struct {
@@ -106,6 +127,13 @@ func CompareWithOptions(baseline BaselineReport, proposal ProposalReport, opts C
 	report.RiskDeltas = riskDeltas(baseline.Risks, proposal.Generated)
 	report.NativeResults = runNativeChecks(baseline.InventoryRoot, baseline.NativeChecks, opts)
 	report.Summary = summarizeCompare(baseline, proposal, checks, report.RiskDeltas, report.NativeResults)
+	report.Intervention = buildInterventionLoop(baseline, proposal, report.Summary)
+	report.Summary.InterventionLoops = 1
+	if report.Intervention.Status == "accepted-for-review" {
+		report.Summary.InterventionAccepted = 1
+	} else {
+		report.Summary.InterventionRejected = 1
+	}
 	report.Review = reviewCompare(report)
 	report.Hash = compareHash(report)
 	report.Markdown = renderCompareMarkdown(report)
@@ -300,6 +328,45 @@ func summarizeCompare(baseline BaselineReport, proposal ProposalReport, checks [
 	return summary
 }
 
+func buildInterventionLoop(baseline BaselineReport, proposal ProposalReport, summary CompareSummary) InterventionLoop {
+	status := "accepted-for-review"
+	next := []string{
+		"review generated artifacts as an untrusted intervention",
+		"apply only in an isolated worktree or patch review",
+		"rerun baseline and compare after any maintainer edits",
+	}
+	if summary.PatchlineChecksFailed > 0 || summary.NativeChecksFailed > 0 || summary.NewHighRiskSQL > 0 {
+		status = "rejected-by-deterministic-checks"
+		next = []string{
+			"fix or discard generated artifacts that failed deterministic checks",
+			"regenerate or edit the intervention before applying it",
+			"rerun repo compare after changes",
+		}
+	}
+	riskIDs := append([]string(nil), proposal.TargetRiskIDs...)
+	sort.Strings(riskIDs)
+	stage := proposal.Intervention.Stage
+	if stage == "" {
+		stage = "generated-untrusted"
+	}
+	return InterventionLoop{
+		ID:                  "loop:" + canonical.Hash(baseline.Hash + "\x00" + proposal.OutputHash + "\x00" + strings.Join(riskIDs, ","))[:16],
+		Status:              status,
+		BaselineHash:        baseline.Hash,
+		ProposalHash:        proposal.OutputHash,
+		ProposalStage:       stage,
+		TargetRiskIDs:       riskIDs,
+		GeneratedFiles:      summary.GeneratedFiles,
+		RisksWithCoverage:   summary.RisksWithCoverage,
+		ChecksPassed:        summary.PatchlineChecksPassed,
+		ChecksFailed:        summary.PatchlineChecksFailed,
+		NativeChecksRun:     summary.NativeChecksRun,
+		NativeChecksFailed:  summary.NativeChecksFailed,
+		RequiredNextActions: next,
+		Rationale:           "generated code is treated as an intervention in a repair-analysis loop, not as trusted completion output",
+	}
+}
+
 func runNativeChecks(root string, commands []Command, opts CompareOptions) []NativeResult {
 	commands = uniqueCommands(commands)
 	if len(commands) == 0 {
@@ -457,7 +524,17 @@ func renderCompareMarkdown(report CompareReport) string {
 	fmt.Fprintf(&b, "| native checks run | %d |\n", report.Summary.NativeChecksRun)
 	fmt.Fprintf(&b, "| native checks passed | %d |\n", report.Summary.NativeChecksPassed)
 	fmt.Fprintf(&b, "| native checks failed | %d |\n", report.Summary.NativeChecksFailed)
-	fmt.Fprintf(&b, "| native checks skipped | %d |\n\n", report.Summary.NativeChecksSkipped)
+	fmt.Fprintf(&b, "| native checks skipped | %d |\n", report.Summary.NativeChecksSkipped)
+	fmt.Fprintf(&b, "| intervention loops | %d |\n", report.Summary.InterventionLoops)
+	fmt.Fprintf(&b, "| intervention accepted | %d |\n", report.Summary.InterventionAccepted)
+	fmt.Fprintf(&b, "| intervention rejected | %d |\n\n", report.Summary.InterventionRejected)
+	if report.Intervention.ID != "" {
+		fmt.Fprintf(&b, "## Intervention loop\n\n")
+		fmt.Fprintf(&b, "- id: `%s`\n", report.Intervention.ID)
+		fmt.Fprintf(&b, "- status: `%s`\n", report.Intervention.Status)
+		fmt.Fprintf(&b, "- stage: `%s`\n", report.Intervention.ProposalStage)
+		fmt.Fprintf(&b, "- rationale: %s\n\n", report.Intervention.Rationale)
+	}
 	if len(report.Review) > 0 {
 		fmt.Fprintf(&b, "## Review\n\n")
 		for _, item := range report.Review {

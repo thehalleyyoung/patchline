@@ -629,6 +629,9 @@ func TestProposeWritesIsolatedPatchAndMetadata(t *testing.T) {
 	if proposal.Trust != "untrusted-generated-proposal" || len(proposal.GeneratedFiles) != 5 || proposal.ContextHash == "" || proposal.OutputHash == "" {
 		t.Fatalf("unexpected proposal metadata: %#v", proposal)
 	}
+	if proposal.Intervention.ID == "" || proposal.Intervention.Stage != "generated-untrusted" || len(proposal.Intervention.RequiredReanalysis) == 0 {
+		t.Fatalf("expected generated proposal to be recorded as an untrusted intervention: %#v", proposal.Intervention)
+	}
 	if err := WriteProposal(out, proposal); err != nil {
 		t.Fatal(err)
 	}
@@ -687,6 +690,9 @@ func TestCompareChecksGeneratedProposalCoverage(t *testing.T) {
 	compare := Compare(baseline, proposal)
 	if compare.Summary.GeneratedFiles != 5 || compare.Summary.RisksWithCoverage != 1 || compare.Summary.PatchlineChecksFailed != 0 || compare.Summary.NewHighRiskSQL != 0 {
 		t.Fatalf("unexpected compare summary: %#v", compare.Summary)
+	}
+	if compare.Summary.InterventionLoops != 1 || compare.Summary.InterventionAccepted != 1 || compare.Intervention.Status != "accepted-for-review" {
+		t.Fatalf("expected accepted intervention loop: summary=%#v loop=%#v", compare.Summary, compare.Intervention)
 	}
 	if !strings.Contains(compare.Markdown, "Patchline repo compare") {
 		t.Fatalf("expected compare markdown, got %q", compare.Markdown)

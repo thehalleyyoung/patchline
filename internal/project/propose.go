@@ -37,6 +37,7 @@ type ProposalReport struct {
 	ContextHash    string              `json:"context_hash"`
 	PromptHash     string              `json:"prompt_hash"`
 	OutputHash     string              `json:"output_hash"`
+	Intervention   RepairIntervention  `json:"intervention"`
 	GeneratedFiles []GeneratedFile     `json:"generated_files,omitempty"`
 	Constraints    []string            `json:"constraints,omitempty"`
 	Warnings       []string            `json:"warnings,omitempty"`
@@ -81,6 +82,18 @@ type GeneratedArtifact struct {
 	Kind    string
 	Content string
 	RiskIDs []string
+}
+
+type RepairIntervention struct {
+	ID                 string   `json:"id"`
+	Stage              string   `json:"stage"`
+	BaselineHash       string   `json:"baseline_hash"`
+	OutputHash         string   `json:"output_hash"`
+	TargetRiskIDs      []string `json:"target_risk_ids"`
+	ArtifactKinds      []string `json:"artifact_kinds"`
+	Hypothesis         string   `json:"hypothesis"`
+	RequiredReanalysis []string `json:"required_reanalysis"`
+	Trust              string   `json:"trust"`
 }
 
 func Propose(opts ProposalOptions) (ProposalReport, error) {
@@ -141,6 +154,7 @@ func Propose(opts ProposalOptions) (ProposalReport, error) {
 		Generated: generated,
 		Patch:     patch,
 	}
+	report.Intervention = buildRepairIntervention(report.BaselineHash, report.OutputHash, report.TargetRiskIDs, generated)
 	for _, artifact := range generated {
 		report.GeneratedFiles = append(report.GeneratedFiles, GeneratedFile{Path: artifact.Path, Kind: artifact.Kind, ContentHash: "sha256:" + canonical.Hash(artifact.Content), RiskIDs: artifact.RiskIDs})
 	}
@@ -342,6 +356,31 @@ func expandProposalKinds(kind string) []string {
 	}
 }
 
+func buildRepairIntervention(baselineHash, outputHash string, riskIDs []string, artifacts []GeneratedArtifact) RepairIntervention {
+	kinds := make([]string, 0, len(artifacts))
+	for _, artifact := range artifacts {
+		kinds = append(kinds, artifact.Kind)
+	}
+	riskIDs = append([]string(nil), riskIDs...)
+	sort.Strings(riskIDs)
+	kinds = uniqueSortedStrings(kinds)
+	return RepairIntervention{
+		ID:            "intervention:" + canonical.Hash(baselineHash + "\x00" + outputHash + "\x00" + strings.Join(riskIDs, ","))[:16],
+		Stage:         "generated-untrusted",
+		BaselineHash:  baselineHash,
+		OutputHash:    outputHash,
+		TargetRiskIDs: riskIDs,
+		ArtifactKinds: kinds,
+		Hypothesis:    "generated artifacts are an intervention intended to reduce or bound the targeted repo risks after deterministic re-analysis",
+		RequiredReanalysis: []string{
+			"patchline repo compare --before <baseline-report> --after <proposal-report>",
+			"apply only in an isolated worktree or patch review",
+			"rerun project-native tests before trusting the intervention",
+		},
+		Trust: "untrusted-until-reanalyzed",
+	}
+}
+
 func renderTestProposal(risk ProposalRiskContext) string {
 	return fmt.Sprintf(`# Untrusted generated test proposal
 
@@ -462,6 +501,11 @@ func renderProposalMarkdown(report ProposalReport) string {
 	fmt.Fprintf(&b, "- generator: `%s`\n", report.Generator)
 	fmt.Fprintf(&b, "- trust: `%s`\n", report.Trust)
 	fmt.Fprintf(&b, "- output_hash: `%s`\n\n", report.OutputHash)
+	fmt.Fprintf(&b, "## Intervention\n\n")
+	fmt.Fprintf(&b, "- id: `%s`\n", report.Intervention.ID)
+	fmt.Fprintf(&b, "- stage: `%s`\n", report.Intervention.Stage)
+	fmt.Fprintf(&b, "- trust: `%s`\n", report.Intervention.Trust)
+	fmt.Fprintf(&b, "- hypothesis: %s\n\n", report.Intervention.Hypothesis)
 	fmt.Fprintf(&b, "## Generated files\n\n| path | kind | risks |\n| --- | --- | --- |\n")
 	for _, file := range report.GeneratedFiles {
 		fmt.Fprintf(&b, "| %s | %s | %s |\n", file.Path, file.Kind, strings.Join(file.RiskIDs, ", "))
