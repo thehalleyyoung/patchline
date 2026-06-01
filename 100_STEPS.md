@@ -36,7 +36,7 @@ Every addition to the repo should be judged by whether it makes that loop more a
 
 21. [x] Add `patchline repo inventory <path>` for languages, frameworks, migration systems, DB engines, CI, test commands, and deploy config.
 22. [x] Classify files as migrations, source SQL, ORM/schema declarations, tests, fixtures, incidents, runbooks, repair scripts, logs, traces, configs, or unknown.
-23. [ ] Extract tables, columns, models, endpoints, queues, jobs, reports, incidents, commits, PRs, deploy IDs, timestamps, and error names.
+23. [x] Extract tables, columns, models, endpoints, queues, jobs, reports, incidents, commits, PRs, deploy IDs, timestamps, and error names.
 24. [ ] Infer schema evolution from migrations and ORM declarations without requiring a Patchline schema.
 25. [x] Extract embedded SQL and persistence calls from common languages.
 26. [ ] Detect migration frameworks and native commands such as `rails db:migrate`, `manage.py migrate`, `prisma migrate`, `alembic`, `flyway`, and `go test`.

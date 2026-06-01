@@ -124,7 +124,7 @@ PATCHLINE_PLUGPLAY_CASES=$'My app|owner/repo|path/to/migrations\nOther app|owner
 | --- | --- |
 | Source provenance | `source.json` from repo fetch: owner/repo, ref, resolved commit, subpath, archive hash, timestamp, tool version, and cache hit/path |
 | Risky data-changing SQL | `.sql`, `.psql`, `.ddl`, and SQL snippets in text/source files |
-| Project facts | `facts.jsonl` from repo inventory: files, languages, migrations, docs, evidence exports, identifiers, and next commands |
+| Project facts | `facts.jsonl` from repo inventory: files, languages, migrations, docs, evidence exports, tables, columns, models, endpoints, queues, jobs, deploys, timestamps, errors, and next commands |
 | Baseline ranking | `baseline.json`, `baseline.md`, and `baseline.sarif` from repo baseline: ranked risks, evidence links, native checks, and ablation counts |
 | Bounded proposals | `proposal.patch` plus isolated untrusted tests, guards, instrumentation notes, repair manifests, and explain SQL from repo propose |
 | Proposal checks | `compare.json` and `compare.md` from repo compare: generated-artifact checks, coverage, risky generated SQL, and review status |

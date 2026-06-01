@@ -222,6 +222,42 @@ func TestIdentifiersIgnoreSQLExistenceKeywords(t *testing.T) {
 	}
 }
 
+func TestIdentifiersExtractProjectNativeSignals(t *testing.T) {
+	text := `
+class Invoice < ApplicationRecord
+type LedgerEntry struct {}
+model Account {
+ALTER TABLE invoices ADD COLUMN status text;
+UPDATE invoices SET repaired_at = now() WHERE account_id = 42;
+POST /api/v1/invoices/{id}
+queue: billing.reconcile
+worker: InvoiceRepairWorker
+report: revenue-drift
+deploy: prod-20250102
+panic=PaymentRepairError
+incident-42 PR-77 2025-01-02T03:04:05Z 0123456789abcdef0123456789abcdef01234567
+`
+	ids := identifiersFromText(text)
+	expected := map[string]string{
+		"model":        "invoice",
+		"column":       "status",
+		"endpoint":     "/api/v1/invoices/{id}",
+		"queue":        "billing.reconcile",
+		"job":          "invoicerepairworker",
+		"report":       "revenue-drift",
+		"deploy":       "prod-20250102",
+		"error":        "paymentrepairerror",
+		"timestamp":    "2025-01-02t03:04:05z",
+		"commit":       "0123456789abcdef0123456789abcdef01234567",
+		"pull_request": "pr-77",
+	}
+	for kind, value := range expected {
+		if !hasIdentifier(ids, kind, value) {
+			t.Fatalf("missing %s=%s in %#v", kind, value, ids)
+		}
+	}
+}
+
 func TestInventoryTreatsMigrationsRootAsMigrationEvidence(t *testing.T) {
 	root := filepath.Join(t.TempDir(), "django", "contrib", "auth", "migrations")
 	writeFile(t, root, "0001_initial.py", "class Migration: pass")
@@ -493,4 +529,13 @@ func tarGzForTest(t *testing.T, files map[string]string) []byte {
 		t.Fatal(err)
 	}
 	return buf.Bytes()
+}
+
+func hasIdentifier(ids []Identifier, kind, value string) bool {
+	for _, id := range ids {
+		if id.Kind == kind && id.Value == value {
+			return true
+		}
+	}
+	return false
 }

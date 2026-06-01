@@ -932,11 +932,31 @@ func (inv *Inventory) inspectFile(file scanFile) {
 const factContentLimit = 64 << 10
 
 var (
-	identifierDatePattern     = regexp.MustCompile(`\b20[0-9]{2}[-_/]?[01][0-9][-_/]?[0-3][0-9]\b`)
-	identifierIncidentPattern = regexp.MustCompile(`(?i)\b(?:incident|inc|sev)[-_:# ]*[0-9]+\b`)
-	identifierPRPattern       = regexp.MustCompile(`(?i)\b(?:pr|pull request)[-:# ]*[0-9]+\b|#[0-9]+\b`)
-	identifierCommitPattern   = regexp.MustCompile(`\b[0-9a-f]{40}\b`)
-	identifierSQLTablePattern = regexp.MustCompile(`(?i)\b(?:update|delete\s+from|insert\s+into|alter\s+table|create\s+table|drop\s+table|truncate\s+table)\s+(?:if\s+(?:not\s+)?exists\s+)?["'\[]?([A-Za-z_][A-Za-z0-9_.$-]*)`)
+	identifierDatePattern      = regexp.MustCompile(`\b20[0-9]{2}[-_/]?[01][0-9][-_/]?[0-3][0-9]\b`)
+	identifierTimestampPattern = regexp.MustCompile(`\b20[0-9]{2}-[01][0-9]-[0-3][0-9][T ][0-2][0-9]:[0-5][0-9](?::[0-5][0-9](?:\.[0-9]+)?)?(?:Z|[+-][0-9]{2}:?[0-9]{2})?\b`)
+	identifierIncidentPattern  = regexp.MustCompile(`(?i)\b(?:incident|inc|sev)[-_:# ]*[0-9]+\b`)
+	identifierPRPattern        = regexp.MustCompile(`(?i)\b(?:pr|pull request)[-:# ]*[0-9]+\b|#[0-9]+\b`)
+	identifierCommitPattern    = regexp.MustCompile(`\b[0-9a-f]{40}\b`)
+	identifierSQLTablePattern  = regexp.MustCompile(`(?i)\b(?:update|delete\s+from|insert\s+into|alter\s+table|create\s+table|drop\s+table|truncate\s+table)\s+(?:if\s+(?:not\s+)?exists\s+)?["'\[]?([A-Za-z_][A-Za-z0-9_.$-]*)`)
+	identifierColumnPatterns   = []*regexp.Regexp{
+		regexp.MustCompile(`(?i)\b(?:add|drop|rename)\s+column\s+["'\[]?([A-Za-z_][A-Za-z0-9_]*)`),
+		regexp.MustCompile(`(?i)\bset\s+["'\[]?([A-Za-z_][A-Za-z0-9_]*)["'\]]?\s*=`),
+		regexp.MustCompile(`(?i)\bwhere\s+["'\[]?([A-Za-z_][A-Za-z0-9_]*)["'\]]?\s*(?:=|>|<|in\b|is\b|like\b)`),
+	}
+	identifierModelPatterns = []*regexp.Regexp{
+		regexp.MustCompile(`\bclass\s+([A-Z][A-Za-z0-9_]+)\s*(?:<\s*ApplicationRecord|\([^)]*Model[^)]*\))`),
+		regexp.MustCompile(`\btype\s+([A-Z][A-Za-z0-9_]+)\s+struct\b`),
+		regexp.MustCompile(`\bmodel\s+([A-Z][A-Za-z0-9_]+)\s*\{`),
+	}
+	identifierEndpointPatterns = []*regexp.Regexp{
+		regexp.MustCompile(`\b(?:GET|POST|PUT|PATCH|DELETE)\s+(/[A-Za-z0-9_./:{}-]+)`),
+		regexp.MustCompile(`(?i)\b(?:route|path|endpoint)\s*[:=]\s*["']?(/[A-Za-z0-9_./:{}-]+)`),
+	}
+	identifierQueuePattern  = regexp.MustCompile(`(?i)\b(?:queue|topic|stream)\s*[:=]\s*["']?([A-Za-z0-9_.:/-]{3,})`)
+	identifierJobPattern    = regexp.MustCompile(`(?i)\b(?:job|worker|task|cron)\s*[:=]\s*["']?([A-Za-z0-9_.:/-]{3,})|\b([A-Z][A-Za-z0-9_]*(?:Job|Worker|Task))\b`)
+	identifierReportPattern = regexp.MustCompile(`(?i)\b(?:report|dashboard)\s*[:=]\s*["']?([A-Za-z0-9_.:/-]{3,})|([A-Za-z0-9_.-]*report[A-Za-z0-9_.-]*)`)
+	identifierDeployPattern = regexp.MustCompile(`(?i)\b(?:deploy(?:ment)?|release|build)\s*[:=#-]\s*["']?([A-Za-z0-9][A-Za-z0-9_.-]{2,})`)
+	identifierErrorPattern  = regexp.MustCompile(`(?i)\b([A-Za-z][A-Za-z0-9_]*(?:Error|Exception))\b|\b(?:error|exception|panic)\s*[:=]\s*["']?([A-Za-z_][A-Za-z0-9_.:-]+)`)
 )
 
 func (inv *Inventory) addFileFact(file scanFile, language string) {
@@ -1009,13 +1029,25 @@ func identifiersFromText(text string) []Identifier {
 	var ids []Identifier
 	addMatches := func(kind string, matches []string) {
 		for _, match := range matches {
-			value := strings.ToLower(strings.TrimSpace(match))
+			value := normalizeProjectIdentifierValue(kind, match)
 			if value != "" {
 				ids = append(ids, Identifier{Kind: kind, Value: value})
 			}
 		}
 	}
+	addSubmatches := func(kind string, pattern *regexp.Regexp) {
+		for _, match := range pattern.FindAllStringSubmatch(text, -1) {
+			for _, value := range match[1:] {
+				value = normalizeProjectIdentifierValue(kind, value)
+				if value != "" {
+					ids = append(ids, Identifier{Kind: kind, Value: value})
+					break
+				}
+			}
+		}
+	}
 	addMatches("date", identifierDatePattern.FindAllString(text, -1))
+	addMatches("timestamp", identifierTimestampPattern.FindAllString(text, -1))
 	addMatches("incident", identifierIncidentPattern.FindAllString(text, -1))
 	addMatches("pull_request", identifierPRPattern.FindAllString(text, -1))
 	addMatches("commit", identifierCommitPattern.FindAllString(strings.ToLower(text), -1))
@@ -1027,7 +1059,42 @@ func identifiersFromText(text string) []Identifier {
 			}
 		}
 	}
+	for _, pattern := range identifierColumnPatterns {
+		addSubmatches("column", pattern)
+	}
+	for _, pattern := range identifierModelPatterns {
+		addSubmatches("model", pattern)
+	}
+	for _, pattern := range identifierEndpointPatterns {
+		addSubmatches("endpoint", pattern)
+	}
+	addSubmatches("queue", identifierQueuePattern)
+	addSubmatches("job", identifierJobPattern)
+	addSubmatches("report", identifierReportPattern)
+	addSubmatches("deploy", identifierDeployPattern)
+	addSubmatches("error", identifierErrorPattern)
 	return uniqueIdentifiers(ids)
+}
+
+func normalizeProjectIdentifierValue(kind, value string) string {
+	value = strings.TrimSpace(value)
+	value = strings.Trim(value, `"'[](),;`)
+	value = strings.TrimSpace(value)
+	if value == "" {
+		return ""
+	}
+	value = strings.ToLower(value)
+	switch kind {
+	case "endpoint":
+		if !strings.HasPrefix(value, "/") {
+			return ""
+		}
+	case "column", "model", "queue", "job", "report", "deploy", "error":
+		if isSQLIdentifierStopword(value) {
+			return ""
+		}
+	}
+	return value
 }
 
 func isSQLIdentifierStopword(value string) bool {
