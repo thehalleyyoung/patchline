@@ -126,6 +126,7 @@ make parser-fact-gate
 make generated-code-gate
 make report-section-gate
 make metric-impact-gate
+make finding-signal-gate
 ```
 
 The demo downloads real GitHub project subpaths and writes:
@@ -149,6 +150,8 @@ The real-repo slice matrix is backed by `examples/real-repo-slices.json` and `ex
 `make report-section-gate` checks `examples/report-section-gates.json` by generating reports for a public repo slice and proving each gated section exists and names the maintainer decision it improves.
 
 `make metric-impact-gate` checks `examples/metric-impact-gates.json` by generating public-repo analysis and proving each metric affects ranking, repair safety, or baseline comparison.
+
+`make finding-signal-gate` checks `examples/finding-signal-gates.json` by proving human-facing reports cap findings to the strongest ranked risks across four public repo slices while full JSON keeps the complete ranked set.
 
 Current default projects:
 

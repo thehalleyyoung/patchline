@@ -1,0 +1,53 @@
+{
+  "version": "patchline.finding-signal-gates/v1",
+  "gates": [
+    {
+      "id": "forem-top-risk-report-cap",
+      "status": "implemented",
+      "real_repo": "forem/forem",
+      "subpath": "db/migrate",
+      "report": "baseline/baseline.md",
+      "json_report": "baseline/baseline.json",
+      "max_reported_findings": 25,
+      "minimum_total_findings": 50,
+      "sort_metric": "score",
+      "signal_claim": "human-facing reports show a capped top-risk slice sorted by score while machine-readable JSON preserves the full ranked set"
+    },
+    {
+      "id": "bytebase-top-risk-report-cap",
+      "status": "implemented",
+      "real_repo": "bytebase/bytebase",
+      "subpath": "backend/migrator/migration",
+      "report": "baseline/baseline.md",
+      "json_report": "baseline/baseline.json",
+      "max_reported_findings": 25,
+      "minimum_total_findings": 50,
+      "sort_metric": "score",
+      "signal_claim": "human-facing reports show a capped top-risk slice sorted by score while machine-readable JSON preserves the full ranked set"
+    },
+    {
+      "id": "mastodon-top-risk-report-cap",
+      "status": "implemented",
+      "real_repo": "mastodon/mastodon",
+      "subpath": "db/migrate",
+      "report": "baseline/baseline.md",
+      "json_report": "baseline/baseline.json",
+      "max_reported_findings": 25,
+      "minimum_total_findings": 50,
+      "sort_metric": "score",
+      "signal_claim": "human-facing reports show a capped top-risk slice sorted by score while machine-readable JSON preserves the full ranked set"
+    },
+    {
+      "id": "lobsters-top-risk-report-cap",
+      "status": "implemented",
+      "real_repo": "lobsters/lobsters",
+      "subpath": "db/migrate",
+      "report": "baseline/baseline.md",
+      "json_report": "baseline/baseline.json",
+      "max_reported_findings": 25,
+      "minimum_total_findings": 50,
+      "sort_metric": "score",
+      "signal_claim": "human-facing reports show a capped top-risk slice sorted by score while machine-readable JSON preserves the full ranked set"
+    }
+  ]
+}
