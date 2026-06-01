@@ -24,6 +24,7 @@ type BaselineReport struct {
 	IntakeSource    string                    `json:"intake_source"`
 	Summary         BaselineSummary           `json:"summary"`
 	Risks           []BaselineRisk            `json:"risks,omitempty"`
+	Rankings        []RankingExplanation      `json:"ranking_explanations,omitempty"`
 	EvidenceLinks   []EvidenceLink            `json:"evidence_links,omitempty"`
 	CauseClusters   []EvidenceCluster         `json:"cause_clusters,omitempty"`
 	RepairClusters  []EvidenceCluster         `json:"repair_clusters,omitempty"`
@@ -43,6 +44,9 @@ type BaselineReport struct {
 type BaselineSummary struct {
 	RankedRisks         int `json:"ranked_risks"`
 	CodePathRankedRisks int `json:"code_path_ranked_risks"`
+	RankingExplanations int `json:"ranking_explanations"`
+	RankingFeatures     int `json:"ranking_features"`
+	AblationSensitive   int `json:"ablation_sensitive_risks"`
 	EvidenceLinks       int `json:"evidence_links"`
 	CauseClusters       int `json:"cause_clusters"`
 	RepairClusters      int `json:"repair_clusters"`
@@ -93,6 +97,30 @@ type ScoreFactor struct {
 	Name   string `json:"name"`
 	Weight int    `json:"weight"`
 	Reason string `json:"reason"`
+}
+
+type RankingExplanation struct {
+	RiskID        string                `json:"risk_id"`
+	Score         int                   `json:"score"`
+	Severity      string                `json:"severity"`
+	TopFeature    string                `json:"top_feature,omitempty"`
+	Contributions []FeatureContribution `json:"contributions"`
+	Ablations     []FeatureAblation     `json:"ablations"`
+	Rationale     string                `json:"rationale"`
+}
+
+type FeatureContribution struct {
+	Feature string  `json:"feature"`
+	Weight  int     `json:"weight"`
+	Share   float64 `json:"share"`
+	Reason  string  `json:"reason"`
+}
+
+type FeatureAblation struct {
+	Feature         string `json:"feature"`
+	ScoreWithout    int    `json:"score_without"`
+	SeverityWithout string `json:"severity_without"`
+	ChangesSeverity bool   `json:"changes_severity"`
 }
 
 type EvidenceLink struct {
@@ -226,6 +254,7 @@ func Baseline(inv Inventory, facts []Fact, intakeReport intake.Report) BaselineR
 	report := BaselineReport{Version: BaselineVersion, InventoryRoot: inv.Root, IntakeSource: intakeReport.Source.Input}
 	factIndex := indexFacts(facts)
 	report.Risks = rankRisks(inv, intakeReport, factIndex)
+	report.Rankings = buildRankingExplanations(report.Risks)
 	report.EvidenceLinks = linkRisks(report.Risks, factIndex)
 	report.CauseClusters = clusterCandidates("cause", intakeReport.Causes, factIndex)
 	report.RepairClusters = clusterRepairCandidates(intakeReport.RepairCandidates, factIndex)
@@ -241,6 +270,9 @@ func Baseline(inv Inventory, facts []Fact, intakeReport intake.Report) BaselineR
 	report.Summary = BaselineSummary{
 		RankedRisks:         len(report.Risks),
 		CodePathRankedRisks: countCodePathRisks(report.Risks),
+		RankingExplanations: len(report.Rankings),
+		RankingFeatures:     countRankingFeatures(report.Rankings),
+		AblationSensitive:   countAblationSensitive(report.Rankings),
 		EvidenceLinks:       len(report.EvidenceLinks),
 		CauseClusters:       len(report.CauseClusters),
 		RepairClusters:      len(report.RepairClusters),
@@ -716,6 +748,115 @@ func addEvidenceFactors(risk *BaselineRisk, facts factIndex) {
 func addFactor(risk *BaselineRisk, name string, weight int, reason string) {
 	risk.Factors = append(risk.Factors, ScoreFactor{Name: name, Weight: weight, Reason: reason})
 	risk.Score += weight
+}
+
+func buildRankingExplanations(risks []BaselineRisk) []RankingExplanation {
+	explanations := make([]RankingExplanation, 0, len(risks))
+	for _, risk := range risks {
+		if len(risk.Factors) == 0 {
+			continue
+		}
+		contributions := make([]FeatureContribution, 0, len(risk.Factors))
+		ablations := make([]FeatureAblation, 0, len(risk.Factors))
+		score := risk.Score
+		if score < 0 {
+			score = 0
+		}
+		for _, factor := range risk.Factors {
+			share := 0.0
+			if score > 0 {
+				share = float64(factor.Weight) / float64(score)
+			}
+			scoreWithout := score - factor.Weight
+			if scoreWithout < 0 {
+				scoreWithout = 0
+			}
+			severityWithout := severityForScore(scoreWithout)
+			contributions = append(contributions, FeatureContribution{
+				Feature: factor.Name,
+				Weight:  factor.Weight,
+				Share:   share,
+				Reason:  factor.Reason,
+			})
+			ablations = append(ablations, FeatureAblation{
+				Feature:         factor.Name,
+				ScoreWithout:    scoreWithout,
+				SeverityWithout: severityWithout,
+				ChangesSeverity: severityWithout != risk.Severity,
+			})
+		}
+		sort.Slice(contributions, func(i, j int) bool {
+			if contributions[i].Weight != contributions[j].Weight {
+				return contributions[i].Weight > contributions[j].Weight
+			}
+			return contributions[i].Feature < contributions[j].Feature
+		})
+		sort.Slice(ablations, func(i, j int) bool {
+			if ablations[i].ChangesSeverity != ablations[j].ChangesSeverity {
+				return ablations[i].ChangesSeverity
+			}
+			if ablations[i].ScoreWithout != ablations[j].ScoreWithout {
+				return ablations[i].ScoreWithout < ablations[j].ScoreWithout
+			}
+			return ablations[i].Feature < ablations[j].Feature
+		})
+		topFeature := ""
+		if len(contributions) > 0 {
+			topFeature = contributions[0].Feature
+		}
+		explanations = append(explanations, RankingExplanation{
+			RiskID:        risk.ID,
+			Score:         score,
+			Severity:      risk.Severity,
+			TopFeature:    topFeature,
+			Contributions: contributions,
+			Ablations:     ablations,
+			Rationale:     "ranking explanation expands score factors into per-feature contributions and leave-one-feature ablations",
+		})
+	}
+	sort.Slice(explanations, func(i, j int) bool {
+		if explanations[i].Score != explanations[j].Score {
+			return explanations[i].Score > explanations[j].Score
+		}
+		return explanations[i].RiskID < explanations[j].RiskID
+	})
+	if len(explanations) > 400 {
+		explanations = explanations[:400]
+	}
+	return explanations
+}
+
+func countRankingFeatures(explanations []RankingExplanation) int {
+	seen := map[string]bool{}
+	for _, explanation := range explanations {
+		for _, contribution := range explanation.Contributions {
+			seen[contribution.Feature] = true
+		}
+	}
+	return len(seen)
+}
+
+func countAblationSensitive(explanations []RankingExplanation) int {
+	count := 0
+	for _, explanation := range explanations {
+		for _, ablation := range explanation.Ablations {
+			if ablation.ChangesSeverity {
+				count++
+				break
+			}
+		}
+	}
+	return count
+}
+
+func countExplanationSeverityChanges(explanation RankingExplanation) int {
+	count := 0
+	for _, ablation := range explanation.Ablations {
+		if ablation.ChangesSeverity {
+			count++
+		}
+	}
+	return count
 }
 
 func matchingFacts(ids []Identifier, facts factIndex) []Fact {
@@ -2267,6 +2408,9 @@ func renderBaselineMarkdown(report BaselineReport) string {
 	fmt.Fprintf(&b, "## Summary\n\n| area | count |\n| --- | ---: |\n")
 	fmt.Fprintf(&b, "| ranked risks | %d |\n", report.Summary.RankedRisks)
 	fmt.Fprintf(&b, "| code-path ranked risks | %d |\n", report.Summary.CodePathRankedRisks)
+	fmt.Fprintf(&b, "| ranking explanations | %d |\n", report.Summary.RankingExplanations)
+	fmt.Fprintf(&b, "| ranking features | %d |\n", report.Summary.RankingFeatures)
+	fmt.Fprintf(&b, "| ablation-sensitive risks | %d |\n", report.Summary.AblationSensitive)
 	fmt.Fprintf(&b, "| evidence links | %d |\n", report.Summary.EvidenceLinks)
 	fmt.Fprintf(&b, "| cause clusters | %d |\n", report.Summary.CauseClusters)
 	fmt.Fprintf(&b, "| repair clusters | %d |\n", report.Summary.RepairClusters)
@@ -2302,6 +2446,14 @@ func renderBaselineMarkdown(report BaselineReport) string {
 		limit := minInt(len(report.Risks), 25)
 		for _, risk := range report.Risks[:limit] {
 			fmt.Fprintf(&b, "| %d | %s | %s | %s | %s | %s |\n", risk.Score, risk.Severity, risk.Path, risk.Kind, risk.Table, risk.Rationale)
+		}
+		fmt.Fprintf(&b, "\n")
+	}
+	if len(report.Rankings) > 0 {
+		fmt.Fprintf(&b, "## Ranking explanations\n\n| risk | score | severity | top feature | features | severity-changing ablations |\n| --- | ---: | --- | --- | ---: | ---: |\n")
+		limit := minInt(len(report.Rankings), 25)
+		for _, explanation := range report.Rankings[:limit] {
+			fmt.Fprintf(&b, "| `%s` | %d | %s | %s | %d | %d |\n", explanation.RiskID, explanation.Score, explanation.Severity, explanation.TopFeature, len(explanation.Contributions), countExplanationSeverityChanges(explanation))
 		}
 		fmt.Fprintf(&b, "\n")
 	}

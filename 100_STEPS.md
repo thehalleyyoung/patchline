@@ -94,7 +94,7 @@ Every addition to the repo should be judged by whether it makes that loop more a
 66. [x] Add recurrence detection for patterns similar to prior risky migrations or repairs in the same repo.
 67. [x] Add policy checks requiring guard, rollback, approval, dry run, or tests for selected risk classes.
 68. [x] Add proof-carrying summaries when a repair's scope and frame conditions can be checked.
-69. [ ] Explain rankings with feature contributions so results are inspectable and ablation-friendly.
+69. [x] Explain rankings with feature contributions so results are inspectable and ablation-friendly.
 70. [ ] Treat generated code as an intervention in a repair-analysis loop, not merely as text completion.
 
 ## Stage 7: Make it industrially easy to run

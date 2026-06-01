@@ -549,6 +549,9 @@ func TestBaselineBuildsProvenanceSlices(t *testing.T) {
 	if baseline.Summary.Recurrences == 0 || baseline.Summary.RecurringRisks < 2 {
 		t.Fatalf("expected recurring risk patterns: %#v", baseline.Summary)
 	}
+	if baseline.Summary.RankingExplanations == 0 || baseline.Summary.RankingFeatures == 0 {
+		t.Fatalf("expected inspectable ranking explanations: %#v", baseline.Summary)
+	}
 	if baseline.Summary.PolicyChecks == 0 || baseline.Summary.PolicyFailed == 0 {
 		t.Fatalf("expected failing policy obligations for high-risk changes: %#v", baseline.Summary)
 	}
