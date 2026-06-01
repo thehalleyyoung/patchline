@@ -144,6 +144,21 @@ func TestEvaluateSuppressionsClassifiesStates(t *testing.T) {
 	}
 }
 
+func TestBuildWhyNowReportFindsNewRisks(t *testing.T) {
+	oldRisk := project.BaselineRisk{ID: "risk:old", StableID: "stable-risk:old0000000000000", Path: "db/migrate/old.sql", Severity: "medium", Score: 50}
+	newRisk := project.BaselineRisk{ID: "risk:new", StableID: "stable-risk:new0000000000000", Path: "db/migrate/new.sql", Severity: "high", Score: 90}
+	report := buildWhyNowReport(
+		project.BaselineReport{Hash: "previous", Risks: []project.BaselineRisk{oldRisk}},
+		project.BaselineReport{Hash: "current", Risks: []project.BaselineRisk{oldRisk, newRisk}},
+	)
+	if report.Summary.NewRisks != 1 || report.Summary.PersistingRisks != 1 || report.Summary.ResolvedRisks != 0 || report.NewRisks[0].StableID != newRisk.StableID {
+		t.Fatalf("unexpected why-now report: %#v", report)
+	}
+	if report.Hash == "" || !strings.Contains(report.Markdown, "Newly introduced risks") {
+		t.Fatalf("expected hash and markdown: %#v", report)
+	}
+}
+
 func TestPhaseCheckInputKindResolvesImplicitInputs(t *testing.T) {
 	tests := []struct {
 		name string

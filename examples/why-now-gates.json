@@ -1,0 +1,33 @@
+{
+  "version": "patchline.why-now-gates/v1",
+  "gates": [
+    {
+      "id": "forem-why-now",
+      "status": "implemented",
+      "real_repo": "forem/forem",
+      "subpath": "db/migrate",
+      "why_now_claim": "why-now compares a stored previous baseline to the current baseline and highlights newly introduced stable risks"
+    },
+    {
+      "id": "bytebase-why-now",
+      "status": "implemented",
+      "real_repo": "bytebase/bytebase",
+      "subpath": "backend/migrator/migration",
+      "why_now_claim": "why-now compares a stored previous baseline to the current baseline and highlights newly introduced stable risks"
+    },
+    {
+      "id": "mastodon-why-now",
+      "status": "implemented",
+      "real_repo": "mastodon/mastodon",
+      "subpath": "db/migrate",
+      "why_now_claim": "why-now compares a stored previous baseline to the current baseline and highlights newly introduced stable risks"
+    },
+    {
+      "id": "lobsters-why-now",
+      "status": "implemented",
+      "real_repo": "lobsters/lobsters",
+      "subpath": "db/migrate",
+      "why_now_claim": "why-now compares a stored previous baseline to the current baseline and highlights newly introduced stable risks"
+    }
+  ]
+}

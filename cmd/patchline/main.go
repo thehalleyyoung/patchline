@@ -410,6 +410,7 @@ Usage:
   patchline repo propose --from-report baseline-dir --proposal-kind tests|guards|instrumentation|repair|all [--budget files=N,lines=N,tokens=N,changes=N] [--no-llm] [--llm-command cmd] [--prompt-without-facts] [--out dir] [--json]
   patchline repo compare --before baseline-dir --after proposal-dir [--out dir] [--run-native-tests] [--json]
   patchline repo suppressions --baseline baseline-dir --suppressions suppressions.json [--out dir] [--json]
+  patchline repo why-now --previous baseline-dir --current baseline-dir [--out dir] [--json]
   patchline intake <path> [--out results/generated/intake] [--json]
   patchline intake --github owner/repo [--ref ref] [--subpath path] [--out results/generated/intake] [--json]
   patchline semantics-contract [--json]
@@ -499,7 +500,7 @@ Examples:
 
 func repoCommand(args []string) error {
 	if len(args) == 0 {
-		return errors.New("usage: patchline repo <doctor|fetch|analyze|inventory|baseline|propose|compare|suppressions> ...")
+		return errors.New("usage: patchline repo <doctor|fetch|analyze|inventory|baseline|propose|compare|suppressions|why-now> ...")
 	}
 	switch args[0] {
 	case "doctor":
@@ -518,6 +519,8 @@ func repoCommand(args []string) error {
 		return repoCompare(args[1:])
 	case "suppressions":
 		return repoSuppressions(args[1:])
+	case "why-now":
+		return repoWhyNow(args[1:])
 	default:
 		return fmt.Errorf("unknown repo subcommand %q", args[0])
 	}
@@ -719,6 +722,37 @@ type suppressionResult struct {
 	ExpectedEvidenceHash string `json:"expected_evidence_hash,omitempty"`
 	ActualEvidenceHash   string `json:"actual_evidence_hash,omitempty"`
 	Reason               string `json:"reason"`
+}
+
+type whyNowReport struct {
+	Version       string        `json:"version"`
+	PreviousHash  string        `json:"previous_hash"`
+	CurrentHash   string        `json:"current_hash"`
+	Summary       whyNowSummary `json:"summary"`
+	NewRisks      []whyNowRisk  `json:"new_risks,omitempty"`
+	ResolvedRisks []whyNowRisk  `json:"resolved_risks,omitempty"`
+	Persisting    []whyNowRisk  `json:"persisting_risks,omitempty"`
+	Hash          string        `json:"hash"`
+	Markdown      string        `json:"markdown,omitempty"`
+}
+
+type whyNowSummary struct {
+	PreviousRisks   int `json:"previous_risks"`
+	CurrentRisks    int `json:"current_risks"`
+	NewRisks        int `json:"new_risks"`
+	ResolvedRisks   int `json:"resolved_risks"`
+	PersistingRisks int `json:"persisting_risks"`
+}
+
+type whyNowRisk struct {
+	StableID string `json:"stable_id"`
+	RiskID   string `json:"risk_id"`
+	Path     string `json:"path"`
+	Kind     string `json:"kind"`
+	Table    string `json:"table,omitempty"`
+	Severity string `json:"severity"`
+	Score    int    `json:"score"`
+	Reason   string `json:"reason"`
 }
 
 func repoAnalyze(args []string) error {
@@ -2580,6 +2614,169 @@ func renderSuppressionMarkdown(report suppressionReport) string {
 	fmt.Fprintf(&b, "## Results\n\n| stable id | status | owner | expires | reason |\n| --- | --- | --- | --- | --- |\n")
 	for _, result := range report.Results {
 		fmt.Fprintf(&b, "| `%s` | %s | %s | %s | %s |\n", result.StableID, result.Status, result.Owner, result.Expires, result.Reason)
+	}
+	return b.String()
+}
+
+func repoWhyNow(args []string) error {
+	fs := flag.NewFlagSet("repo why-now", flag.ContinueOnError)
+	fs.SetOutput(ioDiscard{})
+	previousPath := fs.String("previous", "", "previous baseline directory or baseline.json")
+	currentPath := fs.String("current", "", "current baseline directory or baseline.json")
+	outPath := fs.String("out", "", "output directory")
+	jsonOut := fs.Bool("json", false, "emit JSON")
+	if err := fs.Parse(args); err != nil {
+		return err
+	}
+	if *previousPath == "" || *currentPath == "" || fs.NArg() != 0 {
+		return errors.New("usage: patchline repo why-now --previous baseline-dir --current baseline-dir [--out dir] [--json]")
+	}
+	previous, err := project.LoadBaseline(*previousPath)
+	if err != nil {
+		return err
+	}
+	current, err := project.LoadBaseline(*currentPath)
+	if err != nil {
+		return err
+	}
+	report := buildWhyNowReport(previous, current)
+	if *outPath != "" {
+		if err := writeWhyNowReport(*outPath, report); err != nil {
+			return err
+		}
+	}
+	if *jsonOut {
+		return writeJSON(os.Stdout, report)
+	}
+	fmt.Printf("why-now previous=%s current=%s new=%d resolved=%d persisting=%d hash=%s\n",
+		report.PreviousHash,
+		report.CurrentHash,
+		report.Summary.NewRisks,
+		report.Summary.ResolvedRisks,
+		report.Summary.PersistingRisks,
+		report.Hash,
+	)
+	if *outPath != "" {
+		fmt.Printf("  out=%s\n", *outPath)
+	}
+	return nil
+}
+
+func buildWhyNowReport(previous, current project.BaselineReport) whyNowReport {
+	prev := risksByStableID(previous.Risks)
+	cur := risksByStableID(current.Risks)
+	report := whyNowReport{
+		Version:      "patchline.why-now/v1",
+		PreviousHash: previous.Hash,
+		CurrentHash:  current.Hash,
+		Summary: whyNowSummary{
+			PreviousRisks: len(prev),
+			CurrentRisks:  len(cur),
+		},
+	}
+	for stableID, risk := range cur {
+		if _, ok := prev[stableID]; !ok {
+			report.NewRisks = append(report.NewRisks, whyNowRiskFromBaseline(risk, "stable ID is present in current baseline but absent from previous baseline"))
+		} else {
+			report.Persisting = append(report.Persisting, whyNowRiskFromBaseline(risk, "stable ID is present in both baselines"))
+		}
+	}
+	for stableID, risk := range prev {
+		if _, ok := cur[stableID]; !ok {
+			report.ResolvedRisks = append(report.ResolvedRisks, whyNowRiskFromBaseline(risk, "stable ID was present previously but is absent from current baseline"))
+		}
+	}
+	sortWhyNowRisks(report.NewRisks)
+	sortWhyNowRisks(report.ResolvedRisks)
+	sortWhyNowRisks(report.Persisting)
+	report.Summary.NewRisks = len(report.NewRisks)
+	report.Summary.ResolvedRisks = len(report.ResolvedRisks)
+	report.Summary.PersistingRisks = len(report.Persisting)
+	report.Hash = whyNowHash(report)
+	report.Markdown = renderWhyNowMarkdown(report)
+	return report
+}
+
+func risksByStableID(risks []project.BaselineRisk) map[string]project.BaselineRisk {
+	out := map[string]project.BaselineRisk{}
+	for _, risk := range risks {
+		key := risk.StableID
+		if key == "" {
+			key = risk.ID
+		}
+		if key != "" {
+			out[key] = risk
+		}
+	}
+	return out
+}
+
+func whyNowRiskFromBaseline(risk project.BaselineRisk, reason string) whyNowRisk {
+	return whyNowRisk{
+		StableID: risk.StableID,
+		RiskID:   risk.ID,
+		Path:     risk.Path,
+		Kind:     risk.Kind,
+		Table:    risk.Table,
+		Severity: risk.Severity,
+		Score:    risk.Score,
+		Reason:   reason,
+	}
+}
+
+func sortWhyNowRisks(risks []whyNowRisk) {
+	sort.Slice(risks, func(i, j int) bool {
+		if risks[i].Score != risks[j].Score {
+			return risks[i].Score > risks[j].Score
+		}
+		return risks[i].StableID < risks[j].StableID
+	})
+}
+
+func writeWhyNowReport(outDir string, report whyNowReport) error {
+	if err := os.MkdirAll(outDir, 0o755); err != nil {
+		return err
+	}
+	copy := report
+	copy.Markdown = ""
+	data, err := json.MarshalIndent(copy, "", "  ")
+	if err != nil {
+		return err
+	}
+	if err := os.WriteFile(filepath.Join(outDir, "why-now.json"), append(data, '\n'), 0o644); err != nil {
+		return err
+	}
+	return os.WriteFile(filepath.Join(outDir, "why-now.md"), []byte(report.Markdown), 0o644)
+}
+
+func whyNowHash(report whyNowReport) string {
+	copy := report
+	copy.Hash = ""
+	copy.Markdown = ""
+	return canonical.Hash(copy)
+}
+
+func renderWhyNowMarkdown(report whyNowReport) string {
+	var b strings.Builder
+	fmt.Fprintf(&b, "# Patchline why now\n\n")
+	fmt.Fprintf(&b, "- previous_hash: `%s`\n", report.PreviousHash)
+	fmt.Fprintf(&b, "- current_hash: `%s`\n", report.CurrentHash)
+	fmt.Fprintf(&b, "- hash: `%s`\n\n", report.Hash)
+	fmt.Fprintf(&b, "## Summary\n\n| area | count |\n| --- | ---: |\n")
+	fmt.Fprintf(&b, "| previous risks | %d |\n", report.Summary.PreviousRisks)
+	fmt.Fprintf(&b, "| current risks | %d |\n", report.Summary.CurrentRisks)
+	fmt.Fprintf(&b, "| new risks | %d |\n", report.Summary.NewRisks)
+	fmt.Fprintf(&b, "| resolved risks | %d |\n", report.Summary.ResolvedRisks)
+	fmt.Fprintf(&b, "| persisting risks | %d |\n\n", report.Summary.PersistingRisks)
+	if len(report.NewRisks) > 0 {
+		fmt.Fprintf(&b, "## Newly introduced risks\n\n| stable id | score | severity | path | reason |\n| --- | ---: | --- | --- | --- |\n")
+		limit := len(report.NewRisks)
+		if limit > 20 {
+			limit = 20
+		}
+		for _, risk := range report.NewRisks[:limit] {
+			fmt.Fprintf(&b, "| `%s` | %d | %s | %s | %s |\n", risk.StableID, risk.Score, risk.Severity, risk.Path, risk.Reason)
+		}
 	}
 	return b.String()
 }
