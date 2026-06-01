@@ -147,6 +147,7 @@ make run-change-gate
 make notify-summary-gate
 make explain-finding-gate
 make public-gallery-gate
+make real-repo-catalog-gate
 ```
 
 The demo downloads real GitHub project subpaths and writes:
@@ -200,6 +201,8 @@ The real-repo slice matrix is backed by `examples/real-repo-slices.json` and `ex
 `make explain-finding-gate` checks `examples/explain-finding-gates.json` by explaining stable finding IDs from four public repo slices with evidence, ranking factors, alternatives considered, proof holes, and verification commands.
 
 `make public-gallery-gate` checks `examples/public-gallery-gates.json` by generating a public gallery with redacted analysis bundles, pinned commits, expected bundle/screenshot hashes, and SVG maintainer-facing screenshots for four public repo slices.
+
+`make real-repo-catalog-gate` checks `examples/real-repo-catalog.json` by verifying at least 25 pinned public slices across Rails, Django, Alembic, Flyway, Liquibase, Prisma, TypeORM, EF Core, Go, Java, Node, and monorepos.
 
 Current default projects:
 
