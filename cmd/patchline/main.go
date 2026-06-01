@@ -395,10 +395,10 @@ func usage() {
 Usage:
   patchline about
   patchline repo fetch <owner/repo|github-url|path|archive> [--ref ref] [--subpath path] [--out dir] [--download-dir dir] [--json]
-  patchline repo analyze [<path>|--github owner/repo] [--ref ref] [--subpath path] [--stages inventory,baseline,propose,compare,deep] [--no-llm] [--llm-command cmd] [--out dir] [--json]
+  patchline repo analyze [<path>|--github owner/repo] [--ref ref] [--subpath path] [--stages inventory,baseline,propose,compare,deep] [--proposal-kind tests|guards|instrumentation|repair|all] [--no-llm] [--llm-command cmd] [--out dir] [--json]
   patchline repo inventory <path> [--out dir] [--full] [--json]
   patchline repo baseline --inventory inventory-dir --intake intake-dir [--out dir] [--json]
-  patchline repo propose --from-report baseline-dir --kind tests|guards|instrumentation|repair|explain|all [--no-llm] [--llm-command cmd] [--out dir] [--json]
+  patchline repo propose --from-report baseline-dir --proposal-kind tests|guards|instrumentation|repair|all [--no-llm] [--llm-command cmd] [--out dir] [--json]
   patchline repo compare --before baseline-dir --after proposal-dir [--out dir] [--run-native-tests] [--json]
   patchline intake <path> [--out results/generated/intake] [--json]
   patchline intake --github owner/repo [--ref ref] [--subpath path] [--out results/generated/intake] [--json]
@@ -472,10 +472,10 @@ Usage:
 
 Examples:
   patchline repo fetch bytebase/bytebase --subpath backend/migrator/migration --out results/generated/repos/bytebase-migrations
-  patchline repo analyze --github bytebase/bytebase --subpath backend/migrator/migration --stages inventory,baseline,propose,compare,deep --out results/generated/repos/bytebase-analysis
+  patchline repo analyze --github bytebase/bytebase --subpath backend/migrator/migration --stages inventory,baseline,propose,compare,deep --proposal-kind all --out results/generated/repos/bytebase-analysis
   patchline repo inventory results/generated/repos/bytebase-migrations --out results/generated/repos/bytebase-migrations/inventory
   patchline repo baseline --inventory results/generated/repos/bytebase-migrations/inventory --intake results/generated/intake --out results/generated/repos/bytebase-migrations/baseline
-  patchline repo propose --from-report results/generated/repos/bytebase-migrations/baseline --kind all --out results/generated/repos/bytebase-migrations/proposal
+  patchline repo propose --from-report results/generated/repos/bytebase-migrations/baseline --proposal-kind all --out results/generated/repos/bytebase-migrations/proposal
   patchline repo compare --before results/generated/repos/bytebase-migrations/baseline --after results/generated/repos/bytebase-migrations/proposal --out results/generated/repos/bytebase-migrations/compare
   patchline intake . --out results/generated/intake
   patchline intake --github bytebase/bytebase --subpath store/migration --out results/generated/intake
@@ -969,7 +969,8 @@ func repoPropose(args []string) error {
 	fs := flag.NewFlagSet("repo propose", flag.ContinueOnError)
 	fs.SetOutput(ioDiscard{})
 	baselinePath := fs.String("from-report", "", "baseline directory or baseline.json")
-	kind := fs.String("kind", "all", "proposal kind: tests|guards|instrumentation|repair|explain|all")
+	kind := fs.String("kind", "", "deprecated alias for --proposal-kind")
+	proposalKind := fs.String("proposal-kind", "", "proposal kind: tests|guards|instrumentation|repair|explain|all")
 	outPath := fs.String("out", "", "output directory")
 	llmCommand := fs.String("llm-command", "", "optional user-provided generator command; prompt is passed on stdin")
 	noLLM := fs.Bool("no-llm", false, "force deterministic template proposals and reject LLM generation")
@@ -979,11 +980,15 @@ func repoPropose(args []string) error {
 		return err
 	}
 	if *baselinePath == "" {
-		return errors.New("usage: patchline repo propose --from-report baseline-dir --kind tests|guards|instrumentation|repair|explain|all --out dir [--no-llm] [--llm-command cmd] [--json]")
+		return errors.New("usage: patchline repo propose --from-report baseline-dir --proposal-kind tests|guards|instrumentation|repair|all --out dir [--no-llm] [--llm-command cmd] [--json]")
+	}
+	selectedKind, err := selectProposalKind(*kind, *proposalKind)
+	if err != nil {
+		return err
 	}
 	report, err := project.Propose(project.ProposalOptions{
 		BaselinePath: *baselinePath,
-		Kind:         *kind,
+		Kind:         selectedKind,
 		OutDir:       *outPath,
 		LLMCommand:   *llmCommand,
 		NoLLM:        *noLLM,
@@ -1012,6 +1017,22 @@ func repoPropose(args []string) error {
 		fmt.Printf("  out=%s\n", *outPath)
 	}
 	return nil
+}
+
+func selectProposalKind(kind, proposalKind string) (string, error) {
+	kind = strings.TrimSpace(kind)
+	proposalKind = strings.TrimSpace(proposalKind)
+	if kind != "" && proposalKind != "" && kind != proposalKind {
+		return "", fmt.Errorf("--kind and --proposal-kind disagree: %q != %q", kind, proposalKind)
+	}
+	selected := proposalKind
+	if selected == "" {
+		selected = kind
+	}
+	if selected == "" {
+		selected = "all"
+	}
+	return selected, nil
 }
 
 func repoCompare(args []string) error {

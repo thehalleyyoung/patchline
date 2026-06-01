@@ -24,7 +24,7 @@ SCAN_ROOT="$(jq -r '.source.scanned_root' "$OUT/fetch.json")"
 go run ./cmd/patchline repo inventory "$SCAN_ROOT" --out "$INVENTORY_OUT" --json > "$OUT/inventory.json"
 go run ./cmd/patchline intake "$SCAN_ROOT" --out "$INTAKE_OUT" --json > "$OUT/intake.json"
 go run ./cmd/patchline repo baseline --inventory "$INVENTORY_OUT" --intake "$INTAKE_OUT" --out "$BASELINE_OUT" --json > "$OUT/baseline.json"
-go run ./cmd/patchline repo propose --from-report "$BASELINE_OUT" --kind all --out "$PROPOSAL_OUT" --json > "$OUT/proposal.json"
+go run ./cmd/patchline repo propose --from-report "$BASELINE_OUT" --proposal-kind all --out "$PROPOSAL_OUT" --json > "$OUT/proposal.json"
 go run ./cmd/patchline repo compare --before "$BASELINE_OUT" --after "$PROPOSAL_OUT" --out "$COMPARE_OUT" --json > "$OUT/compare.json"
 FACT_COUNT="$(wc -l < "$INVENTORY_OUT/facts.jsonl" | tr -d ' ')"
 

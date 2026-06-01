@@ -23,7 +23,7 @@ while IFS='|' read -r label repo subpath; do
   PATCHLINE_REPO_DEMO_REPO="$repo" \
     PATCHLINE_REPO_DEMO_SUBPATH="$subpath" \
     bash scripts/repo-analysis-demo.sh "$case_out"
-  go run ./cmd/patchline repo propose --from-report "$case_out/baseline" --kind tests --llm-command cat --out "$case_out/llm-proposal" --json > "$case_out/llm-proposal.json"
+  go run ./cmd/patchline repo propose --from-report "$case_out/baseline" --proposal-kind tests --llm-command cat --out "$case_out/llm-proposal" --json > "$case_out/llm-proposal.json"
   go run ./cmd/patchline repo compare --before "$case_out/baseline" --after "$case_out/llm-proposal" --out "$case_out/llm-compare" --json > "$case_out/llm-compare.json"
   go run ./cmd/patchline repo fetch "$repo" --subpath "$subpath" --out "$case_out/cache-proof" --json > "$case_out/cache-proof.json"
   go run ./cmd/patchline repo analyze --github "$repo" --subpath "$subpath" --stages inventory,baseline,propose,compare,deep --no-llm --out "$case_out/analyze" --json > "$case_out/analyze.json"

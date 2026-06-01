@@ -102,7 +102,7 @@ Every addition to the repo should be judged by whether it makes that loop more a
 71. [x] Add `patchline repo analyze --github owner/repo --stages inventory,baseline,propose,compare,deep`.
 72. [x] Support `--no-llm` for deterministic-only analysis.
 73. [x] Support `--llm-command <cmd>` so users can plug in local or hosted code generation without coupling Patchline to one provider.
-74. [ ] Support `--proposal-kind tests|guards|instrumentation|repair|all`.
+74. [x] Support `--proposal-kind tests|guards|instrumentation|repair|all`.
 75. [ ] Support `--budget files=N,lines=N,tokens=N,changes=N` to bound generated-code scope.
 76. [ ] Emit `analysis-bundle/` containing `source.json`, `facts.jsonl`, `baseline.json`, `proposal.patch`, `compare.json`, `summary.md`, and `summary.sarif`.
 77. [ ] Add resume mode so fetch, inventory, and baseline stages are reused across experiments.

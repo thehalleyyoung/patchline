@@ -35,7 +35,7 @@ go run ./cmd/patchline repo baseline \
 
 go run ./cmd/patchline repo propose \
   --from-report results/generated/repos/django-auth-baseline \
-  --kind all \
+  --proposal-kind all \
   --out results/generated/repos/django-auth-proposal
 
 go run ./cmd/patchline repo compare \
@@ -53,7 +53,7 @@ For example, with an OpenAI key already exported as `OPENAI_API_KEY` or `openai_
 ```bash
 go run ./cmd/patchline repo propose \
   --from-report results/generated/repos/django-auth-baseline \
-  --kind tests \
+  --proposal-kind tests \
   --llm-command 'python3 -c "import json, os, sys, urllib.request; prompt=sys.stdin.read(); key=os.environ.get(\"OPENAI_API_KEY\") or os.environ[\"openai_api_key\"]; body=json.dumps({\"model\":\"gpt-4o-mini\",\"messages\":[{\"role\":\"user\",\"content\":prompt}]}).encode(); req=urllib.request.Request(\"https://api.openai.com/v1/chat/completions\", data=body, headers={\"Authorization\":\"Bearer \"+key,\"Content-Type\":\"application/json\"}); print(json.load(urllib.request.urlopen(req))[\"choices\"][0][\"message\"][\"content\"])"' \
   --out results/generated/repos/django-auth-openai-proposal
 ```
