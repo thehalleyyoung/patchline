@@ -29,6 +29,7 @@ type BaselineReport struct {
 	Provenance      []ProvenanceSlice         `json:"provenance_slices,omitempty"`
 	DatalogQueries  []DatalogQuery            `json:"datalog_queries,omitempty"`
 	AbstractEffects []effects.AbstractSummary `json:"abstract_effects,omitempty"`
+	SymbolicChecks  []SymbolicCheck           `json:"symbolic_checks,omitempty"`
 	NativeChecks    []Command                 `json:"native_checks,omitempty"`
 	Hash            string                    `json:"hash"`
 	Markdown        string                    `json:"markdown,omitempty"`
@@ -46,6 +47,10 @@ type BaselineSummary struct {
 	AbstractEffects     int `json:"abstract_effects"`
 	AbstractOperations  int `json:"abstract_operations"`
 	AbstractProofHoles  int `json:"abstract_proof_holes"`
+	SymbolicChecks      int `json:"symbolic_checks"`
+	SymbolicPassed      int `json:"symbolic_passed"`
+	SymbolicWarnings    int `json:"symbolic_warnings"`
+	SymbolicFailed      int `json:"symbolic_failed"`
 	GrepOnlyMatches     int `json:"grep_only_matches"`
 	SQLOnlyRankedRisks  int `json:"sql_only_ranked_risks"`
 	IdentifierOnlyLinks int `json:"identifier_only_links"`
@@ -121,6 +126,17 @@ type DatalogRow struct {
 	Confidence string            `json:"confidence"`
 }
 
+type SymbolicCheck struct {
+	ID         string   `json:"id"`
+	RiskID     string   `json:"risk_id"`
+	Property   string   `json:"property"`
+	Status     string   `json:"status"`
+	Table      string   `json:"table,omitempty"`
+	Expression string   `json:"expression"`
+	Evidence   []string `json:"evidence,omitempty"`
+	Reason     string   `json:"reason"`
+}
+
 func Baseline(inv Inventory, facts []Fact, intakeReport intake.Report) BaselineReport {
 	report := BaselineReport{Version: BaselineVersion, InventoryRoot: inv.Root, IntakeSource: intakeReport.Source.Input}
 	factIndex := indexFacts(facts)
@@ -132,6 +148,7 @@ func Baseline(inv Inventory, facts []Fact, intakeReport intake.Report) BaselineR
 	report.Provenance = buildProvenanceSlices(inv, report.Risks, intakeReport, factIndex)
 	report.DatalogQueries = buildDatalogQueries(report.Risks, report.Provenance)
 	report.AbstractEffects = buildAbstractEffectSummaries(report.Risks, report.Provenance)
+	report.SymbolicChecks = buildSymbolicChecks(report.Risks, report.AbstractEffects, report.Provenance)
 	report.Summary = BaselineSummary{
 		RankedRisks:         len(report.Risks),
 		CodePathRankedRisks: countCodePathRisks(report.Risks),
@@ -144,6 +161,10 @@ func Baseline(inv Inventory, facts []Fact, intakeReport intake.Report) BaselineR
 		AbstractEffects:     len(report.AbstractEffects),
 		AbstractOperations:  countAbstractOperations(report.AbstractEffects),
 		AbstractProofHoles:  countAbstractProofHoles(report.AbstractEffects),
+		SymbolicChecks:      len(report.SymbolicChecks),
+		SymbolicPassed:      countSymbolicStatus(report.SymbolicChecks, "pass"),
+		SymbolicWarnings:    countSymbolicStatus(report.SymbolicChecks, "warn"),
+		SymbolicFailed:      countSymbolicStatus(report.SymbolicChecks, "fail"),
 		GrepOnlyMatches:     grepOnlyMatches(inv.Root),
 		SQLOnlyRankedRisks:  sqlOnlyRankedRisks(intakeReport),
 		IdentifierOnlyLinks: countLinksByIdentifierKind(report.EvidenceLinks, false),
@@ -1188,6 +1209,149 @@ func countAbstractProofHoles(summaries []effects.AbstractSummary) int {
 	return count
 }
 
+func buildSymbolicChecks(risks []BaselineRisk, summaries []effects.AbstractSummary, slices []ProvenanceSlice) []SymbolicCheck {
+	riskByID := map[string]BaselineRisk{}
+	for _, risk := range risks {
+		riskByID[risk.ID] = risk
+	}
+	sliceByRisk := map[string]ProvenanceSlice{}
+	for _, slice := range slices {
+		sliceByRisk[slice.RiskID] = slice
+	}
+	var checks []SymbolicCheck
+	for _, summary := range summaries {
+		for _, op := range summary.Operations {
+			risk := riskByID[op.OperationID]
+			slice := sliceByRisk[op.OperationID]
+			checks = append(checks,
+				symbolicIdempotencyCheck(risk, op, slice),
+				symbolicReversibilityCheck(risk, op, slice),
+				symbolicFrameCheck(risk, op, slice),
+				symbolicScopeCheck(risk, op, slice),
+			)
+		}
+	}
+	sort.Slice(checks, func(i, j int) bool {
+		if checks[i].Status != checks[j].Status {
+			return symbolicStatusRank(checks[i].Status) > symbolicStatusRank(checks[j].Status)
+		}
+		if checks[i].RiskID != checks[j].RiskID {
+			return checks[i].RiskID < checks[j].RiskID
+		}
+		return checks[i].Property < checks[j].Property
+	})
+	if len(checks) > 400 {
+		checks = checks[:400]
+	}
+	return checks
+}
+
+func symbolicIdempotencyCheck(risk BaselineRisk, op effects.AbstractOperation, slice ProvenanceSlice) SymbolicCheck {
+	status := "pass"
+	reason := "abstract transfer is stable under repeated application"
+	if !op.Idempotent {
+		status = "warn"
+		reason = "idempotency is not proven by the static transfer function"
+	}
+	if op.Destructive {
+		status = "fail"
+		reason = "destructive or unknown effect cannot be considered idempotent without stronger evidence"
+	}
+	return symbolicCheck(risk, op, slice, "idempotency", status, "T(T(state)) == T(state)", reason)
+}
+
+func symbolicReversibilityCheck(risk BaselineRisk, op effects.AbstractOperation, slice ProvenanceSlice) SymbolicCheck {
+	status := "pass"
+	reason := "abstract transfer has a rollback or inverse witness"
+	if !op.Reversible {
+		status = "warn"
+		reason = "reversibility is not proven by the static transfer function"
+	}
+	if op.Destructive {
+		status = "fail"
+		reason = "destructive or unknown effect lacks a safe inverse without snapshot or repair evidence"
+	}
+	return symbolicCheck(risk, op, slice, "reversibility", status, "exists inverse T^-1 such that T^-1(T(state)) == state", reason)
+}
+
+func symbolicFrameCheck(risk BaselineRisk, op effects.AbstractOperation, slice ProvenanceSlice) SymbolicCheck {
+	status := "pass"
+	reason := "changed columns define an explicit frame for untouched fields"
+	expression := "forall c notin changed_columns: post[c] == pre[c]"
+	if op.Table == "" {
+		status = "fail"
+		reason = "frame condition cannot be scoped without a table"
+	} else if len(op.ChangedColumns) == 0 {
+		status = "warn"
+		reason = "changed-column frame is unknown from static evidence"
+	}
+	if op.Destructive {
+		status = "fail"
+		reason = "destructive or unknown effect invalidates a row-preservation frame"
+		expression = "rows_outside_scope are preserved"
+	}
+	return symbolicCheck(risk, op, slice, "frame_condition", status, expression, reason)
+}
+
+func symbolicScopeCheck(risk BaselineRisk, op effects.AbstractOperation, slice ProvenanceSlice) SymbolicCheck {
+	status := "pass"
+	reason := "risk has table scope and no broad-write factor"
+	expression := "affected_rows subset scope(table, predicates, provenance)"
+	if op.Table == "" {
+		status = "fail"
+		reason = "scope preservation cannot be checked without a table"
+	} else if riskHasFactor(risk, "broad-write") || riskHasFactor(risk, "write-breadth-unknown") || riskHasFactor(risk, "source-window-unavailable") {
+		status = "warn"
+		reason = "scope is table-known but row breadth is not statically bounded"
+	}
+	if op.Destructive {
+		status = "fail"
+		reason = "destructive or unknown effect must be reviewed as potentially escaping the intended scope"
+	}
+	return symbolicCheck(risk, op, slice, "scope_preservation", status, expression, reason)
+}
+
+func symbolicCheck(risk BaselineRisk, op effects.AbstractOperation, slice ProvenanceSlice, property, status, expression, reason string) SymbolicCheck {
+	evidence := provenanceEvidence(slice)
+	for _, hole := range op.ProofHoles {
+		evidence = append(evidence, "proof-hole:"+hole)
+	}
+	evidence = capStrings(uniqueSortedStrings(evidence), 12)
+	return SymbolicCheck{
+		ID:         "sym:" + canonical.Hash(op.OperationID + "\x00" + property)[:16],
+		RiskID:     op.OperationID,
+		Property:   property,
+		Status:     status,
+		Table:      firstNonEmpty(op.Table, risk.Table),
+		Expression: expression,
+		Evidence:   evidence,
+		Reason:     reason,
+	}
+}
+
+func symbolicStatusRank(status string) int {
+	switch status {
+	case "fail":
+		return 3
+	case "warn":
+		return 2
+	case "pass":
+		return 1
+	default:
+		return 0
+	}
+}
+
+func countSymbolicStatus(checks []SymbolicCheck, status string) int {
+	var count int
+	for _, check := range checks {
+		if check.Status == status {
+			count++
+		}
+	}
+	return count
+}
+
 func sharedIdentifiers(left, right []Identifier) []Identifier {
 	rightSet := map[string]Identifier{}
 	for _, id := range right {
@@ -1350,6 +1514,10 @@ func renderBaselineMarkdown(report BaselineReport) string {
 	fmt.Fprintf(&b, "| abstract effects | %d |\n", report.Summary.AbstractEffects)
 	fmt.Fprintf(&b, "| abstract operations | %d |\n", report.Summary.AbstractOperations)
 	fmt.Fprintf(&b, "| abstract proof holes | %d |\n", report.Summary.AbstractProofHoles)
+	fmt.Fprintf(&b, "| symbolic checks | %d |\n", report.Summary.SymbolicChecks)
+	fmt.Fprintf(&b, "| symbolic passed | %d |\n", report.Summary.SymbolicPassed)
+	fmt.Fprintf(&b, "| symbolic warnings | %d |\n", report.Summary.SymbolicWarnings)
+	fmt.Fprintf(&b, "| symbolic failed | %d |\n", report.Summary.SymbolicFailed)
 	fmt.Fprintf(&b, "| grep-only matches | %d |\n", report.Summary.GrepOnlyMatches)
 	fmt.Fprintf(&b, "| SQL-only ranked risks | %d |\n", report.Summary.SQLOnlyRankedRisks)
 	fmt.Fprintf(&b, "| identifier-only links | %d |\n", report.Summary.IdentifierOnlyLinks)
@@ -1382,6 +1550,14 @@ func renderBaselineMarkdown(report BaselineReport) string {
 		limit := minInt(len(report.AbstractEffects), 20)
 		for _, summary := range report.AbstractEffects[:limit] {
 			fmt.Fprintf(&b, "| %s | %d | %d | %s |\n", summary.Join, len(summary.Operations), len(summary.Concretization.UnsupportedFacts), summary.Manifest)
+		}
+		fmt.Fprintf(&b, "\n")
+	}
+	if len(report.SymbolicChecks) > 0 {
+		fmt.Fprintf(&b, "## Symbolic checks\n\n| status | property | risk | table | reason |\n| --- | --- | --- | --- | --- |\n")
+		limit := minInt(len(report.SymbolicChecks), 25)
+		for _, check := range report.SymbolicChecks[:limit] {
+			fmt.Fprintf(&b, "| %s | %s | `%s` | %s | %s |\n", check.Status, check.Property, check.RiskID, check.Table, check.Reason)
 		}
 		fmt.Fprintf(&b, "\n")
 	}
