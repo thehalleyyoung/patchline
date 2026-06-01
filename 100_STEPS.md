@@ -23,8 +23,8 @@ Every addition to the repo should be judged by whether it makes that loop more a
 
 11. [x] Add `patchline repo fetch owner/repo --ref <ref> --out <dir>` with normalized source metadata.
 12. [x] Support GitHub URLs, `owner/repo`, local paths, tarballs, zip archives, and pre-existing worktrees.
-13. [ ] Record repo owner, name, ref, resolved commit SHA, subpath, archive hash, fetch timestamp, and tool version.
-14. [ ] Cache downloads by content hash so repeated experiments reuse the same source.
+13. [x] Record repo owner, name, ref, resolved commit SHA, subpath, archive hash, fetch timestamp, and tool version.
+14. [x] Cache downloads by content hash so repeated experiments reuse the same source.
 15. [x] Add safe subpath extraction for scanning only migrations, services, docs, or exports inside large repos.
 16. [x] Emit `source.json` for every run so reports can be reproduced or cited.
 17. [x] Detect ignored/generated/vendor directories and explain what was skipped.

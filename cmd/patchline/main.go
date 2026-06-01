@@ -393,7 +393,7 @@ func usage() {
 
 Usage:
   patchline about
-  patchline repo fetch <owner/repo|github-url|path|archive> [--ref ref] [--subpath path] [--out dir] [--json]
+  patchline repo fetch <owner/repo|github-url|path|archive> [--ref ref] [--subpath path] [--out dir] [--download-dir dir] [--json]
   patchline repo inventory <path> [--out dir] [--full] [--json]
   patchline repo baseline --inventory inventory-dir --intake intake-dir [--out dir] [--json]
   patchline repo propose --from-report baseline-dir --kind tests|guards|instrumentation|repair|explain|all [--out dir] [--json]
@@ -521,7 +521,7 @@ func repoFetch(args []string) error {
 		return err
 	}
 	if input == "" || fs.NArg() != 0 {
-		return errors.New("usage: patchline repo fetch <owner/repo|github-url|path|archive> [--ref ref] [--subpath path] [--out dir] [--json]")
+		return errors.New("usage: patchline repo fetch <owner/repo|github-url|path|archive> [--ref ref] [--subpath path] [--out dir] [--download-dir dir] [--json]")
 	}
 	result, err := project.Fetch(context.Background(), project.FetchOptions{
 		Input:       input,

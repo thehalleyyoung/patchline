@@ -14,8 +14,10 @@ import (
 	"io/fs"
 	"net/http"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"regexp"
+	"runtime/debug"
 	"sort"
 	"strings"
 	"time"
@@ -36,18 +38,24 @@ type FetchOptions struct {
 }
 
 type Source struct {
-	Version     string   `json:"version"`
-	Mode        string   `json:"mode"`
-	Input       string   `json:"input"`
-	Owner       string   `json:"owner,omitempty"`
-	Repo        string   `json:"repo,omitempty"`
-	Ref         string   `json:"ref,omitempty"`
-	CommitHint  string   `json:"commit_hint,omitempty"`
-	Subpath     string   `json:"subpath,omitempty"`
-	ArchiveHash string   `json:"archive_hash,omitempty"`
-	OutDir      string   `json:"out_dir"`
-	ScannedRoot string   `json:"scanned_root"`
-	SkippedDirs []string `json:"skipped_dirs,omitempty"`
+	Version        string   `json:"version"`
+	ToolVersion    string   `json:"tool_version"`
+	Mode           string   `json:"mode"`
+	Input          string   `json:"input"`
+	Owner          string   `json:"owner,omitempty"`
+	Repo           string   `json:"repo,omitempty"`
+	Ref            string   `json:"ref,omitempty"`
+	ResolvedCommit string   `json:"resolved_commit,omitempty"`
+	CommitHint     string   `json:"commit_hint,omitempty"`
+	Subpath        string   `json:"subpath,omitempty"`
+	ArchiveHash    string   `json:"archive_hash,omitempty"`
+	FetchedAt      string   `json:"fetched_at"`
+	CacheKey       string   `json:"cache_key,omitempty"`
+	CachePath      string   `json:"cache_path,omitempty"`
+	CacheHit       bool     `json:"cache_hit,omitempty"`
+	OutDir         string   `json:"out_dir"`
+	ScannedRoot    string   `json:"scanned_root"`
+	SkippedDirs    []string `json:"skipped_dirs,omitempty"`
 }
 
 type FetchResult struct {
@@ -121,6 +129,26 @@ type scanFile struct {
 	Size int64
 }
 
+type downloadCacheEntry struct {
+	Version        string `json:"version"`
+	Key            string `json:"key"`
+	URL            string `json:"url"`
+	ArchiveHash    string `json:"archive_hash"`
+	ArchivePath    string `json:"archive_path"`
+	Kind           string `json:"kind"`
+	Top            string `json:"top,omitempty"`
+	FetchedAt      string `json:"fetched_at"`
+	ResolvedCommit string `json:"resolved_commit,omitempty"`
+}
+
+type downloadCacheResult struct {
+	Key         string
+	Path        string
+	ArchiveHash string
+	FetchedAt   string
+	Hit         bool
+}
+
 func Fetch(ctx context.Context, opts FetchOptions) (FetchResult, error) {
 	if strings.TrimSpace(opts.Input) == "" {
 		return FetchResult{}, fmt.Errorf("repo fetch input is required")
@@ -133,11 +161,17 @@ func Fetch(ctx context.Context, opts FetchOptions) (FetchResult, error) {
 		return FetchResult{}, err
 	}
 	source := Source{
-		Version: Version,
-		Input:   opts.Input,
-		Ref:     firstNonEmpty(strings.TrimSpace(opts.Ref), "HEAD"),
-		Subpath: filepath.ToSlash(strings.TrimSpace(opts.Subpath)),
-		OutDir:  filepath.ToSlash(outDir),
+		Version:     Version,
+		ToolVersion: toolVersion(),
+		Input:       opts.Input,
+		Ref:         firstNonEmpty(strings.TrimSpace(opts.Ref), "HEAD"),
+		Subpath:     filepath.ToSlash(strings.TrimSpace(opts.Subpath)),
+		FetchedAt:   time.Now().UTC().Format(time.RFC3339),
+		OutDir:      filepath.ToSlash(outDir),
+	}
+	downloadDir := opts.DownloadDir
+	if downloadDir == "" {
+		downloadDir = filepath.Join("results", "generated", "repo-downloads")
 	}
 	skipped := map[string]bool{}
 	input := strings.TrimSpace(opts.Input)
@@ -147,20 +181,27 @@ func Fetch(ctx context.Context, opts FetchOptions) (FetchResult, error) {
 		if err != nil {
 			return FetchResult{}, err
 		}
-		source.Mode, source.Owner, source.Repo = "github", owner, repo
-		root, archiveHash, commitHint, err := fetchGitHubArchive(ctx, owner, repo, source.Ref, outDir)
+		resolvedCommit, err := resolveGitHubCommit(ctx, owner, repo, source.Ref)
 		if err != nil {
 			return FetchResult{}, err
 		}
+		source.Mode, source.Owner, source.Repo = "github", owner, repo
+		source.ResolvedCommit = resolvedCommit
+		root, archiveHash, commitHint, cache, err := fetchGitHubArchive(ctx, owner, repo, source.Ref, resolvedCommit, outDir, downloadDir)
+		if err != nil {
+			return FetchResult{}, err
+		}
+		applyCacheResult(&source, cache)
 		source.ArchiveHash = archiveHash
 		source.CommitHint = commitHint
 		source.ScannedRoot = filepath.ToSlash(root)
 	case isHTTPArchive(input):
 		source.Mode = "archive-url"
-		root, archiveHash, err := fetchArchiveURL(ctx, input, outDir)
+		root, archiveHash, cache, err := fetchArchiveURL(ctx, input, outDir, downloadDir)
 		if err != nil {
 			return FetchResult{}, err
 		}
+		applyCacheResult(&source, cache)
 		source.ArchiveHash = archiveHash
 		source.ScannedRoot = filepath.ToSlash(root)
 	case isArchivePath(input):
@@ -187,6 +228,7 @@ func Fetch(ctx context.Context, opts FetchOptions) (FetchResult, error) {
 		if err := copyDir(root, outDir, skipped); err != nil {
 			return FetchResult{}, err
 		}
+		source.ResolvedCommit = localGitCommit(root)
 		source.ScannedRoot = filepath.ToSlash(outDir)
 		source.Ref = ""
 	}
@@ -313,11 +355,94 @@ func isGitHubInput(input string) bool {
 	return true
 }
 
-func fetchGitHubArchive(ctx context.Context, owner, repo, ref, outDir string) (string, string, string, error) {
-	url := fmt.Sprintf("https://api.github.com/repos/%s/%s/tarball/%s", owner, repo, ref)
+func resolveGitHubCommit(ctx context.Context, owner, repo, ref string) (string, error) {
+	if isFullSHA(ref) {
+		return strings.ToLower(ref), nil
+	}
+	url := fmt.Sprintf("https://api.github.com/repos/%s/%s/commits/%s", owner, repo, ref)
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
 	if err != nil {
-		return "", "", "", err
+		return "", err
+	}
+	req.Header.Set("User-Agent", "patchline-repo")
+	req.Header.Set("Accept", "application/vnd.github+json")
+	if token := os.Getenv("GITHUB_TOKEN"); token != "" {
+		req.Header.Set("Authorization", "Bearer "+token)
+	}
+	client := &http.Client{Timeout: 2 * time.Minute}
+	resp, err := client.Do(req)
+	if err != nil {
+		return "", err
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
+		return "", fmt.Errorf("resolve github commit %s/%s@%s: %s", owner, repo, ref, resp.Status)
+	}
+	var payload struct {
+		SHA string `json:"sha"`
+	}
+	if err := json.NewDecoder(io.LimitReader(resp.Body, 1<<20)).Decode(&payload); err != nil {
+		return "", err
+	}
+	if !isFullSHA(payload.SHA) {
+		return "", fmt.Errorf("github commit %s/%s@%s resolved to invalid sha %q", owner, repo, ref, payload.SHA)
+	}
+	return strings.ToLower(payload.SHA), nil
+}
+
+func fetchGitHubArchive(ctx context.Context, owner, repo, ref, resolvedCommit, outDir, downloadDir string) (string, string, string, downloadCacheResult, error) {
+	url := fmt.Sprintf("https://api.github.com/repos/%s/%s/tarball/%s", owner, repo, resolvedCommit)
+	key := "github:" + owner + "/" + repo + "@" + resolvedCommit
+	root, top, cache, err := fetchCachedArchive(ctx, url, outDir, downloadDir, key, "tar.gz", resolvedCommit)
+	if err != nil {
+		return "", "", "", downloadCacheResult{}, err
+	}
+	commitHint := commitHintFromTop(top)
+	if commitHint == "" {
+		commitHint = ref
+	}
+	return root, cache.ArchiveHash, commitHint, cache, nil
+}
+
+func fetchArchiveURL(ctx context.Context, url, outDir, downloadDir string) (string, string, downloadCacheResult, error) {
+	kind := "tar.gz"
+	if strings.HasSuffix(strings.ToLower(url), ".zip") {
+		kind = "zip"
+	}
+	key := "archive-url:" + url
+	root, _, cache, err := fetchCachedArchive(ctx, url, outDir, downloadDir, key, kind, "")
+	if err != nil {
+		return "", "", downloadCacheResult{}, err
+	}
+	return root, cache.ArchiveHash, cache, nil
+}
+
+func fetchCachedArchive(ctx context.Context, url, outDir, downloadDir, key, kind, resolvedCommit string) (string, string, downloadCacheResult, error) {
+	if downloadDir == "" {
+		return fetchUncachedArchive(ctx, url, outDir, kind)
+	}
+	if entry, ok := readDownloadCache(downloadDir, key); ok {
+		if _, err := os.Stat(entry.ArchivePath); err == nil {
+			root, top, err := extractCachedArchive(entry.ArchivePath, entry.Kind, outDir)
+			if err != nil {
+				return "", "", downloadCacheResult{}, err
+			}
+			return root, firstNonEmpty(entry.Top, top), downloadCacheResult{Key: key, Path: filepath.ToSlash(entry.ArchivePath), ArchiveHash: entry.ArchiveHash, FetchedAt: entry.FetchedAt, Hit: true}, nil
+		}
+	}
+	if err := os.MkdirAll(downloadDir, 0o755); err != nil {
+		return "", "", downloadCacheResult{}, err
+	}
+	tmp, err := os.CreateTemp(downloadDir, "patchline-download-*")
+	if err != nil {
+		return "", "", downloadCacheResult{}, err
+	}
+	tmpPath := tmp.Name()
+	defer os.Remove(tmpPath)
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
+	if err != nil {
+		_ = tmp.Close()
+		return "", "", downloadCacheResult{}, err
 	}
 	req.Header.Set("User-Agent", "patchline-repo")
 	if token := os.Getenv("GITHUB_TOKEN"); token != "" {
@@ -326,55 +451,91 @@ func fetchGitHubArchive(ctx context.Context, owner, repo, ref, outDir string) (s
 	client := &http.Client{Timeout: 2 * time.Minute}
 	resp, err := client.Do(req)
 	if err != nil {
-		return "", "", "", err
+		_ = tmp.Close()
+		return "", "", downloadCacheResult{}, err
 	}
 	defer resp.Body.Close()
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
-		return "", "", "", fmt.Errorf("download github repo %s/%s: %s", owner, repo, resp.Status)
+		_ = tmp.Close()
+		return "", "", downloadCacheResult{}, fmt.Errorf("download archive %s: %s", url, resp.Status)
 	}
 	hasher := sha256.New()
-	root, top, err := extractTarGz(io.TeeReader(resp.Body, hasher), outDir)
-	if err != nil {
-		return "", "", "", err
+	if _, err := io.Copy(tmp, io.TeeReader(resp.Body, hasher)); err != nil {
+		_ = tmp.Close()
+		return "", "", downloadCacheResult{}, err
 	}
-	return root, "sha256:" + hex.EncodeToString(hasher.Sum(nil)), commitHintFromTop(top), nil
+	if err := tmp.Close(); err != nil {
+		return "", "", downloadCacheResult{}, err
+	}
+	archiveHash := "sha256:" + hex.EncodeToString(hasher.Sum(nil))
+	archivePath := cacheArchivePath(downloadDir, archiveHash, kind)
+	if err := os.MkdirAll(filepath.Dir(archivePath), 0o755); err != nil {
+		return "", "", downloadCacheResult{}, err
+	}
+	if _, err := os.Stat(archivePath); os.IsNotExist(err) {
+		if err := os.Rename(tmpPath, archivePath); err != nil {
+			return "", "", downloadCacheResult{}, err
+		}
+	}
+	root, top, err := extractCachedArchive(archivePath, kind, outDir)
+	if err != nil {
+		return "", "", downloadCacheResult{}, err
+	}
+	fetchedAt := time.Now().UTC().Format(time.RFC3339)
+	entry := downloadCacheEntry{
+		Version:        Version,
+		Key:            key,
+		URL:            url,
+		ArchiveHash:    archiveHash,
+		ArchivePath:    filepath.ToSlash(archivePath),
+		Kind:           kind,
+		Top:            top,
+		FetchedAt:      fetchedAt,
+		ResolvedCommit: resolvedCommit,
+	}
+	if err := writeDownloadCache(downloadDir, entry); err != nil {
+		return "", "", downloadCacheResult{}, err
+	}
+	return root, top, downloadCacheResult{Key: key, Path: filepath.ToSlash(archivePath), ArchiveHash: archiveHash, FetchedAt: fetchedAt}, nil
 }
 
-func fetchArchiveURL(ctx context.Context, url, outDir string) (string, string, error) {
+func fetchUncachedArchive(ctx context.Context, url, outDir, kind string) (string, string, downloadCacheResult, error) {
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
 	if err != nil {
-		return "", "", err
+		return "", "", downloadCacheResult{}, err
 	}
 	req.Header.Set("User-Agent", "patchline-repo")
 	client := &http.Client{Timeout: 2 * time.Minute}
 	resp, err := client.Do(req)
 	if err != nil {
-		return "", "", err
+		return "", "", downloadCacheResult{}, err
 	}
 	defer resp.Body.Close()
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
-		return "", "", fmt.Errorf("download archive %s: %s", url, resp.Status)
+		return "", "", downloadCacheResult{}, fmt.Errorf("download archive %s: %s", url, resp.Status)
 	}
 	hasher := sha256.New()
-	if strings.HasSuffix(strings.ToLower(url), ".zip") {
+	if kind == "zip" {
 		tmp, err := os.CreateTemp("", "patchline-archive-*.zip")
 		if err != nil {
-			return "", "", err
+			return "", "", downloadCacheResult{}, err
 		}
 		tmpPath := tmp.Name()
 		defer os.Remove(tmpPath)
 		if _, err := io.Copy(tmp, io.TeeReader(resp.Body, hasher)); err != nil {
 			_ = tmp.Close()
-			return "", "", err
+			return "", "", downloadCacheResult{}, err
 		}
 		if err := tmp.Close(); err != nil {
-			return "", "", err
+			return "", "", downloadCacheResult{}, err
 		}
 		root, err := extractZip(tmpPath, outDir)
-		return root, "sha256:" + hex.EncodeToString(hasher.Sum(nil)), err
+		archiveHash := "sha256:" + hex.EncodeToString(hasher.Sum(nil))
+		return root, "", downloadCacheResult{ArchiveHash: archiveHash, FetchedAt: time.Now().UTC().Format(time.RFC3339)}, err
 	}
 	root, _, err := extractTarGz(io.TeeReader(resp.Body, hasher), outDir)
-	return root, "sha256:" + hex.EncodeToString(hasher.Sum(nil)), err
+	archiveHash := "sha256:" + hex.EncodeToString(hasher.Sum(nil))
+	return root, "", downloadCacheResult{ArchiveHash: archiveHash, FetchedAt: time.Now().UTC().Format(time.RFC3339)}, err
 }
 
 func extractArchivePath(path, outDir string) (string, string, error) {
@@ -394,6 +555,71 @@ func extractArchivePath(path, outDir string) (string, string, error) {
 	defer file.Close()
 	root, _, err := extractTarGz(file, outDir)
 	return root, sum, err
+}
+
+func extractCachedArchive(path, kind, outDir string) (string, string, error) {
+	if kind == "zip" {
+		root, err := extractZip(path, outDir)
+		return root, "", err
+	}
+	file, err := os.Open(path)
+	if err != nil {
+		return "", "", err
+	}
+	defer file.Close()
+	return extractTarGz(file, outDir)
+}
+
+func readDownloadCache(downloadDir, key string) (downloadCacheEntry, bool) {
+	path := downloadCacheEntryPath(downloadDir, key)
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return downloadCacheEntry{}, false
+	}
+	var entry downloadCacheEntry
+	if err := json.Unmarshal(data, &entry); err != nil || entry.Key != key || entry.ArchiveHash == "" || entry.ArchivePath == "" {
+		return downloadCacheEntry{}, false
+	}
+	return entry, true
+}
+
+func writeDownloadCache(downloadDir string, entry downloadCacheEntry) error {
+	path := downloadCacheEntryPath(downloadDir, entry.Key)
+	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+		return err
+	}
+	data, err := json.MarshalIndent(entry, "", "  ")
+	if err != nil {
+		return err
+	}
+	return os.WriteFile(path, append(data, '\n'), 0o644)
+}
+
+func downloadCacheEntryPath(downloadDir, key string) string {
+	sum := sha256.Sum256([]byte(key))
+	return filepath.Join(downloadDir, "sources", hex.EncodeToString(sum[:])+".json")
+}
+
+func cacheArchivePath(downloadDir, archiveHash, kind string) string {
+	name := strings.TrimPrefix(archiveHash, "sha256:")
+	name = "sha256-" + name
+	switch kind {
+	case "zip":
+		name += ".zip"
+	default:
+		name += ".tar.gz"
+	}
+	return filepath.Join(downloadDir, "archives", name)
+}
+
+func applyCacheResult(source *Source, cache downloadCacheResult) {
+	source.ArchiveHash = cache.ArchiveHash
+	if cache.FetchedAt != "" {
+		source.FetchedAt = cache.FetchedAt
+	}
+	source.CacheKey = cache.Key
+	source.CachePath = cache.Path
+	source.CacheHit = cache.Hit
 }
 
 func prepareOutDir(outDir string) error {
@@ -1168,6 +1394,45 @@ func firstNonEmpty(values ...string) string {
 		}
 	}
 	return ""
+}
+
+func toolVersion() string {
+	info, ok := debug.ReadBuildInfo()
+	if !ok {
+		return "patchline@(unknown)"
+	}
+	version := info.Main.Version
+	if version == "" {
+		version = "(unknown)"
+	}
+	return info.Main.Path + "@" + version
+}
+
+func isFullSHA(value string) bool {
+	if len(value) != 40 {
+		return false
+	}
+	for _, r := range value {
+		if !((r >= '0' && r <= '9') || (r >= 'a' && r <= 'f') || (r >= 'A' && r <= 'F')) {
+			return false
+		}
+	}
+	return true
+}
+
+func localGitCommit(root string) string {
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	cmd := exec.CommandContext(ctx, "git", "-C", root, "rev-parse", "HEAD")
+	output, err := cmd.Output()
+	if err != nil {
+		return ""
+	}
+	commit := strings.TrimSpace(string(output))
+	if !isFullSHA(commit) {
+		return ""
+	}
+	return strings.ToLower(commit)
 }
 
 func safeSlug(value string) string {

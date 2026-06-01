@@ -1,15 +1,23 @@
 package project
 
 import (
+	"archive/tar"
 	"archive/zip"
 	"bufio"
+	"bytes"
+	"compress/gzip"
 	"context"
 	"encoding/json"
+	"io"
+	"net/http"
+	"net/http/httptest"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"strings"
+	"sync/atomic"
 	"testing"
+	"time"
 
 	"github.com/thehalleyyoung/patchline/internal/intake"
 	"github.com/thehalleyyoung/patchline/internal/migration"
@@ -55,8 +63,60 @@ func TestFetchLocalCopiesRepoAndWritesSourceMetadata(t *testing.T) {
 	if err := json.Unmarshal(data, &source); err != nil {
 		t.Fatal(err)
 	}
-	if source.Subpath != "db/migrate" || len(source.SkippedDirs) != 1 || source.SkippedDirs[0] != ".git" {
+	if source.Subpath != "db/migrate" || len(source.SkippedDirs) != 1 || source.SkippedDirs[0] != ".git" || source.ToolVersion == "" {
 		t.Fatalf("unexpected source.json: %s", string(data))
+	}
+	if _, err := time.Parse(time.RFC3339, source.FetchedAt); err != nil {
+		t.Fatalf("unexpected source.json: %s", string(data))
+	}
+}
+
+func TestFetchLocalGitRecordsResolvedCommit(t *testing.T) {
+	src := t.TempDir()
+	writeFile(t, src, "db/migrate/001.sql", "create table accounts(id int);")
+	runGit(t, src, "init", "--quiet")
+	runGit(t, src, "config", "user.email", "patchline@example.com")
+	runGit(t, src, "config", "user.name", "Patchline")
+	runGit(t, src, "add", ".")
+	runGit(t, src, "commit", "--quiet", "-m", "initial")
+	expected := strings.TrimSpace(runGitOutput(t, src, "rev-parse", "HEAD"))
+
+	result, err := Fetch(context.Background(), FetchOptions{Input: src, OutDir: filepath.Join(t.TempDir(), "fetched")})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if result.Source.ResolvedCommit != expected {
+		t.Fatalf("expected resolved commit %s, got %#v", expected, result.Source)
+	}
+}
+
+func TestFetchArchiveURLUsesContentAddressedCache(t *testing.T) {
+	archive := tarGzForTest(t, map[string]string{"repo-main/db/migrate/001.sql": "create table accounts(id int);"})
+	var requests int32
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if atomic.AddInt32(&requests, 1) > 1 {
+			http.Error(w, "cache miss", http.StatusInternalServerError)
+			return
+		}
+		w.Header().Set("Content-Type", "application/gzip")
+		_, _ = w.Write(archive)
+	}))
+	defer server.Close()
+	cacheDir := filepath.Join(t.TempDir(), "cache")
+
+	first, err := Fetch(context.Background(), FetchOptions{Input: server.URL + "/repo.tar.gz", OutDir: filepath.Join(t.TempDir(), "first"), DownloadDir: cacheDir})
+	if err != nil {
+		t.Fatal(err)
+	}
+	second, err := Fetch(context.Background(), FetchOptions{Input: server.URL + "/repo.tar.gz", OutDir: filepath.Join(t.TempDir(), "second"), DownloadDir: cacheDir})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if first.Source.CacheHit || !second.Source.CacheHit || second.Source.CachePath == "" || second.Source.ArchiveHash != first.Source.ArchiveHash || atomic.LoadInt32(&requests) != 1 {
+		t.Fatalf("unexpected cache behavior: first=%#v second=%#v requests=%d", first.Source, second.Source, requests)
+	}
+	if _, err := os.Stat(filepath.Join(filepath.FromSlash(second.Source.ScannedRoot), "db/migrate/001.sql")); err != nil {
+		t.Fatalf("expected cached archive extraction: %v", err)
 	}
 }
 
@@ -394,4 +454,43 @@ func writeFile(t *testing.T, root, rel, content string) {
 	if err := os.WriteFile(path, []byte(content), 0o644); err != nil {
 		t.Fatal(err)
 	}
+}
+
+func runGit(t *testing.T, root string, args ...string) {
+	t.Helper()
+	if output, err := exec.Command("git", append([]string{"-C", root}, args...)...).CombinedOutput(); err != nil {
+		t.Fatalf("git %v failed: %v\n%s", args, err, string(output))
+	}
+}
+
+func runGitOutput(t *testing.T, root string, args ...string) string {
+	t.Helper()
+	output, err := exec.Command("git", append([]string{"-C", root}, args...)...).CombinedOutput()
+	if err != nil {
+		t.Fatalf("git %v failed: %v\n%s", args, err, string(output))
+	}
+	return string(output)
+}
+
+func tarGzForTest(t *testing.T, files map[string]string) []byte {
+	t.Helper()
+	var buf bytes.Buffer
+	gz := gzip.NewWriter(&buf)
+	tw := tar.NewWriter(gz)
+	for name, content := range files {
+		header := &tar.Header{Name: filepath.ToSlash(name), Mode: 0o644, Size: int64(len(content))}
+		if err := tw.WriteHeader(header); err != nil {
+			t.Fatal(err)
+		}
+		if _, err := io.WriteString(tw, content); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if err := tw.Close(); err != nil {
+		t.Fatal(err)
+	}
+	if err := gz.Close(); err != nil {
+		t.Fatal(err)
+	}
+	return buf.Bytes()
 }
