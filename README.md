@@ -9,6 +9,18 @@ go run ./cmd/patchline intake . --out results/generated/intake
 go run ./cmd/patchline intake --github owner/repo --subpath path/to/migrations --out results/generated/intake
 ```
 
+If you want a reproducible local workspace first, fetch and inventory the repo before intake:
+
+```bash
+go run ./cmd/patchline repo fetch django/django \
+  --subpath django/contrib/auth/migrations \
+  --out results/generated/repos/django-auth
+
+go run ./cmd/patchline repo inventory \
+  results/generated/repos/django-auth/django-django-*/django/contrib/auth/migrations \
+  --out results/generated/repos/django-auth-inventory
+```
+
 ## Why this is useful
 
 Real production data problems often start as ordinary files: a broad migration, a risky backfill, a rollback note, a deploy export, a trace dump, or an ad hoc repair script. Those files are usually scattered across repos and tools. Patchline gives you a first pass over them without asking you to prepare a special dataset.
@@ -51,6 +63,12 @@ Run one command to check several public projects and get a compact report:
 
 ```bash
 make plug-and-play-demo
+```
+
+To run the staged fetch -> inventory -> intake path on a real GitHub repo:
+
+```bash
+make repo-demo
 ```
 
 The demo downloads real GitHub project subpaths and writes:
@@ -108,6 +126,9 @@ go run ./cmd/patchline intake --github bytebase/bytebase --subpath backend/migra
 
 # Compare several existing public projects
 make plug-and-play-demo
+
+# Fetch, inventory, and analyze one real GitHub repo slice
+make repo-demo
 
 # Use as a GitHub Action in another repo
 # - uses: thehalleyyoung/patchline@main

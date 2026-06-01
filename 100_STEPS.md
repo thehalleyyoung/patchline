@@ -1,137 +1,137 @@
-# 100 steps to make Patchline work on existing projects
+# 100 steps for high-impact analysis of pre-existing repos
 
-Patchline should be practical infrastructure software first: ingest real project checkouts, public GitHub repositories, migration directories, service source trees, telemetry exports, incident notes, ledgers, and repair records that were not designed for Patchline; turn them into typed semantic artifacts where possible; and produce new, checkable knowledge about what broke, why it broke, what was affected, what repairs are safe, and which risks are recurring. Formal methods should strictly improve this usability: operational semantics, Hoare triples, abstract interpretation, refinement, model checking, SMT, Datalog, provenance semirings, SARIF, and proof-carrying artifacts become concrete CLI outputs, plug-and-play project reports, CI annotations, and audit hashes.
+Patchline's strongest promise should be industrially practical and research-interestingly novel at the same time: **download a real repository that was not built for Patchline, infer the data-repair surface it already contains, run deterministic analysis, optionally add bounded LLM-generated tests/guards/repair code in an isolated workspace, and then re-analyze the changed repo more deeply than before.**
 
-Checked items are already represented in the repo. Unchecked items are the next implementation increments. Every checked or unchecked item should have a project-native interpretation: it should either run directly on an arbitrary downloaded project, run on common exports from existing tools, or clearly state which optional richer input unlocks it.
+The industrial promise is plug-and-play usefulness for teams with messy existing systems: migrations, source SQL, incident notes, telemetry exports, tests, runbooks, CI, and repair scripts. The research promise is a new feedback loop for software/data repair: repo-native fact extraction -> risk/cause/repair hypotheses -> generated interventions -> semantic before/after verification -> ablations on real projects.
 
-## A. Practical semantic thesis
+Every addition to the repo should be judged by whether it makes that loop more accurate, safer, more reproducible, or more actionable on real repositories.
 
-1. [x] Define Patchline as deterministic production data/code repair software, not AI software.
-2. [x] Instantiate a Go CLI with canonical JSON, stable hashes, and reproducible command output.
-3. [x] Document the existing-project value proposition: start from repos, migrations, source SQL, telemetry exports, incident notes, and repair scripts.
-4. [x] Provide a plug-and-play demo over real public GitHub project subpaths plus a local example demo.
-5. [x] Position repair as typed provenance plus replay plus policy plus audit, rather than ad hoc cleanup scripts.
-6. [x] Define the Patchline semantic contract: every command must emit facts, obligations, counterexamples, or hashes that can be checked later.
-7. [x] Define the core state model for historical production systems: code, schema, rows, jobs, queues, reports, deploys, migrations, traces, policies, and ledgers.
-8. [x] Define the observation model: alerts, report totals, row predicates, traces, logs, dashboards, customer-visible outputs, and approval records.
-9. [x] Define repair as a partial state transformer with explicit domain, codomain, effects, and failure states.
-10. [x] Add semantic documentation and keep command outputs as the primary checkable interface for project-native use.
+## Stage 0: Keep the promise sharp
 
-## B. Historical data ingestion as trace reconstruction
+1. [ ] Define Patchline as deterministic data/code repair analysis for existing projects, not as a labeling framework.
+2. [ ] Treat arbitrary GitHub repos, local checkouts, archives, and project exports as first-class inputs.
+3. [ ] Keep LLMs optional and bounded: generated code is a proposed artifact to analyze, not a trusted oracle.
+4. [ ] Make every high-level finding traceable to file paths, line ranges, identifiers, timestamps, and hashes.
+5. [ ] Prefer outputs maintainers can act on today: commands, patches, SARIF, Markdown summaries, JSON facts, and risk rankings.
+6. [ ] Preserve the research novelty: combine project-native mining, repair synthesis, provenance, semantic checks, and ablation-driven evaluation.
+7. [ ] Add only features that improve real-repo analysis quality, generated-change safety, or before/after explanatory power.
+8. [ ] Avoid demo-only features that work only on curated fixtures.
+9. [ ] Keep outputs stable enough for CI, artifact bundles, and comparative experiments.
+10. [ ] Maintain a one-command path from public repo URL to actionable report.
 
-11. [x] Implement typed provenance entities for services, commits, deploys, migrations, traces, SQL mutations, records, reports, jobs, queues, and repairs.
-12. [x] Implement typed provenance edges for deploy, execute, cause, mutate, derive, observe, and repair relationships.
-13. [x] Add JSONL evidence ingestion for deploy, migration, trace, SQL mutation, row mutation, and derived-output events.
-14. [x] Add adapters for current OTLP, Datadog, Postgres logical decoding, GitHub deployment/release, and migration-runner exports.
-15. [x] Preserve unknown operational fields while validating required Patchline evidence fields.
-16. [x] Make ingested graph projections usable by `explain` and `slice`.
-17. [x] Recast evidence ingestion as trace reconstruction from partial, heterogeneous historical observations.
-18. [x] Add source-confidence and clock-confidence fields to distinguish exact, causal, temporal, inferred, and conflicting trace facts.
-19. [x] Add deterministic event-time normalization with explicit uncertainty intervals.
-20. [x] Add import equivalence checks proving that two source exports reconstruct the same typed trace projection.
+## Stage 1: Download real repositories reproducibly
 
-## C. Provenance semantics and immediate incident value
+11. [ ] Add `patchline repo fetch owner/repo --ref <ref> --out <dir>` with normalized source metadata.
+12. [ ] Support GitHub URLs, `owner/repo`, local paths, tarballs, zip archives, and pre-existing worktrees.
+13. [ ] Record repo owner, name, ref, resolved commit SHA, subpath, archive hash, fetch timestamp, and tool version.
+14. [ ] Cache downloads by content hash so repeated experiments reuse the same source.
+15. [ ] Add safe subpath extraction for scanning only migrations, services, docs, or exports inside large repos.
+16. [ ] Emit `source.json` for every run so reports can be reproduced or cited.
+17. [ ] Detect ignored/generated/vendor directories and explain what was skipped.
+18. [ ] Provide a `--full` mode for exhaustive scans and a default mode optimized for maintainer signal.
+19. [ ] Add public-repo smoke cases across Rails, Django, Alembic, Flyway, Prisma, TypeORM, Go services, and mixed monorepos.
+20. [ ] Make the fetch stage independent from later analysis so failures are easy to isolate.
 
-21. [x] Implement deterministic backtracing from corrupted records to causal deploys and migrations.
-22. [x] Implement deterministic provenance slicing with evidence thresholds and slice hashes.
-23. [x] Propagate damage through derived-record and derived-report edges.
-24. [x] Add Datalog-style queries for historical cause discovery: minimal causes, common ancestors, affected observations, and repair lineage.
-25. [x] Add provenance semiring annotations for exact, strong, weak, absent, conflicting, and redacted evidence.
-26. [x] Add minimal-explanation output: the smallest evidence slice sufficient to justify a causal claim.
-27. [x] Add differential provenance: compare two historical incidents and emit shared causal structure.
-28. [x] Add recurring-cause mining over incident archives without ML: canonical trace-shape clustering by graph isomorphism and hashes.
-29. [x] Add blast-radius summaries over historical traces: tables, reports, services, customers, and time windows repeatedly affected.
-30. [x] Add causal/candidate certificates that bundle trace or intake slices, confidence, hashes, and missing-evidence holes.
+## Stage 2: Build a project-native fact layer
 
-## D. Repair manifests as executable contracts
+21. [ ] Add `patchline repo inventory <path>` for languages, frameworks, migration systems, DB engines, CI, test commands, and deploy config.
+22. [ ] Classify files as migrations, source SQL, ORM/schema declarations, tests, fixtures, incidents, runbooks, repair scripts, logs, traces, configs, or unknown.
+23. [ ] Extract tables, columns, models, endpoints, queues, jobs, reports, incidents, commits, PRs, deploy IDs, timestamps, and error names.
+24. [ ] Infer schema evolution from migrations and ORM declarations without requiring a Patchline schema.
+25. [ ] Extract embedded SQL and persistence calls from common languages.
+26. [ ] Detect migration frameworks and native commands such as `rails db:migrate`, `manage.py migrate`, `prisma migrate`, `alembic`, `flyway`, and `go test`.
+27. [ ] Preserve unknown JSON/YAML/TOML/log fields as searchable evidence rather than discarding them.
+28. [ ] Emit `facts.jsonl` as the stable low-level interface for later stages.
+29. [ ] Emit `project-map.md` showing where data-change evidence lives in the repo.
+30. [ ] Hash every fact with provenance so generated prompts and reports can cite exact context.
 
-31. [x] Define a strict repair manifest DSL with incident, scope, operations, preconditions, postconditions, rollback, and dependencies.
-32. [x] Reject unknown manifest fields and unsupported manifest versions.
-33. [x] Validate repair manifests against provenance graph scope.
-34. [x] Reject repair operations whose predicates do not respect declared scope.
-35. [x] Add manifest migration, templates, linting, deterministic SQL generation, rollback planning, and transaction planning.
-36. [x] Support dry-run replay for update, insert, delete, replay, and rebuild-index operations.
-37. [x] Give each manifest a Hoare-triple view: `{historical evidence + preconditions} repair {postconditions + obligations}`.
-38. [x] Generate weakest preconditions for supported repair operations and expose them in `lint-repair --proof`.
-39. [x] Add frame-condition checks so a repair proves which rows, columns, tables, reports, and services it leaves untouched.
-40. [x] Add refinement checks showing generated SQL refines the abstract repair manifest and does not introduce extra effects.
+## Stage 3: Do real baseline analysis before generation
 
-## E. Effects, abstract interpretation, and invariants
+31. [ ] Rank risky migrations and SQL snippets by destructive operation, breadth, reversibility, guard presence, transaction use, and affected table importance.
+32. [ ] Rank risky code paths by persistent write breadth, missing idempotency, missing transaction boundaries, retry hazards, and weak rollback behavior.
+33. [ ] Link risk candidates to nearby tests, docs, incidents, commits, deploy notes, and repair scripts using identifiers and time signals.
+34. [ ] Detect cause clusters around shared tables, dates, incidents, deploys, commits, error names, and changed files.
+35. [ ] Detect repair clusters around rollback scripts, fix migrations, reconciliation jobs, backfills, runbooks, and generated/manual data patches.
+36. [ ] Emit top findings as problem/cause/repair hypotheses with evidence, confidence, and specific next commands.
+37. [ ] Emit SARIF for high-risk data changes so existing code-scanning systems can display results.
+38. [ ] Emit "native checks to run" based on detected project tooling.
+39. [ ] Compare findings to simple baselines: grep-only SQL risk, SQL-only scanning, identifier-only linking, and date-only linking.
+40. [ ] Store a baseline report that later generated-code analysis must improve or explain.
 
-41. [x] Implement deterministic repair-effect inference.
-42. [x] Add executable attestation checks for changed row values, max changed rows, operation effects, downstream impact, scoped updates, report hashes, and ledger checkpoints.
-43. [x] Replace informal effect labels with a documented effect lattice and monotone transfer functions.
-44. [x] Add an abstract interpreter that summarizes bounded row effects, destructive effects, idempotence, reversibility, downstream impact, and proof holes.
-45. [x] Emit both concrete dry-run diffs and abstract summaries, with a documented abstraction/concretization relation.
-46. [x] Add invariant declarations for uniqueness, foreign keys, enums, sums, counts, materialized reports, ledger balance, and customer-visible totals.
-47. [x] Add invariant checking over historical snapshots before and after replay.
-48. [x] Add invariant candidate discovery from historical data with explicit support counts and counterexamples, never silent auto-acceptance.
-49. [x] Add commutativity, independence, and confluence checks for multi-operation repairs.
-50. [x] Add counterexample JSON objects whenever an effect, invariant, frame, or refinement check fails.
+## Stage 4: Create bounded LLM-generated interventions
 
-## F. Replay and transaction semantics
+41. [ ] Add `patchline propose --from-report <baseline> --kind tests|guards|instrumentation|repair --out <worktree>`.
+42. [ ] Build prompt context only from deterministic facts, top-ranked evidence, relevant file excerpts, and explicit constraints.
+43. [ ] Record model name, prompt hash, context hash, output hash, generated files, and target risk IDs.
+44. [ ] Generate tests that exercise risky migrations, ORM paths, repair scripts, or data invariants.
+45. [ ] Generate migration guards for row counts, table existence, transaction safety, reversibility, dry-run behavior, and bounded scope.
+46. [ ] Generate instrumentation patches that expose metrics, structured logs, or trace attributes for risky data changes.
+47. [ ] Generate repair candidates as patches plus manifests containing scope, preconditions, postconditions, rollback, and validation commands.
+48. [ ] Generate SQL explain/dry-run scripts for maintainers who cannot run full production-like tests.
+49. [ ] Apply generated code only in an isolated worktree or patch file, never silently in the user's active tree.
+50. [ ] Label generated code as untrusted until deterministic re-analysis and project-native checks complete.
 
-51. [x] Implement an in-memory replay sandbox with deterministic row diffs and report hashes.
-52. [x] Generate deterministic rollback plans from reversible dry-run effects.
-53. [x] Generate deterministic transaction plans with sorted lock ordering and dependency ordering.
-54. [x] Model replay as small-step operational semantics with normal, error, stuck, rollback, and unknown states.
-55. [x] Add a step trace output so reviewers can inspect every semantic transition, not just the final diff.
-56. [x] Add transaction-isolation models for read committed, repeatable read, snapshot isolation, and serializable execution.
-57. [x] Check serializability and write-conflict hazards for repair plans touching multiple tables or derived artifacts.
-58. [x] Add compensating-action semantics for append-only logs, event-sourced stores, queues, and irreversible external effects.
-59. [x] Add replay over imported historical row snapshots, not only built-in demo stores.
-60. [x] Add replay comparison across two historical snapshots to quantify drift and repair stability.
+## Stage 5: Re-analyze generated code more deeply
 
-## G. Migration and code semantics
+51. [ ] Add `patchline compare --before <repo> --after <generated-worktree>` for deterministic before/after analysis.
+52. [ ] Detect new risky SQL, broader writes, destructive DDL, missing guards, and non-idempotent generated changes.
+53. [ ] Check whether generated tests cover the exact tables, code paths, and risk IDs they claim to cover.
+54. [ ] Check whether generated guards fail closed when assumptions or database metadata are unavailable.
+55. [ ] Check whether generated repairs preserve scope and include rollback/validation obligations.
+56. [ ] Run safe native tests when discovered, recording commands, exit status, logs, and hashes.
+57. [ ] Run Patchline semantic checks even when native tests are unavailable.
+58. [ ] Emit a before/after delta: risks reduced, risks added, coverage added, evidence strengthened, and unresolved risks.
+59. [ ] Reject or flag generated changes that improve documentation while making data safety worse.
+60. [ ] Produce a maintainer-ready patch review: what changed, why it was proposed, how it was checked, and what remains uncertain.
 
-61. [x] Implement lexical SQL migration analysis with statement fingerprints and risk classification.
-62. [x] Add dialect-specific analyzer modes for Postgres, MySQL, SQLite, and SQL Server.
-63. [x] Add a lightweight AST-backed parsing layer behind migration analysis.
-64. [x] Complete schema-state diffing against expected relational signatures.
-65. [x] Define schema migrations as typed transformations over relational signatures.
-66. [x] Add relational-algebra semantics for supported `select`, `insert`, `update`, `delete`, and DDL fragments.
-67. [x] Extract embedded SQL from Go, Python, TypeScript, Ruby, Java, shell scripts, and migration frameworks.
-68. [x] Add ORM-aware extraction for Rails, Django, Prisma, TypeORM, Sequelize, Entity Framework, and common query builders.
-69. [x] Link historical migrations to later traces, row mutations, policy failures, and repairs to create migration outcome histories.
-70. [x] Emit migration "semantic changelogs": changed tables, changed invariants, possible broad effects, observed historical outcomes, and benchmark hashes.
+## Stage 6: Add semantic depth that is research-worthy
 
-## H. Solvers, model checking, and proof-carrying artifacts
+61. [ ] Build provenance slices connecting migration -> table -> source path -> test -> incident -> repair.
+62. [ ] Add Datalog-style queries for minimal cause sets, shared ancestors, repair lineage, and affected outputs.
+63. [ ] Add abstract interpretation for SQL/data-change effects when concrete data is unavailable.
+64. [ ] Add symbolic checks for idempotency, reversibility, frame conditions, and scope preservation.
+65. [ ] Add temporal windowing around incidents, releases, migrations, and generated repairs.
+66. [ ] Add recurrence detection for patterns similar to prior risky migrations or repairs in the same repo.
+67. [ ] Add policy checks requiring guard, rollback, approval, dry run, or tests for selected risk classes.
+68. [ ] Add proof-carrying summaries when a repair's scope and frame conditions can be checked.
+69. [ ] Explain rankings with feature contributions so results are inspectable and ablation-friendly.
+70. [ ] Treat generated code as an intervention in a repair-analysis loop, not merely as text completion.
 
-71. [x] Add Z3-backed predicate implication for scope containment.
-72. [x] Add finite-store frame, row-count, and invariant preservation checks for bounded relational fragments.
-73. [x] Add symbolic execution for small repair programs over bounded stores.
-74. [x] Add model checking for incident workflows: ingest, explain, approve, dry-run, apply, verify, rollback, audit, archive.
-75. [x] Add temporal properties: no apply before approval, no approval without evidence, eventual verification, rollback availability, immutable audit.
-76. [x] Add proof-obligation objects with status `proved`, `checked`, `counterexample`, `assumed`, or `not_supported`.
-77. [x] Add proof-hole reporting so practical checks are honest about what remains unproved.
-78. [x] Add proof-carrying repair bundles containing manifest, evidence slice, dry-run hash, policies, proof obligations, counterexamples, and ledger checkpoint.
-79. [x] Add CEGAR-style refinement: emit counterexample, refine abstraction, rerun semantic analysis.
-80. [x] Add signed proof/gate attestations for CI and incident review artifacts.
+## Stage 7: Make it industrially easy to run
 
-## I. Historical knowledge generation
+71. [ ] Add `patchline repo analyze --github owner/repo --stages inventory,baseline,propose,compare,deep`.
+72. [ ] Support `--no-llm` for deterministic-only analysis.
+73. [ ] Support `--llm-command <cmd>` so users can plug in local or hosted code generation without coupling Patchline to one provider.
+74. [ ] Support `--proposal-kind tests|guards|instrumentation|repair|all`.
+75. [ ] Support `--budget files=N,lines=N,tokens=N,changes=N` to bound generated-code scope.
+76. [ ] Emit `analysis-bundle/` containing `source.json`, `facts.jsonl`, `baseline.json`, `proposal.patch`, `compare.json`, `summary.md`, and `summary.sarif`.
+77. [ ] Add resume mode so fetch, inventory, and baseline stages are reused across experiments.
+78. [ ] Add redaction mode for identifiers, literals, customer names, and secrets while preserving joins and hashes.
+79. [ ] Add CI mode that uploads SARIF and stores the analysis bundle as an artifact.
+80. [ ] Add a clean "copy these commands" report for maintainers evaluating a repo for the first time.
 
-81. [x] Add an incident archive index over past evidence, migrations, repair manifests, policies, and benchmark results.
-82. [x] Add deterministic historical queries: "which migrations caused broad updates?", "which reports repeatedly derived from damaged rows?", "which repairs lacked rollback?"
-82a. [x] Add public historical-failure counterfactuals that verify postmortem source assertions and show current Patchline gates would flag destructive primary-data mutations and split-brain write divergence.
-82b. [x] Add source-derived public incident observations from linked GitLab 2017 postmortem/issues/API records, so historical counterfactuals are grounded in a multi-document public corpus rather than a single synthetic reconstruction.
-83. [x] Add repair outcome history: dry-run hash, applied SQL hash, verification result, rollback availability, and later recurrence.
-84. [x] Add semantic regression detection over history: a new migration resembles prior high-risk trace shapes or violates learned invariant candidates.
-85. [ ] Add historical invariant dashboards as JSON/Markdown generated from actual project records, imported snapshots, and evidence exports, with counterexamples included.
-86. [x] Add project-native "new knowledge" reports that summarize previously unconnected problem, cause, and repair candidates from existing migrations, source SQL, JSON/JSONL exports, docs, and scripts.
-87. [ ] Add time-windowed slicing over existing project evidence so teams can ask what changed before a corruption window using timestamps from filenames, commits, deploy exports, logs, and incident notes.
-88. [ ] Add organization-local benchmark generation from historical incidents and current-project intake reports with redaction-safe hashes.
-89. [ ] Add redaction that preserves proof-relevant structure while hiding sensitive values in intake, SARIF, bundles, and archived incident knowledge.
-90. [ ] Add content-addressed bundle export and verification for archived project knowledge, including intake summaries, SARIF, evidence slices, and optional proof/replay artifacts.
+## Stage 8: Evaluate novelty on real projects
 
-## J. Benchmarks, gates, and adoption
+81. [ ] Maintain a public matrix of real repo slices by ecosystem, migration framework, repo size, and available evidence types.
+82. [ ] For each slice, report inventory coverage, risks, linked candidates, time signals, generated artifacts, and before/after deltas.
+83. [ ] Compare against grep-only risk detection.
+84. [ ] Compare against SQL-only analysis without code/docs/evidence links.
+85. [ ] Compare against identifier-only linking without temporal signals.
+86. [ ] Compare against temporal-only linking without identifiers.
+87. [ ] Compare fact-grounded generated code against prompt-without-facts generated code.
+88. [ ] Compare deterministic re-analysis against trusting generated code without verification.
+89. [ ] Track false positives and false negatives with sampled public findings and explicit adjudication notes.
+90. [ ] Report runtime, memory, download size, cache hit rate, and maintainers' review burden.
 
-91. [x] Add deterministic benchmark suites and expected hashes, while keeping the primary path label-free for arbitrary projects.
-92. [x] Add CI gates with precision/recall floors, GitHub Actions summaries, annotations, and distinct exit codes.
-93. [x] Add deterministic policy gates over manifests, dry-runs, migrations, and ledger checkpoints.
-94. [x] Add hash-chained audit ledger entries and checkpoint verification.
-95. [x] Add public OSS project scanning over real GitHub migration/source subpaths with deterministic plug-and-play summaries and per-case hashes.
-96. [ ] Add benchmark cases for provenance slicing, repair replay, invariant checking, solver obligations, policy gates, and bundle verification.
-97. [ ] Add baseline comparison for benchmark regressions against `main`.
-98. [x] Add SARIF output and reusable GitHub Action packaging for project intake, semantic migration findings, cause candidates, and repair candidates.
-99. [ ] Add fuzz tests and performance benchmarks for parsers, evidence ingest, graph slicing, replay, abstract interpretation, and historical archive queries.
-100. [x] Publish a plug-and-play end-to-end demo that downloads existing public projects, runs intake, discovers problem/cause/repair knowledge, emits JSON/Markdown/SARIF, and can be run from CI; keep richer telemetry/replay/proof demos as optional extensions when those inputs are present.
+## Stage 9: Keep every future addition high-impact
+
+91. [ ] Before adding a feature, name the real-repo failure mode it fixes.
+92. [ ] Before adding a parser, show the new facts it extracts from at least one real project.
+93. [ ] Before adding a generated-code feature, show the deterministic checks that can catch bad generated output.
+94. [ ] Before adding a report section, show what maintainer decision it improves.
+95. [ ] Before adding a metric, show how it affects ranking, repair safety, or comparison against baselines.
+96. [ ] Prefer fewer, stronger findings over exhaustive low-signal output.
+97. [ ] Keep non-deterministic steps optional, bounded, auditable, and followed by deterministic analysis.
+98. [ ] Make every new command runnable on a downloaded public repo in a few shell commands.
+99. [ ] Keep industrial value and research novelty aligned: practical reports should also support rigorous experiments.
+100. [ ] End each development cycle with a real-repo demonstration where baseline analysis, generated intervention, and deeper re-analysis produce a better result than the previous version.

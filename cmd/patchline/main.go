@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"flag"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -27,6 +28,7 @@ import (
 	"github.com/thehalleyyoung/patchline/internal/ledger"
 	"github.com/thehalleyyoung/patchline/internal/migration"
 	"github.com/thehalleyyoung/patchline/internal/policy"
+	"github.com/thehalleyyoung/patchline/internal/project"
 	"github.com/thehalleyyoung/patchline/internal/proof"
 	"github.com/thehalleyyoung/patchline/internal/provenance"
 	"github.com/thehalleyyoung/patchline/internal/refinement"
@@ -80,6 +82,8 @@ func run(args []string) error {
 		fmt.Println("RiSE angle: program analysis + verifiable transformations + reproducible repair benchmarks, without AI.")
 	case "intake":
 		return currentIntake(args[1:])
+	case "repo":
+		return repoCommand(args[1:])
 	case "semantics-contract":
 		return semanticsContract(hasFlag(args[1:], "--json"))
 	case "semantics-audit":
@@ -389,6 +393,8 @@ func usage() {
 
 Usage:
   patchline about
+  patchline repo fetch <owner/repo|github-url|path|archive> [--ref ref] [--subpath path] [--out dir] [--json]
+  patchline repo inventory <path> [--out dir] [--full] [--json]
   patchline intake <path> [--out results/generated/intake] [--json]
   patchline intake --github owner/repo [--ref ref] [--subpath path] [--out results/generated/intake] [--json]
   patchline semantics-contract [--json]
@@ -460,6 +466,8 @@ Usage:
   patchline ledger-verify [--json]
 
 Examples:
+  patchline repo fetch bytebase/bytebase --subpath backend/migrator/migration --out results/generated/repos/bytebase-migrations
+  patchline repo inventory results/generated/repos/bytebase-migrations --out results/generated/repos/bytebase-migrations/inventory
   patchline intake . --out results/generated/intake
   patchline intake --github bytebase/bytebase --subpath store/migration --out results/generated/intake
   patchline explain record:invoices/inv_1002
@@ -468,6 +476,146 @@ Examples:
   patchline provenance certificate record:invoices/inv_1002 --evidence examples/incidents/bad-migration.jsonl
   patchline analyze-migration demos/billing/migrations/002_bad_backfill.sql
   patchline reproduce examples/reproduce/bad-migration-billing.json --json`)
+}
+
+func repoCommand(args []string) error {
+	if len(args) == 0 {
+		return errors.New("usage: patchline repo <fetch|inventory> ...")
+	}
+	switch args[0] {
+	case "fetch":
+		return repoFetch(args[1:])
+	case "inventory":
+		return repoInventory(args[1:])
+	default:
+		return fmt.Errorf("unknown repo subcommand %q", args[0])
+	}
+}
+
+func repoFetch(args []string) error {
+	fs := flag.NewFlagSet("repo fetch", flag.ContinueOnError)
+	fs.SetOutput(ioDiscard{})
+	ref := fs.String("ref", "", "git ref")
+	subpath := fs.String("subpath", "", "subpath to focus on")
+	outPath := fs.String("out", "", "output directory")
+	downloadDir := fs.String("download-dir", "", "download/cache directory")
+	jsonOut := fs.Bool("json", false, "emit JSON")
+	full := fs.Bool("full", false, "record exhaustive fetch intent")
+	input, flagArgs, err := onePositionalWithFlags(args, map[string]bool{"--json": true, "--full": true})
+	if err != nil {
+		return err
+	}
+	if err := fs.Parse(flagArgs); err != nil {
+		return err
+	}
+	if input == "" || fs.NArg() != 0 {
+		return errors.New("usage: patchline repo fetch <owner/repo|github-url|path|archive> [--ref ref] [--subpath path] [--out dir] [--json]")
+	}
+	result, err := project.Fetch(context.Background(), project.FetchOptions{
+		Input:       input,
+		Ref:         *ref,
+		Subpath:     *subpath,
+		OutDir:      *outPath,
+		DownloadDir: *downloadDir,
+		Full:        *full,
+	})
+	if err != nil {
+		return err
+	}
+	if *jsonOut {
+		return writeJSON(os.Stdout, result)
+	}
+	fmt.Printf("repo source=%s mode=%s out=%s scanned_root=%s",
+		result.Source.Input,
+		result.Source.Mode,
+		result.Source.OutDir,
+		result.Source.ScannedRoot,
+	)
+	if result.Source.ArchiveHash != "" {
+		fmt.Printf(" archive_hash=%s", result.Source.ArchiveHash)
+	}
+	if result.Source.CommitHint != "" {
+		fmt.Printf(" commit_hint=%s", result.Source.CommitHint)
+	}
+	fmt.Println()
+	fmt.Printf("  source=%s\n", filepath.Join(result.Source.OutDir, "source.json"))
+	return nil
+}
+
+func repoInventory(args []string) error {
+	fs := flag.NewFlagSet("repo inventory", flag.ContinueOnError)
+	fs.SetOutput(ioDiscard{})
+	outPath := fs.String("out", "", "output directory")
+	full := fs.Bool("full", false, "include normally skipped directories")
+	jsonOut := fs.Bool("json", false, "emit JSON")
+	input, flagArgs, err := onePositionalWithFlags(args, map[string]bool{"--json": true, "--full": true})
+	if err != nil {
+		return err
+	}
+	if err := fs.Parse(flagArgs); err != nil {
+		return err
+	}
+	if input == "" || fs.NArg() != 0 {
+		return errors.New("usage: patchline repo inventory <path> [--out dir] [--full] [--json]")
+	}
+	inv, err := project.InventoryPath(project.InventoryOptions{Path: input, Full: *full})
+	if err != nil {
+		return err
+	}
+	if *outPath != "" {
+		if err := project.WriteInventory(*outPath, inv); err != nil {
+			return err
+		}
+	}
+	if *jsonOut {
+		return writeJSON(os.Stdout, inv)
+	}
+	fmt.Printf("inventory root=%s files=%d languages=%d frameworks=%d migration_roots=%d ci=%d source_sql_hints=%d evidence_exports=%d\n",
+		inv.Root,
+		inv.FilesScanned,
+		len(inv.Languages),
+		len(inv.Frameworks),
+		len(inv.MigrationRoots)+len(inv.MigrationSystems),
+		len(inv.CI),
+		len(inv.SourceSQLHints),
+		len(inv.EvidenceExports),
+	)
+	if *outPath != "" {
+		fmt.Printf("  out=%s\n", *outPath)
+	}
+	for _, command := range inv.NextCommands {
+		fmt.Printf("  next: %s # %s\n", command.Command, command.Reason)
+	}
+	return nil
+}
+
+type ioDiscard struct{}
+
+func (ioDiscard) Write(p []byte) (int, error) { return len(p), nil }
+
+func onePositionalWithFlags(args []string, boolFlags map[string]bool) (string, []string, error) {
+	var positional string
+	var flagArgs []string
+	for i := 0; i < len(args); i++ {
+		arg := args[i]
+		if strings.HasPrefix(arg, "--") {
+			flagArgs = append(flagArgs, arg)
+			if strings.Contains(arg, "=") || boolFlags[arg] {
+				continue
+			}
+			if i+1 >= len(args) || strings.HasPrefix(args[i+1], "--") {
+				return "", nil, fmt.Errorf("flag %s requires a value", arg)
+			}
+			i++
+			flagArgs = append(flagArgs, args[i])
+			continue
+		}
+		if positional != "" {
+			return "", nil, fmt.Errorf("unexpected extra positional argument %q", arg)
+		}
+		positional = arg
+	}
+	return positional, flagArgs, nil
 }
 
 func currentIntake(args []string) error {

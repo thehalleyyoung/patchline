@@ -1,0 +1,147 @@
+package project
+
+import (
+	"archive/zip"
+	"context"
+	"encoding/json"
+	"os"
+	"path/filepath"
+	"testing"
+)
+
+func TestParseGitHubRepoAcceptsURLAndOwnerRepo(t *testing.T) {
+	tests := []string{"bytebase/bytebase", "https://github.com/django/django.git"}
+	for _, input := range tests {
+		owner, repo, err := ParseGitHubRepo(input)
+		if err != nil {
+			t.Fatalf("ParseGitHubRepo(%q): %v", input, err)
+		}
+		if owner == "" || repo == "" {
+			t.Fatalf("expected owner and repo for %q", input)
+		}
+	}
+	if _, _, err := ParseGitHubRepo("../bad/repo"); err == nil {
+		t.Fatalf("expected unsafe repo to fail")
+	}
+}
+
+func TestFetchLocalCopiesRepoAndWritesSourceMetadata(t *testing.T) {
+	src := t.TempDir()
+	writeFile(t, src, "db/migrate/20250101_add_accounts.sql", "create table accounts(id int);")
+	writeFile(t, src, ".git/config", "ignored")
+	out := filepath.Join(t.TempDir(), "fetched")
+
+	result, err := Fetch(context.Background(), FetchOptions{Input: src, OutDir: out, Subpath: "db/migrate"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if result.Source.Mode != "local" || result.Source.ScannedRoot != filepath.ToSlash(filepath.Join(out, "db/migrate")) {
+		t.Fatalf("unexpected source metadata: %#v", result.Source)
+	}
+	if _, err := os.Stat(filepath.Join(out, ".git")); !os.IsNotExist(err) {
+		t.Fatalf("expected .git to be skipped, got err=%v", err)
+	}
+	data, err := os.ReadFile(filepath.Join(out, "source.json"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	var source Source
+	if err := json.Unmarshal(data, &source); err != nil {
+		t.Fatal(err)
+	}
+	if source.Subpath != "db/migrate" || len(source.SkippedDirs) != 1 || source.SkippedDirs[0] != ".git" {
+		t.Fatalf("unexpected source.json: %s", string(data))
+	}
+}
+
+func TestFetchRejectsEscapingSubpath(t *testing.T) {
+	src := t.TempDir()
+	writeFile(t, src, "README.md", "hello")
+	out := filepath.Join(t.TempDir(), "fetched")
+	if _, err := Fetch(context.Background(), FetchOptions{Input: src, OutDir: out, Subpath: "../"}); err == nil {
+		t.Fatalf("expected escaping subpath to fail")
+	}
+}
+
+func TestInventoryDetectsProjectNativeSignals(t *testing.T) {
+	root := t.TempDir()
+	writeFile(t, root, "go.mod", "module example.com/app\n")
+	writeFile(t, root, ".github/workflows/ci.yml", "name: ci\n")
+	writeFile(t, root, "db/migrate/20250101_fix_accounts.sql", "update accounts set disabled = false;")
+	writeFile(t, root, "docs/incident-42.md", "rollback account repair")
+	writeFile(t, root, "exports/deploy-events.jsonl", `{"deploy":"prod"}`)
+
+	inv, err := InventoryPath(InventoryOptions{Path: root})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if inv.FilesScanned != 5 {
+		t.Fatalf("expected five files scanned, got %d", inv.FilesScanned)
+	}
+	if len(inv.Frameworks) == 0 || len(inv.MigrationRoots) == 0 || len(inv.CI) == 0 {
+		t.Fatalf("expected framework, migration, and CI findings: %#v", inv)
+	}
+	if len(inv.OperationalDocs) == 0 || len(inv.EvidenceExports) == 0 || len(inv.NextCommands) == 0 {
+		t.Fatalf("expected docs/evidence/next commands: %#v", inv)
+	}
+}
+
+func TestInventoryTreatsMigrationsRootAsMigrationEvidence(t *testing.T) {
+	root := filepath.Join(t.TempDir(), "django", "contrib", "auth", "migrations")
+	writeFile(t, root, "0001_initial.py", "class Migration: pass")
+	inv, err := InventoryPath(InventoryOptions{Path: root})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(inv.MigrationRoots) == 0 || inv.MigrationRoots[0].Path != "." {
+		t.Fatalf("expected root migration evidence, got %#v", inv.MigrationRoots)
+	}
+}
+
+func TestInventoryTreatsSingularMigrationRootAsMigrationEvidence(t *testing.T) {
+	root := filepath.Join(t.TempDir(), "backend", "migrator", "migration")
+	writeFile(t, root, "0001.sql", "create table accounts(id int)")
+	inv, err := InventoryPath(InventoryOptions{Path: root})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(inv.MigrationRoots) == 0 || inv.MigrationRoots[0].Kind != "migration" {
+		t.Fatalf("expected singular migration root evidence, got %#v", inv.MigrationRoots)
+	}
+}
+
+func TestExtractZipRejectsUnsafePaths(t *testing.T) {
+	archive := filepath.Join(t.TempDir(), "unsafe.zip")
+	file, err := os.Create(archive)
+	if err != nil {
+		t.Fatal(err)
+	}
+	zw := zip.NewWriter(file)
+	w, err := zw.Create("../escape.txt")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := w.Write([]byte("bad")); err != nil {
+		t.Fatal(err)
+	}
+	if err := zw.Close(); err != nil {
+		t.Fatal(err)
+	}
+	if err := file.Close(); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := extractZip(archive, t.TempDir()); err == nil {
+		t.Fatalf("expected unsafe zip path to fail")
+	}
+}
+
+func writeFile(t *testing.T, root, rel, content string) {
+	t.Helper()
+	path := filepath.Join(root, filepath.FromSlash(rel))
+	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(path, []byte(content), 0o644); err != nil {
+		t.Fatal(err)
+	}
+}

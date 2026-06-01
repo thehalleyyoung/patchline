@@ -27,6 +27,19 @@ func TestParseGateOptionsRejectsInvalidThresholds(t *testing.T) {
 	}
 }
 
+func TestOnePositionalWithFlagsAllowsFlagsAfterPath(t *testing.T) {
+	pos, flags, err := onePositionalWithFlags([]string{"django/django", "--subpath", "django/contrib/auth/migrations", "--json"}, map[string]bool{"--json": true})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if pos != "django/django" {
+		t.Fatalf("unexpected positional %q", pos)
+	}
+	if len(flags) != 3 || flags[0] != "--subpath" || flags[1] != "django/contrib/auth/migrations" || flags[2] != "--json" {
+		t.Fatalf("unexpected flags %#v", flags)
+	}
+}
+
 func TestPhaseCheckInputKindResolvesImplicitInputs(t *testing.T) {
 	tests := []struct {
 		name string
