@@ -1,0 +1,21 @@
+{
+  "version": "patchline.parser-fact-gates/v1",
+  "parsers": [
+    {
+      "id": "schema-evolution-parser",
+      "real_repo": "lobsters/lobsters",
+      "subpath": "db/migrate",
+      "expected_fact_kind": "schema_evolution",
+      "new_fact": "schema evolution facts from Rails migrations",
+      "sample_fact_property": "operation"
+    },
+    {
+      "id": "migration-root-parser",
+      "real_repo": "lobsters/lobsters",
+      "subpath": "db/migrate",
+      "expected_fact_kind": "migration_root",
+      "new_fact": "migration root fact for generic db/migrate repository slices",
+      "sample_fact_property": "kind"
+    }
+  ]
+}

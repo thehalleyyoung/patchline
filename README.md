@@ -122,6 +122,7 @@ make repo-demo
 make four-repo-demo
 make repo-slice-matrix
 make impact-gate
+make parser-fact-gate
 ```
 
 The demo downloads real GitHub project subpaths and writes:
@@ -137,6 +138,8 @@ results/generated/real-repo-slice-matrix/slice-matrix.json
 The real-repo slice matrix is backed by `examples/real-repo-slices.json` and `examples/real-repo-adjudications.json`. It reports each public slice by ecosystem, migration framework, repo size class, available evidence types, fetched commit, runtime, memory, download size, cache hit rate, maintainer review burden, inventory coverage, grep-only, SQL-only, identifier-only, temporal-only, fact-grounded-generation, deterministic re-analysis, sampled false-positive/false-negative adjudications, risks, linked candidates, time signals, generated artifacts, before/after deltas, and cache proof.
 
 `make impact-gate` checks `examples/feature-impact-gates.json` so each feature entry names the public repo slice and real-repo failure mode it is meant to fix.
+
+`make parser-fact-gate` checks `examples/parser-fact-gates.json` by fetching a public repo slice, running inventory, and proving the expected fact kind appears in `facts.jsonl`.
 
 Current default projects:
 
