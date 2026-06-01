@@ -18,6 +18,7 @@ go run ./cmd/patchline repo fetch django/django \
 go run ./cmd/patchline repo analyze --github django/django \
   --subpath django/contrib/auth/migrations \
   --stages inventory,baseline,propose,compare,deep \
+  --no-llm \
   --out results/generated/repos/django-auth-analysis
 go run ./cmd/patchline repo inventory \
   results/generated/repos/django-auth/django-django-*/django/contrib/auth/migrations \

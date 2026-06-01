@@ -23,6 +23,7 @@ type ProposalOptions struct {
 	Kind         string
 	OutDir       string
 	LLMCommand   string
+	NoLLM        bool
 	BudgetRisks  int
 }
 
@@ -31,6 +32,7 @@ type ProposalReport struct {
 	BaselineHash   string              `json:"baseline_hash"`
 	Kind           string              `json:"kind"`
 	Generator      string              `json:"generator"`
+	Deterministic  bool                `json:"deterministic_only"`
 	Trust          string              `json:"trust"`
 	BudgetRisks    int                 `json:"budget_risks"`
 	TargetRiskIDs  []string            `json:"target_risk_ids"`
@@ -106,6 +108,9 @@ func Propose(opts ProposalOptions) (ProposalReport, error) {
 	if opts.OutDir == "" {
 		opts.OutDir = filepath.Join("results", "generated", "repo-proposal")
 	}
+	if opts.NoLLM && opts.LLMCommand != "" {
+		return ProposalReport{}, fmt.Errorf("--no-llm cannot be combined with --llm-command")
+	}
 	if err := os.MkdirAll(opts.OutDir, 0o755); err != nil {
 		return ProposalReport{}, err
 	}
@@ -138,6 +143,7 @@ func Propose(opts ProposalOptions) (ProposalReport, error) {
 		BaselineHash:  baseline.Hash,
 		Kind:          opts.Kind,
 		Generator:     generator,
+		Deterministic: opts.LLMCommand == "",
 		Trust:         "untrusted-generated-proposal",
 		BudgetRisks:   opts.BudgetRisks,
 		TargetRiskIDs: riskIDs(context.Risks),
@@ -499,6 +505,7 @@ func renderProposalMarkdown(report ProposalReport) string {
 	fmt.Fprintf(&b, "- baseline_hash: `%s`\n", report.BaselineHash)
 	fmt.Fprintf(&b, "- kind: `%s`\n", report.Kind)
 	fmt.Fprintf(&b, "- generator: `%s`\n", report.Generator)
+	fmt.Fprintf(&b, "- deterministic_only: `%t`\n", report.Deterministic)
 	fmt.Fprintf(&b, "- trust: `%s`\n", report.Trust)
 	fmt.Fprintf(&b, "- output_hash: `%s`\n\n", report.OutputHash)
 	fmt.Fprintf(&b, "## Intervention\n\n")

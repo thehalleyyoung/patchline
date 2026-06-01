@@ -629,6 +629,9 @@ func TestProposeWritesIsolatedPatchAndMetadata(t *testing.T) {
 	if proposal.Trust != "untrusted-generated-proposal" || len(proposal.GeneratedFiles) != 5 || proposal.ContextHash == "" || proposal.OutputHash == "" {
 		t.Fatalf("unexpected proposal metadata: %#v", proposal)
 	}
+	if !proposal.Deterministic || proposal.Generator != "patchline-template" {
+		t.Fatalf("expected deterministic template proposal: %#v", proposal)
+	}
 	if proposal.Intervention.ID == "" || proposal.Intervention.Stage != "generated-untrusted" || len(proposal.Intervention.RequiredReanalysis) == 0 {
 		t.Fatalf("expected generated proposal to be recorded as an untrusted intervention: %#v", proposal.Intervention)
 	}
@@ -665,6 +668,12 @@ func TestProposeLLMCommandCapturesOutputAsUntrustedArtifact(t *testing.T) {
 	}
 	if proposal.Generator != "llm-command" || len(proposal.GeneratedFiles) != 1 || proposal.GeneratedFiles[0].Kind != "llm-output" {
 		t.Fatalf("unexpected llm proposal: %#v", proposal)
+	}
+	if proposal.Deterministic {
+		t.Fatalf("expected llm-command proposal to be marked non-deterministic: %#v", proposal)
+	}
+	if _, err := Propose(ProposalOptions{BaselinePath: baselineDir, Kind: "tests", LLMCommand: "cat", NoLLM: true, BudgetRisks: 1}); err == nil {
+		t.Fatal("expected --no-llm to reject llm-command")
 	}
 }
 

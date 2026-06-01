@@ -24,7 +24,7 @@ while IFS='|' read -r label repo subpath; do
     PATCHLINE_REPO_DEMO_SUBPATH="$subpath" \
     bash scripts/repo-analysis-demo.sh "$case_out"
   go run ./cmd/patchline repo fetch "$repo" --subpath "$subpath" --out "$case_out/cache-proof" --json > "$case_out/cache-proof.json"
-  go run ./cmd/patchline repo analyze --github "$repo" --subpath "$subpath" --stages inventory,baseline,propose,compare,deep --out "$case_out/analyze" --json > "$case_out/analyze.json"
+  go run ./cmd/patchline repo analyze --github "$repo" --subpath "$subpath" --stages inventory,baseline,propose,compare,deep --no-llm --out "$case_out/analyze" --json > "$case_out/analyze.json"
   go run ./cmd/patchline repo fetch "$repo" --subpath ".github/workflows" --out "$case_out/structured-fetch" --json > "$case_out/structured-fetch.json"
   structured_root="$(jq -r '.source.scanned_root' "$case_out/structured-fetch.json")"
   go run ./cmd/patchline repo inventory "$structured_root" --out "$case_out/structured-inventory" --json > "$case_out/structured-inventory.json"
