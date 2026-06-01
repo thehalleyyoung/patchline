@@ -127,6 +127,7 @@ make generated-code-gate
 make report-section-gate
 make metric-impact-gate
 make finding-signal-gate
+make nondeterministic-gate
 ```
 
 The demo downloads real GitHub project subpaths and writes:
@@ -152,6 +153,8 @@ The real-repo slice matrix is backed by `examples/real-repo-slices.json` and `ex
 `make metric-impact-gate` checks `examples/metric-impact-gates.json` by generating public-repo analysis and proving each metric affects ranking, repair safety, or baseline comparison.
 
 `make finding-signal-gate` checks `examples/finding-signal-gates.json` by proving human-facing reports cap findings to the strongest ranked risks across four public repo slices while full JSON keeps the complete ranked set.
+
+`make nondeterministic-gate` checks `examples/nondeterministic-gates.json` by proving generator-backed proposals are optional, budgeted, hash-audited, and followed by deterministic compare analysis across four public repo slices.
 
 Current default projects:
 

@@ -1,0 +1,41 @@
+{
+  "version": "patchline.nondeterministic-gates/v1",
+  "gates": [
+    {
+      "id": "forem-optional-bounded-generation",
+      "status": "implemented",
+      "real_repo": "forem/forem",
+      "subpath": "db/migrate",
+      "llm_command": "cat",
+      "budget": "files=1,lines=80,tokens=2000,changes=2",
+      "audit_claim": "non-deterministic generation is optional, scope-bounded, hash-recorded, and followed by deterministic compare analysis"
+    },
+    {
+      "id": "bytebase-optional-bounded-generation",
+      "status": "implemented",
+      "real_repo": "bytebase/bytebase",
+      "subpath": "backend/migrator/migration",
+      "llm_command": "cat",
+      "budget": "files=1,lines=80,tokens=2000,changes=2",
+      "audit_claim": "non-deterministic generation is optional, scope-bounded, hash-recorded, and followed by deterministic compare analysis"
+    },
+    {
+      "id": "mastodon-optional-bounded-generation",
+      "status": "implemented",
+      "real_repo": "mastodon/mastodon",
+      "subpath": "db/migrate",
+      "llm_command": "cat",
+      "budget": "files=1,lines=80,tokens=2000,changes=2",
+      "audit_claim": "non-deterministic generation is optional, scope-bounded, hash-recorded, and followed by deterministic compare analysis"
+    },
+    {
+      "id": "lobsters-optional-bounded-generation",
+      "status": "implemented",
+      "real_repo": "lobsters/lobsters",
+      "subpath": "db/migrate",
+      "llm_command": "cat",
+      "budget": "files=1,lines=80,tokens=2000,changes=2",
+      "audit_claim": "non-deterministic generation is optional, scope-bounded, hash-recorded, and followed by deterministic compare analysis"
+    }
+  ]
+}
