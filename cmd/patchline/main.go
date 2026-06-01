@@ -411,6 +411,7 @@ Usage:
   patchline repo compare --before baseline-dir --after proposal-dir [--out dir] [--run-native-tests] [--json]
   patchline repo suppressions --baseline baseline-dir --suppressions suppressions.json [--out dir] [--json]
   patchline repo why-now --previous baseline-dir --current baseline-dir [--out dir] [--json]
+  patchline repo changes --previous analysis-dir --current analysis-dir [--out dir] [--json]
   patchline intake <path> [--out results/generated/intake] [--json]
   patchline intake --github owner/repo [--ref ref] [--subpath path] [--out results/generated/intake] [--json]
   patchline semantics-contract [--json]
@@ -500,7 +501,7 @@ Examples:
 
 func repoCommand(args []string) error {
 	if len(args) == 0 {
-		return errors.New("usage: patchline repo <doctor|fetch|analyze|inventory|baseline|propose|compare|suppressions|why-now> ...")
+		return errors.New("usage: patchline repo <doctor|fetch|analyze|inventory|baseline|propose|compare|suppressions|why-now|changes> ...")
 	}
 	switch args[0] {
 	case "doctor":
@@ -521,6 +522,8 @@ func repoCommand(args []string) error {
 		return repoSuppressions(args[1:])
 	case "why-now":
 		return repoWhyNow(args[1:])
+	case "changes":
+		return repoChanges(args[1:])
 	default:
 		return fmt.Errorf("unknown repo subcommand %q", args[0])
 	}
@@ -753,6 +756,49 @@ type whyNowRisk struct {
 	Severity string `json:"severity"`
 	Score    int    `json:"score"`
 	Reason   string `json:"reason"`
+}
+
+type changesReport struct {
+	Version   string         `json:"version"`
+	Previous  string         `json:"previous"`
+	Current   string         `json:"current"`
+	Summary   changesSummary `json:"summary"`
+	Facts     changesDelta   `json:"facts"`
+	Risks     changesDelta   `json:"ranked_risks"`
+	Links     changesDelta   `json:"links"`
+	Generated changesDelta   `json:"generated_artifacts"`
+	Checks    checksDelta    `json:"deterministic_checks"`
+	Hash      string         `json:"hash"`
+	Markdown  string         `json:"markdown,omitempty"`
+}
+
+type changesSummary struct {
+	ChangedDimensions int `json:"changed_dimensions"`
+	PreviousFacts     int `json:"previous_facts"`
+	CurrentFacts      int `json:"current_facts"`
+	PreviousRisks     int `json:"previous_risks"`
+	CurrentRisks      int `json:"current_risks"`
+	PreviousGenerated int `json:"previous_generated"`
+	CurrentGenerated  int `json:"current_generated"`
+	PreviousFailures  int `json:"previous_failures"`
+	CurrentFailures   int `json:"current_failures"`
+}
+
+type changesDelta struct {
+	Previous int      `json:"previous"`
+	Current  int      `json:"current"`
+	Added    int      `json:"added"`
+	Removed  int      `json:"removed"`
+	Examples []string `json:"examples,omitempty"`
+}
+
+type checksDelta struct {
+	PreviousFailures int `json:"previous_failures"`
+	CurrentFailures  int `json:"current_failures"`
+	PreviousPassed   int `json:"previous_passed"`
+	CurrentPassed    int `json:"current_passed"`
+	FailureDelta     int `json:"failure_delta"`
+	PassDelta        int `json:"pass_delta"`
 }
 
 func repoAnalyze(args []string) error {
@@ -2778,6 +2824,239 @@ func renderWhyNowMarkdown(report whyNowReport) string {
 			fmt.Fprintf(&b, "| `%s` | %d | %s | %s | %s |\n", risk.StableID, risk.Score, risk.Severity, risk.Path, risk.Reason)
 		}
 	}
+	return b.String()
+}
+
+func repoChanges(args []string) error {
+	fs := flag.NewFlagSet("repo changes", flag.ContinueOnError)
+	fs.SetOutput(ioDiscard{})
+	previousPath := fs.String("previous", "", "previous repo analyze output directory")
+	currentPath := fs.String("current", "", "current repo analyze output directory")
+	outPath := fs.String("out", "", "output directory")
+	jsonOut := fs.Bool("json", false, "emit JSON")
+	if err := fs.Parse(args); err != nil {
+		return err
+	}
+	if *previousPath == "" || *currentPath == "" || fs.NArg() != 0 {
+		return errors.New("usage: patchline repo changes --previous analysis-dir --current analysis-dir [--out dir] [--json]")
+	}
+	report, err := buildChangesReport(*previousPath, *currentPath)
+	if err != nil {
+		return err
+	}
+	if *outPath != "" {
+		if err := writeChangesReport(*outPath, report); err != nil {
+			return err
+		}
+	}
+	if *jsonOut {
+		return writeJSON(os.Stdout, report)
+	}
+	fmt.Printf("changes facts=%+d risks=%+d links=%+d generated=%+d check_failures=%+d hash=%s\n",
+		report.Facts.Current-report.Facts.Previous,
+		report.Risks.Current-report.Risks.Previous,
+		report.Links.Current-report.Links.Previous,
+		report.Generated.Current-report.Generated.Previous,
+		report.Checks.FailureDelta,
+		report.Hash,
+	)
+	if *outPath != "" {
+		fmt.Printf("  out=%s\n", *outPath)
+	}
+	return nil
+}
+
+func buildChangesReport(previousPath, currentPath string) (changesReport, error) {
+	prev, err := loadAnalysisSnapshot(previousPath)
+	if err != nil {
+		return changesReport{}, err
+	}
+	cur, err := loadAnalysisSnapshot(currentPath)
+	if err != nil {
+		return changesReport{}, err
+	}
+	report := changesReport{
+		Version:   "patchline.repo-changes/v1",
+		Previous:  filepath.ToSlash(previousPath),
+		Current:   filepath.ToSlash(currentPath),
+		Facts:     compareStringSets(prev.Facts, cur.Facts),
+		Risks:     compareStringSets(prev.Risks, cur.Risks),
+		Links:     compareStringSets(prev.Links, cur.Links),
+		Generated: compareStringSets(prev.Generated, cur.Generated),
+		Checks: checksDelta{
+			PreviousFailures: prev.CheckFailures,
+			CurrentFailures:  cur.CheckFailures,
+			PreviousPassed:   prev.CheckPassed,
+			CurrentPassed:    cur.CheckPassed,
+			FailureDelta:     cur.CheckFailures - prev.CheckFailures,
+			PassDelta:        cur.CheckPassed - prev.CheckPassed,
+		},
+	}
+	report.Summary = changesSummary{
+		PreviousFacts:     len(prev.Facts),
+		CurrentFacts:      len(cur.Facts),
+		PreviousRisks:     len(prev.Risks),
+		CurrentRisks:      len(cur.Risks),
+		PreviousGenerated: len(prev.Generated),
+		CurrentGenerated:  len(cur.Generated),
+		PreviousFailures:  prev.CheckFailures,
+		CurrentFailures:   cur.CheckFailures,
+	}
+	for _, changed := range []bool{
+		report.Facts.Added > 0 || report.Facts.Removed > 0,
+		report.Risks.Added > 0 || report.Risks.Removed > 0,
+		report.Links.Added > 0 || report.Links.Removed > 0,
+		report.Generated.Added > 0 || report.Generated.Removed > 0,
+		report.Checks.FailureDelta != 0 || report.Checks.PassDelta != 0,
+	} {
+		if changed {
+			report.Summary.ChangedDimensions++
+		}
+	}
+	report.Hash = changesHash(report)
+	report.Markdown = renderChangesMarkdown(report)
+	return report, nil
+}
+
+type analysisSnapshot struct {
+	Facts         []string
+	Risks         []string
+	Links         []string
+	Generated     []string
+	CheckFailures int
+	CheckPassed   int
+}
+
+func loadAnalysisSnapshot(path string) (analysisSnapshot, error) {
+	var snap analysisSnapshot
+	facts, err := project.LoadFacts(filepath.Join(path, "inventory", "facts.jsonl"))
+	if err != nil {
+		return snap, err
+	}
+	for _, fact := range facts {
+		snap.Facts = append(snap.Facts, fact.ID)
+	}
+	baseline, err := project.LoadBaseline(filepath.Join(path, "baseline"))
+	if err != nil {
+		return snap, err
+	}
+	for _, risk := range baseline.Risks {
+		id := risk.StableID
+		if id == "" {
+			id = risk.ID
+		}
+		snap.Risks = append(snap.Risks, id)
+	}
+	for _, link := range baseline.EvidenceLinks {
+		snap.Links = append(snap.Links, link.RiskID+"\x00"+link.FactID)
+	}
+	generated, err := loadGeneratedFileKeys(filepath.Join(path, "proposal", "proposal.json"))
+	if err != nil {
+		return snap, err
+	}
+	snap.Generated = append(snap.Generated, generated...)
+	if compare, err := loadCompareReport(filepath.Join(path, "compare", "compare.json")); err == nil {
+		snap.CheckFailures = compare.Summary.PatchlineChecksFailed + compare.Summary.NativeChecksFailed
+		snap.CheckPassed = compare.Summary.PatchlineChecksPassed + compare.Summary.NativeChecksPassed
+	}
+	sort.Strings(snap.Facts)
+	sort.Strings(snap.Risks)
+	sort.Strings(snap.Links)
+	sort.Strings(snap.Generated)
+	return snap, nil
+}
+
+func loadGeneratedFileKeys(path string) ([]string, error) {
+	data, err := os.ReadFile(path)
+	if errors.Is(err, os.ErrNotExist) {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+	var report project.ProposalReport
+	if err := json.Unmarshal(data, &report); err != nil {
+		return nil, err
+	}
+	keys := make([]string, 0, len(report.GeneratedFiles))
+	for _, generated := range report.GeneratedFiles {
+		keys = append(keys, generated.Path+"\x00"+generated.ContentHash)
+	}
+	sort.Strings(keys)
+	return keys, nil
+}
+
+func compareStringSets(previous, current []string) changesDelta {
+	prev := map[string]bool{}
+	cur := map[string]bool{}
+	for _, value := range previous {
+		prev[value] = true
+	}
+	for _, value := range current {
+		cur[value] = true
+	}
+	var added, removed []string
+	for value := range cur {
+		if !prev[value] {
+			added = append(added, value)
+		}
+	}
+	for value := range prev {
+		if !cur[value] {
+			removed = append(removed, value)
+		}
+	}
+	sort.Strings(added)
+	sort.Strings(removed)
+	examples := append([]string{}, firstNStrings(added, 3)...)
+	examples = append(examples, firstNStrings(removed, 3)...)
+	return changesDelta{Previous: len(prev), Current: len(cur), Added: len(added), Removed: len(removed), Examples: examples}
+}
+
+func firstNStrings(values []string, n int) []string {
+	if len(values) < n {
+		n = len(values)
+	}
+	return append([]string(nil), values[:n]...)
+}
+
+func writeChangesReport(outDir string, report changesReport) error {
+	if err := os.MkdirAll(outDir, 0o755); err != nil {
+		return err
+	}
+	copy := report
+	copy.Markdown = ""
+	data, err := json.MarshalIndent(copy, "", "  ")
+	if err != nil {
+		return err
+	}
+	if err := os.WriteFile(filepath.Join(outDir, "changes.json"), append(data, '\n'), 0o644); err != nil {
+		return err
+	}
+	return os.WriteFile(filepath.Join(outDir, "changes.md"), []byte(report.Markdown), 0o644)
+}
+
+func changesHash(report changesReport) string {
+	copy := report
+	copy.Hash = ""
+	copy.Markdown = ""
+	return canonical.Hash(copy)
+}
+
+func renderChangesMarkdown(report changesReport) string {
+	var b strings.Builder
+	fmt.Fprintf(&b, "# Patchline repo changes\n\n")
+	fmt.Fprintf(&b, "- previous: `%s`\n", report.Previous)
+	fmt.Fprintf(&b, "- current: `%s`\n", report.Current)
+	fmt.Fprintf(&b, "- hash: `%s`\n\n", report.Hash)
+	fmt.Fprintf(&b, "## Summary\n\n| dimension | previous | current | added | removed |\n| --- | ---: | ---: | ---: | ---: |\n")
+	fmt.Fprintf(&b, "| facts | %d | %d | %d | %d |\n", report.Facts.Previous, report.Facts.Current, report.Facts.Added, report.Facts.Removed)
+	fmt.Fprintf(&b, "| ranked risks | %d | %d | %d | %d |\n", report.Risks.Previous, report.Risks.Current, report.Risks.Added, report.Risks.Removed)
+	fmt.Fprintf(&b, "| links | %d | %d | %d | %d |\n", report.Links.Previous, report.Links.Current, report.Links.Added, report.Links.Removed)
+	fmt.Fprintf(&b, "| generated artifacts | %d | %d | %d | %d |\n", report.Generated.Previous, report.Generated.Current, report.Generated.Added, report.Generated.Removed)
+	fmt.Fprintf(&b, "\n## Deterministic checks\n\n| area | previous | current | delta |\n| --- | ---: | ---: | ---: |\n")
+	fmt.Fprintf(&b, "| failures | %d | %d | %+d |\n", report.Checks.PreviousFailures, report.Checks.CurrentFailures, report.Checks.FailureDelta)
+	fmt.Fprintf(&b, "| passed | %d | %d | %+d |\n", report.Checks.PreviousPassed, report.Checks.CurrentPassed, report.Checks.PassDelta)
 	return b.String()
 }
 

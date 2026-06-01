@@ -2,6 +2,7 @@ package main
 
 import (
 	"errors"
+	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
@@ -157,6 +158,54 @@ func TestBuildWhyNowReportFindsNewRisks(t *testing.T) {
 	if report.Hash == "" || !strings.Contains(report.Markdown, "Newly introduced risks") {
 		t.Fatalf("expected hash and markdown: %#v", report)
 	}
+}
+
+func TestBuildChangesReportComparesAnalysisArtifacts(t *testing.T) {
+	root := t.TempDir()
+	previous := filepath.Join(root, "previous")
+	current := filepath.Join(root, "current")
+	writeAnalysisSnapshotForTest(t, previous, "fact-old", "stable-risk:old0000000000000", "generated/old.md", "sha256:old", 1, 2)
+	writeAnalysisSnapshotForTest(t, current, "fact-new", "stable-risk:new0000000000000", "generated/new.md", "sha256:new", 0, 3)
+
+	report, err := buildChangesReport(previous, current)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if report.Facts.Added != 1 || report.Facts.Removed != 1 || report.Risks.Added != 1 || report.Risks.Removed != 1 || report.Links.Added != 1 || report.Generated.Added != 1 {
+		t.Fatalf("unexpected changes report: %#v", report)
+	}
+	if report.Checks.FailureDelta != -1 || report.Checks.PassDelta != 1 || report.Hash == "" || !strings.Contains(report.Markdown, "Deterministic checks") {
+		t.Fatalf("expected deterministic check deltas and markdown: %#v", report)
+	}
+}
+
+func writeAnalysisSnapshotForTest(t *testing.T, root, factID, stableID, generatedPath, generatedHash string, failures, passed int) {
+	t.Helper()
+	writeMainTestFile(t, root, "inventory/facts.jsonl", `{"id":"`+factID+`","kind":"sql","path":"db/migrate/001.sql"}`+"\n")
+	writeMainTestFile(t, root, "baseline/baseline.json", `{
+  "version": "patchline.baseline/v1",
+  "summary": {"ranked_risks": 1},
+  "risks": [{"id":"risk:test","stable_id":"`+stableID+`","severity":"high","score":90}],
+  "evidence_links": [{"risk_id":"risk:test","fact_id":"`+factID+`"}],
+  "hash": "baseline"
+}
+`)
+	writeMainTestFile(t, root, "proposal/proposal.json", `{
+  "version": "patchline.proposal/v1",
+  "generated_files": [{"path":"`+generatedPath+`","content_hash":"`+generatedHash+`"}],
+  "hash": "proposal"
+}
+`)
+	writeMainTestFile(t, root, "compare/compare.json", `{
+  "version": "patchline.compare/v1",
+  "summary": {"patchline_checks_failed": `+itoaForTest(failures)+`, "patchline_checks_passed": `+itoaForTest(passed)+`},
+  "hash": "compare"
+}
+`)
+}
+
+func itoaForTest(value int) string {
+	return fmt.Sprintf("%d", value)
 }
 
 func TestPhaseCheckInputKindResolvesImplicitInputs(t *testing.T) {

@@ -1,0 +1,33 @@
+{
+  "version": "patchline.run-change-gates/v1",
+  "gates": [
+    {
+      "id": "forem-run-change",
+      "status": "implemented",
+      "real_repo": "forem/forem",
+      "subpath": "db/migrate",
+      "change_claim": "repo changes compares stored analysis runs across facts, ranked risks, links, generated artifacts, and deterministic check outcomes"
+    },
+    {
+      "id": "bytebase-run-change",
+      "status": "implemented",
+      "real_repo": "bytebase/bytebase",
+      "subpath": "backend/migrator/migration",
+      "change_claim": "repo changes compares stored analysis runs across facts, ranked risks, links, generated artifacts, and deterministic check outcomes"
+    },
+    {
+      "id": "mastodon-run-change",
+      "status": "implemented",
+      "real_repo": "mastodon/mastodon",
+      "subpath": "db/migrate",
+      "change_claim": "repo changes compares stored analysis runs across facts, ranked risks, links, generated artifacts, and deterministic check outcomes"
+    },
+    {
+      "id": "lobsters-run-change",
+      "status": "implemented",
+      "real_repo": "lobsters/lobsters",
+      "subpath": "db/migrate",
+      "change_claim": "repo changes compares stored analysis runs across facts, ranked risks, links, generated artifacts, and deterministic check outcomes"
+    }
+  ]
+}
