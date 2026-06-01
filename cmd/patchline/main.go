@@ -396,10 +396,10 @@ func usage() {
 Usage:
   patchline about
   patchline repo fetch <owner/repo|github-url|path|archive> [--ref ref] [--subpath path] [--out dir] [--download-dir dir] [--json]
-  patchline repo analyze [<path>|--github owner/repo] [--ref ref] [--subpath path] [--stages inventory,baseline,propose,compare,deep] [--proposal-kind tests|guards|instrumentation|repair|all] [--budget files=N,lines=N,tokens=N,changes=N] [--ci] [--redact] [--resume] [--no-llm] [--llm-command cmd] [--out dir] [--json]
+  patchline repo analyze [<path>|--github owner/repo] [--ref ref] [--subpath path] [--stages inventory,baseline,propose,compare,deep] [--proposal-kind tests|guards|instrumentation|repair|all] [--budget files=N,lines=N,tokens=N,changes=N] [--ci] [--redact] [--resume] [--no-llm] [--llm-command cmd] [--prompt-without-facts] [--out dir] [--json]
   patchline repo inventory <path> [--out dir] [--full] [--json]
   patchline repo baseline --inventory inventory-dir --intake intake-dir [--out dir] [--json]
-  patchline repo propose --from-report baseline-dir --proposal-kind tests|guards|instrumentation|repair|all [--budget files=N,lines=N,tokens=N,changes=N] [--no-llm] [--llm-command cmd] [--out dir] [--json]
+  patchline repo propose --from-report baseline-dir --proposal-kind tests|guards|instrumentation|repair|all [--budget files=N,lines=N,tokens=N,changes=N] [--no-llm] [--llm-command cmd] [--prompt-without-facts] [--out dir] [--json]
   patchline repo compare --before baseline-dir --after proposal-dir [--out dir] [--run-native-tests] [--json]
   patchline intake <path> [--out results/generated/intake] [--json]
   patchline intake --github owner/repo [--ref ref] [--subpath path] [--out results/generated/intake] [--json]
@@ -579,6 +579,7 @@ func repoAnalyze(args []string) error {
 	downloadDir := fs.String("download-dir", "", "download/cache directory")
 	proposalKind := fs.String("proposal-kind", "all", "proposal kind: tests|guards|instrumentation|repair|explain|all")
 	llmCommand := fs.String("llm-command", "", "optional user-provided generator command; prompt is passed on stdin")
+	promptNoFacts := fs.Bool("prompt-without-facts", false, "ablation mode: send generator a prompt without repository facts")
 	budget := fs.String("budget", "", "generated scope budget: files=N,lines=N,tokens=N,changes=N")
 	budgetRisks := fs.Int("budget-risks", 3, "maximum ranked risks to include")
 	noLLM := fs.Bool("no-llm", false, "force deterministic template proposals and reject LLM generation")
@@ -587,7 +588,7 @@ func repoAnalyze(args []string) error {
 	ciMode := fs.Bool("ci", false, "write CI metadata for SARIF upload and analysis-bundle artifact storage")
 	runNativeTests := fs.Bool("run-native-tests", false, "run safe allowlisted native test commands during compare")
 	jsonOut := fs.Bool("json", false, "emit JSON")
-	input, flagArgs, err := onePositionalWithFlags(args, map[string]bool{"--ci": true, "--json": true, "--no-llm": true, "--redact": true, "--resume": true, "--run-native-tests": true})
+	input, flagArgs, err := onePositionalWithFlags(args, map[string]bool{"--ci": true, "--json": true, "--no-llm": true, "--prompt-without-facts": true, "--redact": true, "--resume": true, "--run-native-tests": true})
 	if err != nil {
 		return err
 	}
@@ -731,7 +732,7 @@ func repoAnalyze(args []string) error {
 			}
 			report.ReusedStages = append(report.ReusedStages, "proposal")
 		} else {
-			proposal, err = project.Propose(project.ProposalOptions{BaselinePath: filepath.Join(*outPath, "baseline"), Kind: *proposalKind, OutDir: proposalOut, LLMCommand: *llmCommand, NoLLM: *noLLM, Budget: *budget, BudgetRisks: *budgetRisks})
+			proposal, err = project.Propose(project.ProposalOptions{BaselinePath: filepath.Join(*outPath, "baseline"), Kind: *proposalKind, OutDir: proposalOut, LLMCommand: *llmCommand, NoLLM: *noLLM, PromptNoFacts: *promptNoFacts, Budget: *budget, BudgetRisks: *budgetRisks})
 			if err != nil {
 				return err
 			}
@@ -781,7 +782,7 @@ func repoAnalyze(args []string) error {
 	report.Outputs["analysis_bundle"] = filepath.Join(*outPath, "analysis-bundle")
 	report.CommandsPath = filepath.Join(*outPath, "commands.md")
 	report.Outputs["commands"] = report.CommandsPath
-	if err := writeCopyCommandsReport(*outPath, report, *githubRepo != "", *ref, *proposalKind, *llmCommand, *budget, *noLLM, *redact, *ciMode); err != nil {
+	if err := writeCopyCommandsReport(*outPath, report, *githubRepo != "", *ref, *proposalKind, *llmCommand, *budget, *noLLM, *promptNoFacts, *redact, *ciMode); err != nil {
 		return err
 	}
 	report.Hash = canonical.Hash(struct {
@@ -1072,7 +1073,7 @@ func writeAnalysisBundle(outDir string, report repoAnalyzeReport) error {
 	return copyIfExists(filepath.Join(outDir, "analyze.md"), "summary.md")
 }
 
-func writeCopyCommandsReport(outDir string, report repoAnalyzeReport, githubInput bool, githubRef, proposalKind, llmCommand, budget string, noLLM, redact, ciMode bool) error {
+func writeCopyCommandsReport(outDir string, report repoAnalyzeReport, githubInput bool, githubRef, proposalKind, llmCommand, budget string, noLLM, promptNoFacts, redact, ciMode bool) error {
 	var b strings.Builder
 	fmt.Fprintf(&b, "# Copy these Patchline commands\n\n")
 	fmt.Fprintf(&b, "Run this first for an end-to-end analysis of the same project slice:\n\n")
@@ -1098,6 +1099,9 @@ func writeCopyCommandsReport(outDir string, report repoAnalyzeReport, githubInpu
 	}
 	if llmCommand != "" {
 		fmt.Fprintf(&b, " --llm-command %s", shellArg(llmCommand))
+	}
+	if promptNoFacts {
+		fmt.Fprintf(&b, " --prompt-without-facts")
 	}
 	if ciMode {
 		fmt.Fprintf(&b, " --ci")
@@ -1133,6 +1137,9 @@ func writeCopyCommandsReport(outDir string, report repoAnalyzeReport, githubInpu
 	}
 	if llmCommand != "" {
 		fmt.Fprintf(&b, " --llm-command %s", shellArg(llmCommand))
+	}
+	if promptNoFacts {
+		fmt.Fprintf(&b, " --prompt-without-facts")
 	}
 	if noLLM {
 		fmt.Fprintf(&b, " --no-llm")
@@ -1537,6 +1544,7 @@ func repoPropose(args []string) error {
 	outPath := fs.String("out", "", "output directory")
 	llmCommand := fs.String("llm-command", "", "optional user-provided generator command; prompt is passed on stdin")
 	noLLM := fs.Bool("no-llm", false, "force deterministic template proposals and reject LLM generation")
+	promptNoFacts := fs.Bool("prompt-without-facts", false, "ablation mode: send generator a prompt without repository facts")
 	budget := fs.String("budget", "", "generated scope budget: files=N,lines=N,tokens=N,changes=N")
 	budgetRisks := fs.Int("budget-risks", 3, "maximum ranked risks to include")
 	jsonOut := fs.Bool("json", false, "emit JSON")
@@ -1544,20 +1552,21 @@ func repoPropose(args []string) error {
 		return err
 	}
 	if *baselinePath == "" {
-		return errors.New("usage: patchline repo propose --from-report baseline-dir --proposal-kind tests|guards|instrumentation|repair|all --out dir [--budget files=N,lines=N,tokens=N,changes=N] [--no-llm] [--llm-command cmd] [--json]")
+		return errors.New("usage: patchline repo propose --from-report baseline-dir --proposal-kind tests|guards|instrumentation|repair|all --out dir [--budget files=N,lines=N,tokens=N,changes=N] [--no-llm] [--llm-command cmd] [--prompt-without-facts] [--json]")
 	}
 	selectedKind, err := selectProposalKind(*kind, *proposalKind)
 	if err != nil {
 		return err
 	}
 	report, err := project.Propose(project.ProposalOptions{
-		BaselinePath: *baselinePath,
-		Kind:         selectedKind,
-		OutDir:       *outPath,
-		LLMCommand:   *llmCommand,
-		NoLLM:        *noLLM,
-		Budget:       *budget,
-		BudgetRisks:  *budgetRisks,
+		BaselinePath:  *baselinePath,
+		Kind:          selectedKind,
+		OutDir:        *outPath,
+		LLMCommand:    *llmCommand,
+		NoLLM:         *noLLM,
+		PromptNoFacts: *promptNoFacts,
+		Budget:        *budget,
+		BudgetRisks:   *budgetRisks,
 	})
 	if err != nil {
 		return err

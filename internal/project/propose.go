@@ -20,13 +20,14 @@ import (
 const ProposalVersion = "patchline.repo-proposal/v1"
 
 type ProposalOptions struct {
-	BaselinePath string
-	Kind         string
-	OutDir       string
-	LLMCommand   string
-	NoLLM        bool
-	Budget       string
-	BudgetRisks  int
+	BaselinePath  string
+	Kind          string
+	OutDir        string
+	LLMCommand    string
+	NoLLM         bool
+	PromptNoFacts bool
+	Budget        string
+	BudgetRisks   int
 }
 
 type ProposalReport struct {
@@ -35,6 +36,7 @@ type ProposalReport struct {
 	Kind           string              `json:"kind"`
 	Generator      string              `json:"generator"`
 	Deterministic  bool                `json:"deterministic_only"`
+	PromptMode     string              `json:"prompt_mode"`
 	Trust          string              `json:"trust"`
 	BudgetRisks    int                 `json:"budget_risks"`
 	ScopeBudget    ProposalBudget      `json:"scope_budget,omitempty"`
@@ -49,6 +51,7 @@ type ProposalReport struct {
 	Artifacts      map[string]string   `json:"artifacts,omitempty"`
 	Markdown       string              `json:"markdown,omitempty"`
 	Context        ProposalContext     `json:"-"`
+	Prompt         string              `json:"-"`
 	Generated      []GeneratedArtifact `json:"-"`
 	Patch          string              `json:"-"`
 }
@@ -137,7 +140,12 @@ func Propose(opts ProposalOptions) (ProposalReport, error) {
 		return ProposalReport{}, err
 	}
 	context := buildProposalContext(baseline, opts.Kind, opts.BudgetRisks)
+	promptMode := "fact-grounded"
 	prompt := renderProposalPrompt(context)
+	if opts.PromptNoFacts {
+		promptMode = "without-facts"
+		prompt = renderProposalPromptWithoutFacts(context)
+	}
 	generator := "patchline-template"
 	var generated []GeneratedArtifact
 	if opts.LLMCommand != "" {
@@ -163,6 +171,7 @@ func Propose(opts ProposalOptions) (ProposalReport, error) {
 		Kind:          opts.Kind,
 		Generator:     generator,
 		Deterministic: opts.LLMCommand == "",
+		PromptMode:    promptMode,
 		Trust:         "untrusted-generated-proposal",
 		BudgetRisks:   opts.BudgetRisks,
 		ScopeBudget:   budget,
@@ -177,6 +186,7 @@ func Propose(opts ProposalOptions) (ProposalReport, error) {
 			"patch":          "proposal.patch",
 		},
 		Context:   context,
+		Prompt:    prompt,
 		Generated: generated,
 		Patch:     patch,
 	}
@@ -201,7 +211,11 @@ func WriteProposal(outDir string, report ProposalReport) error {
 	if err := os.WriteFile(filepath.Join(outDir, "prompt-context.json"), append(contextData, '\n'), 0o644); err != nil {
 		return err
 	}
-	if err := os.WriteFile(filepath.Join(outDir, "prompt.txt"), []byte(renderProposalPrompt(report.Context)), 0o644); err != nil {
+	prompt := report.Prompt
+	if prompt == "" {
+		prompt = renderProposalPrompt(report.Context)
+	}
+	if err := os.WriteFile(filepath.Join(outDir, "prompt.txt"), []byte(prompt), 0o644); err != nil {
 		return err
 	}
 	if err := os.WriteFile(filepath.Join(outDir, "proposal.patch"), []byte(report.Patch), 0o644); err != nil {
@@ -310,6 +324,21 @@ func renderProposalPrompt(context ProposalContext) string {
 			fmt.Fprintf(&b, "  excerpt:\n%s\n", indent(risk.Excerpt, "    "))
 		}
 	}
+	return b.String()
+}
+
+func renderProposalPromptWithoutFacts(context ProposalContext) string {
+	var b strings.Builder
+	fmt.Fprintf(&b, "Patchline proposal context\n")
+	fmt.Fprintf(&b, "Baseline hash: %s\n", context.BaselineHash)
+	fmt.Fprintf(&b, "Kind: %s\n", context.Kind)
+	fmt.Fprintf(&b, "Prompt mode: without-facts\n")
+	fmt.Fprintf(&b, "Risks: %d withheld for ablation\n", len(context.Risks))
+	fmt.Fprintf(&b, "Constraints:\n")
+	for _, constraint := range context.Constraints {
+		fmt.Fprintf(&b, "- %s\n", constraint)
+	}
+	fmt.Fprintf(&b, "Generate a bounded proposal without repository facts; deterministic re-analysis must catch unsupported output.\n")
 	return b.String()
 }
 

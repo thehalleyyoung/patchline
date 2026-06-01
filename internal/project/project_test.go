@@ -687,6 +687,16 @@ func TestProposeLLMCommandCapturesOutputAsUntrustedArtifact(t *testing.T) {
 	if proposal.Deterministic {
 		t.Fatalf("expected llm-command proposal to be marked non-deterministic: %#v", proposal)
 	}
+	if proposal.PromptMode != "fact-grounded" || !strings.Contains(proposal.Generated[0].Content, "accounts") {
+		t.Fatalf("expected fact-grounded prompt to include risk facts: mode=%q content=%s", proposal.PromptMode, proposal.Generated[0].Content)
+	}
+	noFacts, err := Propose(ProposalOptions{BaselinePath: baselineDir, Kind: "tests", LLMCommand: "cat", PromptNoFacts: true, BudgetRisks: 1})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if noFacts.PromptMode != "without-facts" || strings.Contains(noFacts.Generated[0].Content, "accounts") || !strings.Contains(noFacts.Generated[0].Content, "withheld for ablation") {
+		t.Fatalf("expected fact-free prompt to withhold risk facts: mode=%q content=%s", noFacts.PromptMode, noFacts.Generated[0].Content)
+	}
 	if _, err := Propose(ProposalOptions{BaselinePath: baselineDir, Kind: "tests", LLMCommand: "cat", NoLLM: true, BudgetRisks: 1}); err == nil {
 		t.Fatal("expected --no-llm to reject llm-command")
 	}
