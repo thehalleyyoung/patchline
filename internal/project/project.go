@@ -784,7 +784,6 @@ func identifiersFromText(text string) []Identifier {
 	addMatches := func(kind string, matches []string) {
 		for _, match := range matches {
 			value := strings.ToLower(strings.TrimSpace(match))
-			value = strings.ReplaceAll(value, "_", "-")
 			if value != "" {
 				ids = append(ids, Identifier{Kind: kind, Value: value})
 			}
@@ -807,7 +806,7 @@ func identifiersFromText(text string) []Identifier {
 
 func isSQLIdentifierStopword(value string) bool {
 	switch value {
-	case "", "if", "not", "exists", "set", "where", "select", "from":
+	case "", "if", "not", "exists", "set", "where", "select", "from", "the":
 		return true
 	default:
 		return false

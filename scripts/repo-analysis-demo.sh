@@ -14,18 +14,21 @@ mkdir -p "$OUT"
 FETCH_OUT="$OUT/fetched"
 INVENTORY_OUT="$OUT/inventory"
 INTAKE_OUT="$OUT/intake"
+BASELINE_OUT="$OUT/baseline"
 
 go run ./cmd/patchline repo fetch "$REPO" --subpath "$SUBPATH" --out "$FETCH_OUT" --json > "$OUT/fetch.json"
 SCAN_ROOT="$(jq -r '.source.scanned_root' "$OUT/fetch.json")"
 
 go run ./cmd/patchline repo inventory "$SCAN_ROOT" --out "$INVENTORY_OUT" --json > "$OUT/inventory.json"
 go run ./cmd/patchline intake "$SCAN_ROOT" --out "$INTAKE_OUT" --json > "$OUT/intake.json"
+go run ./cmd/patchline repo baseline --inventory "$INVENTORY_OUT" --intake "$INTAKE_OUT" --out "$BASELINE_OUT" --json > "$OUT/baseline.json"
 FACT_COUNT="$(wc -l < "$INVENTORY_OUT/facts.jsonl" | tr -d ' ')"
 
 jq -n \
   --slurpfile fetch "$OUT/fetch.json" \
   --slurpfile inventory "$OUT/inventory.json" \
   --slurpfile intake "$OUT/intake.json" \
+  --slurpfile baseline "$OUT/baseline.json" \
   --argjson fact_count "$FACT_COUNT" \
   '{
     version: "patchline.repo-demo/v1",
@@ -47,6 +50,13 @@ jq -n \
       problems: $intake[0].summary.problem_candidates,
       causes: $intake[0].summary.cause_candidates,
       links: $intake[0].summary.linked_candidates
+    },
+    baseline: {
+      risks: $baseline[0].summary.ranked_risks,
+      evidence_links: $baseline[0].summary.evidence_links,
+      grep_only: $baseline[0].summary.grep_only_matches,
+      sql_only: $baseline[0].summary.sql_only_ranked_risks,
+      identifier_only_links: $baseline[0].summary.identifier_only_links
     }
   }' > "$OUT/summary.json"
 
@@ -62,10 +72,12 @@ jq -n \
   echo "| project map | \`$INVENTORY_OUT/project-map.md\` |"
   echo "| fact stream | \`$INVENTORY_OUT/facts.jsonl\` |"
   echo "| intake | \`$INTAKE_OUT/summary.md\` |"
+  echo "| baseline | \`$BASELINE_OUT/baseline.md\` |"
+  echo "| baseline SARIF | \`$BASELINE_OUT/baseline.sarif\` |"
   echo
   echo "## Summary"
   echo
-  jq -r '"- files inventoried: \(.inventory.files)\n- project facts: \(.inventory.facts)\n- intake high-risk SQL: \(.intake.high_risk)\n- problem candidates: \(.intake.problems)\n- candidate links: \(.intake.links)"' "$OUT/summary.json"
+  jq -r '"- files inventoried: \(.inventory.files)\n- project facts: \(.inventory.facts)\n- intake high-risk SQL: \(.intake.high_risk)\n- problem candidates: \(.intake.problems)\n- candidate links: \(.intake.links)\n- baseline ranked risks: \(.baseline.risks)\n- baseline evidence links: \(.baseline.evidence_links)"' "$OUT/summary.json"
 } > "$OUT/summary.md"
 
 echo "repo analysis summary: $OUT/summary.md"

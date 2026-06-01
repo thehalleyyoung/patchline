@@ -395,6 +395,7 @@ Usage:
   patchline about
   patchline repo fetch <owner/repo|github-url|path|archive> [--ref ref] [--subpath path] [--out dir] [--json]
   patchline repo inventory <path> [--out dir] [--full] [--json]
+  patchline repo baseline --inventory inventory-dir --intake intake-dir [--out dir] [--json]
   patchline intake <path> [--out results/generated/intake] [--json]
   patchline intake --github owner/repo [--ref ref] [--subpath path] [--out results/generated/intake] [--json]
   patchline semantics-contract [--json]
@@ -468,6 +469,7 @@ Usage:
 Examples:
   patchline repo fetch bytebase/bytebase --subpath backend/migrator/migration --out results/generated/repos/bytebase-migrations
   patchline repo inventory results/generated/repos/bytebase-migrations --out results/generated/repos/bytebase-migrations/inventory
+  patchline repo baseline --inventory results/generated/repos/bytebase-migrations/inventory --intake results/generated/intake --out results/generated/repos/bytebase-migrations/baseline
   patchline intake . --out results/generated/intake
   patchline intake --github bytebase/bytebase --subpath store/migration --out results/generated/intake
   patchline explain record:invoices/inv_1002
@@ -487,6 +489,8 @@ func repoCommand(args []string) error {
 		return repoFetch(args[1:])
 	case "inventory":
 		return repoInventory(args[1:])
+	case "baseline":
+		return repoBaseline(args[1:])
 	default:
 		return fmt.Errorf("unknown repo subcommand %q", args[0])
 	}
@@ -585,6 +589,53 @@ func repoInventory(args []string) error {
 	}
 	for _, command := range inv.NextCommands {
 		fmt.Printf("  next: %s # %s\n", command.Command, command.Reason)
+	}
+	return nil
+}
+
+func repoBaseline(args []string) error {
+	fs := flag.NewFlagSet("repo baseline", flag.ContinueOnError)
+	fs.SetOutput(ioDiscard{})
+	inventoryPath := fs.String("inventory", "", "inventory directory or inventory.json")
+	intakePath := fs.String("intake", "", "intake directory or summary.json")
+	outPath := fs.String("out", "", "output directory")
+	jsonOut := fs.Bool("json", false, "emit JSON")
+	if err := fs.Parse(args); err != nil {
+		return err
+	}
+	if *inventoryPath == "" || *intakePath == "" {
+		return errors.New("usage: patchline repo baseline --inventory inventory-dir --intake intake-dir [--out dir] [--json]")
+	}
+	inv, _, err := project.LoadInventory(*inventoryPath)
+	if err != nil {
+		return err
+	}
+	intakeReport, err := project.LoadIntakeReport(*intakePath)
+	if err != nil {
+		return err
+	}
+	report := project.Baseline(inv, inv.Facts, intakeReport)
+	if *outPath != "" {
+		if err := project.WriteBaseline(*outPath, report); err != nil {
+			return err
+		}
+	}
+	if *jsonOut {
+		return writeJSON(os.Stdout, report)
+	}
+	fmt.Printf("baseline root=%s risks=%d links=%d grep_only=%d sql_only=%d hash=%s\n",
+		report.InventoryRoot,
+		report.Summary.RankedRisks,
+		report.Summary.EvidenceLinks,
+		report.Summary.GrepOnlyMatches,
+		report.Summary.SQLOnlyRankedRisks,
+		report.Hash,
+	)
+	if *outPath != "" {
+		fmt.Printf("  out=%s\n", *outPath)
+	}
+	for _, command := range report.NativeChecks {
+		fmt.Printf("  native: %s # %s\n", command.Command, command.Reason)
 	}
 	return nil
 }

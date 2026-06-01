@@ -19,9 +19,18 @@ go run ./cmd/patchline repo fetch django/django \
 go run ./cmd/patchline repo inventory \
   results/generated/repos/django-auth/django-django-*/django/contrib/auth/migrations \
   --out results/generated/repos/django-auth-inventory
+
+go run ./cmd/patchline intake \
+  results/generated/repos/django-auth/django-django-*/django/contrib/auth/migrations \
+  --out results/generated/repos/django-auth-intake
+
+go run ./cmd/patchline repo baseline \
+  --inventory results/generated/repos/django-auth-inventory \
+  --intake results/generated/repos/django-auth-intake \
+  --out results/generated/repos/django-auth-baseline
 ```
 
-Inventory writes `inventory.json`, `inventory.md`, `facts.jsonl`, and `project-map.md`.
+Inventory writes `inventory.json`, `inventory.md`, `facts.jsonl`, and `project-map.md`. Baseline writes `baseline.json`, `baseline.md`, and `baseline.sarif`.
 
 ## Why this is useful
 
@@ -67,10 +76,11 @@ Run one command to check several public projects and get a compact report:
 make plug-and-play-demo
 ```
 
-To run the staged fetch -> inventory -> intake path on a real GitHub repo:
+To run the staged fetch -> inventory -> intake -> baseline path on real GitHub repos:
 
 ```bash
 make repo-demo
+make four-repo-demo
 ```
 
 The demo downloads real GitHub project subpaths and writes:
@@ -104,6 +114,7 @@ PATCHLINE_PLUGPLAY_CASES=$'My app|owner/repo|path/to/migrations\nOther app|owner
 | --- | --- |
 | Risky data-changing SQL | `.sql`, `.psql`, `.ddl`, and SQL snippets in text/source files |
 | Project facts | `facts.jsonl` from repo inventory: files, languages, migrations, docs, evidence exports, identifiers, and next commands |
+| Baseline ranking | `baseline.json`, `baseline.md`, and `baseline.sarif` from repo baseline: ranked risks, evidence links, native checks, and ablation counts |
 | Embedded/source SQL | Go, Python, Ruby, JavaScript/TypeScript, Java, C#, shell, and SQL files |
 | Cause candidates | risky migrations, deploy/trace/commit/migration signals, incident-like notes, export fields |
 | Repair candidates | repair manifests, rollback/revert/restore/backfill/reconcile/fix clues in SQL/docs/scripts |
@@ -130,8 +141,11 @@ go run ./cmd/patchline intake --github bytebase/bytebase --subpath backend/migra
 # Compare several existing public projects
 make plug-and-play-demo
 
-# Fetch, inventory, and analyze one real GitHub repo slice
+# Fetch, inventory, analyze, and rank one real GitHub repo slice
 make repo-demo
+
+# Prove the staged workflow across four real external repo slices
+make four-repo-demo
 
 # Use as a GitHub Action in another repo
 # - uses: thehalleyyoung/patchline@main

@@ -9,6 +9,9 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+
+	"github.com/thehalleyyoung/patchline/internal/intake"
+	"github.com/thehalleyyoung/patchline/internal/migration"
 )
 
 func TestParseGitHubRepoAcceptsURLAndOwnerRepo(t *testing.T) {
@@ -146,7 +149,7 @@ func TestWriteInventoryEmitsFactsAndProjectMap(t *testing.T) {
 }
 
 func TestIdentifiersIgnoreSQLExistenceKeywords(t *testing.T) {
-	ids := identifiersFromText("CREATE TABLE IF NOT EXISTS sheet_blob (id int); ALTER TABLE IF EXISTS sheet ADD COLUMN x int;")
+	ids := identifiersFromText("CREATE TABLE IF NOT EXISTS sheet_blob (id int); ALTER TABLE IF EXISTS sheet ADD COLUMN x int; update the record")
 	var values []string
 	for _, id := range ids {
 		if id.Kind == "table" {
@@ -205,6 +208,76 @@ func TestExtractZipRejectsUnsafePaths(t *testing.T) {
 	if _, err := extractZip(archive, t.TempDir()); err == nil {
 		t.Fatalf("expected unsafe zip path to fail")
 	}
+}
+
+func TestBaselineRanksRisksAndLinksFactsWithUnderscores(t *testing.T) {
+	inv := Inventory{
+		Root:         filepath.ToSlash(t.TempDir()),
+		TestCommands: []Command{{Command: "go test ./...", Reason: "Go tests"}},
+		Facts: []Fact{
+			{Version: Version, ID: "fact:table", Kind: "file", Path: "db/migrate/001.sql", Confidence: "observed", Identifiers: []Identifier{{Kind: "table", Value: "auth_user"}}},
+			{Version: Version, ID: "fact:doc", Kind: "operational_doc", Path: "docs/incident.md", Confidence: "path", Identifiers: []Identifier{{Kind: "table", Value: "auth_user"}}},
+		},
+	}
+	report := intake.Report{
+		Source: intake.Source{Input: "fixture"},
+		SQL: []intake.SQLFinding{{
+			Path:       "db/migrate/001.sql",
+			SourceKind: "sql_file",
+			Statements: migrationStatementsForTest{{
+				Index: 0, Kind: "update", Table: "auth_user", Risk: "high", Reasons: []string{"unbounded update can rewrite an entire table"},
+			}}.asMigrationStatements(),
+		}},
+		Problems: []intake.ProblemCandidate{{ID: "problem:1", Path: "db/migrate/001.sql", Kind: "high-risk-sql", Severity: "high", Table: "auth_user", Identifiers: []string{"table:auth_user"}, Rationale: "risky update"}},
+	}
+	baseline := Baseline(inv, inv.Facts, report)
+	if baseline.Summary.RankedRisks == 0 || baseline.Summary.EvidenceLinks == 0 || baseline.Summary.IdentifierOnlyLinks == 0 {
+		t.Fatalf("expected ranked risks and identifier links: %#v", baseline.Summary)
+	}
+	if len(baseline.NativeChecks) != 1 {
+		t.Fatalf("expected native check passthrough: %#v", baseline.NativeChecks)
+	}
+	if !strings.Contains(baseline.Markdown, "Patchline repo baseline") {
+		t.Fatalf("expected baseline markdown, got %q", baseline.Markdown)
+	}
+}
+
+func TestLoadInventoryAcceptsInventoryJSONPath(t *testing.T) {
+	root := t.TempDir()
+	writeFile(t, root, "db/migrate/001.sql", "update auth_user set is_active = false;")
+	inv, err := InventoryPath(InventoryOptions{Path: root})
+	if err != nil {
+		t.Fatal(err)
+	}
+	out := filepath.Join(t.TempDir(), "inventory")
+	if err := WriteInventory(out, inv); err != nil {
+		t.Fatal(err)
+	}
+	loaded, _, err := LoadInventory(filepath.Join(out, "inventory.json"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(loaded.Facts) == 0 {
+		t.Fatalf("expected facts loaded from sibling facts.jsonl")
+	}
+}
+
+type migrationStatementForTest struct {
+	Index   int
+	Kind    string
+	Table   string
+	Risk    string
+	Reasons []string
+}
+
+type migrationStatementsForTest []migrationStatementForTest
+
+func (items migrationStatementsForTest) asMigrationStatements() []migration.Statement {
+	out := make([]migration.Statement, 0, len(items))
+	for _, item := range items {
+		out = append(out, migration.Statement{Index: item.Index, Kind: item.Kind, Table: item.Table, Risk: migration.Risk(item.Risk), Reasons: item.Reasons})
+	}
+	return out
 }
 
 func writeFile(t *testing.T, root, rel, content string) {
