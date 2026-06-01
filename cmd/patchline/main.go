@@ -395,10 +395,10 @@ func usage() {
 Usage:
   patchline about
   patchline repo fetch <owner/repo|github-url|path|archive> [--ref ref] [--subpath path] [--out dir] [--download-dir dir] [--json]
-  patchline repo analyze [<path>|--github owner/repo] [--ref ref] [--subpath path] [--stages inventory,baseline,propose,compare,deep] [--no-llm] [--out dir] [--json]
+  patchline repo analyze [<path>|--github owner/repo] [--ref ref] [--subpath path] [--stages inventory,baseline,propose,compare,deep] [--no-llm] [--llm-command cmd] [--out dir] [--json]
   patchline repo inventory <path> [--out dir] [--full] [--json]
   patchline repo baseline --inventory inventory-dir --intake intake-dir [--out dir] [--json]
-  patchline repo propose --from-report baseline-dir --kind tests|guards|instrumentation|repair|explain|all [--no-llm] [--out dir] [--json]
+  patchline repo propose --from-report baseline-dir --kind tests|guards|instrumentation|repair|explain|all [--no-llm] [--llm-command cmd] [--out dir] [--json]
   patchline repo compare --before baseline-dir --after proposal-dir [--out dir] [--run-native-tests] [--json]
   patchline intake <path> [--out results/generated/intake] [--json]
   patchline intake --github owner/repo [--ref ref] [--subpath path] [--out results/generated/intake] [--json]
@@ -531,6 +531,8 @@ type repoAnalyzeSummary struct {
 	PolicyChecks         int    `json:"policy_checks"`
 	RepairProofSummaries int    `json:"repair_proof_summaries"`
 	GeneratedFiles       int    `json:"generated_files"`
+	ProposalGenerator    string `json:"proposal_generator,omitempty"`
+	DeterministicOnly    bool   `json:"deterministic_only"`
 	InterventionLoops    int    `json:"intervention_loops"`
 	CompareChecksFailed  int    `json:"compare_checks_failed"`
 	NativeChecksSkipped  int    `json:"native_checks_skipped"`
@@ -558,6 +560,7 @@ func repoAnalyze(args []string) error {
 	outPath := fs.String("out", filepath.Join("results", "generated", "repo-analysis"), "output directory")
 	downloadDir := fs.String("download-dir", "", "download/cache directory")
 	proposalKind := fs.String("proposal-kind", "all", "proposal kind: tests|guards|instrumentation|repair|explain|all")
+	llmCommand := fs.String("llm-command", "", "optional user-provided generator command; prompt is passed on stdin")
 	budgetRisks := fs.Int("budget-risks", 3, "maximum ranked risks to include")
 	noLLM := fs.Bool("no-llm", false, "force deterministic template proposals and reject LLM generation")
 	runNativeTests := fs.Bool("run-native-tests", false, "run safe allowlisted native test commands during compare")
@@ -573,7 +576,7 @@ func repoAnalyze(args []string) error {
 		input = *githubRepo
 	}
 	if input == "" || fs.NArg() != 0 {
-		return errors.New("usage: patchline repo analyze [<path>|--github owner/repo] [--ref ref] [--subpath path] [--stages inventory,baseline,propose,compare,deep] [--no-llm] [--out dir] [--json]")
+		return errors.New("usage: patchline repo analyze [<path>|--github owner/repo] [--ref ref] [--subpath path] [--stages inventory,baseline,propose,compare,deep] [--no-llm] [--llm-command cmd] [--out dir] [--json]")
 	}
 	stages, err := parseAnalyzeStages(*stagesValue)
 	if err != nil {
@@ -662,7 +665,7 @@ func repoAnalyze(args []string) error {
 	}
 	if analyzeNeeds(stageSet, "propose") {
 		proposalOut := filepath.Join(*outPath, "proposal")
-		proposal, err = project.Propose(project.ProposalOptions{BaselinePath: filepath.Join(*outPath, "baseline"), Kind: *proposalKind, OutDir: proposalOut, NoLLM: *noLLM, BudgetRisks: *budgetRisks})
+		proposal, err = project.Propose(project.ProposalOptions{BaselinePath: filepath.Join(*outPath, "baseline"), Kind: *proposalKind, OutDir: proposalOut, LLMCommand: *llmCommand, NoLLM: *noLLM, BudgetRisks: *budgetRisks})
 		if err != nil {
 			return err
 		}
@@ -671,6 +674,8 @@ func repoAnalyze(args []string) error {
 		}
 		report.Outputs["proposal"] = proposalOut
 		report.Summary.GeneratedFiles = len(proposal.GeneratedFiles)
+		report.Summary.ProposalGenerator = proposal.Generator
+		report.Summary.DeterministicOnly = proposal.Deterministic
 		report.Summary.ProposalHash = proposal.OutputHash
 	}
 	if analyzeNeeds(stageSet, "compare") {
@@ -848,6 +853,10 @@ func writeRepoAnalyzeReport(outDir string, report repoAnalyzeReport) error {
 	fmt.Fprintf(&b, "| policy checks | %d |\n", report.Summary.PolicyChecks)
 	fmt.Fprintf(&b, "| repair proof summaries | %d |\n", report.Summary.RepairProofSummaries)
 	fmt.Fprintf(&b, "| generated files | %d |\n", report.Summary.GeneratedFiles)
+	if report.Summary.ProposalGenerator != "" {
+		fmt.Fprintf(&b, "| proposal generator | %s |\n", report.Summary.ProposalGenerator)
+	}
+	fmt.Fprintf(&b, "| deterministic only | %t |\n", report.Summary.DeterministicOnly)
 	fmt.Fprintf(&b, "| intervention loops | %d |\n", report.Summary.InterventionLoops)
 	fmt.Fprintf(&b, "| compare checks failed | %d |\n\n", report.Summary.CompareChecksFailed)
 	fmt.Fprintf(&b, "## Outputs\n\n| stage | path |\n| --- | --- |\n")
@@ -970,7 +979,7 @@ func repoPropose(args []string) error {
 		return err
 	}
 	if *baselinePath == "" {
-		return errors.New("usage: patchline repo propose --from-report baseline-dir --kind tests|guards|instrumentation|repair|explain|all --out dir [--no-llm] [--json]")
+		return errors.New("usage: patchline repo propose --from-report baseline-dir --kind tests|guards|instrumentation|repair|explain|all --out dir [--no-llm] [--llm-command cmd] [--json]")
 	}
 	report, err := project.Propose(project.ProposalOptions{
 		BaselinePath: *baselinePath,
