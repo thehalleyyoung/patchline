@@ -1,0 +1,37 @@
+{
+  "version": "patchline.triage-gates/v1",
+  "gates": [
+    {
+      "id": "forem-triage",
+      "status": "implemented",
+      "real_repo": "forem/forem",
+      "subpath": "db/migrate",
+      "required_surfaces": ["migrations", "app_write_paths", "jobs", "tests", "incidents", "runbooks", "generated_interventions"],
+      "triage_claim": "maintainer triage groups findings by owner-relevant surfaces and includes generated intervention review state"
+    },
+    {
+      "id": "bytebase-triage",
+      "status": "implemented",
+      "real_repo": "bytebase/bytebase",
+      "subpath": "backend/migrator/migration",
+      "required_surfaces": ["migrations", "app_write_paths", "jobs", "tests", "incidents", "runbooks", "generated_interventions"],
+      "triage_claim": "maintainer triage groups findings by owner-relevant surfaces and includes generated intervention review state"
+    },
+    {
+      "id": "mastodon-triage",
+      "status": "implemented",
+      "real_repo": "mastodon/mastodon",
+      "subpath": "db/migrate",
+      "required_surfaces": ["migrations", "app_write_paths", "jobs", "tests", "incidents", "runbooks", "generated_interventions"],
+      "triage_claim": "maintainer triage groups findings by owner-relevant surfaces and includes generated intervention review state"
+    },
+    {
+      "id": "lobsters-triage",
+      "status": "implemented",
+      "real_repo": "lobsters/lobsters",
+      "subpath": "db/migrate",
+      "required_surfaces": ["migrations", "app_write_paths", "jobs", "tests", "incidents", "runbooks", "generated_interventions"],
+      "triage_claim": "maintainer triage groups findings by owner-relevant surfaces and includes generated intervention review state"
+    }
+  ]
+}

@@ -578,6 +578,45 @@ type repoAnalyzeDeepSummary struct {
 	AblationSensitiveRisks int `json:"ablation_sensitive_risks"`
 }
 
+type maintainerTriageReport struct {
+	Version      string                  `json:"version"`
+	BaselineHash string                  `json:"baseline_hash"`
+	ProposalHash string                  `json:"proposal_hash,omitempty"`
+	CompareHash  string                  `json:"compare_hash,omitempty"`
+	Groups       []maintainerTriageGroup `json:"groups"`
+	Summary      maintainerTriageSummary `json:"summary"`
+	Hash         string                  `json:"hash"`
+	Markdown     string                  `json:"markdown,omitempty"`
+}
+
+type maintainerTriageSummary struct {
+	Groups                 int `json:"groups"`
+	GroupsWithFindings     int `json:"groups_with_findings"`
+	TotalFindings          int `json:"total_findings"`
+	GeneratedInterventions int `json:"generated_interventions"`
+	NativeChecks           int `json:"native_checks"`
+}
+
+type maintainerTriageGroup struct {
+	Surface        string                  `json:"surface"`
+	OwnerHint      string                  `json:"owner_hint"`
+	FindingCount   int                     `json:"finding_count"`
+	TopRisks       []maintainerTriageRisk  `json:"top_risks,omitempty"`
+	EvidencePaths  []string                `json:"evidence_paths,omitempty"`
+	GeneratedFiles []project.GeneratedFile `json:"generated_files,omitempty"`
+	NativeChecks   []project.Command       `json:"native_checks,omitempty"`
+	Rationale      string                  `json:"rationale"`
+}
+
+type maintainerTriageRisk struct {
+	ID       string `json:"id"`
+	Path     string `json:"path"`
+	Kind     string `json:"kind"`
+	Table    string `json:"table,omitempty"`
+	Severity string `json:"severity"`
+	Score    int    `json:"score"`
+}
+
 type repoDoctorReport struct {
 	Version      string            `json:"version"`
 	Input        string            `json:"input"`
@@ -848,6 +887,14 @@ func repoAnalyze(args []string) error {
 		report.Summary.CompareChecksFailed = compare.Summary.PatchlineChecksFailed
 		report.Summary.NativeChecksSkipped = compare.Summary.NativeChecksSkipped
 		report.Summary.CompareHash = compare.Hash
+	}
+	if baseline.Hash != "" {
+		triage := buildMaintainerTriage(baseline, proposal, compare)
+		triageOut := filepath.Join(*outPath, "triage")
+		if err := writeMaintainerTriage(triageOut, triage); err != nil {
+			return err
+		}
+		report.Outputs["triage"] = triageOut
 	}
 	report.Outputs["analysis_bundle"] = filepath.Join(*outPath, "analysis-bundle")
 	report.CommandsPath = filepath.Join(*outPath, "commands.md")
@@ -1445,6 +1492,187 @@ func writeRepoAnalyzeReport(outDir string, report repoAnalyzeReport) error {
 	return os.WriteFile(filepath.Join(outDir, "analyze.md"), []byte(b.String()), 0o644)
 }
 
+func buildMaintainerTriage(baseline project.BaselineReport, proposal project.ProposalReport, compare project.CompareReport) maintainerTriageReport {
+	report := maintainerTriageReport{
+		Version:      "patchline.maintainer-triage/v1",
+		BaselineHash: baseline.Hash,
+		ProposalHash: proposal.OutputHash,
+		CompareHash:  compare.Hash,
+	}
+	groups := []maintainerTriageGroup{
+		{Surface: "migrations", OwnerHint: "database or migration owner", Rationale: "schema/data migrations and raw migration SQL with ranked risk"},
+		{Surface: "app_write_paths", OwnerHint: "service or feature owner", Rationale: "application source paths that write persistent data"},
+		{Surface: "jobs", OwnerHint: "background job owner", Rationale: "workers, jobs, cron tasks, and async data changes"},
+		{Surface: "tests", OwnerHint: "test owner", Rationale: "native tests and test commands linked to risky data changes"},
+		{Surface: "incidents", OwnerHint: "on-call or reliability owner", Rationale: "incident-like paths and linked operational evidence"},
+		{Surface: "runbooks", OwnerHint: "operations or repair owner", Rationale: "runbooks, repair paths, rollback notes, and repair clusters"},
+		{Surface: "generated_interventions", OwnerHint: "reviewer of generated artifacts", Rationale: "untrusted generated tests, guards, instrumentation, and repairs"},
+	}
+	bySurface := map[string]*maintainerTriageGroup{}
+	for i := range groups {
+		bySurface[groups[i].Surface] = &groups[i]
+	}
+	for _, risk := range baseline.Risks {
+		addTriageRisk(bySurface[triageRiskSurface(risk)], risk)
+	}
+	for _, slice := range baseline.Provenance {
+		for _, path := range slice.SourcePaths {
+			addTriagePath(bySurface["app_write_paths"], path)
+		}
+		for _, path := range slice.IncidentPaths {
+			addTriagePath(bySurface["incidents"], path)
+		}
+		for _, path := range slice.RepairPaths {
+			addTriagePath(bySurface["runbooks"], path)
+		}
+		for _, command := range slice.TestCommands {
+			addTriageCommand(bySurface["tests"], command)
+		}
+		for _, command := range slice.NativeCommands {
+			addTriageCommand(bySurface["tests"], command)
+		}
+	}
+	for _, cluster := range baseline.CauseClusters {
+		addTriagePath(bySurface["incidents"], cluster.Path)
+	}
+	for _, cluster := range baseline.RepairClusters {
+		addTriagePath(bySurface["runbooks"], cluster.Path)
+	}
+	for _, command := range baseline.NativeChecks {
+		addTriageCommand(bySurface["tests"], command)
+	}
+	for _, generated := range proposal.GeneratedFiles {
+		bySurface["generated_interventions"].GeneratedFiles = append(bySurface["generated_interventions"].GeneratedFiles, generated)
+	}
+	for i := range groups {
+		sort.Slice(groups[i].TopRisks, func(a, b int) bool {
+			if groups[i].TopRisks[a].Score != groups[i].TopRisks[b].Score {
+				return groups[i].TopRisks[a].Score > groups[i].TopRisks[b].Score
+			}
+			return groups[i].TopRisks[a].ID < groups[i].TopRisks[b].ID
+		})
+		if len(groups[i].TopRisks) > 10 {
+			groups[i].TopRisks = groups[i].TopRisks[:10]
+		}
+		sort.Strings(groups[i].EvidencePaths)
+		sort.Slice(groups[i].GeneratedFiles, func(a, b int) bool { return groups[i].GeneratedFiles[a].Path < groups[i].GeneratedFiles[b].Path })
+		sort.Slice(groups[i].NativeChecks, func(a, b int) bool { return groups[i].NativeChecks[a].Command < groups[i].NativeChecks[b].Command })
+		groups[i].FindingCount = len(groups[i].TopRisks) + len(groups[i].EvidencePaths) + len(groups[i].GeneratedFiles) + len(groups[i].NativeChecks)
+		report.Summary.TotalFindings += groups[i].FindingCount
+		report.Summary.GeneratedInterventions += len(groups[i].GeneratedFiles)
+		report.Summary.NativeChecks += len(groups[i].NativeChecks)
+		if groups[i].FindingCount > 0 {
+			report.Summary.GroupsWithFindings++
+		}
+	}
+	report.Groups = groups
+	report.Summary.Groups = len(groups)
+	report.Hash = maintainerTriageHash(report)
+	report.Markdown = renderMaintainerTriageMarkdown(report)
+	return report
+}
+
+func triageRiskSurface(risk project.BaselineRisk) string {
+	path := strings.ToLower(risk.Path)
+	kind := strings.ToLower(risk.Kind)
+	switch {
+	case strings.Contains(path, "test") || strings.Contains(path, "spec"):
+		return "tests"
+	case strings.Contains(path, "job") || strings.Contains(path, "worker") || strings.Contains(path, "cron") || strings.Contains(path, "task"):
+		return "jobs"
+	case strings.Contains(path, "incident") || strings.Contains(path, "postmortem") || strings.Contains(path, "outage"):
+		return "incidents"
+	case strings.Contains(path, "runbook") || strings.Contains(path, "rollback") || strings.Contains(path, "repair") || strings.Contains(path, "reconcile"):
+		return "runbooks"
+	case strings.Contains(path, "migrate") || strings.Contains(path, "migration") || strings.Contains(kind, "schema") || strings.Contains(kind, "sql"):
+		return "migrations"
+	default:
+		return "app_write_paths"
+	}
+}
+
+func addTriageRisk(group *maintainerTriageGroup, risk project.BaselineRisk) {
+	if group == nil {
+		return
+	}
+	group.TopRisks = append(group.TopRisks, maintainerTriageRisk{ID: risk.ID, Path: risk.Path, Kind: risk.Kind, Table: risk.Table, Severity: risk.Severity, Score: risk.Score})
+}
+
+func addTriagePath(group *maintainerTriageGroup, path string) {
+	if group == nil || strings.TrimSpace(path) == "" {
+		return
+	}
+	for _, existing := range group.EvidencePaths {
+		if existing == path {
+			return
+		}
+	}
+	group.EvidencePaths = append(group.EvidencePaths, path)
+}
+
+func addTriageCommand(group *maintainerTriageGroup, command project.Command) {
+	if group == nil || strings.TrimSpace(command.Command) == "" {
+		return
+	}
+	for _, existing := range group.NativeChecks {
+		if existing.Command == command.Command {
+			return
+		}
+	}
+	group.NativeChecks = append(group.NativeChecks, command)
+}
+
+func writeMaintainerTriage(outDir string, report maintainerTriageReport) error {
+	if err := os.MkdirAll(outDir, 0o755); err != nil {
+		return err
+	}
+	copy := report
+	copy.Markdown = ""
+	data, err := json.MarshalIndent(copy, "", "  ")
+	if err != nil {
+		return err
+	}
+	if err := os.WriteFile(filepath.Join(outDir, "triage.json"), append(data, '\n'), 0o644); err != nil {
+		return err
+	}
+	return os.WriteFile(filepath.Join(outDir, "triage.md"), []byte(report.Markdown), 0o644)
+}
+
+func maintainerTriageHash(report maintainerTriageReport) string {
+	copy := report
+	copy.Hash = ""
+	copy.Markdown = ""
+	return canonical.Hash(copy)
+}
+
+func renderMaintainerTriageMarkdown(report maintainerTriageReport) string {
+	var b strings.Builder
+	fmt.Fprintf(&b, "# Patchline maintainer triage\n\n")
+	fmt.Fprintf(&b, "- baseline_hash: `%s`\n", report.BaselineHash)
+	if report.ProposalHash != "" {
+		fmt.Fprintf(&b, "- proposal_hash: `%s`\n", report.ProposalHash)
+	}
+	if report.CompareHash != "" {
+		fmt.Fprintf(&b, "- compare_hash: `%s`\n", report.CompareHash)
+	}
+	fmt.Fprintf(&b, "- hash: `%s`\n\n", report.Hash)
+	fmt.Fprintf(&b, "## Summary\n\n| area | count |\n| --- | ---: |\n")
+	fmt.Fprintf(&b, "| groups | %d |\n", report.Summary.Groups)
+	fmt.Fprintf(&b, "| groups with findings | %d |\n", report.Summary.GroupsWithFindings)
+	fmt.Fprintf(&b, "| total findings | %d |\n", report.Summary.TotalFindings)
+	fmt.Fprintf(&b, "| generated interventions | %d |\n", report.Summary.GeneratedInterventions)
+	fmt.Fprintf(&b, "| native checks | %d |\n\n", report.Summary.NativeChecks)
+	fmt.Fprintf(&b, "## Owner surfaces\n\n| surface | owner hint | findings | top risk | rationale |\n| --- | --- | ---: | --- | --- |\n")
+	for _, group := range report.Groups {
+		topRisk := ""
+		if len(group.TopRisks) > 0 {
+			topRisk = fmt.Sprintf("%s (%s %d)", group.TopRisks[0].ID, group.TopRisks[0].Severity, group.TopRisks[0].Score)
+		}
+		fmt.Fprintf(&b, "| %s | %s | %d | %s | %s |\n", group.Surface, group.OwnerHint, group.FindingCount, topRisk, group.Rationale)
+	}
+	return b.String()
+}
+
 func writeAnalysisBundle(outDir string, report repoAnalyzeReport) error {
 	bundleDir := filepath.Join(outDir, "analysis-bundle")
 	if err := os.MkdirAll(bundleDir, 0o755); err != nil {
@@ -1503,6 +1731,14 @@ func writeAnalysisBundle(outDir string, report repoAnalyzeReport) error {
 	}
 	if compareOut := report.Outputs["compare"]; compareOut != "" {
 		if err := copyIfExists(filepath.Join(compareOut, "compare.json"), "compare.json"); err != nil {
+			return err
+		}
+	}
+	if triageOut := report.Outputs["triage"]; triageOut != "" {
+		if err := copyIfExists(filepath.Join(triageOut, "triage.json"), "triage.json"); err != nil {
+			return err
+		}
+		if err := copyIfExists(filepath.Join(triageOut, "triage.md"), "triage.md"); err != nil {
 			return err
 		}
 	}

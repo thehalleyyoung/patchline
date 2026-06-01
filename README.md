@@ -53,7 +53,7 @@ go run ./cmd/patchline repo compare \
   --out results/generated/repos/django-auth-compare
 ```
 
-Quickstart writes `quickstart.json`, `quickstart.md`, and `commands.sh` with exactly three copy/paste commands plus expected artifacts. Doctor writes `doctor.json` and `doctor.md` with tool availability, cache state, scanned files, facts, and safe native checks before analysis. Fetch writes `source.json` with source provenance, resolved GitHub commit, archive hash, timestamp, tool version, and cache metadata. Inventory writes `inventory.json`, `inventory.md`, `facts.jsonl`, and `project-map.md`. Baseline writes `baseline.json`, `baseline.md`, and `baseline.sarif`. Propose writes `prompt-context.json`, `prompt.txt`, `proposal.patch`, `proposal.json`, and generated untrusted artifacts under `patchline-proposals/`. Compare writes `compare.json` and `compare.md`.
+Quickstart writes `quickstart.json`, `quickstart.md`, and `commands.sh` with exactly three copy/paste commands plus expected artifacts. Doctor writes `doctor.json` and `doctor.md` with tool availability, cache state, scanned files, facts, and safe native checks before analysis. Fetch writes `source.json` with source provenance, resolved GitHub commit, archive hash, timestamp, tool version, and cache metadata. Inventory writes `inventory.json`, `inventory.md`, `facts.jsonl`, and `project-map.md`. Baseline writes `baseline.json`, `baseline.md`, and `baseline.sarif`. Propose writes `prompt-context.json`, `prompt.txt`, `proposal.patch`, `proposal.json`, and generated untrusted artifacts under `patchline-proposals/`. Compare writes `compare.json` and `compare.md`. Triage writes `triage/triage.json` and `triage/triage.md`, also copied into `analysis-bundle/`, grouping findings by maintainer owner surface.
 
 `repo analyze` also writes `commands.md`, a copy/paste maintainer report with the equivalent one-command and staged command sequences plus the shareable bundle paths.
 
@@ -139,6 +139,7 @@ make industrial-research-gate
 make development-cycle-gate
 make doctor-gate
 make quickstart-gate
+make triage-gate
 ```
 
 The demo downloads real GitHub project subpaths and writes:
@@ -176,6 +177,8 @@ The real-repo slice matrix is backed by `examples/real-repo-slices.json` and `ex
 `make doctor-gate` checks `examples/doctor-gates.json` by running `patchline doctor` on four public repo slices and proving preflight diagnostics are emitted before analysis.
 
 `make quickstart-gate` checks `examples/quickstart-gates.json` by running emitted three-command quickstarts against four public repo slices and verifying the expected artifacts.
+
+`make triage-gate` checks `examples/triage-gates.json` by running analysis on four public repo slices and proving maintainer triage dashboards group findings by migrations, app write paths, jobs, tests, incidents, runbooks, and generated interventions.
 
 Current default projects:
 

@@ -8,6 +8,7 @@ import (
 	"testing"
 
 	"github.com/thehalleyyoung/patchline/internal/artifact"
+	"github.com/thehalleyyoung/patchline/internal/project"
 )
 
 func TestExitCodeDefaultsToUsageOrGenericFailure(t *testing.T) {
@@ -95,6 +96,30 @@ func TestQuickstartEmitsExactlyThreeCommands(t *testing.T) {
 func TestQuickstartRequiresGitHubAndSubpath(t *testing.T) {
 	if err := quickstart([]string{"--github", "lobsters/lobsters", "--json"}); err == nil {
 		t.Fatal("expected missing subpath usage error")
+	}
+}
+
+func TestMaintainerTriageGroupsOwnerSurfaces(t *testing.T) {
+	baseline := project.BaselineReport{
+		Hash: "baseline-hash",
+		Risks: []project.BaselineRisk{
+			{ID: "risk:migration", Path: "db/migrate/001.sql", Kind: "schema_evolution", Severity: "high", Score: 90},
+			{ID: "risk:job", Path: "app/jobs/backfill.rb", Kind: "code_path", Severity: "medium", Score: 60},
+		},
+		NativeChecks: []project.Command{{Command: "go test ./...", Reason: "Go tests"}},
+		Provenance: []project.ProvenanceSlice{{
+			RiskID:        "risk:migration",
+			IncidentPaths: []string{"docs/incidents/backfill.md"},
+			RepairPaths:   []string{"docs/runbooks/rollback.md"},
+		}},
+	}
+	proposal := project.ProposalReport{OutputHash: "proposal-hash", GeneratedFiles: []project.GeneratedFile{{Path: "patchline-proposals/tests/risk.md", Kind: "tests"}}}
+	triage := buildMaintainerTriage(baseline, proposal, project.CompareReport{Hash: "compare-hash"})
+	if triage.Version != "patchline.maintainer-triage/v1" || triage.Summary.Groups != 7 || triage.Summary.GeneratedInterventions != 1 || triage.Hash == "" {
+		t.Fatalf("unexpected triage summary: %#v", triage)
+	}
+	if !strings.Contains(triage.Markdown, "generated_interventions") {
+		t.Fatalf("expected generated intervention group in markdown: %s", triage.Markdown)
 	}
 }
 
