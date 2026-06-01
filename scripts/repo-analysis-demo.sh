@@ -63,7 +63,9 @@ jq -n \
       high_risk: $intake[0].summary.high_risk_sql_statements,
       problems: $intake[0].summary.problem_candidates,
       causes: $intake[0].summary.cause_candidates,
-      links: $intake[0].summary.linked_candidates
+      repairs: $intake[0].summary.repair_candidates,
+      links: $intake[0].summary.linked_candidates,
+      time_signals: $intake[0].summary.time_signals
     },
     baseline: {
       risks: $baseline[0].summary.ranked_risks,
@@ -103,6 +105,28 @@ jq -n \
       intervention_accepted: ($compare[0].summary.intervention_accepted // 0),
       intervention_rejected: ($compare[0].summary.intervention_rejected // 0),
       rejected: $compare[0].summary.rejected
+    },
+    coverage: {
+      files_scanned: $inventory[0].files_scanned,
+      facts: $fact_count,
+      schema_evolution: ($inventory[0].summary_by_category.schema_evolution // 0),
+      native_commands: ($inventory[0].summary_by_category.native_commands // 0),
+      field_evidence: ($inventory[0].summary_by_category.field_evidence // 0),
+      ranked_risks: $baseline[0].summary.ranked_risks,
+      evidence_links: $baseline[0].summary.evidence_links,
+      time_signals: $intake[0].summary.time_signals
+    },
+    before_after_deltas: {
+      baseline_risks: $compare[0].summary.baseline_risks,
+      targeted_risks: $compare[0].summary.targeted_risks,
+      risks_with_generated_coverage: $compare[0].summary.risks_with_coverage,
+      generated_files: $compare[0].summary.generated_files,
+      new_high_risk_sql: $compare[0].summary.new_high_risk_sql,
+      new_medium_risk_sql: $compare[0].summary.new_medium_risk_sql,
+      checks_passed: $compare[0].summary.patchline_checks_passed,
+      checks_failed: $compare[0].summary.patchline_checks_failed,
+      intervention_accepted: ($compare[0].summary.intervention_accepted // 0),
+      intervention_rejected: ($compare[0].summary.intervention_rejected // 0)
     }
   }' > "$OUT/summary.json"
 
@@ -126,8 +150,8 @@ jq -n \
   echo
   echo "## Summary"
   echo
-  jq -r '"- files inventoried: \(.inventory.files)\n- project facts: \(.inventory.facts)\n- schema evolution findings: \(.inventory.schema_evolution)\n- native commands: \(.inventory.native_commands)\n- field evidence: \(.inventory.field_evidence)\n- intake high-risk SQL: \(.intake.high_risk)\n- problem candidates: \(.intake.problems)\n- candidate links: \(.intake.links)\n- baseline ranked risks: \(.baseline.risks)\n- baseline code-path risks: \(.baseline.code_path_risks)\n- ranking explanations: \(.baseline.ranking_explanations)\n- provenance slices: \(.baseline.provenance_slices)\n- datalog-style rows: \(.baseline.datalog_rows)\n- abstract effects: \(.baseline.abstract_effects)\n- symbolic checks: \(.baseline.symbolic_checks)\n- temporal windows: \(.baseline.temporal_windows)\n- recurrence patterns: \(.baseline.recurrences)\n- policy checks: \(.baseline.policy_checks)\n- repair proof summaries: \(.baseline.repair_proof_summaries)\n- baseline evidence links: \(.baseline.evidence_links)\n- generated proposal files: \(.proposal.files)\n  - proposal scope budget: \(.proposal.scope_budget)
-  - proposal output hash: \(.proposal.output_hash)\n- compare checks passed: \(.compare.checks_passed)\n- compare checks failed: \(.compare.checks_failed)\n- native checks run: \(.compare.native_checks_run)\n- native checks passed: \(.compare.native_checks_passed)\n- native checks failed: \(.compare.native_checks_failed)\n- native checks skipped: \(.compare.native_checks_skipped)\n- intervention loops: \(.compare.intervention_loops)\n- intervention accepted: \(.compare.intervention_accepted)\n- intervention rejected: \(.compare.intervention_rejected)"' "$OUT/summary.json"
+  jq -r '"- files inventoried: \(.inventory.files)\n- project facts: \(.inventory.facts)\n- schema evolution findings: \(.inventory.schema_evolution)\n- native commands: \(.inventory.native_commands)\n- field evidence: \(.inventory.field_evidence)\n- intake high-risk SQL: \(.intake.high_risk)\n- problem candidates: \(.intake.problems)\n- cause candidates: \(.intake.causes)\n- repair candidates: \(.intake.repairs)\n- candidate links: \(.intake.links)\n- time signals: \(.intake.time_signals)\n- baseline ranked risks: \(.baseline.risks)\n- baseline code-path risks: \(.baseline.code_path_risks)\n- ranking explanations: \(.baseline.ranking_explanations)\n- provenance slices: \(.baseline.provenance_slices)\n- datalog-style rows: \(.baseline.datalog_rows)\n- abstract effects: \(.baseline.abstract_effects)\n- symbolic checks: \(.baseline.symbolic_checks)\n- temporal windows: \(.baseline.temporal_windows)\n- recurrence patterns: \(.baseline.recurrences)\n- policy checks: \(.baseline.policy_checks)\n- repair proof summaries: \(.baseline.repair_proof_summaries)\n- baseline evidence links: \(.baseline.evidence_links)\n- generated proposal files: \(.proposal.files)\n  - proposal scope budget: \(.proposal.scope_budget)
+  - proposal output hash: \(.proposal.output_hash)\n- covered risks after generated intervention: \(.before_after_deltas.risks_with_generated_coverage)\n- new high-risk SQL after generated intervention: \(.before_after_deltas.new_high_risk_sql)\n- compare checks passed: \(.compare.checks_passed)\n- compare checks failed: \(.compare.checks_failed)\n- native checks run: \(.compare.native_checks_run)\n- native checks passed: \(.compare.native_checks_passed)\n- native checks failed: \(.compare.native_checks_failed)\n- native checks skipped: \(.compare.native_checks_skipped)\n- intervention loops: \(.compare.intervention_loops)\n- intervention accepted: \(.compare.intervention_accepted)\n- intervention rejected: \(.compare.intervention_rejected)"' "$OUT/summary.json"
 } > "$OUT/summary.md"
 
 echo "repo analysis summary: $OUT/summary.md"
