@@ -133,7 +133,7 @@ results/generated/real-repo-slice-matrix/slice-matrix.md
 results/generated/real-repo-slice-matrix/slice-matrix.json
 ```
 
-The real-repo slice matrix is backed by `examples/real-repo-slices.json` and reports each public slice by ecosystem, migration framework, repo size class, available evidence types, fetched commit, inventory coverage, grep-only and SQL-only comparisons, risks, linked candidates, time signals, generated artifacts, before/after deltas, and cache proof.
+The real-repo slice matrix is backed by `examples/real-repo-slices.json` and reports each public slice by ecosystem, migration framework, repo size class, available evidence types, fetched commit, inventory coverage, grep-only, SQL-only, and identifier-only comparisons, risks, linked candidates, time signals, generated artifacts, before/after deltas, and cache proof.
 
 Current default projects:
 
