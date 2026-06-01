@@ -179,6 +179,29 @@ func TestBuildChangesReportComparesAnalysisArtifacts(t *testing.T) {
 	}
 }
 
+func TestBuildNotifySummaryReportKeepsSlackAndGitHubCompact(t *testing.T) {
+	root := t.TempDir()
+	writeAnalysisSnapshotForTest(t, root, "fact-top", "stable-risk:top0000000000000", "generated/top.md", "sha256:top", 0, 3)
+	writeMainTestFile(t, root, "analyze.json", `{
+  "version": "patchline.repo-analyze/v1",
+  "input": "bytebase/bytebase",
+  "subpath": "backend/migrator/migration",
+  "outputs": {"analysis_bundle":"`+filepath.ToSlash(filepath.Join(root, "analysis-bundle"))+`"},
+  "source": {"mode":"github","owner":"bytebase","repo":"bytebase","ref":"main"}
+}
+`)
+	report, err := buildNotifySummaryReport(root, "https://example.test/bundle")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if report.TopMaintainerAction == "" || report.TopRisk.StableID != "stable-risk:top0000000000000" || !strings.Contains(report.ReproductionCommand, "--github bytebase/bytebase") {
+		t.Fatalf("unexpected notify summary: %#v", report)
+	}
+	if !strings.Contains(report.SlackText, "top risk") || !strings.Contains(report.GitHubMarkdown, "**Top action:**") || report.Hash == "" {
+		t.Fatalf("expected Slack/GitHub output and hash: %#v", report)
+	}
+}
+
 func writeAnalysisSnapshotForTest(t *testing.T, root, factID, stableID, generatedPath, generatedHash string, failures, passed int) {
 	t.Helper()
 	writeMainTestFile(t, root, "inventory/facts.jsonl", `{"id":"`+factID+`","kind":"sql","path":"db/migrate/001.sql"}`+"\n")

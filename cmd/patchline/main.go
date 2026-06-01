@@ -412,6 +412,7 @@ Usage:
   patchline repo suppressions --baseline baseline-dir --suppressions suppressions.json [--out dir] [--json]
   patchline repo why-now --previous baseline-dir --current baseline-dir [--out dir] [--json]
   patchline repo changes --previous analysis-dir --current analysis-dir [--out dir] [--json]
+  patchline repo notify-summary --analysis analysis-dir [--bundle-link url] [--out dir] [--json]
   patchline intake <path> [--out results/generated/intake] [--json]
   patchline intake --github owner/repo [--ref ref] [--subpath path] [--out results/generated/intake] [--json]
   patchline semantics-contract [--json]
@@ -501,7 +502,7 @@ Examples:
 
 func repoCommand(args []string) error {
 	if len(args) == 0 {
-		return errors.New("usage: patchline repo <doctor|fetch|analyze|inventory|baseline|propose|compare|suppressions|why-now|changes> ...")
+		return errors.New("usage: patchline repo <doctor|fetch|analyze|inventory|baseline|propose|compare|suppressions|why-now|changes|notify-summary> ...")
 	}
 	switch args[0] {
 	case "doctor":
@@ -524,6 +525,8 @@ func repoCommand(args []string) error {
 		return repoWhyNow(args[1:])
 	case "changes":
 		return repoChanges(args[1:])
+	case "notify-summary":
+		return repoNotifySummary(args[1:])
 	default:
 		return fmt.Errorf("unknown repo subcommand %q", args[0])
 	}
@@ -799,6 +802,29 @@ type checksDelta struct {
 	CurrentPassed    int `json:"current_passed"`
 	FailureDelta     int `json:"failure_delta"`
 	PassDelta        int `json:"pass_delta"`
+}
+
+type notifySummaryReport struct {
+	Version             string            `json:"version"`
+	Analysis            string            `json:"analysis"`
+	BundleLink          string            `json:"bundle_link"`
+	TopMaintainerAction string            `json:"top_maintainer_action"`
+	TopRisk             notifySummaryRisk `json:"top_risk"`
+	ReproductionCommand string            `json:"reproduction_command"`
+	SlackText           string            `json:"slack_text"`
+	GitHubMarkdown      string            `json:"github_markdown"`
+	Hash                string            `json:"hash"`
+	Markdown            string            `json:"markdown,omitempty"`
+}
+
+type notifySummaryRisk struct {
+	ID       string `json:"id"`
+	StableID string `json:"stable_id,omitempty"`
+	Path     string `json:"path"`
+	Table    string `json:"table,omitempty"`
+	Severity string `json:"severity"`
+	Score    int    `json:"score"`
+	Reason   string `json:"reason,omitempty"`
 }
 
 func repoAnalyze(args []string) error {
@@ -3057,6 +3083,209 @@ func renderChangesMarkdown(report changesReport) string {
 	fmt.Fprintf(&b, "\n## Deterministic checks\n\n| area | previous | current | delta |\n| --- | ---: | ---: | ---: |\n")
 	fmt.Fprintf(&b, "| failures | %d | %d | %+d |\n", report.Checks.PreviousFailures, report.Checks.CurrentFailures, report.Checks.FailureDelta)
 	fmt.Fprintf(&b, "| passed | %d | %d | %+d |\n", report.Checks.PreviousPassed, report.Checks.CurrentPassed, report.Checks.PassDelta)
+	return b.String()
+}
+
+func repoNotifySummary(args []string) error {
+	fs := flag.NewFlagSet("repo notify-summary", flag.ContinueOnError)
+	fs.SetOutput(ioDiscard{})
+	analysisPath := fs.String("analysis", "", "repo analyze output directory")
+	bundleLink := fs.String("bundle-link", "", "analysis bundle URL or path")
+	outPath := fs.String("out", "", "output directory")
+	jsonOut := fs.Bool("json", false, "emit JSON")
+	if err := fs.Parse(args); err != nil {
+		return err
+	}
+	if *analysisPath == "" || fs.NArg() != 0 {
+		return errors.New("usage: patchline repo notify-summary --analysis analysis-dir [--bundle-link url] [--out dir] [--json]")
+	}
+	report, err := buildNotifySummaryReport(*analysisPath, *bundleLink)
+	if err != nil {
+		return err
+	}
+	if *outPath != "" {
+		if err := writeNotifySummaryReport(*outPath, report); err != nil {
+			return err
+		}
+	}
+	if *jsonOut {
+		return writeJSON(os.Stdout, report)
+	}
+	fmt.Println(report.SlackText)
+	if *outPath != "" {
+		fmt.Printf("  out=%s\n", *outPath)
+	}
+	return nil
+}
+
+func buildNotifySummaryReport(analysisPath, bundleLink string) (notifySummaryReport, error) {
+	baseline, err := project.LoadBaseline(filepath.Join(analysisPath, "baseline"))
+	if err != nil {
+		return notifySummaryReport{}, err
+	}
+	var analyze repoAnalyzeReport
+	analyzeData, analyzeErr := os.ReadFile(filepath.Join(analysisPath, "analyze.json"))
+	if analyzeErr == nil {
+		if err := json.Unmarshal(analyzeData, &analyze); err != nil {
+			return notifySummaryReport{}, err
+		}
+	} else if !errors.Is(analyzeErr, os.ErrNotExist) {
+		return notifySummaryReport{}, analyzeErr
+	}
+	var proposal project.ProposalReport
+	if data, err := os.ReadFile(filepath.Join(analysisPath, "proposal", "proposal.json")); err == nil {
+		if err := json.Unmarshal(data, &proposal); err != nil {
+			return notifySummaryReport{}, err
+		}
+	} else if !errors.Is(err, os.ErrNotExist) {
+		return notifySummaryReport{}, err
+	}
+	compare, _ := loadCompareReport(filepath.Join(analysisPath, "compare", "compare.json"))
+	if bundleLink == "" {
+		if analyze.Outputs != nil && analyze.Outputs["analysis_bundle"] != "" {
+			bundleLink = analyze.Outputs["analysis_bundle"]
+		} else {
+			bundleLink = filepath.ToSlash(filepath.Join(analysisPath, "analysis-bundle"))
+		}
+	}
+	var top project.BaselineRisk
+	if len(baseline.Risks) > 0 {
+		top = baseline.Risks[0]
+	}
+	report := notifySummaryReport{
+		Version:             "patchline.notify-summary/v1",
+		Analysis:            filepath.ToSlash(analysisPath),
+		BundleLink:          bundleLink,
+		TopMaintainerAction: notifyTopAction(top, proposal, compare),
+		TopRisk: notifySummaryRisk{
+			ID:       top.ID,
+			StableID: top.StableID,
+			Path:     top.Path,
+			Table:    top.Table,
+			Severity: top.Severity,
+			Score:    top.Score,
+			Reason:   top.Rationale,
+		},
+		ReproductionCommand: notifyReproductionCommand(top, analyze),
+	}
+	report.SlackText = renderNotifySlackText(report)
+	report.GitHubMarkdown = renderNotifyGitHubMarkdown(report)
+	report.Hash = notifySummaryHash(report)
+	report.Markdown = renderNotifySummaryMarkdown(report)
+	return report, nil
+}
+
+func notifyTopAction(risk project.BaselineRisk, proposal project.ProposalReport, compare project.CompareReport) string {
+	if compare.Summary.PatchlineChecksFailed+compare.Summary.NativeChecksFailed > 0 {
+		return "Fix deterministic check failures before using generated interventions"
+	}
+	if risk.ID == "" {
+		return "Run repo analysis and inspect the generated analysis bundle"
+	}
+	if len(proposal.GeneratedFiles) > 0 {
+		return "Review generated intervention for the top-ranked data-change risk"
+	}
+	if risk.Table != "" {
+		return "Review the top-ranked risk on table " + risk.Table
+	}
+	return "Review the top-ranked data-change risk"
+}
+
+func notifyReproductionCommand(risk project.BaselineRisk, analyze repoAnalyzeReport) string {
+	if strings.TrimSpace(risk.NextCommand) != "" {
+		return risk.NextCommand
+	}
+	if analyze.Input != "" {
+		args := []string{"go run ./cmd/patchline repo analyze"}
+		if analyze.Source.Mode == "github" && analyze.Source.Repo != "" {
+			repo := analyze.Source.Repo
+			if analyze.Source.Owner != "" && !strings.Contains(repo, "/") {
+				repo = analyze.Source.Owner + "/" + repo
+			}
+			args = append(args, "--github "+shellArg(repo))
+			if analyze.Source.Ref != "" {
+				args = append(args, "--ref "+shellArg(analyze.Source.Ref))
+			}
+		} else {
+			args = append(args, shellArg(analyze.Input))
+		}
+		if analyze.Subpath != "" {
+			args = append(args, "--subpath "+shellArg(analyze.Subpath))
+		}
+		args = append(args, "--stages inventory,baseline,propose,compare", "--no-llm", "--out results/generated/reproduce-analysis")
+		return strings.Join(args, " ")
+	}
+	if risk.Path != "" {
+		return "go run ./cmd/patchline analyze-migration " + shellArg(risk.Path) + " --json"
+	}
+	return "go run ./cmd/patchline repo analyze <repo-or-path> --stages inventory,baseline,propose,compare --no-llm"
+}
+
+func renderNotifySlackText(report notifySummaryReport) string {
+	risk := report.TopRisk.ID
+	if risk == "" {
+		risk = "no ranked risk"
+	}
+	return fmt.Sprintf("Patchline: %s | top risk: %s (%s %d) | reproduce: `%s` | bundle: %s",
+		report.TopMaintainerAction,
+		risk,
+		report.TopRisk.Severity,
+		report.TopRisk.Score,
+		report.ReproductionCommand,
+		report.BundleLink,
+	)
+}
+
+func renderNotifyGitHubMarkdown(report notifySummaryReport) string {
+	var b strings.Builder
+	fmt.Fprintf(&b, "### Patchline summary\n\n")
+	fmt.Fprintf(&b, "**Top action:** %s\n\n", report.TopMaintainerAction)
+	fmt.Fprintf(&b, "**Top risk:** `%s`", report.TopRisk.ID)
+	if report.TopRisk.StableID != "" {
+		fmt.Fprintf(&b, " / `%s`", report.TopRisk.StableID)
+	}
+	fmt.Fprintf(&b, " (%s, score %d)", report.TopRisk.Severity, report.TopRisk.Score)
+	if report.TopRisk.Path != "" {
+		fmt.Fprintf(&b, " in `%s`", report.TopRisk.Path)
+	}
+	fmt.Fprintf(&b, "\n\n**Reproduce:** `%s`\n\n", report.ReproductionCommand)
+	fmt.Fprintf(&b, "**Bundle:** %s\n", report.BundleLink)
+	return b.String()
+}
+
+func writeNotifySummaryReport(outDir string, report notifySummaryReport) error {
+	if err := os.MkdirAll(outDir, 0o755); err != nil {
+		return err
+	}
+	copy := report
+	copy.Markdown = ""
+	data, err := json.MarshalIndent(copy, "", "  ")
+	if err != nil {
+		return err
+	}
+	if err := os.WriteFile(filepath.Join(outDir, "notify-summary.json"), append(data, '\n'), 0o644); err != nil {
+		return err
+	}
+	return os.WriteFile(filepath.Join(outDir, "notify-summary.md"), []byte(report.Markdown), 0o644)
+}
+
+func notifySummaryHash(report notifySummaryReport) string {
+	copy := report
+	copy.Hash = ""
+	copy.Markdown = ""
+	return canonical.Hash(copy)
+}
+
+func renderNotifySummaryMarkdown(report notifySummaryReport) string {
+	var b strings.Builder
+	fmt.Fprintf(&b, "# Patchline notification summary\n\n")
+	fmt.Fprintf(&b, "- action: %s\n", report.TopMaintainerAction)
+	fmt.Fprintf(&b, "- top_risk: `%s`\n", report.TopRisk.ID)
+	fmt.Fprintf(&b, "- reproduce: `%s`\n", report.ReproductionCommand)
+	fmt.Fprintf(&b, "- bundle: %s\n", report.BundleLink)
+	fmt.Fprintf(&b, "- hash: `%s`\n\n", report.Hash)
+	fmt.Fprintf(&b, "## Slack\n\n%s\n\n", report.SlackText)
+	fmt.Fprintf(&b, "## GitHub\n\n%s", report.GitHubMarkdown)
 	return b.String()
 }
 

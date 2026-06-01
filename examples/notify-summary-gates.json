@@ -1,0 +1,33 @@
+{
+  "version": "patchline.notify-summary-gates/v1",
+  "gates": [
+    {
+      "id": "forem-notify-summary",
+      "status": "implemented",
+      "real_repo": "forem/forem",
+      "subpath": "db/migrate",
+      "summary_claim": "notify-summary emits one Slack/GitHub-friendly top action, top risk, reproduction command, and bundle link"
+    },
+    {
+      "id": "bytebase-notify-summary",
+      "status": "implemented",
+      "real_repo": "bytebase/bytebase",
+      "subpath": "backend/migrator/migration",
+      "summary_claim": "notify-summary emits one Slack/GitHub-friendly top action, top risk, reproduction command, and bundle link"
+    },
+    {
+      "id": "mastodon-notify-summary",
+      "status": "implemented",
+      "real_repo": "mastodon/mastodon",
+      "subpath": "db/migrate",
+      "summary_claim": "notify-summary emits one Slack/GitHub-friendly top action, top risk, reproduction command, and bundle link"
+    },
+    {
+      "id": "lobsters-notify-summary",
+      "status": "implemented",
+      "real_repo": "lobsters/lobsters",
+      "subpath": "db/migrate",
+      "summary_claim": "notify-summary emits one Slack/GitHub-friendly top action, top risk, reproduction command, and bundle link"
+    }
+  ]
+}
