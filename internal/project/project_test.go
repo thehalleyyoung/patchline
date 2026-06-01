@@ -788,6 +788,56 @@ func TestStableRiskIDIgnoresPathAndLineDrift(t *testing.T) {
 	}
 }
 
+func TestHostedArchiveInputsParseAndBuildURLs(t *testing.T) {
+	tests := []struct {
+		input     string
+		host      string
+		nested    bool
+		wantOwner string
+		wantRepo  string
+		wantURL   string
+	}{
+		{
+			input:     "gitlab:gitlab-org/security-products/analyzers/secrets",
+			host:      "gitlab",
+			nested:    true,
+			wantOwner: "gitlab-org/security-products/analyzers",
+			wantRepo:  "secrets",
+			wantURL:   "https://gitlab.com/gitlab-org/security-products/analyzers/secrets/-/archive/main/secrets-main.tar.gz",
+		},
+		{
+			input:     "bitbucket:atlassian/python-bitbucket",
+			host:      "bitbucket",
+			wantOwner: "atlassian",
+			wantRepo:  "python-bitbucket",
+			wantURL:   "https://bitbucket.org/atlassian/python-bitbucket/get/main.tar.gz",
+		},
+		{
+			input:     "sourcehut:sircmpwn/scdoc",
+			host:      "sourcehut",
+			wantOwner: "~sircmpwn",
+			wantRepo:  "scdoc",
+			wantURL:   "https://git.sr.ht/~sircmpwn/scdoc/archive/main.tar.gz",
+		},
+	}
+	for _, tc := range tests {
+		owner, repo, err := parsePrefixedRepo(tc.input, tc.host, tc.nested)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if owner != tc.wantOwner || repo != tc.wantRepo {
+			t.Fatalf("%s parsed to %s/%s", tc.input, owner, repo)
+		}
+		got, kind, err := hostedArchiveURL(tc.host, owner, repo, "main")
+		if err != nil {
+			t.Fatal(err)
+		}
+		if got != tc.wantURL || kind != "tar.gz" {
+			t.Fatalf("%s URL = %s kind=%s", tc.input, got, kind)
+		}
+	}
+}
+
 func writeBaselineForTest(t *testing.T, baseline BaselineReport) string {
 	t.Helper()
 	dir := filepath.Join(t.TempDir(), "baseline")

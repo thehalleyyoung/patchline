@@ -1,0 +1,37 @@
+{
+  "version": "patchline.non-github-source-gates/v1",
+  "sources": [
+    {
+      "id": "gitlab-cli",
+      "kind": "gitlab",
+      "input": "gitlab:gitlab-org/cli",
+      "ref": "b37860458a2c5f0ef8caf606ae5b8be30b0c62b5",
+      "subpath": "cmd",
+      "claim": "GitLab archives use Patchline fetch provenance and content-addressed cache semantics"
+    },
+    {
+      "id": "bitbucket-helloworld",
+      "kind": "bitbucket",
+      "input": "bitbucket:atlassian_tutorial/helloworld",
+      "ref": "65d938f39f364da3f90767e008022ffe45c562af",
+      "subpath": ".",
+      "claim": "Bitbucket archives use Patchline fetch provenance and content-addressed cache semantics"
+    },
+    {
+      "id": "sourcehut-scdoc",
+      "kind": "sourcehut",
+      "input": "sourcehut:sircmpwn/scdoc",
+      "ref": "1d4143da79f22b71dd51da69a9f587f52d19dc84",
+      "subpath": "src",
+      "claim": "SourceHut archives use Patchline fetch provenance and content-addressed cache semantics"
+    },
+    {
+      "id": "release-tarball-tinyhacknews",
+      "kind": "archive-url",
+      "input": "https://github.com/adlternative/tinyhacknews/archive/b02895a0a927f010269661557a1951ac4e314a76.tar.gz",
+      "ref": "-",
+      "subpath": "src/main/resources/db/migration",
+      "claim": "Release/archive tarballs use Patchline fetch provenance and content-addressed cache semantics"
+    }
+  ]
+}

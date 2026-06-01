@@ -13,6 +13,7 @@ import (
 	"io"
 	"io/fs"
 	"net/http"
+	"net/url"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -180,6 +181,60 @@ func Fetch(ctx context.Context, opts FetchOptions) (FetchResult, error) {
 	skipped := map[string]bool{}
 	input := strings.TrimSpace(opts.Input)
 	switch {
+	case isHostedArchiveInput(input, "gitlab"):
+		namespace, repo, err := parsePrefixedRepo(input, "gitlab", true)
+		if err != nil {
+			return FetchResult{}, err
+		}
+		source.Mode, source.Owner, source.Repo = "gitlab", namespace, repo
+		root, archiveHash, commitHint, cache, err := fetchHostedArchive(ctx, "gitlab", namespace, repo, source.Ref, outDir, downloadDir)
+		if err != nil {
+			return FetchResult{}, err
+		}
+		applyCacheResult(&source, cache)
+		source.ResolvedCommit = source.Ref
+		source.ArchiveHash = archiveHash
+		source.CommitHint = commitHint
+		source.ScannedRoot = filepath.ToSlash(root)
+	case isHostedArchiveInput(input, "bitbucket"):
+		namespace, repo, err := parsePrefixedRepo(input, "bitbucket", false)
+		if err != nil {
+			return FetchResult{}, err
+		}
+		source.Mode, source.Owner, source.Repo = "bitbucket", namespace, repo
+		root, archiveHash, commitHint, cache, err := fetchHostedArchive(ctx, "bitbucket", namespace, repo, source.Ref, outDir, downloadDir)
+		if err != nil {
+			return FetchResult{}, err
+		}
+		applyCacheResult(&source, cache)
+		source.ResolvedCommit = source.Ref
+		source.ArchiveHash = archiveHash
+		source.CommitHint = commitHint
+		source.ScannedRoot = filepath.ToSlash(root)
+	case isHostedArchiveInput(input, "sourcehut"):
+		namespace, repo, err := parsePrefixedRepo(input, "sourcehut", false)
+		if err != nil {
+			return FetchResult{}, err
+		}
+		source.Mode, source.Owner, source.Repo = "sourcehut", namespace, repo
+		root, archiveHash, commitHint, cache, err := fetchHostedArchive(ctx, "sourcehut", namespace, repo, source.Ref, outDir, downloadDir)
+		if err != nil {
+			return FetchResult{}, err
+		}
+		applyCacheResult(&source, cache)
+		source.ResolvedCommit = source.Ref
+		source.ArchiveHash = archiveHash
+		source.CommitHint = commitHint
+		source.ScannedRoot = filepath.ToSlash(root)
+	case isHTTPArchive(input):
+		source.Mode = "archive-url"
+		root, archiveHash, cache, err := fetchArchiveURL(ctx, input, outDir, downloadDir)
+		if err != nil {
+			return FetchResult{}, err
+		}
+		applyCacheResult(&source, cache)
+		source.ArchiveHash = archiveHash
+		source.ScannedRoot = filepath.ToSlash(root)
 	case isGitHubInput(input):
 		owner, repo, err := ParseGitHubRepo(input)
 		if err != nil {
@@ -198,15 +253,6 @@ func Fetch(ctx context.Context, opts FetchOptions) (FetchResult, error) {
 		applyCacheResult(&source, cache)
 		source.ArchiveHash = archiveHash
 		source.CommitHint = commitHint
-		source.ScannedRoot = filepath.ToSlash(root)
-	case isHTTPArchive(input):
-		source.Mode = "archive-url"
-		root, archiveHash, cache, err := fetchArchiveURL(ctx, input, outDir, downloadDir)
-		if err != nil {
-			return FetchResult{}, err
-		}
-		applyCacheResult(&source, cache)
-		source.ArchiveHash = archiveHash
 		source.ScannedRoot = filepath.ToSlash(root)
 	case isArchivePath(input):
 		source.Mode = "archive"
@@ -362,6 +408,37 @@ func isGitHubInput(input string) bool {
 	return true
 }
 
+func isHostedArchiveInput(input, host string) bool {
+	return strings.HasPrefix(strings.TrimSpace(input), host+":")
+}
+
+func parsePrefixedRepo(input, host string, allowNestedNamespace bool) (string, string, error) {
+	value := strings.TrimSpace(strings.TrimPrefix(input, host+":"))
+	value = strings.TrimSuffix(value, ".git")
+	value = strings.Trim(value, "/")
+	value = strings.TrimPrefix(value, "https://")
+	value = strings.TrimPrefix(value, "http://")
+	for _, prefix := range []string{"gitlab.com/", "bitbucket.org/", "git.sr.ht/"} {
+		value = strings.TrimPrefix(value, prefix)
+	}
+	parts := strings.Split(value, "/")
+	if len(parts) < 2 || strings.Contains(value, "..") {
+		return "", "", fmt.Errorf("%s repo must be namespace/repo, got %q", host, input)
+	}
+	if !allowNestedNamespace && len(parts) != 2 {
+		return "", "", fmt.Errorf("%s repo must be owner/repo, got %q", host, input)
+	}
+	repo := parts[len(parts)-1]
+	namespace := strings.Join(parts[:len(parts)-1], "/")
+	if namespace == "" || repo == "" {
+		return "", "", fmt.Errorf("%s repo must be namespace/repo, got %q", host, input)
+	}
+	if host == "sourcehut" && !strings.HasPrefix(namespace, "~") {
+		namespace = "~" + namespace
+	}
+	return namespace, repo, nil
+}
+
 func resolveGitHubCommit(ctx context.Context, owner, repo, ref string) (string, error) {
 	if isFullSHA(ref) {
 		return strings.ToLower(ref), nil
@@ -395,6 +472,49 @@ func resolveGitHubCommit(ctx context.Context, owner, repo, ref string) (string, 
 		return "", fmt.Errorf("github commit %s/%s@%s resolved to invalid sha %q", owner, repo, ref, payload.SHA)
 	}
 	return strings.ToLower(payload.SHA), nil
+}
+
+func fetchHostedArchive(ctx context.Context, host, namespace, repo, ref, outDir, downloadDir string) (string, string, string, downloadCacheResult, error) {
+	if ref == "" {
+		ref = "HEAD"
+	}
+	archiveURL, kind, err := hostedArchiveURL(host, namespace, repo, ref)
+	if err != nil {
+		return "", "", "", downloadCacheResult{}, err
+	}
+	key := host + ":" + namespace + "/" + repo + "@" + ref
+	root, top, cache, err := fetchCachedArchive(ctx, archiveURL, outDir, downloadDir, key, kind, ref)
+	if err != nil {
+		return "", "", "", downloadCacheResult{}, err
+	}
+	commitHint := commitHintFromTop(top)
+	if commitHint == "" {
+		commitHint = ref
+	}
+	return root, cache.ArchiveHash, commitHint, cache, nil
+}
+
+func hostedArchiveURL(host, namespace, repo, ref string) (string, string, error) {
+	switch host {
+	case "gitlab":
+		repoPath := namespace + "/" + repo
+		filename := repo + "-" + ref + ".tar.gz"
+		return "https://gitlab.com/" + pathEscapeSegments(repoPath) + "/-/archive/" + url.PathEscape(ref) + "/" + url.PathEscape(filename), "tar.gz", nil
+	case "bitbucket":
+		return "https://bitbucket.org/" + pathEscapeSegments(namespace+"/"+repo) + "/get/" + url.PathEscape(ref) + ".tar.gz", "tar.gz", nil
+	case "sourcehut":
+		return "https://git.sr.ht/" + pathEscapeSegments(namespace+"/"+repo) + "/archive/" + url.PathEscape(ref) + ".tar.gz", "tar.gz", nil
+	default:
+		return "", "", fmt.Errorf("unsupported source host %q", host)
+	}
+}
+
+func pathEscapeSegments(path string) string {
+	parts := strings.Split(path, "/")
+	for i, part := range parts {
+		parts[i] = url.PathEscape(part)
+	}
+	return strings.Join(parts, "/")
 }
 
 func fetchGitHubArchive(ctx context.Context, owner, repo, ref, resolvedCommit, outDir, downloadDir string) (string, string, string, downloadCacheResult, error) {

@@ -1127,7 +1127,7 @@ func repoFetch(args []string) error {
 		return err
 	}
 	if input == "" || fs.NArg() != 0 {
-		return errors.New("usage: patchline repo fetch <owner/repo|github-url|path|archive> [--ref ref] [--subpath path] [--out dir] [--download-dir dir] [--json]")
+		return errors.New("usage: patchline repo fetch <owner/repo|github-url|gitlab:namespace/repo|bitbucket:owner/repo|sourcehut:owner/repo|path|archive-url> [--ref ref] [--subpath path] [--out dir] [--download-dir dir] [--json]")
 	}
 	result, err := project.Fetch(context.Background(), project.FetchOptions{
 		Input:       input,

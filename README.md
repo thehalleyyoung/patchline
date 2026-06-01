@@ -148,6 +148,7 @@ make notify-summary-gate
 make explain-finding-gate
 make public-gallery-gate
 make real-repo-catalog-gate
+make non-github-source-gate
 ```
 
 The demo downloads real GitHub project subpaths and writes:
@@ -203,6 +204,8 @@ The real-repo slice matrix is backed by `examples/real-repo-slices.json` and `ex
 `make public-gallery-gate` checks `examples/public-gallery-gates.json` by generating a public gallery with redacted analysis bundles, pinned commits, expected bundle/screenshot hashes, and SVG maintainer-facing screenshots for four public repo slices.
 
 `make real-repo-catalog-gate` checks `examples/real-repo-catalog.json` by verifying at least 25 pinned public slices across Rails, Django, Alembic, Flyway, Liquibase, Prisma, TypeORM, EF Core, Go, Java, Node, and monorepos.
+
+`make non-github-source-gate` checks `examples/non-github-source-gates.json` by fetching GitLab, Bitbucket, SourceHut, and release/archive tarball sources through the same provenance and content-addressed cache path.
 
 Current default projects:
 
