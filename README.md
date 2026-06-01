@@ -146,6 +146,7 @@ make why-now-gate
 make run-change-gate
 make notify-summary-gate
 make explain-finding-gate
+make public-gallery-gate
 ```
 
 The demo downloads real GitHub project subpaths and writes:
@@ -197,6 +198,8 @@ The real-repo slice matrix is backed by `examples/real-repo-slices.json` and `ex
 `make notify-summary-gate` checks `examples/notify-summary-gates.json` by emitting Slack/GitHub-friendly summaries with only the top maintainer action, top risk, reproduction command, and bundle link across four public repo slices.
 
 `make explain-finding-gate` checks `examples/explain-finding-gates.json` by explaining stable finding IDs from four public repo slices with evidence, ranking factors, alternatives considered, proof holes, and verification commands.
+
+`make public-gallery-gate` checks `examples/public-gallery-gates.json` by generating a public gallery with redacted analysis bundles, pinned commits, expected bundle/screenshot hashes, and SVG maintainer-facing screenshots for four public repo slices.
 
 Current default projects:
 

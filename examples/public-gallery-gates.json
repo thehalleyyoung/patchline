@@ -1,0 +1,33 @@
+{
+  "version": "patchline.public-gallery-gates/v1",
+  "gates": [
+    {
+      "id": "forem-gallery",
+      "status": "implemented",
+      "real_repo": "forem/forem",
+      "subpath": "db/migrate",
+      "gallery_claim": "public gallery publishes a redacted analysis bundle, pinned commit, expected hash, and maintainer-facing SVG screenshot"
+    },
+    {
+      "id": "bytebase-gallery",
+      "status": "implemented",
+      "real_repo": "bytebase/bytebase",
+      "subpath": "backend/migrator/migration",
+      "gallery_claim": "public gallery publishes a redacted analysis bundle, pinned commit, expected hash, and maintainer-facing SVG screenshot"
+    },
+    {
+      "id": "mastodon-gallery",
+      "status": "implemented",
+      "real_repo": "mastodon/mastodon",
+      "subpath": "db/migrate",
+      "gallery_claim": "public gallery publishes a redacted analysis bundle, pinned commit, expected hash, and maintainer-facing SVG screenshot"
+    },
+    {
+      "id": "lobsters-gallery",
+      "status": "implemented",
+      "real_repo": "lobsters/lobsters",
+      "subpath": "db/migrate",
+      "gallery_claim": "public gallery publishes a redacted analysis bundle, pinned commit, expected hash, and maintainer-facing SVG screenshot"
+    }
+  ]
+}
