@@ -21,6 +21,8 @@ go run ./cmd/patchline repo inventory \
   --out results/generated/repos/django-auth-inventory
 ```
 
+Inventory writes `inventory.json`, `inventory.md`, `facts.jsonl`, and `project-map.md`.
+
 ## Why this is useful
 
 Real production data problems often start as ordinary files: a broad migration, a risky backfill, a rollback note, a deploy export, a trace dump, or an ad hoc repair script. Those files are usually scattered across repos and tools. Patchline gives you a first pass over them without asking you to prepare a special dataset.
@@ -101,6 +103,7 @@ PATCHLINE_PLUGPLAY_CASES=$'My app|owner/repo|path/to/migrations\nOther app|owner
 | Finds | From |
 | --- | --- |
 | Risky data-changing SQL | `.sql`, `.psql`, `.ddl`, and SQL snippets in text/source files |
+| Project facts | `facts.jsonl` from repo inventory: files, languages, migrations, docs, evidence exports, identifiers, and next commands |
 | Embedded/source SQL | Go, Python, Ruby, JavaScript/TypeScript, Java, C#, shell, and SQL files |
 | Cause candidates | risky migrations, deploy/trace/commit/migration signals, incident-like notes, export fields |
 | Repair candidates | repair manifests, rollback/revert/restore/backfill/reconcile/fix clues in SQL/docs/scripts |

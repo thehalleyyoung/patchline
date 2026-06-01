@@ -2,10 +2,12 @@ package project
 
 import (
 	"archive/zip"
+	"bufio"
 	"context"
 	"encoding/json"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 )
 
@@ -83,6 +85,76 @@ func TestInventoryDetectsProjectNativeSignals(t *testing.T) {
 	}
 	if len(inv.OperationalDocs) == 0 || len(inv.EvidenceExports) == 0 || len(inv.NextCommands) == 0 {
 		t.Fatalf("expected docs/evidence/next commands: %#v", inv)
+	}
+	if len(inv.Facts) < inv.FilesScanned {
+		t.Fatalf("expected fact stream to include at least file facts: facts=%d files=%d", len(inv.Facts), inv.FilesScanned)
+	}
+	if !strings.Contains(inv.ProjectMap, "facts.jsonl") {
+		t.Fatalf("expected project map to point at facts.jsonl:\n%s", inv.ProjectMap)
+	}
+}
+
+func TestWriteInventoryEmitsFactsAndProjectMap(t *testing.T) {
+	root := t.TempDir()
+	writeFile(t, root, "db/migrate/2025-01-01_fix_accounts.sql", "update accounts set disabled = false;")
+	writeFile(t, root, "docs/incident-42.md", "Incident 42 rollback for accounts")
+	inv, err := InventoryPath(InventoryOptions{Path: root})
+	if err != nil {
+		t.Fatal(err)
+	}
+	out := filepath.Join(t.TempDir(), "out")
+	if err := WriteInventory(out, inv); err != nil {
+		t.Fatal(err)
+	}
+	facts, err := os.Open(filepath.Join(out, "facts.jsonl"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer facts.Close()
+	var sawFile, sawTable, sawIncident bool
+	scanner := bufio.NewScanner(facts)
+	for scanner.Scan() {
+		var fact Fact
+		if err := json.Unmarshal(scanner.Bytes(), &fact); err != nil {
+			t.Fatal(err)
+		}
+		if fact.Kind == "file" && strings.HasPrefix(fact.ID, "fact:") {
+			sawFile = true
+		}
+		for _, id := range fact.Identifiers {
+			if id.Kind == "table" && id.Value == "accounts" {
+				sawTable = true
+			}
+			if id.Kind == "incident" && strings.Contains(id.Value, "42") {
+				sawIncident = true
+			}
+		}
+	}
+	if err := scanner.Err(); err != nil {
+		t.Fatal(err)
+	}
+	if !sawFile || !sawTable || !sawIncident {
+		t.Fatalf("expected file/table/incident facts, got file=%v table=%v incident=%v", sawFile, sawTable, sawIncident)
+	}
+	projectMap, err := os.ReadFile(filepath.Join(out, "project-map.md"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(string(projectMap), "Patchline project map") {
+		t.Fatalf("unexpected project map:\n%s", string(projectMap))
+	}
+}
+
+func TestIdentifiersIgnoreSQLExistenceKeywords(t *testing.T) {
+	ids := identifiersFromText("CREATE TABLE IF NOT EXISTS sheet_blob (id int); ALTER TABLE IF EXISTS sheet ADD COLUMN x int;")
+	var values []string
+	for _, id := range ids {
+		if id.Kind == "table" {
+			values = append(values, id.Value)
+		}
+	}
+	if strings.Join(values, ",") != "sheet,sheet_blob" {
+		t.Fatalf("unexpected table identifiers: %#v", ids)
 	}
 }
 

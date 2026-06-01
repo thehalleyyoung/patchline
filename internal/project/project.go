@@ -3,6 +3,7 @@ package project
 import (
 	"archive/tar"
 	"archive/zip"
+	"bytes"
 	"compress/gzip"
 	"context"
 	"crypto/sha256"
@@ -14,9 +15,13 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"regexp"
 	"sort"
 	"strings"
 	"time"
+	"unicode/utf8"
+
+	"github.com/thehalleyyoung/patchline/internal/canonical"
 )
 
 const Version = "patchline.project/v1"
@@ -73,6 +78,8 @@ type Inventory struct {
 	SkippedDirs       []string       `json:"skipped_dirs,omitempty"`
 	SummaryByCategory map[string]int `json:"summary_by_category,omitempty"`
 	Markdown          string         `json:"markdown,omitempty"`
+	Facts             []Fact         `json:"-"`
+	ProjectMap        string         `json:"-"`
 }
 
 type Count struct {
@@ -90,6 +97,22 @@ type Finding struct {
 type Command struct {
 	Command string `json:"command"`
 	Reason  string `json:"reason"`
+}
+
+type Fact struct {
+	Version     string            `json:"version"`
+	ID          string            `json:"id"`
+	Kind        string            `json:"kind"`
+	Path        string            `json:"path,omitempty"`
+	Confidence  string            `json:"confidence"`
+	Rationale   string            `json:"rationale,omitempty"`
+	Identifiers []Identifier      `json:"identifiers,omitempty"`
+	Properties  map[string]string `json:"properties,omitempty"`
+}
+
+type Identifier struct {
+	Kind  string `json:"kind"`
+	Value string `json:"value"`
 }
 
 type scanFile struct {
@@ -201,6 +224,7 @@ func InventoryPath(opts InventoryOptions) (Inventory, error) {
 		if lang != "" {
 			languages[lang]++
 		}
+		inv.addFileFact(file, lang)
 		inv.inspectFile(file)
 	}
 	inv.Languages = countsFromMap(languages)
@@ -212,11 +236,17 @@ func (inv *Inventory) inspectRoot(root string) {
 	lower := strings.ToLower(filepath.ToSlash(root))
 	switch {
 	case strings.HasSuffix(lower, "/db/migrate") || strings.Contains(lower, "/db/migrate/"):
-		inv.MigrationRoots = append(inv.MigrationRoots, Finding{Kind: "rails-or-generic-db-migrate", Path: ".", Confidence: "path", Rationale: "inventory root is a db/migrate migration path"})
+		finding := Finding{Kind: "rails-or-generic-db-migrate", Path: ".", Confidence: "path", Rationale: "inventory root is a db/migrate migration path"}
+		inv.MigrationRoots = append(inv.MigrationRoots, finding)
+		inv.addFindingFact("migration_root", finding)
 	case strings.HasSuffix(lower, "/migrations") || strings.Contains(lower, "/migrations/"):
-		inv.MigrationRoots = append(inv.MigrationRoots, Finding{Kind: "migrations", Path: ".", Confidence: "path", Rationale: "inventory root is a migrations path"})
+		finding := Finding{Kind: "migrations", Path: ".", Confidence: "path", Rationale: "inventory root is a migrations path"}
+		inv.MigrationRoots = append(inv.MigrationRoots, finding)
+		inv.addFindingFact("migration_root", finding)
 	case strings.HasSuffix(lower, "/migration") || strings.Contains(lower, "/migration/"):
-		inv.MigrationRoots = append(inv.MigrationRoots, Finding{Kind: "migration", Path: ".", Confidence: "path", Rationale: "inventory root is a migration path"})
+		finding := Finding{Kind: "migration", Path: ".", Confidence: "path", Rationale: "inventory root is a migration path"}
+		inv.MigrationRoots = append(inv.MigrationRoots, finding)
+		inv.addFindingFact("migration_root", finding)
 	}
 }
 
@@ -233,7 +263,28 @@ func WriteInventory(outDir string, inv Inventory) error {
 	if err := os.WriteFile(filepath.Join(outDir, "inventory.json"), append(data, '\n'), 0o644); err != nil {
 		return err
 	}
-	return os.WriteFile(filepath.Join(outDir, "inventory.md"), []byte(inv.Markdown), 0o644)
+	if err := os.WriteFile(filepath.Join(outDir, "inventory.md"), []byte(inv.Markdown), 0o644); err != nil {
+		return err
+	}
+	if err := writeFacts(filepath.Join(outDir, "facts.jsonl"), inv.Facts); err != nil {
+		return err
+	}
+	return os.WriteFile(filepath.Join(outDir, "project-map.md"), []byte(inv.ProjectMap), 0o644)
+}
+
+func writeFacts(path string, facts []Fact) error {
+	file, err := os.OpenFile(path, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, 0o644)
+	if err != nil {
+		return err
+	}
+	defer file.Close()
+	encoder := json.NewEncoder(file)
+	for _, fact := range facts {
+		if err := encoder.Encode(fact); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 func ParseGitHubRepo(value string) (string, string, error) {
@@ -589,65 +640,239 @@ func discoverFiles(root string, full bool) ([]scanFile, map[string]bool, error) 
 func (inv *Inventory) inspectFile(file scanFile) {
 	lower := strings.ToLower(file.Rel)
 	base := filepath.Base(lower)
-	add := func(dst *[]Finding, kind, rationale string) {
-		*dst = append(*dst, Finding{Kind: kind, Path: file.Rel, Confidence: "path", Rationale: rationale})
+	add := func(category string, dst *[]Finding, kind, rationale string) {
+		finding := Finding{Kind: kind, Path: file.Rel, Confidence: "path", Rationale: rationale}
+		*dst = append(*dst, finding)
+		inv.addFindingFact(category, finding)
 	}
 	switch {
 	case strings.Contains(lower, ".github/workflows/"):
-		add(&inv.CI, "github-actions", "GitHub Actions workflow")
+		add("ci", &inv.CI, "github-actions", "GitHub Actions workflow")
 	case base == "circleci.yml" || strings.Contains(lower, ".circleci/"):
-		add(&inv.CI, "circleci", "CircleCI config")
+		add("ci", &inv.CI, "circleci", "CircleCI config")
 	case base == ".gitlab-ci.yml":
-		add(&inv.CI, "gitlab-ci", "GitLab CI config")
+		add("ci", &inv.CI, "gitlab-ci", "GitLab CI config")
 	}
 	switch {
 	case base == "dockerfile" || strings.HasSuffix(lower, "/dockerfile"):
-		add(&inv.DeployConfig, "docker", "Docker build/deploy config")
+		add("deploy_config", &inv.DeployConfig, "docker", "Docker build/deploy config")
 	case base == "docker-compose.yml" || base == "docker-compose.yaml":
-		add(&inv.DeployConfig, "docker-compose", "Docker Compose deploy config")
+		add("deploy_config", &inv.DeployConfig, "docker-compose", "Docker Compose deploy config")
 	case strings.Contains(lower, "k8s/") || strings.Contains(lower, "kubernetes/") || strings.Contains(lower, "helm/"):
-		add(&inv.DeployConfig, "kubernetes", "Kubernetes or Helm deployment config")
+		add("deploy_config", &inv.DeployConfig, "kubernetes", "Kubernetes or Helm deployment config")
 	}
 	switch {
 	case base == "gemfile":
-		add(&inv.Frameworks, "ruby", "Ruby dependency file")
+		add("framework", &inv.Frameworks, "ruby", "Ruby dependency file")
 		inv.TestCommands = append(inv.TestCommands, Command{Command: "bundle exec rake test", Reason: "Gemfile suggests Ruby tests may be available"})
 	case base == "manage.py":
-		add(&inv.Frameworks, "django", "Django manage.py entrypoint")
+		add("framework", &inv.Frameworks, "django", "Django manage.py entrypoint")
 		inv.TestCommands = append(inv.TestCommands, Command{Command: "python manage.py test", Reason: "Django project test command"})
 	case base == "package.json":
-		add(&inv.Frameworks, "node", "Node package manifest")
+		add("framework", &inv.Frameworks, "node", "Node package manifest")
 		inv.TestCommands = append(inv.TestCommands, Command{Command: "npm test", Reason: "package.json suggests npm tests may be available"})
 	case base == "go.mod":
-		add(&inv.Frameworks, "go", "Go module")
+		add("framework", &inv.Frameworks, "go", "Go module")
 		inv.TestCommands = append(inv.TestCommands, Command{Command: "go test ./...", Reason: "Go module test command"})
 	case base == "pyproject.toml":
-		add(&inv.Frameworks, "python", "Python project metadata")
+		add("framework", &inv.Frameworks, "python", "Python project metadata")
 		inv.TestCommands = append(inv.TestCommands, Command{Command: "pytest", Reason: "Python project metadata suggests pytest may be available"})
 	}
 	switch {
 	case strings.Contains(lower, "db/migrate/"):
-		add(&inv.MigrationRoots, "rails-or-generic-db-migrate", "db/migrate migration path")
+		add("migration_root", &inv.MigrationRoots, "rails-or-generic-db-migrate", "db/migrate migration path")
 	case strings.Contains(lower, "migrations/"):
-		add(&inv.MigrationRoots, "migrations", "migrations path")
+		add("migration_root", &inv.MigrationRoots, "migrations", "migrations path")
 	case strings.Contains(lower, "prisma/migrations/"):
-		add(&inv.MigrationSystems, "prisma", "Prisma migrations path")
+		add("migration_system", &inv.MigrationSystems, "prisma", "Prisma migrations path")
 	case base == "alembic.ini":
-		add(&inv.MigrationSystems, "alembic", "Alembic config")
+		add("migration_system", &inv.MigrationSystems, "alembic", "Alembic config")
 	case base == "flyway.conf":
-		add(&inv.MigrationSystems, "flyway", "Flyway config")
+		add("migration_system", &inv.MigrationSystems, "flyway", "Flyway config")
 	case base == "liquibase.properties":
-		add(&inv.MigrationSystems, "liquibase", "Liquibase config")
+		add("migration_system", &inv.MigrationSystems, "liquibase", "Liquibase config")
 	}
 	if isSourceSQLCandidate(lower) {
-		add(&inv.SourceSQLHints, "source-sql-candidate", "source file type commonly embeds SQL or ORM persistence calls")
+		add("source_sql_hint", &inv.SourceSQLHints, "source-sql-candidate", "source file type commonly embeds SQL or ORM persistence calls")
 	}
 	if isOperationalDoc(lower) {
-		add(&inv.OperationalDocs, "operational-doc", "incident, rollback, runbook, or release-note path")
+		add("operational_doc", &inv.OperationalDocs, "operational-doc", "incident, rollback, runbook, or release-note path")
 	}
 	if isEvidenceExport(lower) {
-		add(&inv.EvidenceExports, "evidence-export", "log, trace, JSON/JSONL, CSV, or SARIF-like export")
+		add("evidence_export", &inv.EvidenceExports, "evidence-export", "log, trace, JSON/JSONL, CSV, or SARIF-like export")
 	}
+}
+
+const factContentLimit = 64 << 10
+
+var (
+	identifierDatePattern     = regexp.MustCompile(`\b20[0-9]{2}[-_/]?[01][0-9][-_/]?[0-3][0-9]\b`)
+	identifierIncidentPattern = regexp.MustCompile(`(?i)\b(?:incident|inc|sev)[-_:# ]*[0-9]+\b`)
+	identifierPRPattern       = regexp.MustCompile(`(?i)\b(?:pr|pull request)[-:# ]*[0-9]+\b|#[0-9]+\b`)
+	identifierCommitPattern   = regexp.MustCompile(`\b[0-9a-f]{40}\b`)
+	identifierSQLTablePattern = regexp.MustCompile(`(?i)\b(?:update|delete\s+from|insert\s+into|alter\s+table|create\s+table|drop\s+table|truncate\s+table)\s+(?:if\s+(?:not\s+)?exists\s+)?["'\[]?([A-Za-z_][A-Za-z0-9_.$-]*)`)
+)
+
+func (inv *Inventory) addFileFact(file scanFile, language string) {
+	props := map[string]string{"size_bytes": fmt.Sprintf("%d", file.Size)}
+	if language != "" {
+		props["language"] = language
+	}
+	if sum, err := hashFile(file.Abs); err == nil {
+		props["content_hash"] = sum
+	} else {
+		props["content_hash_error"] = "unreadable"
+	}
+	prefix, err := readTextPrefix(file.Abs, factContentLimit)
+	if err != nil {
+		props["read_error"] = "unreadable"
+	}
+	text := file.Rel
+	if prefix != "" {
+		text += "\n" + prefix
+	}
+	inv.addFact(Fact{
+		Version:     Version,
+		Kind:        "file",
+		Path:        file.Rel,
+		Confidence:  "observed",
+		Rationale:   "file discovered during project inventory",
+		Identifiers: identifiersFromText(text),
+		Properties:  props,
+	})
+}
+
+func (inv *Inventory) addFindingFact(category string, finding Finding) {
+	inv.addFact(Fact{
+		Version:     Version,
+		Kind:        category,
+		Path:        finding.Path,
+		Confidence:  finding.Confidence,
+		Rationale:   finding.Rationale,
+		Identifiers: identifiersFromText(finding.Path + "\n" + finding.Kind),
+		Properties:  map[string]string{"kind": finding.Kind},
+	})
+}
+
+func (inv *Inventory) addCommandFact(kind string, command Command) {
+	inv.addFact(Fact{
+		Version:    Version,
+		Kind:       kind,
+		Confidence: "derived",
+		Rationale:  command.Reason,
+		Properties: map[string]string{"command": command.Command},
+	})
+}
+
+func (inv *Inventory) addFact(fact Fact) {
+	fact.Version = Version
+	fact.Identifiers = uniqueIdentifiers(fact.Identifiers)
+	if fact.Properties != nil && len(fact.Properties) == 0 {
+		fact.Properties = nil
+	}
+	fact.ID = factID(fact)
+	inv.Facts = append(inv.Facts, fact)
+}
+
+func factID(fact Fact) string {
+	fact.ID = ""
+	return "fact:" + canonical.Hash(fact)[:20]
+}
+
+func identifiersFromText(text string) []Identifier {
+	var ids []Identifier
+	addMatches := func(kind string, matches []string) {
+		for _, match := range matches {
+			value := strings.ToLower(strings.TrimSpace(match))
+			value = strings.ReplaceAll(value, "_", "-")
+			if value != "" {
+				ids = append(ids, Identifier{Kind: kind, Value: value})
+			}
+		}
+	}
+	addMatches("date", identifierDatePattern.FindAllString(text, -1))
+	addMatches("incident", identifierIncidentPattern.FindAllString(text, -1))
+	addMatches("pull_request", identifierPRPattern.FindAllString(text, -1))
+	addMatches("commit", identifierCommitPattern.FindAllString(strings.ToLower(text), -1))
+	for _, match := range identifierSQLTablePattern.FindAllStringSubmatch(text, -1) {
+		if len(match) > 1 {
+			value := strings.ToLower(strings.Trim(match[1], `"'[]`))
+			if !isSQLIdentifierStopword(value) {
+				ids = append(ids, Identifier{Kind: "table", Value: value})
+			}
+		}
+	}
+	return uniqueIdentifiers(ids)
+}
+
+func isSQLIdentifierStopword(value string) bool {
+	switch value {
+	case "", "if", "not", "exists", "set", "where", "select", "from":
+		return true
+	default:
+		return false
+	}
+}
+
+func uniqueIdentifiers(in []Identifier) []Identifier {
+	seen := map[string]bool{}
+	var out []Identifier
+	for _, item := range in {
+		if item.Kind == "" || item.Value == "" {
+			continue
+		}
+		key := item.Kind + "\x00" + item.Value
+		if seen[key] {
+			continue
+		}
+		seen[key] = true
+		out = append(out, item)
+	}
+	sort.Slice(out, func(i, j int) bool {
+		if out[i].Kind != out[j].Kind {
+			return out[i].Kind < out[j].Kind
+		}
+		return out[i].Value < out[j].Value
+	})
+	return out
+}
+
+func uniqueFacts(in []Fact) []Fact {
+	sort.Slice(in, func(i, j int) bool {
+		if in[i].Kind != in[j].Kind {
+			return in[i].Kind < in[j].Kind
+		}
+		if in[i].Path != in[j].Path {
+			return in[i].Path < in[j].Path
+		}
+		return in[i].ID < in[j].ID
+	})
+	seen := map[string]bool{}
+	var out []Fact
+	for _, item := range in {
+		if item.ID == "" || seen[item.ID] {
+			continue
+		}
+		seen[item.ID] = true
+		out = append(out, item)
+	}
+	return out
+}
+
+func readTextPrefix(path string, limit int64) (string, error) {
+	file, err := os.Open(path)
+	if err != nil {
+		return "", err
+	}
+	defer file.Close()
+	data, err := io.ReadAll(io.LimitReader(file, limit))
+	if err != nil {
+		return "", err
+	}
+	if bytes.IndexByte(data, 0) >= 0 || !utf8.Valid(data) {
+		return "", nil
+	}
+	return string(data), nil
 }
 
 func (inv *Inventory) finalize() {
@@ -664,6 +889,21 @@ func (inv *Inventory) finalize() {
 	if len(inv.TestCommands) > 0 {
 		inv.NextCommands = append(inv.NextCommands, inv.TestCommands...)
 	}
+	for _, language := range inv.Languages {
+		inv.addFact(Fact{
+			Version:    Version,
+			Kind:       "language",
+			Confidence: "extension",
+			Rationale:  "language inferred from file extensions",
+			Properties: map[string]string{"language": language.Name, "files": fmt.Sprintf("%d", language.Count)},
+		})
+	}
+	for _, command := range inv.TestCommands {
+		inv.addCommandFact("test_command", command)
+	}
+	for _, command := range inv.NextCommands {
+		inv.addCommandFact("next_command", command)
+	}
 	inv.SummaryByCategory = map[string]int{
 		"ci":                len(inv.CI),
 		"deploy_config":     len(inv.DeployConfig),
@@ -674,7 +914,9 @@ func (inv *Inventory) finalize() {
 		"operational_docs":  len(inv.OperationalDocs),
 		"source_sql_hints":  len(inv.SourceSQLHints),
 	}
+	inv.Facts = uniqueFacts(inv.Facts)
 	inv.Markdown = renderMarkdown(*inv)
+	inv.ProjectMap = renderProjectMap(*inv)
 }
 
 func renderMarkdown(inv Inventory) string {
@@ -713,6 +955,45 @@ func renderMarkdown(inv Inventory) string {
 			fmt.Fprintf(&b, "- `%s` — %s\n", c.Command, c.Reason)
 		}
 	}
+	return b.String()
+}
+
+func renderProjectMap(inv Inventory) string {
+	var b strings.Builder
+	fmt.Fprintf(&b, "# Patchline project map\n\n")
+	fmt.Fprintf(&b, "This map shows where data-change evidence lives in the scanned project slice.\n\n")
+	fmt.Fprintf(&b, "| area | count |\n| --- | ---: |\n")
+	fmt.Fprintf(&b, "| files | %d |\n", inv.FilesScanned)
+	fmt.Fprintf(&b, "| facts | %d |\n", len(inv.Facts))
+	fmt.Fprintf(&b, "| languages | %d |\n", len(inv.Languages))
+	fmt.Fprintf(&b, "| migration roots | %d |\n", len(inv.MigrationRoots))
+	fmt.Fprintf(&b, "| migration systems | %d |\n", len(inv.MigrationSystems))
+	fmt.Fprintf(&b, "| source SQL hints | %d |\n", len(inv.SourceSQLHints))
+	fmt.Fprintf(&b, "| operational docs | %d |\n", len(inv.OperationalDocs))
+	fmt.Fprintf(&b, "| evidence exports | %d |\n\n", len(inv.EvidenceExports))
+	writePaths := func(title string, findings []Finding) {
+		if len(findings) == 0 {
+			return
+		}
+		fmt.Fprintf(&b, "## %s\n\n", title)
+		for _, finding := range findings {
+			fmt.Fprintf(&b, "- `%s` (%s) — %s\n", finding.Path, finding.Kind, finding.Rationale)
+		}
+		fmt.Fprintf(&b, "\n")
+	}
+	writePaths("Migration roots", inv.MigrationRoots)
+	writePaths("Migration systems", inv.MigrationSystems)
+	writePaths("Source SQL candidates", inv.SourceSQLHints)
+	writePaths("Operational docs", inv.OperationalDocs)
+	writePaths("Evidence exports", inv.EvidenceExports)
+	if len(inv.NextCommands) > 0 {
+		fmt.Fprintf(&b, "## Next commands\n\n")
+		for _, command := range inv.NextCommands {
+			fmt.Fprintf(&b, "- `%s` — %s\n", command.Command, command.Reason)
+		}
+		fmt.Fprintf(&b, "\n")
+	}
+	fmt.Fprintf(&b, "The complete low-level fact stream is in `facts.jsonl`.\n")
 	return b.String()
 }
 
