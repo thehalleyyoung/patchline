@@ -409,6 +409,11 @@ func TestBaselineRanksRisksAndLinksFactsWithUnderscores(t *testing.T) {
 	}
 	report := intake.Report{
 		Source: intake.Source{Input: "fixture"},
+		TimeSignals: []intake.TimeSignal{
+			{ID: "time:migration", Path: "db/migrate/001_accounts.sql", Timestamp: "2025-01-15", Source: "path", Confidence: "temporal", Identifiers: []string{"table:accounts"}},
+			{ID: "time:incident", Path: "docs/inc-42.md", Timestamp: "2025-01-16", Source: "content", Confidence: "temporal", Identifiers: []string{"table:accounts", "incident:incident 42"}},
+			{ID: "time:repair", Path: "scripts/rollback_accounts.sql", Timestamp: "2025-01-17", Source: "path", Confidence: "temporal", Identifiers: []string{"table:accounts"}},
+		},
 		SQL: []intake.SQLFinding{{
 			Path:       "db/migrate/001.sql",
 			SourceKind: "sql_file",
@@ -500,6 +505,11 @@ func TestBaselineBuildsProvenanceSlices(t *testing.T) {
 	}
 	report := intake.Report{
 		Source: intake.Source{Input: "fixture"},
+		TimeSignals: []intake.TimeSignal{
+			{ID: "time:migration", Path: "db/migrate/001_accounts.sql", Timestamp: "2025-01-15", Source: "path", Confidence: "temporal", Identifiers: []string{"table:accounts"}},
+			{ID: "time:incident", Path: "docs/inc-42.md", Timestamp: "2025-01-16", Source: "content", Confidence: "temporal", Identifiers: []string{"table:accounts", "incident:incident 42"}},
+			{ID: "time:repair", Path: "scripts/rollback_accounts.sql", Timestamp: "2025-01-17", Source: "path", Confidence: "temporal", Identifiers: []string{"table:accounts"}},
+		},
 		SQL: []intake.SQLFinding{{
 			Path:       "db/migrate/001_accounts.sql",
 			SourceKind: "sql_file",
@@ -526,6 +536,9 @@ func TestBaselineBuildsProvenanceSlices(t *testing.T) {
 	}
 	if baseline.Summary.SymbolicChecks == 0 || baseline.Summary.SymbolicFailed == 0 {
 		t.Fatalf("expected symbolic checks with unresolved obligations: %#v", baseline.Summary)
+	}
+	if baseline.Summary.TemporalWindows == 0 || baseline.Summary.TemporalSignals < 3 {
+		t.Fatalf("expected temporal windows over migration/incident/repair signals: %#v", baseline.Summary)
 	}
 	var fullSlice ProvenanceSlice
 	for _, slice := range baseline.Provenance {

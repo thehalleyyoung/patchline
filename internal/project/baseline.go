@@ -8,6 +8,7 @@ import (
 	"path/filepath"
 	"sort"
 	"strings"
+	"time"
 
 	"github.com/thehalleyyoung/patchline/internal/canonical"
 	"github.com/thehalleyyoung/patchline/internal/effects"
@@ -30,6 +31,7 @@ type BaselineReport struct {
 	DatalogQueries  []DatalogQuery            `json:"datalog_queries,omitempty"`
 	AbstractEffects []effects.AbstractSummary `json:"abstract_effects,omitempty"`
 	SymbolicChecks  []SymbolicCheck           `json:"symbolic_checks,omitempty"`
+	TemporalWindows []TemporalWindow          `json:"temporal_windows,omitempty"`
 	NativeChecks    []Command                 `json:"native_checks,omitempty"`
 	Hash            string                    `json:"hash"`
 	Markdown        string                    `json:"markdown,omitempty"`
@@ -51,6 +53,8 @@ type BaselineSummary struct {
 	SymbolicPassed      int `json:"symbolic_passed"`
 	SymbolicWarnings    int `json:"symbolic_warnings"`
 	SymbolicFailed      int `json:"symbolic_failed"`
+	TemporalWindows     int `json:"temporal_windows"`
+	TemporalSignals     int `json:"temporal_signals"`
 	GrepOnlyMatches     int `json:"grep_only_matches"`
 	SQLOnlyRankedRisks  int `json:"sql_only_ranked_risks"`
 	IdentifierOnlyLinks int `json:"identifier_only_links"`
@@ -137,6 +141,28 @@ type SymbolicCheck struct {
 	Reason     string   `json:"reason"`
 }
 
+type TemporalWindow struct {
+	ID            string       `json:"id"`
+	RiskID        string       `json:"risk_id,omitempty"`
+	Table         string       `json:"table,omitempty"`
+	Start         string       `json:"start"`
+	End           string       `json:"end"`
+	Anchor        string       `json:"anchor"`
+	Signals       []TimeSignal `json:"signals"`
+	RelatedPaths  []string     `json:"related_paths,omitempty"`
+	StagesPresent []string     `json:"stages_present,omitempty"`
+	Confidence    string       `json:"confidence"`
+	Rationale     string       `json:"rationale"`
+}
+
+type TimeSignal struct {
+	Timestamp   string       `json:"timestamp"`
+	Source      string       `json:"source"`
+	Path        string       `json:"path"`
+	Stage       string       `json:"stage"`
+	Identifiers []Identifier `json:"identifiers,omitempty"`
+}
+
 func Baseline(inv Inventory, facts []Fact, intakeReport intake.Report) BaselineReport {
 	report := BaselineReport{Version: BaselineVersion, InventoryRoot: inv.Root, IntakeSource: intakeReport.Source.Input}
 	factIndex := indexFacts(facts)
@@ -149,6 +175,7 @@ func Baseline(inv Inventory, facts []Fact, intakeReport intake.Report) BaselineR
 	report.DatalogQueries = buildDatalogQueries(report.Risks, report.Provenance)
 	report.AbstractEffects = buildAbstractEffectSummaries(report.Risks, report.Provenance)
 	report.SymbolicChecks = buildSymbolicChecks(report.Risks, report.AbstractEffects, report.Provenance)
+	report.TemporalWindows = buildTemporalWindows(report.Risks, report.Provenance, intakeReport)
 	report.Summary = BaselineSummary{
 		RankedRisks:         len(report.Risks),
 		CodePathRankedRisks: countCodePathRisks(report.Risks),
@@ -165,6 +192,8 @@ func Baseline(inv Inventory, facts []Fact, intakeReport intake.Report) BaselineR
 		SymbolicPassed:      countSymbolicStatus(report.SymbolicChecks, "pass"),
 		SymbolicWarnings:    countSymbolicStatus(report.SymbolicChecks, "warn"),
 		SymbolicFailed:      countSymbolicStatus(report.SymbolicChecks, "fail"),
+		TemporalWindows:     len(report.TemporalWindows),
+		TemporalSignals:     countTemporalSignals(report.TemporalWindows),
 		GrepOnlyMatches:     grepOnlyMatches(inv.Root),
 		SQLOnlyRankedRisks:  sqlOnlyRankedRisks(intakeReport),
 		IdentifierOnlyLinks: countLinksByIdentifierKind(report.EvidenceLinks, false),
@@ -1352,6 +1381,242 @@ func countSymbolicStatus(checks []SymbolicCheck, status string) int {
 	return count
 }
 
+func buildTemporalWindows(risks []BaselineRisk, slices []ProvenanceSlice, report intake.Report) []TemporalWindow {
+	signalsByPath := map[string][]TimeSignal{}
+	for _, signal := range report.TimeSignals {
+		parsed, err := time.Parse("2006-01-02", signal.Timestamp)
+		if err != nil {
+			continue
+		}
+		ts := TimeSignal{
+			Timestamp:   parsed.Format("2006-01-02"),
+			Source:      signal.Source,
+			Path:        signal.Path,
+			Stage:       temporalStageForPath(signal.Path),
+			Identifiers: identifiersFromIntake(signal.Identifiers, ""),
+		}
+		signalsByPath[signal.Path] = append(signalsByPath[signal.Path], ts)
+	}
+	for path := range signalsByPath {
+		sort.Slice(signalsByPath[path], func(i, j int) bool {
+			if signalsByPath[path][i].Timestamp != signalsByPath[path][j].Timestamp {
+				return signalsByPath[path][i].Timestamp < signalsByPath[path][j].Timestamp
+			}
+			return signalsByPath[path][i].Source < signalsByPath[path][j].Source
+		})
+	}
+	riskByID := map[string]BaselineRisk{}
+	for _, risk := range risks {
+		riskByID[risk.ID] = risk
+	}
+	var windows []TemporalWindow
+	for _, slice := range slices {
+		signals := temporalSignalsForSlice(slice, signalsByPath)
+		if len(signals) == 0 {
+			signals = temporalSignalsForRisk(riskByID[slice.RiskID], signalsByPath)
+		}
+		if len(signals) == 0 {
+			if window, ok := logicalTemporalWindow(slice); ok {
+				windows = append(windows, window)
+			}
+			continue
+		}
+		window := temporalWindowForSignals(slice, signals)
+		windows = append(windows, window)
+	}
+	windows = uniqueTemporalWindows(windows)
+	sort.Slice(windows, func(i, j int) bool {
+		if windows[i].Start != windows[j].Start {
+			return windows[i].Start < windows[j].Start
+		}
+		if windows[i].End != windows[j].End {
+			return windows[i].End < windows[j].End
+		}
+		return windows[i].ID < windows[j].ID
+	})
+	if len(windows) > 100 {
+		windows = windows[:100]
+	}
+	return windows
+}
+
+func temporalSignalsForSlice(slice ProvenanceSlice, byPath map[string][]TimeSignal) []TimeSignal {
+	var paths []string
+	paths = append(paths, slice.MigrationPath)
+	paths = append(paths, slice.SourcePaths...)
+	paths = append(paths, slice.IncidentPaths...)
+	paths = append(paths, slice.RepairPaths...)
+	var signals []TimeSignal
+	for _, path := range uniqueSortedStrings(paths) {
+		signals = append(signals, byPath[path]...)
+	}
+	return capTimeSignals(uniqueTimeSignals(signals), 12)
+}
+
+func temporalSignalsForRisk(risk BaselineRisk, byPath map[string][]TimeSignal) []TimeSignal {
+	return capTimeSignals(uniqueTimeSignals(byPath[risk.Path]), 12)
+}
+
+func temporalWindowForSignals(slice ProvenanceSlice, signals []TimeSignal) TemporalWindow {
+	minTime := signals[0].Timestamp
+	maxTime := signals[0].Timestamp
+	for _, signal := range signals[1:] {
+		if signal.Timestamp < minTime {
+			minTime = signal.Timestamp
+		}
+		if signal.Timestamp > maxTime {
+			maxTime = signal.Timestamp
+		}
+	}
+	start := addDays(minTime, -3)
+	end := addDays(maxTime, 3)
+	return TemporalWindow{
+		ID:            "timewin:" + canonical.Hash(slice.RiskID + "\x00" + start + "\x00" + end)[:16],
+		RiskID:        slice.RiskID,
+		Table:         slice.Table,
+		Start:         start,
+		End:           end,
+		Anchor:        minTime + ".." + maxTime,
+		Signals:       signals,
+		RelatedPaths:  temporalRelatedPaths(slice),
+		StagesPresent: slice.StagesPresent,
+		Confidence:    temporalConfidence(signals),
+		Rationale:     "window is derived from dates in migration, source, incident, release, or repair evidence around the same provenance slice",
+	}
+}
+
+func temporalRelatedPaths(slice ProvenanceSlice) []string {
+	var paths []string
+	paths = append(paths, slice.MigrationPath)
+	paths = append(paths, slice.SourcePaths...)
+	paths = append(paths, slice.IncidentPaths...)
+	paths = append(paths, slice.RepairPaths...)
+	return capStrings(uniqueSortedStrings(paths), 12)
+}
+
+func logicalTemporalWindow(slice ProvenanceSlice) (TemporalWindow, bool) {
+	if slice.MigrationPath == "" {
+		return TemporalWindow{}, false
+	}
+	anchor := migrationOrderAnchor(slice.MigrationPath)
+	if anchor == "" {
+		return TemporalWindow{}, false
+	}
+	return TemporalWindow{
+		ID:            "timewin:" + canonical.Hash(slice.RiskID + "\x00" + anchor)[:16],
+		RiskID:        slice.RiskID,
+		Table:         slice.Table,
+		Start:         anchor,
+		End:           anchor,
+		Anchor:        anchor,
+		RelatedPaths:  temporalRelatedPaths(slice),
+		StagesPresent: slice.StagesPresent,
+		Confidence:    "migration-order-temporal",
+		Rationale:     "window is derived from migration filename ordering because no calendar date was present in this repo slice",
+	}, true
+}
+
+func migrationOrderAnchor(path string) string {
+	base := filepath.Base(path)
+	var digits strings.Builder
+	for _, r := range base {
+		if r < '0' || r > '9' {
+			break
+		}
+		digits.WriteRune(r)
+	}
+	if digits.Len() == 0 {
+		return ""
+	}
+	return "migration-order:" + digits.String()
+}
+
+func temporalStageForPath(path string) string {
+	lower := strings.ToLower(path)
+	switch {
+	case containsAny(lower, "incident", "postmortem", "outage", "sev"):
+		return "incident"
+	case containsAny(lower, "release", "changelog", "deploy"):
+		return "release"
+	case containsAny(lower, "rollback", "repair", "revert", "backfill", "reconcile", "fix"):
+		return "repair"
+	case isMigrationLikePath(lower):
+		return "migration"
+	default:
+		return "source"
+	}
+}
+
+func temporalConfidence(signals []TimeSignal) string {
+	stages := map[string]bool{}
+	for _, signal := range signals {
+		stages[signal.Stage] = true
+	}
+	if len(stages) >= 2 {
+		return "multi-stage-temporal"
+	}
+	return "single-stage-temporal"
+}
+
+func addDays(date string, days int) string {
+	parsed, err := time.Parse("2006-01-02", date)
+	if err != nil {
+		return date
+	}
+	return parsed.AddDate(0, 0, days).Format("2006-01-02")
+}
+
+func uniqueTimeSignals(in []TimeSignal) []TimeSignal {
+	seen := map[string]bool{}
+	var out []TimeSignal
+	for _, signal := range in {
+		key := signal.Timestamp + "\x00" + signal.Path + "\x00" + signal.Source + "\x00" + signal.Stage
+		if seen[key] {
+			continue
+		}
+		seen[key] = true
+		out = append(out, signal)
+	}
+	sort.Slice(out, func(i, j int) bool {
+		if out[i].Timestamp != out[j].Timestamp {
+			return out[i].Timestamp < out[j].Timestamp
+		}
+		if out[i].Path != out[j].Path {
+			return out[i].Path < out[j].Path
+		}
+		return out[i].Source < out[j].Source
+	})
+	return out
+}
+
+func capTimeSignals(in []TimeSignal, n int) []TimeSignal {
+	if len(in) <= n {
+		return in
+	}
+	return in[:n]
+}
+
+func uniqueTemporalWindows(in []TemporalWindow) []TemporalWindow {
+	seen := map[string]bool{}
+	var out []TemporalWindow
+	for _, window := range in {
+		if seen[window.ID] {
+			continue
+		}
+		seen[window.ID] = true
+		out = append(out, window)
+	}
+	return out
+}
+
+func countTemporalSignals(windows []TemporalWindow) int {
+	var count int
+	for _, window := range windows {
+		count += len(window.Signals)
+	}
+	return count
+}
+
 func sharedIdentifiers(left, right []Identifier) []Identifier {
 	rightSet := map[string]Identifier{}
 	for _, id := range right {
@@ -1518,6 +1783,8 @@ func renderBaselineMarkdown(report BaselineReport) string {
 	fmt.Fprintf(&b, "| symbolic passed | %d |\n", report.Summary.SymbolicPassed)
 	fmt.Fprintf(&b, "| symbolic warnings | %d |\n", report.Summary.SymbolicWarnings)
 	fmt.Fprintf(&b, "| symbolic failed | %d |\n", report.Summary.SymbolicFailed)
+	fmt.Fprintf(&b, "| temporal windows | %d |\n", report.Summary.TemporalWindows)
+	fmt.Fprintf(&b, "| temporal signals | %d |\n", report.Summary.TemporalSignals)
 	fmt.Fprintf(&b, "| grep-only matches | %d |\n", report.Summary.GrepOnlyMatches)
 	fmt.Fprintf(&b, "| SQL-only ranked risks | %d |\n", report.Summary.SQLOnlyRankedRisks)
 	fmt.Fprintf(&b, "| identifier-only links | %d |\n", report.Summary.IdentifierOnlyLinks)
@@ -1558,6 +1825,14 @@ func renderBaselineMarkdown(report BaselineReport) string {
 		limit := minInt(len(report.SymbolicChecks), 25)
 		for _, check := range report.SymbolicChecks[:limit] {
 			fmt.Fprintf(&b, "| %s | %s | `%s` | %s | %s |\n", check.Status, check.Property, check.RiskID, check.Table, check.Reason)
+		}
+		fmt.Fprintf(&b, "\n")
+	}
+	if len(report.TemporalWindows) > 0 {
+		fmt.Fprintf(&b, "## Temporal windows\n\n| window | risk | table | signals | confidence |\n| --- | --- | --- | ---: | --- |\n")
+		limit := minInt(len(report.TemporalWindows), 20)
+		for _, window := range report.TemporalWindows[:limit] {
+			fmt.Fprintf(&b, "| %s..%s | `%s` | %s | %d | %s |\n", window.Start, window.End, window.RiskID, window.Table, len(window.Signals), window.Confidence)
 		}
 		fmt.Fprintf(&b, "\n")
 	}

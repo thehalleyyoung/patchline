@@ -398,7 +398,7 @@ func resolveGitHubCommit(ctx context.Context, owner, repo, ref string) (string, 
 }
 
 func fetchGitHubArchive(ctx context.Context, owner, repo, ref, resolvedCommit, outDir, downloadDir string) (string, string, string, downloadCacheResult, error) {
-	url := fmt.Sprintf("https://api.github.com/repos/%s/%s/tarball/%s", owner, repo, resolvedCommit)
+	url := fmt.Sprintf("https://codeload.github.com/%s/%s/tar.gz/%s", owner, repo, resolvedCommit)
 	key := "github:" + owner + "/" + repo + "@" + resolvedCommit
 	root, top, cache, err := fetchCachedArchive(ctx, url, outDir, downloadDir, key, "tar.gz", resolvedCommit)
 	if err != nil {
