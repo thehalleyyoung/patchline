@@ -115,7 +115,7 @@ Every addition to the repo should be judged by whether it makes that loop more a
 81. [x] Maintain a public matrix of real repo slices by ecosystem, migration framework, repo size, and available evidence types.
 82. [x] For each slice, report inventory coverage, risks, linked candidates, time signals, generated artifacts, and before/after deltas.
 83. [x] Compare against grep-only risk detection.
-84. [ ] Compare against SQL-only analysis without code/docs/evidence links.
+84. [x] Compare against SQL-only analysis without code/docs/evidence links.
 85. [ ] Compare against identifier-only linking without temporal signals.
 86. [ ] Compare against temporal-only linking without identifiers.
 87. [ ] Compare fact-grounded generated code against prompt-without-facts generated code.
