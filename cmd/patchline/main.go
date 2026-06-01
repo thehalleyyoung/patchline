@@ -519,6 +519,7 @@ type repoAnalyzeReport struct {
 	Source       project.Source         `json:"source,omitempty"`
 	CI           bool                   `json:"ci"`
 	CIArtifacts  repoAnalyzeCIArtifacts `json:"ci_artifacts,omitempty"`
+	CommandsPath string                 `json:"commands_path,omitempty"`
 	Resume       bool                   `json:"resume"`
 	ReusedStages []string               `json:"reused_stages,omitempty"`
 	Redact       bool                   `json:"redact"`
@@ -778,6 +779,11 @@ func repoAnalyze(args []string) error {
 		report.Summary.CompareHash = compare.Hash
 	}
 	report.Outputs["analysis_bundle"] = filepath.Join(*outPath, "analysis-bundle")
+	report.CommandsPath = filepath.Join(*outPath, "commands.md")
+	report.Outputs["commands"] = report.CommandsPath
+	if err := writeCopyCommandsReport(*outPath, report, *githubRepo != "", *ref, *proposalKind, *llmCommand, *budget, *noLLM, *redact, *ciMode); err != nil {
+		return err
+	}
 	report.Hash = canonical.Hash(struct {
 		Version      string                 `json:"version"`
 		Input        string                 `json:"input"`
@@ -785,12 +791,13 @@ func repoAnalyze(args []string) error {
 		Stages       []string               `json:"stages"`
 		Outputs      map[string]string      `json:"outputs"`
 		CI           bool                   `json:"ci"`
+		CommandsPath string                 `json:"commands_path,omitempty"`
 		Resume       bool                   `json:"resume"`
 		ReusedStages []string               `json:"reused_stages,omitempty"`
 		Redact       bool                   `json:"redact"`
 		Summary      repoAnalyzeSummary     `json:"summary"`
 		Deep         repoAnalyzeDeepSummary `json:"deep_analysis,omitempty"`
-	}{report.Version, report.Input, report.Subpath, report.Stages, report.Outputs, report.CI, report.Resume, report.ReusedStages, report.Redact, report.Summary, report.DeepAnalysis})
+	}{report.Version, report.Input, report.Subpath, report.Stages, report.Outputs, report.CI, report.CommandsPath, report.Resume, report.ReusedStages, report.Redact, report.Summary, report.DeepAnalysis})
 	if err := writeRepoAnalyzeReport(*outPath, report); err != nil {
 		return err
 	}
@@ -805,17 +812,18 @@ func repoAnalyze(args []string) error {
 		report.CIArtifacts = ciArtifacts
 		report.Outputs["ci"] = filepath.Join(*outPath, "ci")
 		report.Hash = canonical.Hash(struct {
-			Version     string                 `json:"version"`
-			Input       string                 `json:"input"`
-			Subpath     string                 `json:"subpath,omitempty"`
-			Stages      []string               `json:"stages"`
-			Outputs     map[string]string      `json:"outputs"`
-			CI          bool                   `json:"ci"`
-			CIArtifacts repoAnalyzeCIArtifacts `json:"ci_artifacts,omitempty"`
-			Resume      bool                   `json:"resume"`
-			Redact      bool                   `json:"redact"`
-			Summary     repoAnalyzeSummary     `json:"summary"`
-		}{report.Version, report.Input, report.Subpath, report.Stages, report.Outputs, report.CI, report.CIArtifacts, report.Resume, report.Redact, report.Summary})
+			Version      string                 `json:"version"`
+			Input        string                 `json:"input"`
+			Subpath      string                 `json:"subpath,omitempty"`
+			Stages       []string               `json:"stages"`
+			Outputs      map[string]string      `json:"outputs"`
+			CI           bool                   `json:"ci"`
+			CIArtifacts  repoAnalyzeCIArtifacts `json:"ci_artifacts,omitempty"`
+			CommandsPath string                 `json:"commands_path,omitempty"`
+			Resume       bool                   `json:"resume"`
+			Redact       bool                   `json:"redact"`
+			Summary      repoAnalyzeSummary     `json:"summary"`
+		}{report.Version, report.Input, report.Subpath, report.Stages, report.Outputs, report.CI, report.CIArtifacts, report.CommandsPath, report.Resume, report.Redact, report.Summary})
 		if err := writeRepoAnalyzeReport(*outPath, report); err != nil {
 			return err
 		}
@@ -958,6 +966,9 @@ func writeRepoAnalyzeReport(outDir string, report repoAnalyzeReport) error {
 	if report.CIArtifacts.ActionsSnippet != "" {
 		fmt.Fprintf(&b, "- ci_upload_snippet: `%s`\n", report.CIArtifacts.ActionsSnippet)
 	}
+	if report.CommandsPath != "" {
+		fmt.Fprintf(&b, "- commands: `%s`\n", report.CommandsPath)
+	}
 	if len(report.ReusedStages) > 0 {
 		fmt.Fprintf(&b, "- reused_stages: `%s`\n", strings.Join(report.ReusedStages, ","))
 	}
@@ -1053,7 +1064,106 @@ func writeAnalysisBundle(outDir string, report repoAnalyzeReport) error {
 			return err
 		}
 	}
+	if commandsPath := report.Outputs["commands"]; commandsPath != "" {
+		if err := copyIfExists(commandsPath, "commands.md"); err != nil {
+			return err
+		}
+	}
 	return copyIfExists(filepath.Join(outDir, "analyze.md"), "summary.md")
+}
+
+func writeCopyCommandsReport(outDir string, report repoAnalyzeReport, githubInput bool, githubRef, proposalKind, llmCommand, budget string, noLLM, redact, ciMode bool) error {
+	var b strings.Builder
+	fmt.Fprintf(&b, "# Copy these Patchline commands\n\n")
+	fmt.Fprintf(&b, "Run this first for an end-to-end analysis of the same project slice:\n\n")
+	fmt.Fprintf(&b, "```bash\n")
+	fmt.Fprintf(&b, "go run ./cmd/patchline repo analyze")
+	if githubInput {
+		fmt.Fprintf(&b, " --github %s", shellArg(report.Input))
+		if githubRef != "" {
+			fmt.Fprintf(&b, " --ref %s", shellArg(githubRef))
+		}
+	} else {
+		fmt.Fprintf(&b, " %s", shellArg(report.Input))
+	}
+	if report.Subpath != "" {
+		fmt.Fprintf(&b, " --subpath %s", shellArg(report.Subpath))
+	}
+	fmt.Fprintf(&b, " --stages %s", shellArg(strings.Join(report.Stages, ",")))
+	if proposalKind != "" {
+		fmt.Fprintf(&b, " --proposal-kind %s", shellArg(proposalKind))
+	}
+	if budget != "" {
+		fmt.Fprintf(&b, " --budget %s", shellArg(budget))
+	}
+	if llmCommand != "" {
+		fmt.Fprintf(&b, " --llm-command %s", shellArg(llmCommand))
+	}
+	if ciMode {
+		fmt.Fprintf(&b, " --ci")
+	}
+	if redact {
+		fmt.Fprintf(&b, " --redact")
+	}
+	if noLLM {
+		fmt.Fprintf(&b, " --no-llm")
+	}
+	fmt.Fprintf(&b, " --out %s\n", shellArg(outDir))
+	fmt.Fprintf(&b, "```\n\n")
+	fmt.Fprintf(&b, "If you want to inspect each stage separately, run:\n\n```bash\n")
+	if githubInput {
+		fmt.Fprintf(&b, "go run ./cmd/patchline repo fetch %s", shellArg(report.Input))
+		if githubRef != "" {
+			fmt.Fprintf(&b, " --ref %s", shellArg(githubRef))
+		}
+		if report.Subpath != "" {
+			fmt.Fprintf(&b, " --subpath %s", shellArg(report.Subpath))
+		}
+		fmt.Fprintf(&b, " --out %s\n", shellArg(filepath.Join(outDir, "fetch")))
+		fmt.Fprintf(&b, "SCAN_ROOT=%s\n", shellArg(report.Source.ScannedRoot))
+	} else {
+		fmt.Fprintf(&b, "SCAN_ROOT=%s\n", shellArg(report.Input))
+	}
+	fmt.Fprintf(&b, "go run ./cmd/patchline repo inventory \"$SCAN_ROOT\" --out %s\n", shellArg(filepath.Join(outDir, "inventory")))
+	fmt.Fprintf(&b, "go run ./cmd/patchline intake \"$SCAN_ROOT\" --out %s\n", shellArg(filepath.Join(outDir, "intake")))
+	fmt.Fprintf(&b, "go run ./cmd/patchline repo baseline --inventory %s --intake %s --out %s\n", shellArg(filepath.Join(outDir, "inventory")), shellArg(filepath.Join(outDir, "intake")), shellArg(filepath.Join(outDir, "baseline")))
+	fmt.Fprintf(&b, "go run ./cmd/patchline repo propose --from-report %s --proposal-kind %s", shellArg(filepath.Join(outDir, "baseline")), shellArg(firstNonEmpty(proposalKind, "all")))
+	if budget != "" {
+		fmt.Fprintf(&b, " --budget %s", shellArg(budget))
+	}
+	if llmCommand != "" {
+		fmt.Fprintf(&b, " --llm-command %s", shellArg(llmCommand))
+	}
+	if noLLM {
+		fmt.Fprintf(&b, " --no-llm")
+	}
+	fmt.Fprintf(&b, " --out %s\n", shellArg(filepath.Join(outDir, "proposal")))
+	fmt.Fprintf(&b, "go run ./cmd/patchline repo compare --before %s --after %s --out %s\n", shellArg(filepath.Join(outDir, "baseline")), shellArg(filepath.Join(outDir, "proposal")), shellArg(filepath.Join(outDir, "compare")))
+	fmt.Fprintf(&b, "```\n\n")
+	fmt.Fprintf(&b, "Shareable outputs:\n\n")
+	fmt.Fprintf(&b, "- analysis bundle: `%s`\n", filepath.Join(outDir, "analysis-bundle"))
+	fmt.Fprintf(&b, "- SARIF: `%s`\n", filepath.Join(outDir, "analysis-bundle", "summary.sarif"))
+	fmt.Fprintf(&b, "- summary: `%s`\n", filepath.Join(outDir, "analysis-bundle", "summary.md"))
+	return os.WriteFile(filepath.Join(outDir, "commands.md"), []byte(b.String()), 0o644)
+}
+
+func firstNonEmpty(values ...string) string {
+	for _, value := range values {
+		if value != "" {
+			return value
+		}
+	}
+	return ""
+}
+
+func shellArg(value string) string {
+	if value == "" {
+		return "''"
+	}
+	if regexp.MustCompile(`^[A-Za-z0-9_./:@,=-]+$`).MatchString(value) {
+		return value
+	}
+	return "'" + strings.ReplaceAll(value, "'", "'\"'\"'") + "'"
 }
 
 func writeRepoAnalyzeCIArtifacts(outDir string, report repoAnalyzeReport) (repoAnalyzeCIArtifacts, error) {
