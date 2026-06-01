@@ -33,6 +33,7 @@ type BaselineReport struct {
 	SymbolicChecks  []SymbolicCheck           `json:"symbolic_checks,omitempty"`
 	TemporalWindows []TemporalWindow          `json:"temporal_windows,omitempty"`
 	Recurrences     []RecurrencePattern       `json:"recurrences,omitempty"`
+	PolicyChecks    []PolicyCheck             `json:"policy_checks,omitempty"`
 	NativeChecks    []Command                 `json:"native_checks,omitempty"`
 	Hash            string                    `json:"hash"`
 	Markdown        string                    `json:"markdown,omitempty"`
@@ -58,6 +59,10 @@ type BaselineSummary struct {
 	TemporalSignals     int `json:"temporal_signals"`
 	Recurrences         int `json:"recurrences"`
 	RecurringRisks      int `json:"recurring_risks"`
+	PolicyChecks        int `json:"policy_checks"`
+	PolicyPassed        int `json:"policy_passed"`
+	PolicyWarnings      int `json:"policy_warnings"`
+	PolicyFailed        int `json:"policy_failed"`
 	GrepOnlyMatches     int `json:"grep_only_matches"`
 	SQLOnlyRankedRisks  int `json:"sql_only_ranked_risks"`
 	IdentifierOnlyLinks int `json:"identifier_only_links"`
@@ -181,6 +186,20 @@ type RecurrencePattern struct {
 	NextCommand string   `json:"next_command,omitempty"`
 }
 
+type PolicyCheck struct {
+	ID          string   `json:"id"`
+	RiskID      string   `json:"risk_id"`
+	Policy      string   `json:"policy"`
+	Status      string   `json:"status"`
+	RiskClass   string   `json:"risk_class"`
+	Required    []string `json:"required"`
+	Satisfied   []string `json:"satisfied,omitempty"`
+	Missing     []string `json:"missing,omitempty"`
+	Evidence    []string `json:"evidence,omitempty"`
+	ReviewLevel string   `json:"review_level"`
+	Rationale   string   `json:"rationale"`
+}
+
 func Baseline(inv Inventory, facts []Fact, intakeReport intake.Report) BaselineReport {
 	report := BaselineReport{Version: BaselineVersion, InventoryRoot: inv.Root, IntakeSource: intakeReport.Source.Input}
 	factIndex := indexFacts(facts)
@@ -195,6 +214,7 @@ func Baseline(inv Inventory, facts []Fact, intakeReport intake.Report) BaselineR
 	report.SymbolicChecks = buildSymbolicChecks(report.Risks, report.AbstractEffects, report.Provenance)
 	report.TemporalWindows = buildTemporalWindows(report.Risks, report.Provenance, intakeReport)
 	report.Recurrences = buildRecurrences(report.Risks, report.AbstractEffects, report.Provenance)
+	report.PolicyChecks = buildPolicyChecks(report.Risks, report.Provenance, report.SymbolicChecks)
 	report.Summary = BaselineSummary{
 		RankedRisks:         len(report.Risks),
 		CodePathRankedRisks: countCodePathRisks(report.Risks),
@@ -215,6 +235,10 @@ func Baseline(inv Inventory, facts []Fact, intakeReport intake.Report) BaselineR
 		TemporalSignals:     countTemporalSignals(report.TemporalWindows),
 		Recurrences:         len(report.Recurrences),
 		RecurringRisks:      countRecurringRisks(report.Recurrences),
+		PolicyChecks:        len(report.PolicyChecks),
+		PolicyPassed:        countPolicyStatus(report.PolicyChecks, "pass"),
+		PolicyWarnings:      countPolicyStatus(report.PolicyChecks, "warn"),
+		PolicyFailed:        countPolicyStatus(report.PolicyChecks, "fail"),
 		GrepOnlyMatches:     grepOnlyMatches(inv.Root),
 		SQLOnlyRankedRisks:  sqlOnlyRankedRisks(intakeReport),
 		IdentifierOnlyLinks: countLinksByIdentifierKind(report.EvidenceLinks, false),
@@ -1757,6 +1781,184 @@ func countRecurringRisks(patterns []RecurrencePattern) int {
 	return len(seen)
 }
 
+func buildPolicyChecks(risks []BaselineRisk, slices []ProvenanceSlice, symbolic []SymbolicCheck) []PolicyCheck {
+	sliceByRisk := map[string]ProvenanceSlice{}
+	for _, slice := range slices {
+		sliceByRisk[slice.RiskID] = slice
+	}
+	symbolicByRisk := map[string][]SymbolicCheck{}
+	for _, check := range symbolic {
+		symbolicByRisk[check.RiskID] = append(symbolicByRisk[check.RiskID], check)
+	}
+	var checks []PolicyCheck
+	for _, risk := range risks {
+		riskClass, required := policyRequirementForRisk(risk, symbolicByRisk[risk.ID])
+		if len(required) == 0 {
+			continue
+		}
+		slice := sliceByRisk[risk.ID]
+		satisfied := satisfiedPolicyObligations(risk, slice, symbolicByRisk[risk.ID])
+		missing := missingStrings(required, satisfied)
+		status := "pass"
+		if len(missing) > 0 {
+			status = "warn"
+		}
+		if policyMissingCritical(missing) {
+			status = "fail"
+		}
+		checks = append(checks, PolicyCheck{
+			ID:          "policy:" + canonical.Hash(risk.ID + "\x00" + riskClass)[:16],
+			RiskID:      risk.ID,
+			Policy:      "guard-rollback-approval-dryrun-test",
+			Status:      status,
+			RiskClass:   riskClass,
+			Required:    required,
+			Satisfied:   intersectStrings(required, satisfied),
+			Missing:     missing,
+			Evidence:    policyEvidence(slice, symbolicByRisk[risk.ID]),
+			ReviewLevel: policyReviewLevel(riskClass, status),
+			Rationale:   "selected risk classes must carry explicit guard, rollback, approval, dry-run, or test evidence before generated or manual repairs are trusted",
+		})
+	}
+	sort.Slice(checks, func(i, j int) bool {
+		if checks[i].Status != checks[j].Status {
+			return policyStatusRank(checks[i].Status) > policyStatusRank(checks[j].Status)
+		}
+		if len(checks[i].Missing) != len(checks[j].Missing) {
+			return len(checks[i].Missing) > len(checks[j].Missing)
+		}
+		return checks[i].ID < checks[j].ID
+	})
+	if len(checks) > 200 {
+		checks = checks[:200]
+	}
+	return checks
+}
+
+func policyRequirementForRisk(risk BaselineRisk, symbolic []SymbolicCheck) (string, []string) {
+	kind := strings.ToLower(risk.Kind)
+	hasSymbolicFail := false
+	for _, check := range symbolic {
+		if check.Status == "fail" {
+			hasSymbolicFail = true
+			break
+		}
+	}
+	switch {
+	case risk.Severity == "high" || hasSymbolicFail || riskHasFactor(risk, "destructive-effect") || riskHasFactor(risk, "destructive-code-path") || strings.Contains(kind, "delete") || strings.Contains(kind, "drop") || strings.Contains(kind, "truncate"):
+		return "destructive-or-unproven", []string{"guard", "rollback", "approval", "dry-run", "test"}
+	case riskHasFactor(risk, "broad-write") || riskHasFactor(risk, "write-breadth-unknown"):
+		return "broad-write", []string{"guard", "dry-run", "test"}
+	case strings.HasPrefix(kind, "code-path:"):
+		return "persistent-code-path", []string{"test", "approval"}
+	default:
+		return "", nil
+	}
+}
+
+func satisfiedPolicyObligations(risk BaselineRisk, slice ProvenanceSlice, symbolic []SymbolicCheck) []string {
+	var out []string
+	if !riskHasFactor(risk, "broad-write") && !riskHasFactor(risk, "write-breadth-unknown") && !riskHasFactor(risk, "source-window-unavailable") {
+		out = append(out, "guard")
+	}
+	if len(slice.RepairPaths) > 0 || !riskHasFactor(risk, "weak-rollback-signal") {
+		out = append(out, "rollback")
+	}
+	if len(slice.TestCommands) > 0 || len(slice.NativeCommands) > 0 {
+		out = append(out, "test")
+	}
+	for _, check := range symbolic {
+		if check.Property == "scope_preservation" && check.Status == "pass" {
+			out = append(out, "guard")
+		}
+		if check.Property == "reversibility" && check.Status == "pass" {
+			out = append(out, "rollback")
+		}
+	}
+	if risk.NextCommand != "" || slice.MigrationPath != "" {
+		out = append(out, "dry-run")
+	}
+	return uniqueSortedStrings(out)
+}
+
+func missingStrings(required, satisfied []string) []string {
+	sat := map[string]bool{}
+	for _, value := range satisfied {
+		sat[value] = true
+	}
+	var missing []string
+	for _, value := range required {
+		if !sat[value] {
+			missing = append(missing, value)
+		}
+	}
+	return uniqueSortedStrings(missing)
+}
+
+func intersectStrings(required, satisfied []string) []string {
+	req := map[string]bool{}
+	for _, value := range required {
+		req[value] = true
+	}
+	var out []string
+	for _, value := range satisfied {
+		if req[value] {
+			out = append(out, value)
+		}
+	}
+	return uniqueSortedStrings(out)
+}
+
+func policyMissingCritical(missing []string) bool {
+	for _, value := range missing {
+		if value == "guard" || value == "rollback" || value == "approval" {
+			return true
+		}
+	}
+	return false
+}
+
+func policyEvidence(slice ProvenanceSlice, symbolic []SymbolicCheck) []string {
+	evidence := provenanceEvidence(slice)
+	for _, check := range symbolic {
+		evidence = append(evidence, "symbolic:"+check.Property+":"+check.Status)
+	}
+	return capStrings(uniqueSortedStrings(evidence), 12)
+}
+
+func policyReviewLevel(riskClass, status string) string {
+	if status == "fail" || riskClass == "destructive-or-unproven" {
+		return "manual-approval-required"
+	}
+	if status == "warn" {
+		return "maintainer-review"
+	}
+	return "standard-review"
+}
+
+func policyStatusRank(status string) int {
+	switch status {
+	case "fail":
+		return 3
+	case "warn":
+		return 2
+	case "pass":
+		return 1
+	default:
+		return 0
+	}
+}
+
+func countPolicyStatus(checks []PolicyCheck, status string) int {
+	var count int
+	for _, check := range checks {
+		if check.Status == status {
+			count++
+		}
+	}
+	return count
+}
+
 func sharedIdentifiers(left, right []Identifier) []Identifier {
 	rightSet := map[string]Identifier{}
 	for _, id := range right {
@@ -1927,6 +2129,10 @@ func renderBaselineMarkdown(report BaselineReport) string {
 	fmt.Fprintf(&b, "| temporal signals | %d |\n", report.Summary.TemporalSignals)
 	fmt.Fprintf(&b, "| recurrence patterns | %d |\n", report.Summary.Recurrences)
 	fmt.Fprintf(&b, "| recurring risks | %d |\n", report.Summary.RecurringRisks)
+	fmt.Fprintf(&b, "| policy checks | %d |\n", report.Summary.PolicyChecks)
+	fmt.Fprintf(&b, "| policy passed | %d |\n", report.Summary.PolicyPassed)
+	fmt.Fprintf(&b, "| policy warnings | %d |\n", report.Summary.PolicyWarnings)
+	fmt.Fprintf(&b, "| policy failed | %d |\n", report.Summary.PolicyFailed)
 	fmt.Fprintf(&b, "| grep-only matches | %d |\n", report.Summary.GrepOnlyMatches)
 	fmt.Fprintf(&b, "| SQL-only ranked risks | %d |\n", report.Summary.SQLOnlyRankedRisks)
 	fmt.Fprintf(&b, "| identifier-only links | %d |\n", report.Summary.IdentifierOnlyLinks)
@@ -1983,6 +2189,14 @@ func renderBaselineMarkdown(report BaselineReport) string {
 		limit := minInt(len(report.Recurrences), 20)
 		for _, pattern := range report.Recurrences[:limit] {
 			fmt.Fprintf(&b, "| %d | %s | %s | %s | %d | %s |\n", pattern.Count, pattern.Table, pattern.Kind, pattern.Effect, len(pattern.Paths), pattern.Confidence)
+		}
+		fmt.Fprintf(&b, "\n")
+	}
+	if len(report.PolicyChecks) > 0 {
+		fmt.Fprintf(&b, "## Policy checks\n\n| status | risk | class | missing | review |\n| --- | --- | --- | --- | --- |\n")
+		limit := minInt(len(report.PolicyChecks), 25)
+		for _, check := range report.PolicyChecks[:limit] {
+			fmt.Fprintf(&b, "| %s | `%s` | %s | %s | %s |\n", check.Status, check.RiskID, check.RiskClass, strings.Join(check.Missing, ", "), check.ReviewLevel)
 		}
 		fmt.Fprintf(&b, "\n")
 	}

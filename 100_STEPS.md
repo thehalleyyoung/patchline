@@ -92,7 +92,7 @@ Every addition to the repo should be judged by whether it makes that loop more a
 64. [x] Add symbolic checks for idempotency, reversibility, frame conditions, and scope preservation.
 65. [x] Add temporal windowing around incidents, releases, migrations, and generated repairs.
 66. [x] Add recurrence detection for patterns similar to prior risky migrations or repairs in the same repo.
-67. [ ] Add policy checks requiring guard, rollback, approval, dry run, or tests for selected risk classes.
+67. [x] Add policy checks requiring guard, rollback, approval, dry run, or tests for selected risk classes.
 68. [ ] Add proof-carrying summaries when a repair's scope and frame conditions can be checked.
 69. [ ] Explain rankings with feature contributions so results are inspectable and ablation-friendly.
 70. [ ] Treat generated code as an intervention in a repair-analysis loop, not merely as text completion.

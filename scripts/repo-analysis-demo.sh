@@ -69,6 +69,7 @@ jq -n \
       symbolic_checks: ($baseline[0].summary.symbolic_checks // 0),
       temporal_windows: ($baseline[0].summary.temporal_windows // 0),
       recurrences: ($baseline[0].summary.recurrences // 0),
+      policy_checks: ($baseline[0].summary.policy_checks // 0),
       evidence_links: $baseline[0].summary.evidence_links,
       grep_only: $baseline[0].summary.grep_only_matches,
       sql_only: $baseline[0].summary.sql_only_ranked_risks,
@@ -114,7 +115,7 @@ jq -n \
   echo
   echo "## Summary"
   echo
-  jq -r '"- files inventoried: \(.inventory.files)\n- project facts: \(.inventory.facts)\n- schema evolution findings: \(.inventory.schema_evolution)\n- native commands: \(.inventory.native_commands)\n- field evidence: \(.inventory.field_evidence)\n- intake high-risk SQL: \(.intake.high_risk)\n- problem candidates: \(.intake.problems)\n- candidate links: \(.intake.links)\n- baseline ranked risks: \(.baseline.risks)\n- baseline code-path risks: \(.baseline.code_path_risks)\n- provenance slices: \(.baseline.provenance_slices)\n- datalog-style rows: \(.baseline.datalog_rows)\n- abstract effects: \(.baseline.abstract_effects)\n- symbolic checks: \(.baseline.symbolic_checks)\n- temporal windows: \(.baseline.temporal_windows)\n- recurrence patterns: \(.baseline.recurrences)\n- baseline evidence links: \(.baseline.evidence_links)\n- generated proposal files: \(.proposal.files)\n- proposal output hash: \(.proposal.output_hash)\n- compare checks passed: \(.compare.checks_passed)\n- compare checks failed: \(.compare.checks_failed)\n- native checks run: \(.compare.native_checks_run)\n- native checks passed: \(.compare.native_checks_passed)\n- native checks failed: \(.compare.native_checks_failed)\n- native checks skipped: \(.compare.native_checks_skipped)"' "$OUT/summary.json"
+  jq -r '"- files inventoried: \(.inventory.files)\n- project facts: \(.inventory.facts)\n- schema evolution findings: \(.inventory.schema_evolution)\n- native commands: \(.inventory.native_commands)\n- field evidence: \(.inventory.field_evidence)\n- intake high-risk SQL: \(.intake.high_risk)\n- problem candidates: \(.intake.problems)\n- candidate links: \(.intake.links)\n- baseline ranked risks: \(.baseline.risks)\n- baseline code-path risks: \(.baseline.code_path_risks)\n- provenance slices: \(.baseline.provenance_slices)\n- datalog-style rows: \(.baseline.datalog_rows)\n- abstract effects: \(.baseline.abstract_effects)\n- symbolic checks: \(.baseline.symbolic_checks)\n- temporal windows: \(.baseline.temporal_windows)\n- recurrence patterns: \(.baseline.recurrences)\n- policy checks: \(.baseline.policy_checks)\n- baseline evidence links: \(.baseline.evidence_links)\n- generated proposal files: \(.proposal.files)\n- proposal output hash: \(.proposal.output_hash)\n- compare checks passed: \(.compare.checks_passed)\n- compare checks failed: \(.compare.checks_failed)\n- native checks run: \(.compare.native_checks_run)\n- native checks passed: \(.compare.native_checks_passed)\n- native checks failed: \(.compare.native_checks_failed)\n- native checks skipped: \(.compare.native_checks_skipped)"' "$OUT/summary.json"
 } > "$OUT/summary.md"
 
 echo "repo analysis summary: $OUT/summary.md"
