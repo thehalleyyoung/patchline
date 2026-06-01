@@ -80,6 +80,10 @@ jq -n \
       risks_with_coverage: $compare[0].summary.risks_with_coverage,
       checks_passed: $compare[0].summary.patchline_checks_passed,
       checks_failed: $compare[0].summary.patchline_checks_failed,
+      native_checks_run: ($compare[0].summary.native_checks_run // 0),
+      native_checks_passed: ($compare[0].summary.native_checks_passed // 0),
+      native_checks_failed: ($compare[0].summary.native_checks_failed // 0),
+      native_checks_skipped: ($compare[0].summary.native_checks_skipped // 0),
       rejected: $compare[0].summary.rejected
     }
   }' > "$OUT/summary.json"
@@ -104,7 +108,7 @@ jq -n \
   echo
   echo "## Summary"
   echo
-  jq -r '"- files inventoried: \(.inventory.files)\n- project facts: \(.inventory.facts)\n- schema evolution findings: \(.inventory.schema_evolution)\n- native commands: \(.inventory.native_commands)\n- field evidence: \(.inventory.field_evidence)\n- intake high-risk SQL: \(.intake.high_risk)\n- problem candidates: \(.intake.problems)\n- candidate links: \(.intake.links)\n- baseline ranked risks: \(.baseline.risks)\n- baseline code-path risks: \(.baseline.code_path_risks)\n- baseline evidence links: \(.baseline.evidence_links)\n- generated proposal files: \(.proposal.files)\n- proposal output hash: \(.proposal.output_hash)\n- compare checks passed: \(.compare.checks_passed)\n- compare checks failed: \(.compare.checks_failed)"' "$OUT/summary.json"
+  jq -r '"- files inventoried: \(.inventory.files)\n- project facts: \(.inventory.facts)\n- schema evolution findings: \(.inventory.schema_evolution)\n- native commands: \(.inventory.native_commands)\n- field evidence: \(.inventory.field_evidence)\n- intake high-risk SQL: \(.intake.high_risk)\n- problem candidates: \(.intake.problems)\n- candidate links: \(.intake.links)\n- baseline ranked risks: \(.baseline.risks)\n- baseline code-path risks: \(.baseline.code_path_risks)\n- baseline evidence links: \(.baseline.evidence_links)\n- generated proposal files: \(.proposal.files)\n- proposal output hash: \(.proposal.output_hash)\n- compare checks passed: \(.compare.checks_passed)\n- compare checks failed: \(.compare.checks_failed)\n- native checks run: \(.compare.native_checks_run)\n- native checks passed: \(.compare.native_checks_passed)\n- native checks failed: \(.compare.native_checks_failed)\n- native checks skipped: \(.compare.native_checks_skipped)"' "$OUT/summary.json"
 } > "$OUT/summary.md"
 
 echo "repo analysis summary: $OUT/summary.md"

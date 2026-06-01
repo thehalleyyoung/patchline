@@ -78,7 +78,7 @@ Every addition to the repo should be judged by whether it makes that loop more a
 53. [x] Check whether generated tests cover the exact tables, code paths, and risk IDs they claim to cover.
 54. [x] Check whether generated guards fail closed when assumptions or database metadata are unavailable.
 55. [x] Check whether generated repairs preserve scope and include rollback/validation obligations.
-56. [ ] Run safe native tests when discovered, recording commands, exit status, logs, and hashes.
+56. [x] Run safe native tests when discovered, recording commands, exit status, logs, and hashes.
 57. [x] Run Patchline semantic checks even when native tests are unavailable.
 58. [x] Emit a before/after delta: risks reduced, risks added, coverage added, evidence strengthened, and unresolved risks.
 59. [x] Reject or flag generated changes that improve documentation while making data safety worse.

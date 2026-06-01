@@ -11,6 +11,7 @@ import (
 	"sort"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/thehalleyyoung/patchline/internal/archive"
 	"github.com/thehalleyyoung/patchline/internal/artifact"
@@ -397,7 +398,7 @@ Usage:
   patchline repo inventory <path> [--out dir] [--full] [--json]
   patchline repo baseline --inventory inventory-dir --intake intake-dir [--out dir] [--json]
   patchline repo propose --from-report baseline-dir --kind tests|guards|instrumentation|repair|explain|all [--out dir] [--json]
-  patchline repo compare --before baseline-dir --after proposal-dir [--out dir] [--json]
+  patchline repo compare --before baseline-dir --after proposal-dir [--out dir] [--run-native-tests] [--json]
   patchline intake <path> [--out results/generated/intake] [--json]
   patchline intake --github owner/repo [--ref ref] [--subpath path] [--out results/generated/intake] [--json]
   patchline semantics-contract [--json]
@@ -700,12 +701,14 @@ func repoCompare(args []string) error {
 	beforePath := fs.String("before", "", "baseline directory or baseline.json")
 	afterPath := fs.String("after", "", "proposal directory or proposal.json")
 	outPath := fs.String("out", "", "output directory")
+	runNativeTests := fs.Bool("run-native-tests", false, "run safe allowlisted native test commands discovered during inventory")
+	nativeTestTimeout := fs.Duration("native-test-timeout", 30*time.Second, "timeout for each native test command")
 	jsonOut := fs.Bool("json", false, "emit JSON")
 	if err := fs.Parse(args); err != nil {
 		return err
 	}
 	if *beforePath == "" || *afterPath == "" {
-		return errors.New("usage: patchline repo compare --before baseline-dir --after proposal-dir [--out dir] [--json]")
+		return errors.New("usage: patchline repo compare --before baseline-dir --after proposal-dir [--out dir] [--run-native-tests] [--json]")
 	}
 	baseline, err := project.LoadBaseline(*beforePath)
 	if err != nil {
@@ -715,7 +718,10 @@ func repoCompare(args []string) error {
 	if err != nil {
 		return err
 	}
-	report := project.Compare(baseline, proposal)
+	report := project.CompareWithOptions(baseline, proposal, project.CompareOptions{
+		RunNativeTests:    *runNativeTests,
+		NativeTestTimeout: *nativeTestTimeout,
+	})
 	if *outPath != "" {
 		if err := project.WriteCompare(*outPath, report); err != nil {
 			return err

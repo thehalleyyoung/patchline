@@ -43,7 +43,7 @@ jq -s '{version:"patchline.four-repo-demo/v1", cases: .}' "${rows[@]}" > "$OUT/s
 
 jq -e '
   (.cases | length) >= 4 and
-  all(.cases[]; .source.owner != null and .source.repo != null and (.source.resolved_commit | test("^[0-9a-f]{40}$")) and (.source.archive_hash | startswith("sha256:")) and (.source.fetched_at | length > 0) and .inventory.files > 0 and .inventory.facts >= .inventory.files and .inventory.schema_evolution > 0 and .inventory.native_commands > 0 and .structured_proof.files > 0 and .structured_proof.field_evidence > 0 and .baseline.risks > 0 and .baseline.code_path_risks > 0 and .proposal.files > 0 and .compare.checks_failed == 0 and .cache_proof.hit == true and (.cache_proof.resolved_commit | test("^[0-9a-f]{40}$")))
+  all(.cases[]; .source.owner != null and .source.repo != null and (.source.resolved_commit | test("^[0-9a-f]{40}$")) and (.source.archive_hash | startswith("sha256:")) and (.source.fetched_at | length > 0) and .inventory.files > 0 and .inventory.facts >= .inventory.files and .inventory.schema_evolution > 0 and .inventory.native_commands > 0 and .structured_proof.files > 0 and .structured_proof.field_evidence > 0 and .baseline.risks > 0 and .baseline.code_path_risks > 0 and .proposal.files > 0 and .compare.checks_failed == 0 and (.compare.native_checks_failed // 0) == 0 and .cache_proof.hit == true and (.cache_proof.resolved_commit | test("^[0-9a-f]{40}$")))
 ' "$OUT/summary.json" > /dev/null
 
 {
@@ -51,9 +51,9 @@ jq -e '
   echo
   echo "Each row is a real external repository slice fetched, inventoried, converted to facts, checked by intake, and ranked by the baseline stage."
   echo
-  echo "| Project slice | Commit | Files | Facts | Schema evolutions | Native commands | Field evidence proof | High-risk SQL | Problems | Baseline risks | Code-path risks | Evidence links | Proposal files | Compare failures | Cache proof |"
-  echo "| --- | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | --- |"
-  jq -r '.cases[] | "| \(.label) (`\(.repo):\(.subpath)`) | `\(.source.resolved_commit[0:12])` | \(.inventory.files) | \(.inventory.facts) | \(.inventory.schema_evolution) | \(.inventory.native_commands) | \(.structured_proof.field_evidence) | \(.intake.high_risk) | \(.intake.problems) | \(.baseline.risks) | \(.baseline.code_path_risks) | \(.baseline.evidence_links) | \(.proposal.files) | \(.compare.checks_failed) | \(.cache_proof.hit) |"' "$OUT/summary.json"
+  echo "| Project slice | Commit | Files | Facts | Schema evolutions | Native commands | Field evidence proof | High-risk SQL | Problems | Baseline risks | Code-path risks | Evidence links | Proposal files | Compare failures | Native checks run | Cache proof |"
+  echo "| --- | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | --- |"
+  jq -r '.cases[] | "| \(.label) (`\(.repo):\(.subpath)`) | `\(.source.resolved_commit[0:12])` | \(.inventory.files) | \(.inventory.facts) | \(.inventory.schema_evolution) | \(.inventory.native_commands) | \(.structured_proof.field_evidence) | \(.intake.high_risk) | \(.intake.problems) | \(.baseline.risks) | \(.baseline.code_path_risks) | \(.baseline.evidence_links) | \(.proposal.files) | \(.compare.checks_failed) | \(.compare.native_checks_run) | \(.cache_proof.hit) |"' "$OUT/summary.json"
   echo
   echo 'Each case directory contains fetch metadata, inventory outputs, `facts.jsonl`, `project-map.md`, intake outputs, baseline JSON/Markdown/SARIF, isolated proposal artifacts, and compare reports.'
 } > "$OUT/summary.md"

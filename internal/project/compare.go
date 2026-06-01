@@ -1,12 +1,16 @@
 package project
 
 import (
+	"bytes"
+	"context"
 	"encoding/json"
 	"fmt"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"sort"
 	"strings"
+	"time"
 
 	"github.com/thehalleyyoung/patchline/internal/canonical"
 	"github.com/thehalleyyoung/patchline/internal/migration"
@@ -22,6 +26,7 @@ type CompareReport struct {
 	RiskDeltas      []RiskDelta      `json:"risk_deltas,omitempty"`
 	GeneratedChecks []GeneratedCheck `json:"generated_checks,omitempty"`
 	NativeChecks    []Command        `json:"native_checks,omitempty"`
+	NativeResults   []NativeResult   `json:"native_results,omitempty"`
 	Review          []ReviewItem     `json:"review,omitempty"`
 	Hash            string           `json:"hash"`
 	Markdown        string           `json:"markdown,omitempty"`
@@ -38,6 +43,10 @@ type CompareSummary struct {
 	RepairChecks          int `json:"repair_checks"`
 	PatchlineChecksPassed int `json:"patchline_checks_passed"`
 	PatchlineChecksFailed int `json:"patchline_checks_failed"`
+	NativeChecksRun       int `json:"native_checks_run"`
+	NativeChecksPassed    int `json:"native_checks_passed"`
+	NativeChecksFailed    int `json:"native_checks_failed"`
+	NativeChecksSkipped   int `json:"native_checks_skipped"`
 	Rejected              int `json:"rejected"`
 	Warnings              int `json:"warnings"`
 }
@@ -65,7 +74,27 @@ type ReviewItem struct {
 	Message  string `json:"message"`
 }
 
+type CompareOptions struct {
+	RunNativeTests    bool
+	NativeTestTimeout time.Duration
+}
+
+type NativeResult struct {
+	Command        string `json:"command"`
+	Reason         string `json:"reason,omitempty"`
+	Status         string `json:"status"`
+	ExitCode       int    `json:"exit_code,omitempty"`
+	DurationMillis int64  `json:"duration_millis,omitempty"`
+	Log            string `json:"log,omitempty"`
+	LogHash        string `json:"log_hash,omitempty"`
+	SkippedReason  string `json:"skipped_reason,omitempty"`
+}
+
 func Compare(baseline BaselineReport, proposal ProposalReport) CompareReport {
+	return CompareWithOptions(baseline, proposal, CompareOptions{})
+}
+
+func CompareWithOptions(baseline BaselineReport, proposal ProposalReport, opts CompareOptions) CompareReport {
 	report := CompareReport{
 		Version:      CompareVersion,
 		BaselineHash: baseline.Hash,
@@ -75,7 +104,8 @@ func Compare(baseline BaselineReport, proposal ProposalReport) CompareReport {
 	checks := checkGeneratedArtifacts(proposal.Generated)
 	report.GeneratedChecks = checks
 	report.RiskDeltas = riskDeltas(baseline.Risks, proposal.Generated)
-	report.Summary = summarizeCompare(baseline, proposal, checks, report.RiskDeltas)
+	report.NativeResults = runNativeChecks(baseline.InventoryRoot, baseline.NativeChecks, opts)
+	report.Summary = summarizeCompare(baseline, proposal, checks, report.RiskDeltas, report.NativeResults)
 	report.Review = reviewCompare(report)
 	report.Hash = compareHash(report)
 	report.Markdown = renderCompareMarkdown(report)
@@ -211,7 +241,7 @@ func riskDeltas(risks []BaselineRisk, artifacts []GeneratedArtifact) []RiskDelta
 	return out
 }
 
-func summarizeCompare(baseline BaselineReport, proposal ProposalReport, checks []GeneratedCheck, deltas []RiskDelta) CompareSummary {
+func summarizeCompare(baseline BaselineReport, proposal ProposalReport, checks []GeneratedCheck, deltas []RiskDelta, nativeResults []NativeResult) CompareSummary {
 	var summary CompareSummary
 	summary.BaselineRisks = len(baseline.Risks)
 	summary.TargetedRisks = len(proposal.TargetRiskIDs)
@@ -254,7 +284,114 @@ func summarizeCompare(baseline BaselineReport, proposal ProposalReport, checks [
 			}
 		}
 	}
+	for _, result := range nativeResults {
+		switch result.Status {
+		case "pass":
+			summary.NativeChecksRun++
+			summary.NativeChecksPassed++
+		case "fail", "timeout":
+			summary.NativeChecksRun++
+			summary.NativeChecksFailed++
+			summary.Rejected++
+		case "skipped":
+			summary.NativeChecksSkipped++
+		}
+	}
 	return summary
+}
+
+func runNativeChecks(root string, commands []Command, opts CompareOptions) []NativeResult {
+	commands = uniqueCommands(commands)
+	if len(commands) == 0 {
+		return nil
+	}
+	timeout := opts.NativeTestTimeout
+	if timeout <= 0 {
+		timeout = 30 * time.Second
+	}
+	var results []NativeResult
+	for _, command := range commands {
+		result := NativeResult{Command: command.Command, Reason: command.Reason, Status: "skipped"}
+		args, ok := safeNativeTestArgs(command.Command)
+		if !ok {
+			result.SkippedReason = "command is not on the safe native-test allowlist"
+			results = append(results, result)
+			continue
+		}
+		if root == "" {
+			result.SkippedReason = "baseline inventory root is unavailable"
+			results = append(results, result)
+			continue
+		}
+		if !opts.RunNativeTests {
+			result.SkippedReason = "native tests were discovered but not run; pass --run-native-tests to execute safe allowlisted commands"
+			results = append(results, result)
+			continue
+		}
+		start := time.Now()
+		ctx, cancel := context.WithTimeout(context.Background(), timeout)
+		cmd := exec.CommandContext(ctx, args[0], args[1:]...)
+		cmd.Dir = root
+		var output bytes.Buffer
+		cmd.Stdout = &output
+		cmd.Stderr = &output
+		err := cmd.Run()
+		cancel()
+		log := output.String()
+		result.DurationMillis = time.Since(start).Milliseconds()
+		result.LogHash = canonical.Hash(log)
+		result.Log = truncateString(log, 64<<10)
+		if ctx.Err() == context.DeadlineExceeded {
+			result.Status = "timeout"
+			result.ExitCode = -1
+			results = append(results, result)
+			continue
+		}
+		if err != nil {
+			result.Status = "fail"
+			if exitErr, ok := err.(*exec.ExitError); ok {
+				result.ExitCode = exitErr.ExitCode()
+			} else {
+				result.ExitCode = -1
+				if log == "" {
+					result.Log = err.Error()
+					result.LogHash = canonical.Hash(result.Log)
+				}
+			}
+			results = append(results, result)
+			continue
+		}
+		result.Status = "pass"
+		results = append(results, result)
+	}
+	return results
+}
+
+func safeNativeTestArgs(command string) ([]string, bool) {
+	switch strings.TrimSpace(command) {
+	case "go test ./...":
+		return []string{"go", "test", "./..."}, true
+	case "npm test":
+		return []string{"npm", "test"}, true
+	case "python manage.py test":
+		return []string{"python", "manage.py", "test"}, true
+	case "pytest":
+		return []string{"pytest"}, true
+	case "bundle exec rake test":
+		return []string{"bundle", "exec", "rake", "test"}, true
+	default:
+		return nil, false
+	}
+}
+
+func truncateString(value string, limit int) string {
+	if len(value) <= limit {
+		return value
+	}
+	if limit <= 0 {
+		return ""
+	}
+	return value[:limit]
 }
 
 func generatedMutationRisk(statement migration.Statement) bool {
@@ -282,6 +419,9 @@ func reviewCompare(report CompareReport) []ReviewItem {
 	}
 	if report.Summary.NewHighRiskSQL > 0 {
 		review = append(review, ReviewItem{Severity: "error", Message: "generated proposal introduces high-risk SQL"})
+	}
+	if report.Summary.NativeChecksFailed > 0 {
+		review = append(review, ReviewItem{Severity: "error", Message: "project-native tests failed or timed out"})
 	}
 	if report.Summary.RisksWithCoverage < report.Summary.TargetedRisks {
 		review = append(review, ReviewItem{Severity: "warning", Message: "not every targeted risk has generated artifact coverage"})
@@ -313,11 +453,26 @@ func renderCompareMarkdown(report CompareReport) string {
 	fmt.Fprintf(&b, "| new high-risk SQL | %d |\n", report.Summary.NewHighRiskSQL)
 	fmt.Fprintf(&b, "| new medium-risk SQL | %d |\n", report.Summary.NewMediumRiskSQL)
 	fmt.Fprintf(&b, "| checks passed | %d |\n", report.Summary.PatchlineChecksPassed)
-	fmt.Fprintf(&b, "| checks failed | %d |\n\n", report.Summary.PatchlineChecksFailed)
+	fmt.Fprintf(&b, "| checks failed | %d |\n", report.Summary.PatchlineChecksFailed)
+	fmt.Fprintf(&b, "| native checks run | %d |\n", report.Summary.NativeChecksRun)
+	fmt.Fprintf(&b, "| native checks passed | %d |\n", report.Summary.NativeChecksPassed)
+	fmt.Fprintf(&b, "| native checks failed | %d |\n", report.Summary.NativeChecksFailed)
+	fmt.Fprintf(&b, "| native checks skipped | %d |\n\n", report.Summary.NativeChecksSkipped)
 	if len(report.Review) > 0 {
 		fmt.Fprintf(&b, "## Review\n\n")
 		for _, item := range report.Review {
 			fmt.Fprintf(&b, "- **%s**: %s\n", item.Severity, item.Message)
+		}
+		fmt.Fprintf(&b, "\n")
+	}
+	if len(report.NativeResults) > 0 {
+		fmt.Fprintf(&b, "## Native checks\n\n| status | command | log hash | reason |\n| --- | --- | --- | --- |\n")
+		for _, result := range report.NativeResults {
+			reason := result.SkippedReason
+			if reason == "" {
+				reason = result.Reason
+			}
+			fmt.Fprintf(&b, "| %s | `%s` | `%s` | %s |\n", result.Status, result.Command, result.LogHash, reason)
 		}
 		fmt.Fprintf(&b, "\n")
 	}

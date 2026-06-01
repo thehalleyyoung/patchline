@@ -127,7 +127,7 @@ PATCHLINE_PLUGPLAY_CASES=$'My app|owner/repo|path/to/migrations\nOther app|owner
 | Project facts | `facts.jsonl` from repo inventory: files, languages, migrations, schema evolution, native commands, unknown JSON/YAML/TOML/log fields, docs, evidence exports, tables, columns, models, endpoints, queues, jobs, deploys, timestamps, errors, and next commands |
 | Baseline ranking | `baseline.json`, `baseline.md`, and `baseline.sarif` from repo baseline: ranked SQL and code-path risks, evidence links, native checks, and ablation counts |
 | Bounded proposals | `proposal.patch` plus isolated untrusted tests, guards, instrumentation notes, repair manifests, and explain SQL from repo propose |
-| Proposal checks | `compare.json` and `compare.md` from repo compare: generated-artifact checks, coverage, risky generated SQL, and review status |
+| Proposal checks | `compare.json` and `compare.md` from repo compare: generated-artifact checks, coverage, risky generated SQL, optional safe native-test execution, and review status |
 | Embedded/source SQL | Go, Python, Ruby, JavaScript/TypeScript, Java, C#, shell, and SQL files |
 | Cause candidates | risky migrations, deploy/trace/commit/migration signals, incident-like notes, export fields |
 | Repair candidates | repair manifests, rollback/revert/restore/backfill/reconcile/fix clues in SQL/docs/scripts |

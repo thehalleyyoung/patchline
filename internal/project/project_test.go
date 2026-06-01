@@ -596,6 +596,31 @@ func TestCompareChecksGeneratedProposalCoverage(t *testing.T) {
 	}
 }
 
+func TestCompareRunsSafeNativeChecks(t *testing.T) {
+	root := t.TempDir()
+	writeFile(t, root, "go.mod", "module example.com/nativecheck\n\ngo 1.22\n")
+	writeFile(t, root, "native_test.go", `package nativecheck
+
+import "testing"
+
+func TestNative(t *testing.T) {}
+`)
+	baseline := BaselineReport{
+		Version:       BaselineVersion,
+		InventoryRoot: root,
+		Hash:          "baseline-hash",
+		NativeChecks:  []Command{{Command: "go test ./...", Reason: "Go module test command"}},
+	}
+	baseline.Hash = baselineHash(baseline)
+	compare := CompareWithOptions(baseline, ProposalReport{OutputHash: "proposal-hash"}, CompareOptions{RunNativeTests: true})
+	if compare.Summary.NativeChecksRun != 1 || compare.Summary.NativeChecksPassed != 1 || compare.Summary.NativeChecksFailed != 0 {
+		t.Fatalf("unexpected native check summary: %#v", compare.Summary)
+	}
+	if len(compare.NativeResults) != 1 || compare.NativeResults[0].Status != "pass" || compare.NativeResults[0].LogHash == "" {
+		t.Fatalf("expected passing native result with log hash: %#v", compare.NativeResults)
+	}
+}
+
 func writeBaselineForTest(t *testing.T, baseline BaselineReport) string {
 	t.Helper()
 	dir := filepath.Join(t.TempDir(), "baseline")
