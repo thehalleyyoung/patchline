@@ -157,7 +157,7 @@ Every addition to the repo should be judged by whether it makes that loop more a
 114. [x] Add a corpus fairness audit that reports language/framework/source-host coverage and flags over-reliance on any one ecosystem.
 115. [x] Add stratified benchmark manifests so experiments can report per-ecosystem results instead of only aggregate numbers.
 116. [x] Add automatic stale-ref detection that checks whether pinned public repos still download and whether expected hashes still match.
-117. [ ] Add a public issue template for users to nominate real repos and failure modes that Patchline should support.
+117. [x] Add a public issue template for users to nominate real repos and failure modes that Patchline should support.
 118. [ ] Add a corpus minimizer that extracts the smallest public subpath preserving each finding, link, and generated-intervention behavior.
 119. [ ] Add cross-repo recurrence reports that identify repeated data-change failure modes across unrelated projects without leaking private code.
 120. [ ] Add corpus release artifacts with signed checksums, generated reports, and one-command reproduction instructions.

@@ -153,6 +153,7 @@ make dataset-card-gate
 make corpus-fairness-gate
 make stratified-benchmark-gate
 make stale-ref-gate
+make issue-template-gate
 ```
 
 The demo downloads real GitHub project subpaths and writes:
@@ -218,6 +219,8 @@ The real-repo slice matrix is backed by `examples/real-repo-slices.json` and `ex
 `make stratified-benchmark-gate` materializes benchmark manifests by ecosystem and migration framework so experiments can report stratified results instead of aggregate-only metrics.
 
 `make stale-ref-gate` checks pinned public refs still resolve and downloaded archive hashes match expected values.
+
+`make issue-template-gate` validates the public real-repo nomination issue form for required repo, ref, subpath, ecosystem, evidence, and failure-mode fields.
 
 Current default projects:
 

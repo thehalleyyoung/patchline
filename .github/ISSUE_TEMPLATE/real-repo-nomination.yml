@@ -1,0 +1,85 @@
+name: Real repository or failure-mode nomination
+description: Nominate a public repo slice or data-change failure mode Patchline should support.
+title: "[repo nomination]: "
+labels:
+  - corpus
+  - real-repo
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Use this form to nominate existing public data/code repair evidence. Please only include public links and avoid secrets, customer data, or private incident details.
+  - type: input
+    id: repository
+    attributes:
+      label: Repository URL
+      description: Link to the public GitHub, GitLab, Bitbucket, SourceHut, or release archive source.
+      placeholder: https://github.com/owner/repo
+    validations:
+      required: true
+  - type: input
+    id: pinned-ref
+    attributes:
+      label: Pinned commit, tag, or release artifact
+      description: Provide the exact commit SHA, tag, release URL, or archive URL that should be reproducible.
+      placeholder: 0123456789abcdef0123456789abcdef01234567
+    validations:
+      required: true
+  - type: input
+    id: subpath
+    attributes:
+      label: Suggested subpath
+      description: Smallest useful directory or file path to analyze.
+      placeholder: db/migrate
+    validations:
+      required: true
+  - type: dropdown
+    id: ecosystem
+    attributes:
+      label: Ecosystem or migration framework
+      options:
+        - Rails / Active Record
+        - Django
+        - Alembic
+        - Flyway
+        - Liquibase
+        - Prisma
+        - TypeORM
+        - EF Core
+        - Go migrations
+        - Java migrations
+        - Node migrations
+        - Other
+    validations:
+      required: true
+  - type: textarea
+    id: failure-mode
+    attributes:
+      label: Failure mode or repair scenario
+      description: Describe the risky data change, incident, rollback, repair, or missing analysis behavior Patchline should cover.
+      placeholder: Broad update without rollback, unsafe drop, missing idempotency guard, stale generated repair, etc.
+    validations:
+      required: true
+  - type: textarea
+    id: evidence
+    attributes:
+      label: Public evidence links
+      description: Link public migrations, tests, docs, runbooks, issues, PRs, postmortems, release notes, or repair scripts.
+    validations:
+      required: true
+  - type: textarea
+    id: expected-support
+    attributes:
+      label: Expected Patchline support
+      description: What should Patchline find, explain, suppress, compare, or generate for this nomination?
+    validations:
+      required: true
+  - type: checkboxes
+    id: safety
+    attributes:
+      label: Safety and reproducibility
+      options:
+        - label: The linked sources are public and do not contain secrets or private customer data.
+          required: true
+        - label: The nominated ref or artifact is reproducible without private credentials.
+          required: true
