@@ -39,7 +39,7 @@ Every addition to the repo should be judged by whether it makes that loop more a
 23. [x] Extract tables, columns, models, endpoints, queues, jobs, reports, incidents, commits, PRs, deploy IDs, timestamps, and error names.
 24. [x] Infer schema evolution from migrations and ORM declarations without requiring a Patchline schema.
 25. [x] Extract embedded SQL and persistence calls from common languages.
-26. [ ] Detect migration frameworks and native commands such as `rails db:migrate`, `manage.py migrate`, `prisma migrate`, `alembic`, `flyway`, and `go test`.
+26. [x] Detect migration frameworks and native commands such as `rails db:migrate`, `manage.py migrate`, `prisma migrate`, `alembic`, `flyway`, and `go test`.
 27. [ ] Preserve unknown JSON/YAML/TOML/log fields as searchable evidence rather than discarding them.
 28. [x] Emit `facts.jsonl` as the stable low-level interface for later stages.
 29. [x] Emit `project-map.md` showing where data-change evidence lives in the repo.

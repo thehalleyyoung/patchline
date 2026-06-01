@@ -150,11 +150,34 @@ func TestInventoryDetectsProjectNativeSignals(t *testing.T) {
 	if len(inv.OperationalDocs) == 0 || len(inv.EvidenceExports) == 0 || len(inv.NextCommands) == 0 {
 		t.Fatalf("expected docs/evidence/next commands: %#v", inv)
 	}
+	if len(inv.NativeCommands) == 0 {
+		t.Fatalf("expected native command suggestions: %#v", inv)
+	}
 	if len(inv.Facts) < inv.FilesScanned {
 		t.Fatalf("expected fact stream to include at least file facts: facts=%d files=%d", len(inv.Facts), inv.FilesScanned)
 	}
 	if !strings.Contains(inv.ProjectMap, "facts.jsonl") {
 		t.Fatalf("expected project map to point at facts.jsonl:\n%s", inv.ProjectMap)
+	}
+}
+
+func TestInventoryDetectsNativeMigrationCommands(t *testing.T) {
+	root := t.TempDir()
+	writeFile(t, root, "manage.py", "print('django')")
+	writeFile(t, root, "alembic.ini", "[alembic]\n")
+	writeFile(t, root, "prisma/migrations/001/migration.sql", "create table accounts(id int);")
+	writeFile(t, root, "flyway.conf", "flyway.url=jdbc:postgresql://example\n")
+	inv, err := InventoryPath(InventoryOptions{Path: root})
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, command := range []string{"python manage.py migrate", "alembic upgrade head", "npx prisma migrate status", "flyway migrate"} {
+		if !hasCommand(inv.NativeCommands, command) {
+			t.Fatalf("missing native command %q in %#v", command, inv.NativeCommands)
+		}
+	}
+	if !hasCommand(inv.NextCommands, "python manage.py migrate") {
+		t.Fatalf("expected native commands to be surfaced as next commands: %#v", inv.NextCommands)
 	}
 }
 
@@ -575,6 +598,15 @@ func tarGzForTest(t *testing.T, files map[string]string) []byte {
 func hasIdentifier(ids []Identifier, kind, value string) bool {
 	for _, id := range ids {
 		if id.Kind == kind && id.Value == value {
+			return true
+		}
+	}
+	return false
+}
+
+func hasCommand(commands []Command, command string) bool {
+	for _, item := range commands {
+		if item.Command == command {
 			return true
 		}
 	}

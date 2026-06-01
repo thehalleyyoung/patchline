@@ -80,6 +80,7 @@ type Inventory struct {
 	CI                []Finding      `json:"ci,omitempty"`
 	DeployConfig      []Finding      `json:"deploy_config,omitempty"`
 	TestCommands      []Command      `json:"test_commands,omitempty"`
+	NativeCommands    []Command      `json:"native_commands,omitempty"`
 	SourceSQLHints    []Finding      `json:"source_sql_hints,omitempty"`
 	SchemaEvolution   []Finding      `json:"schema_evolution,omitempty"`
 	OperationalDocs   []Finding      `json:"operational_docs,omitempty"`
@@ -283,14 +284,17 @@ func (inv *Inventory) inspectRoot(root string) {
 		finding := Finding{Kind: "rails-or-generic-db-migrate", Path: ".", Confidence: "path", Rationale: "inventory root is a db/migrate migration path"}
 		inv.MigrationRoots = append(inv.MigrationRoots, finding)
 		inv.addFindingFact("migration_root", finding)
+		inv.NativeCommands = append(inv.NativeCommands, Command{Command: "bundle exec rails db:migrate", Reason: "db/migrate inventory root suggests Rails-style migration execution from the project root"})
 	case strings.HasSuffix(lower, "/migrations") || strings.Contains(lower, "/migrations/"):
 		finding := Finding{Kind: "migrations", Path: ".", Confidence: "path", Rationale: "inventory root is a migrations path"}
 		inv.MigrationRoots = append(inv.MigrationRoots, finding)
 		inv.addFindingFact("migration_root", finding)
+		inv.NativeCommands = append(inv.NativeCommands, Command{Command: "python manage.py migrate", Reason: "migrations inventory root may be runnable through Django from the project root"})
 	case strings.HasSuffix(lower, "/migration") || strings.Contains(lower, "/migration/"):
 		finding := Finding{Kind: "migration", Path: ".", Confidence: "path", Rationale: "inventory root is a migration path"}
 		inv.MigrationRoots = append(inv.MigrationRoots, finding)
 		inv.addFindingFact("migration_root", finding)
+		inv.NativeCommands = append(inv.NativeCommands, Command{Command: "go test ./...", Reason: "singular migration root commonly appears in Go services; run from the project root when available"})
 	}
 }
 
@@ -893,12 +897,15 @@ func (inv *Inventory) inspectFile(file scanFile) {
 	case base == "gemfile":
 		add("framework", &inv.Frameworks, "ruby", "Ruby dependency file")
 		inv.TestCommands = append(inv.TestCommands, Command{Command: "bundle exec rake test", Reason: "Gemfile suggests Ruby tests may be available"})
+		inv.NativeCommands = append(inv.NativeCommands, Command{Command: "bundle exec rails db:migrate", Reason: "Ruby/Rails dependency file suggests Rails migrations may be runnable from the project root"})
 	case base == "manage.py":
 		add("framework", &inv.Frameworks, "django", "Django manage.py entrypoint")
 		inv.TestCommands = append(inv.TestCommands, Command{Command: "python manage.py test", Reason: "Django project test command"})
+		inv.NativeCommands = append(inv.NativeCommands, Command{Command: "python manage.py migrate", Reason: "Django manage.py entrypoint exposes native migration execution"})
 	case base == "package.json":
 		add("framework", &inv.Frameworks, "node", "Node package manifest")
 		inv.TestCommands = append(inv.TestCommands, Command{Command: "npm test", Reason: "package.json suggests npm tests may be available"})
+		inv.NativeCommands = append(inv.NativeCommands, Command{Command: "npm test", Reason: "package.json exposes the project-native test command"})
 	case base == "go.mod":
 		add("framework", &inv.Frameworks, "go", "Go module")
 		inv.TestCommands = append(inv.TestCommands, Command{Command: "go test ./...", Reason: "Go module test command"})
@@ -909,16 +916,24 @@ func (inv *Inventory) inspectFile(file scanFile) {
 	switch {
 	case strings.Contains(lower, "db/migrate/"):
 		add("migration_root", &inv.MigrationRoots, "rails-or-generic-db-migrate", "db/migrate migration path")
-	case strings.Contains(lower, "migrations/"):
-		add("migration_root", &inv.MigrationRoots, "migrations", "migrations path")
+		inv.NativeCommands = append(inv.NativeCommands, Command{Command: "bundle exec rails db:migrate", Reason: "db/migrate path suggests Rails-style migration execution from the project root"})
 	case strings.Contains(lower, "prisma/migrations/"):
 		add("migration_system", &inv.MigrationSystems, "prisma", "Prisma migrations path")
+		inv.NativeCommands = append(inv.NativeCommands, Command{Command: "npx prisma migrate status", Reason: "Prisma migrations path exposes native migration status checks"})
+	case strings.Contains(lower, "migrations/"):
+		add("migration_root", &inv.MigrationRoots, "migrations", "migrations path")
+		if strings.HasSuffix(lower, ".py") {
+			inv.NativeCommands = append(inv.NativeCommands, Command{Command: "python manage.py migrate", Reason: "Python migrations path suggests Django-style migration execution from the project root"})
+		}
 	case base == "alembic.ini":
 		add("migration_system", &inv.MigrationSystems, "alembic", "Alembic config")
+		inv.NativeCommands = append(inv.NativeCommands, Command{Command: "alembic upgrade head", Reason: "Alembic config exposes native migration execution"})
 	case base == "flyway.conf":
 		add("migration_system", &inv.MigrationSystems, "flyway", "Flyway config")
+		inv.NativeCommands = append(inv.NativeCommands, Command{Command: "flyway migrate", Reason: "Flyway config exposes native migration execution"})
 	case base == "liquibase.properties":
 		add("migration_system", &inv.MigrationSystems, "liquibase", "Liquibase config")
+		inv.NativeCommands = append(inv.NativeCommands, Command{Command: "liquibase update", Reason: "Liquibase config exposes native migration execution"})
 	}
 	if isSourceSQLCandidate(lower) {
 		add("source_sql_hint", &inv.SourceSQLHints, "source-sql-candidate", "source file type commonly embeds SQL or ORM persistence calls")
@@ -1290,10 +1305,15 @@ func (inv *Inventory) finalize() {
 	inv.OperationalDocs = capFindings(uniqueFindings(inv.OperationalDocs), 50)
 	inv.EvidenceExports = capFindings(uniqueFindings(inv.EvidenceExports), 50)
 	inv.TestCommands = uniqueCommands(inv.TestCommands)
+	inv.NativeCommands = uniqueCommands(inv.NativeCommands)
 	inv.NextCommands = append(inv.NextCommands, Command{Command: fmt.Sprintf("patchline intake %s --out results/generated/intake", shellPath(inv.Root)), Reason: "run deterministic data/code repair intake on this project"})
 	if len(inv.TestCommands) > 0 {
 		inv.NextCommands = append(inv.NextCommands, inv.TestCommands...)
 	}
+	if len(inv.NativeCommands) > 0 {
+		inv.NextCommands = append(inv.NextCommands, inv.NativeCommands...)
+	}
+	inv.NextCommands = uniqueCommands(inv.NextCommands)
 	for _, language := range inv.Languages {
 		inv.addFact(Fact{
 			Version:    Version,
@@ -1306,6 +1326,9 @@ func (inv *Inventory) finalize() {
 	for _, command := range inv.TestCommands {
 		inv.addCommandFact("test_command", command)
 	}
+	for _, command := range inv.NativeCommands {
+		inv.addCommandFact("native_command", command)
+	}
 	for _, command := range inv.NextCommands {
 		inv.addCommandFact("next_command", command)
 	}
@@ -1316,6 +1339,7 @@ func (inv *Inventory) finalize() {
 		"frameworks":        len(inv.Frameworks),
 		"migration_roots":   len(inv.MigrationRoots),
 		"migration_systems": len(inv.MigrationSystems),
+		"native_commands":   len(inv.NativeCommands),
 		"schema_evolution":  len(inv.SchemaEvolution),
 		"operational_docs":  len(inv.OperationalDocs),
 		"source_sql_hints":  len(inv.SourceSQLHints),
@@ -1356,6 +1380,13 @@ func renderMarkdown(inv Inventory) string {
 	writeFindings("Deploy config", inv.DeployConfig)
 	writeFindings("Operational docs", inv.OperationalDocs)
 	writeFindings("Evidence exports", inv.EvidenceExports)
+	if len(inv.NativeCommands) > 0 {
+		fmt.Fprintf(&b, "## Native commands\n\n")
+		for _, c := range inv.NativeCommands {
+			fmt.Fprintf(&b, "- `%s` — %s\n", c.Command, c.Reason)
+		}
+		fmt.Fprintf(&b, "\n")
+	}
 	if len(inv.NextCommands) > 0 {
 		fmt.Fprintf(&b, "## Next commands\n\n")
 		for _, c := range inv.NextCommands {
@@ -1375,6 +1406,7 @@ func renderProjectMap(inv Inventory) string {
 	fmt.Fprintf(&b, "| languages | %d |\n", len(inv.Languages))
 	fmt.Fprintf(&b, "| migration roots | %d |\n", len(inv.MigrationRoots))
 	fmt.Fprintf(&b, "| migration systems | %d |\n", len(inv.MigrationSystems))
+	fmt.Fprintf(&b, "| native commands | %d |\n", len(inv.NativeCommands))
 	fmt.Fprintf(&b, "| schema evolution | %d |\n", len(inv.SchemaEvolution))
 	fmt.Fprintf(&b, "| source SQL hints | %d |\n", len(inv.SourceSQLHints))
 	fmt.Fprintf(&b, "| operational docs | %d |\n", len(inv.OperationalDocs))
@@ -1395,6 +1427,13 @@ func renderProjectMap(inv Inventory) string {
 	writePaths("Source SQL candidates", inv.SourceSQLHints)
 	writePaths("Operational docs", inv.OperationalDocs)
 	writePaths("Evidence exports", inv.EvidenceExports)
+	if len(inv.NativeCommands) > 0 {
+		fmt.Fprintf(&b, "## Native commands\n\n")
+		for _, command := range inv.NativeCommands {
+			fmt.Fprintf(&b, "- `%s` — %s\n", command.Command, command.Reason)
+		}
+		fmt.Fprintf(&b, "\n")
+	}
 	if len(inv.NextCommands) > 0 {
 		fmt.Fprintf(&b, "## Next commands\n\n")
 		for _, command := range inv.NextCommands {
