@@ -120,7 +120,7 @@ Every addition to the repo should be judged by whether it makes that loop more a
 86. [x] Compare against temporal-only linking without identifiers.
 87. [x] Compare fact-grounded generated code against prompt-without-facts generated code.
 88. [x] Compare deterministic re-analysis against trusting generated code without verification.
-89. [ ] Track false positives and false negatives with sampled public findings and explicit adjudication notes.
+89. [x] Track false positives and false negatives with sampled public findings and explicit adjudication notes.
 90. [ ] Report runtime, memory, download size, cache hit rate, and maintainers' review burden.
 
 ## Stage 9: Keep every future addition high-impact

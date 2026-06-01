@@ -1,0 +1,93 @@
+{
+  "version": "patchline.real-repo-adjudications/v1",
+  "adjudications": [
+    {
+      "id": "forem-fp-schema-metadata",
+      "repo": "forem/forem",
+      "subpath": "db/migrate",
+      "sample_type": "false_positive",
+      "path": "db/migrate",
+      "finding": "Rails migration files can contain framework bookkeeping writes that look broad in isolation.",
+      "adjudication": "sampled_false_positive",
+      "note": "A maintainer should suppress or downgrade framework-managed schema/version bookkeeping when the operation is not application data repair risk.",
+      "basis": "public repository static review sample"
+    },
+    {
+      "id": "forem-fn-data-backfill-semantics",
+      "repo": "forem/forem",
+      "subpath": "db/migrate",
+      "sample_type": "false_negative",
+      "path": "db/migrate",
+      "finding": "Business-semantic backfills may be unsafe even when the SQL/API shape is bounded.",
+      "adjudication": "sampled_false_negative_risk_class",
+      "note": "Without production invariants, a bounded update can still violate product semantics; this is tracked as a false-negative class for reviewer sampling.",
+      "basis": "public repository static review sample"
+    },
+    {
+      "id": "bytebase-fp-test-fixture-migrations",
+      "repo": "bytebase/bytebase",
+      "subpath": "backend/migrator/migration",
+      "sample_type": "false_positive",
+      "path": "backend/migrator/migration",
+      "finding": "Some migration-like SQL files are fixtures or compatibility examples rather than live production migrations.",
+      "adjudication": "sampled_false_positive",
+      "note": "The matrix keeps these visible but records that deployment context is needed before treating every matched SQL file as an actionable risk.",
+      "basis": "public repository static review sample"
+    },
+    {
+      "id": "bytebase-fn-dialect-runtime",
+      "repo": "bytebase/bytebase",
+      "subpath": "backend/migrator/migration",
+      "sample_type": "false_negative",
+      "path": "backend/migrator/migration",
+      "finding": "Dialect-specific runtime behavior can be missed when static SQL text is valid but deployment engine/version context is absent.",
+      "adjudication": "sampled_false_negative_risk_class",
+      "note": "This tracks a known blind spot for public migration slices without engine runtime metadata.",
+      "basis": "public repository static review sample"
+    },
+    {
+      "id": "mastodon-fp-safe-rails-helper",
+      "repo": "mastodon/mastodon",
+      "subpath": "db/migrate",
+      "sample_type": "false_positive",
+      "path": "db/migrate",
+      "finding": "Rails helper calls can be intentionally safe even when Patchline assigns risk from the surrounding migration pattern.",
+      "adjudication": "sampled_false_positive",
+      "note": "Reviewer adjudication should separate framework-safe helper behavior from genuinely broad application writes.",
+      "basis": "public repository static review sample"
+    },
+    {
+      "id": "mastodon-fn-background-job-coupling",
+      "repo": "mastodon/mastodon",
+      "subpath": "db/migrate",
+      "sample_type": "false_negative",
+      "path": "db/migrate",
+      "finding": "A migration can be safe alone but unsafe when coupled with application background jobs or deployment order.",
+      "adjudication": "sampled_false_negative_risk_class",
+      "note": "Public migration-only slices cannot fully observe runtime job/deploy coupling, so this remains a sampled false-negative class.",
+      "basis": "public repository static review sample"
+    },
+    {
+      "id": "lobsters-fp-small-repo-maintenance",
+      "repo": "lobsters/lobsters",
+      "subpath": "db/migrate",
+      "sample_type": "false_positive",
+      "path": "db/migrate",
+      "finding": "Small-repo maintenance migrations can be flagged as broad because static analysis lacks operator intent and dataset scale.",
+      "adjudication": "sampled_false_positive",
+      "note": "The finding is still useful for review, but sampled adjudication records that small controlled maintenance changes may be non-actionable.",
+      "basis": "public repository static review sample"
+    },
+    {
+      "id": "lobsters-fn-application-invariant",
+      "repo": "lobsters/lobsters",
+      "subpath": "db/migrate",
+      "sample_type": "false_negative",
+      "path": "db/migrate",
+      "finding": "Application invariants outside the migration folder can make apparently safe schema/data changes risky.",
+      "adjudication": "sampled_false_negative_risk_class",
+      "note": "This is tracked as a false-negative class when the evaluated slice omits application-level invariants.",
+      "basis": "public repository static review sample"
+    }
+  ]
+}
