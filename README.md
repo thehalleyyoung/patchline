@@ -45,6 +45,36 @@ patchline analyze-migration .../backend/migrator/migration/3.1/0000##sheet_blob.
 
 That is the core value: before you write custom labels, manifests, or benchmark cases, Patchline can already tell you where risky data transitions, possible causes, and possible repair/rollback evidence are hiding in a real project.
 
+## Plug-and-play demo on existing projects
+
+Run one command to check several public projects and get a compact report:
+
+```bash
+make plug-and-play-demo
+```
+
+The demo downloads real GitHub project subpaths and writes:
+
+```text
+results/generated/plug-and-play-demo/summary.md
+results/generated/plug-and-play-demo/summary.json
+```
+
+Current default projects:
+
+| Project slice | Files | SQL files | Loose SQL | High-risk SQL | Problems | Causes | Repairs | Links |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| Bytebase migrations (`bytebase/bytebase:backend/migrator/migration`) | 251 | 251 | 0 | 378 | 339 | 339 | 16 | 10243 |
+| Django auth migrations (`django/django:django/contrib/auth/migrations`) | 13 | 0 | 3 | 3 | 2 | 2 | 0 | 2 |
+| Mastodon migrations (`mastodon/mastodon:db/migrate`) | 514 | 0 | 97 | 58 | 44 | 44 | 6 | 76 |
+
+Each case directory contains the full intake report and command log. To scan your own project list:
+
+```bash
+PATCHLINE_PLUGPLAY_CASES=$'My app|owner/repo|path/to/migrations\nOther app|owner2/repo2|db/migrate' \
+  bash scripts/plug-and-play-demo.sh results/generated/my-plugplay
+```
+
 ## What intake finds
 
 `patchline intake` produces `summary.json` and `summary.md` with:
@@ -72,6 +102,9 @@ go run ./cmd/patchline intake . --out results/generated/intake
 
 # Scan part of a public GitHub repo
 go run ./cmd/patchline intake --github bytebase/bytebase --subpath backend/migrator/migration --out results/generated/intake
+
+# Compare several existing public projects
+make plug-and-play-demo
 
 # Analyze one migration directly
 go run ./cmd/patchline analyze-migration path/to/migration.sql --json
