@@ -521,6 +521,9 @@ func TestBaselineBuildsProvenanceSlices(t *testing.T) {
 	if baseline.Summary.DatalogQueries != 4 || baseline.Summary.DatalogRows == 0 {
 		t.Fatalf("expected datalog-style query rows: %#v", baseline.Summary)
 	}
+	if baseline.Summary.AbstractEffects == 0 || baseline.Summary.AbstractOperations == 0 || baseline.Summary.AbstractProofHoles == 0 {
+		t.Fatalf("expected static abstract effects with proof holes: %#v", baseline.Summary)
+	}
 	var fullSlice ProvenanceSlice
 	for _, slice := range baseline.Provenance {
 		if slice.Table == "accounts" {

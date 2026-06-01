@@ -10,6 +10,7 @@ import (
 	"strings"
 
 	"github.com/thehalleyyoung/patchline/internal/canonical"
+	"github.com/thehalleyyoung/patchline/internal/effects"
 	"github.com/thehalleyyoung/patchline/internal/intake"
 	"github.com/thehalleyyoung/patchline/internal/migration"
 )
@@ -17,19 +18,20 @@ import (
 const BaselineVersion = "patchline.repo-baseline/v1"
 
 type BaselineReport struct {
-	Version        string            `json:"version"`
-	InventoryRoot  string            `json:"inventory_root"`
-	IntakeSource   string            `json:"intake_source"`
-	Summary        BaselineSummary   `json:"summary"`
-	Risks          []BaselineRisk    `json:"risks,omitempty"`
-	EvidenceLinks  []EvidenceLink    `json:"evidence_links,omitempty"`
-	CauseClusters  []EvidenceCluster `json:"cause_clusters,omitempty"`
-	RepairClusters []EvidenceCluster `json:"repair_clusters,omitempty"`
-	Provenance     []ProvenanceSlice `json:"provenance_slices,omitempty"`
-	DatalogQueries []DatalogQuery    `json:"datalog_queries,omitempty"`
-	NativeChecks   []Command         `json:"native_checks,omitempty"`
-	Hash           string            `json:"hash"`
-	Markdown       string            `json:"markdown,omitempty"`
+	Version         string                    `json:"version"`
+	InventoryRoot   string                    `json:"inventory_root"`
+	IntakeSource    string                    `json:"intake_source"`
+	Summary         BaselineSummary           `json:"summary"`
+	Risks           []BaselineRisk            `json:"risks,omitempty"`
+	EvidenceLinks   []EvidenceLink            `json:"evidence_links,omitempty"`
+	CauseClusters   []EvidenceCluster         `json:"cause_clusters,omitempty"`
+	RepairClusters  []EvidenceCluster         `json:"repair_clusters,omitempty"`
+	Provenance      []ProvenanceSlice         `json:"provenance_slices,omitempty"`
+	DatalogQueries  []DatalogQuery            `json:"datalog_queries,omitempty"`
+	AbstractEffects []effects.AbstractSummary `json:"abstract_effects,omitempty"`
+	NativeChecks    []Command                 `json:"native_checks,omitempty"`
+	Hash            string                    `json:"hash"`
+	Markdown        string                    `json:"markdown,omitempty"`
 }
 
 type BaselineSummary struct {
@@ -41,6 +43,9 @@ type BaselineSummary struct {
 	ProvenanceSlices    int `json:"provenance_slices"`
 	DatalogQueries      int `json:"datalog_queries"`
 	DatalogRows         int `json:"datalog_rows"`
+	AbstractEffects     int `json:"abstract_effects"`
+	AbstractOperations  int `json:"abstract_operations"`
+	AbstractProofHoles  int `json:"abstract_proof_holes"`
 	GrepOnlyMatches     int `json:"grep_only_matches"`
 	SQLOnlyRankedRisks  int `json:"sql_only_ranked_risks"`
 	IdentifierOnlyLinks int `json:"identifier_only_links"`
@@ -126,6 +131,7 @@ func Baseline(inv Inventory, facts []Fact, intakeReport intake.Report) BaselineR
 	report.NativeChecks = uniqueCommands(append([]Command(nil), inv.TestCommands...))
 	report.Provenance = buildProvenanceSlices(inv, report.Risks, intakeReport, factIndex)
 	report.DatalogQueries = buildDatalogQueries(report.Risks, report.Provenance)
+	report.AbstractEffects = buildAbstractEffectSummaries(report.Risks, report.Provenance)
 	report.Summary = BaselineSummary{
 		RankedRisks:         len(report.Risks),
 		CodePathRankedRisks: countCodePathRisks(report.Risks),
@@ -135,6 +141,9 @@ func Baseline(inv Inventory, facts []Fact, intakeReport intake.Report) BaselineR
 		ProvenanceSlices:    len(report.Provenance),
 		DatalogQueries:      len(report.DatalogQueries),
 		DatalogRows:         countDatalogRows(report.DatalogQueries),
+		AbstractEffects:     len(report.AbstractEffects),
+		AbstractOperations:  countAbstractOperations(report.AbstractEffects),
+		AbstractProofHoles:  countAbstractProofHoles(report.AbstractEffects),
 		GrepOnlyMatches:     grepOnlyMatches(inv.Root),
 		SQLOnlyRankedRisks:  sqlOnlyRankedRisks(intakeReport),
 		IdentifierOnlyLinks: countLinksByIdentifierKind(report.EvidenceLinks, false),
@@ -1071,6 +1080,114 @@ func countDatalogRows(queries []DatalogQuery) int {
 	return count
 }
 
+func buildAbstractEffectSummaries(risks []BaselineRisk, slices []ProvenanceSlice) []effects.AbstractSummary {
+	sliceByRisk := map[string]ProvenanceSlice{}
+	for _, slice := range slices {
+		sliceByRisk[slice.RiskID] = slice
+	}
+	var summaries []effects.AbstractSummary
+	for _, risk := range risks {
+		table := firstNonEmpty(risk.Table, firstIdentifierValue(risk.Identifiers, "table"), firstIdentifierValue(risk.Identifiers, "model"))
+		if table == "" {
+			continue
+		}
+		slice := sliceByRisk[risk.ID]
+		observation := effects.OperationObservation{
+			OperationID:         risk.ID,
+			Table:               table,
+			Effect:              abstractEffectForRisk(risk),
+			MatchedRows:         -1,
+			ChangedColumns:      changedColumnsForRisk(risk),
+			DownstreamEntities:  len(slice.SourcePaths) + len(slice.IncidentPaths) + len(slice.RepairPaths),
+			HasSnapshotRollback: riskHasFactor(risk, "weak-rollback-signal") == false && len(slice.RepairPaths) > 0,
+			Reasons:             abstractReasonsForRisk(risk),
+		}
+		summary := effects.Summarize(firstNonEmpty(slice.MigrationPath, risk.Path), "", []effects.OperationObservation{observation})
+		summaries = append(summaries, summary)
+	}
+	sort.Slice(summaries, func(i, j int) bool {
+		if summaries[i].Join != summaries[j].Join {
+			return effectRank(summaries[i].Join) > effectRank(summaries[j].Join)
+		}
+		return summaries[i].Hash < summaries[j].Hash
+	})
+	if len(summaries) > 100 {
+		summaries = summaries[:100]
+	}
+	return summaries
+}
+
+func abstractEffectForRisk(risk BaselineRisk) effects.Effect {
+	kind := strings.ToLower(risk.Kind)
+	switch {
+	case strings.Contains(kind, "delete"), strings.Contains(kind, "drop"), strings.Contains(kind, "truncate"):
+		return effects.EffectDestructive
+	case riskHasFactor(risk, "destructive-code-path"), riskHasFactor(risk, "destructive-schema-change"), riskHasFactor(risk, "broad-write"):
+		return effects.EffectDestructive
+	case strings.Contains(kind, "insert"), strings.Contains(kind, "create"):
+		return effects.EffectIdempotentUpdate
+	case strings.Contains(kind, "update"), strings.Contains(kind, "alter"), strings.Contains(kind, "add_column"), strings.Contains(kind, "add_field"):
+		if riskHasFactor(risk, "weak-rollback-signal") {
+			return effects.EffectIdempotentUpdate
+		}
+		return effects.EffectReversibleUpdate
+	default:
+		return effects.EffectUnknown
+	}
+}
+
+func changedColumnsForRisk(risk BaselineRisk) []string {
+	var columns []string
+	for _, id := range risk.Identifiers {
+		if id.Kind == "column" {
+			columns = append(columns, id.Value)
+		}
+	}
+	return uniqueSortedStrings(columns)
+}
+
+func abstractReasonsForRisk(risk BaselineRisk) []string {
+	var reasons []string
+	for _, factor := range risk.Factors {
+		reasons = append(reasons, factor.Name+": "+factor.Reason)
+	}
+	return capStrings(uniqueSortedStrings(reasons), 8)
+}
+
+func riskHasFactor(risk BaselineRisk, name string) bool {
+	for _, factor := range risk.Factors {
+		if factor.Name == name {
+			return true
+		}
+	}
+	return false
+}
+
+func effectRank(effect effects.Effect) int {
+	for _, item := range effects.Lattice() {
+		if item.Effect == effect {
+			return item.Rank
+		}
+	}
+	return 7
+}
+
+func countAbstractOperations(summaries []effects.AbstractSummary) int {
+	var count int
+	for _, summary := range summaries {
+		count += len(summary.Operations)
+	}
+	return count
+}
+
+func countAbstractProofHoles(summaries []effects.AbstractSummary) int {
+	var count int
+	for _, summary := range summaries {
+		count += len(summary.Concretization.UnsupportedFacts)
+	}
+	return count
+}
+
 func sharedIdentifiers(left, right []Identifier) []Identifier {
 	rightSet := map[string]Identifier{}
 	for _, id := range right {
@@ -1230,6 +1347,9 @@ func renderBaselineMarkdown(report BaselineReport) string {
 	fmt.Fprintf(&b, "| provenance slices | %d |\n", report.Summary.ProvenanceSlices)
 	fmt.Fprintf(&b, "| datalog-style queries | %d |\n", report.Summary.DatalogQueries)
 	fmt.Fprintf(&b, "| datalog-style rows | %d |\n", report.Summary.DatalogRows)
+	fmt.Fprintf(&b, "| abstract effects | %d |\n", report.Summary.AbstractEffects)
+	fmt.Fprintf(&b, "| abstract operations | %d |\n", report.Summary.AbstractOperations)
+	fmt.Fprintf(&b, "| abstract proof holes | %d |\n", report.Summary.AbstractProofHoles)
 	fmt.Fprintf(&b, "| grep-only matches | %d |\n", report.Summary.GrepOnlyMatches)
 	fmt.Fprintf(&b, "| SQL-only ranked risks | %d |\n", report.Summary.SQLOnlyRankedRisks)
 	fmt.Fprintf(&b, "| identifier-only links | %d |\n", report.Summary.IdentifierOnlyLinks)
@@ -1254,6 +1374,14 @@ func renderBaselineMarkdown(report BaselineReport) string {
 		fmt.Fprintf(&b, "## Datalog-style query results\n\n| query | rows | rule |\n| --- | ---: | --- |\n")
 		for _, query := range report.DatalogQueries {
 			fmt.Fprintf(&b, "| %s | %d | `%s` |\n", query.Name, len(query.Rows), query.Rule)
+		}
+		fmt.Fprintf(&b, "\n")
+	}
+	if len(report.AbstractEffects) > 0 {
+		fmt.Fprintf(&b, "## Abstract effects\n\n| join | operations | proof holes | manifest |\n| --- | ---: | ---: | --- |\n")
+		limit := minInt(len(report.AbstractEffects), 20)
+		for _, summary := range report.AbstractEffects[:limit] {
+			fmt.Fprintf(&b, "| %s | %d | %d | %s |\n", summary.Join, len(summary.Operations), len(summary.Concretization.UnsupportedFacts), summary.Manifest)
 		}
 		fmt.Fprintf(&b, "\n")
 	}

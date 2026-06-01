@@ -55,3 +55,19 @@ func TestSummarizeAbstractsConcreteObservations(t *testing.T) {
 		t.Fatalf("unexpected concretization summary: %#v", summary.Concretization)
 	}
 }
+
+func TestSummarizeStaticObservationKeepsUnknownRowsAsProofHole(t *testing.T) {
+	summary := Summarize("baseline", "", []OperationObservation{{
+		OperationID:    "risk:update",
+		Table:          "accounts",
+		Effect:         EffectDestructive,
+		MatchedRows:    -1,
+		ChangedColumns: []string{"disabled"},
+	}})
+	if summary.Concretization.RowsChanged != 0 {
+		t.Fatalf("unknown row count should not become concrete rows: %#v", summary.Concretization)
+	}
+	if len(summary.Operations) != 1 || summary.Operations[0].BoundedRows || len(summary.Operations[0].ProofHoles) == 0 {
+		t.Fatalf("expected unbounded static proof hole: %#v", summary.Operations)
+	}
+}

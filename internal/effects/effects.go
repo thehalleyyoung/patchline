@@ -168,7 +168,11 @@ func Summarize(manifest, incident string, observations []OperationObservation) A
 		abstract := abstractOperation(observation)
 		summary.Operations = append(summary.Operations, abstract)
 		summary.Join = Join(summary.Join, abstract.Effect)
-		summary.Concretization.RowsChanged += observation.MatchedRows
+		if observation.MatchedRows >= 0 {
+			summary.Concretization.RowsChanged += observation.MatchedRows
+		} else {
+			summary.Concretization.UnsupportedFacts = append(summary.Concretization.UnsupportedFacts, observation.OperationID+": concrete row count unavailable")
+		}
 		if observation.Table != "" {
 			tableSet[observation.Table] = struct{}{}
 		}
@@ -228,6 +232,9 @@ func abstractOperation(observation OperationObservation) AbstractOperation {
 	}
 	if effect == EffectUnknown {
 		abstract.ProofHoles = append(abstract.ProofHoles, observation.OperationID+": no abstract transfer function for operation")
+	}
+	if observation.MatchedRows < 0 {
+		abstract.ProofHoles = append(abstract.ProofHoles, observation.OperationID+": concrete row count unavailable")
 	}
 	return abstract
 }
