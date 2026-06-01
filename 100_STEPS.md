@@ -127,7 +127,7 @@ Every addition to the repo should be judged by whether it makes that loop more a
 
 91. [x] Before adding a feature, name the real-repo failure mode it fixes.
 92. [x] Before adding a parser, show the new facts it extracts from at least one real project.
-93. [ ] Before adding a generated-code feature, show the deterministic checks that can catch bad generated output.
+93. [x] Before adding a generated-code feature, show the deterministic checks that can catch bad generated output.
 94. [ ] Before adding a report section, show what maintainer decision it improves.
 95. [ ] Before adding a metric, show how it affects ranking, repair safety, or comparison against baselines.
 96. [ ] Prefer fewer, stronger findings over exhaustive low-signal output.

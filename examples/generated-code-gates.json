@@ -1,0 +1,31 @@
+{
+  "version": "patchline.generated-code-gates/v1",
+  "features": [
+    {
+      "id": "generated-guard-output",
+      "status": "implemented",
+      "real_repo": "lobsters/lobsters",
+      "subpath": "db/migrate",
+      "proposal_kind": "guards",
+      "bad_generated_output": "untrusted generated guard\nSELECT 1;\n",
+      "deterministic_checks": [
+        "generated guard must include table existence, row count, and rollback checks",
+        "generated guard must be re-scanned for high-risk SQL before review acceptance"
+      ],
+      "catch_condition": "repo compare reports patchline_checks_failed > 0 and rejects the intervention loop"
+    },
+    {
+      "id": "generated-repair-manifest",
+      "status": "implemented",
+      "real_repo": "lobsters/lobsters",
+      "subpath": "db/migrate",
+      "proposal_kind": "repair",
+      "bad_generated_output": "untrusted generated repair\n{\"notes\":\"fix later\"}\n",
+      "deterministic_checks": [
+        "generated repair manifest must include scope, rollback, and postconditions",
+        "generated repair remains untrusted until deterministic re-analysis succeeds"
+      ],
+      "catch_condition": "repo compare reports patchline_checks_failed > 0 and rejects the intervention loop"
+    }
+  ]
+}

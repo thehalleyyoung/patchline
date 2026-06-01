@@ -123,6 +123,7 @@ make four-repo-demo
 make repo-slice-matrix
 make impact-gate
 make parser-fact-gate
+make generated-code-gate
 ```
 
 The demo downloads real GitHub project subpaths and writes:
@@ -140,6 +141,8 @@ The real-repo slice matrix is backed by `examples/real-repo-slices.json` and `ex
 `make impact-gate` checks `examples/feature-impact-gates.json` so each feature entry names the public repo slice and real-repo failure mode it is meant to fix.
 
 `make parser-fact-gate` checks `examples/parser-fact-gates.json` by fetching a public repo slice, running inventory, and proving the expected fact kind appears in `facts.jsonl`.
+
+`make generated-code-gate` checks `examples/generated-code-gates.json` by proving deliberately bad generated artifacts are rejected by deterministic compare-stage checks on a public repo slice.
 
 Current default projects:
 
