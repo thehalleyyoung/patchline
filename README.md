@@ -18,6 +18,7 @@ go run ./cmd/patchline repo fetch django/django \
 go run ./cmd/patchline repo analyze --github django/django \
   --subpath django/contrib/auth/migrations \
   --stages inventory,baseline,propose,compare,deep \
+  --budget files=15,lines=120,tokens=50000,changes=3 \
   --no-llm \
   --out results/generated/repos/django-auth-analysis
 go run ./cmd/patchline repo inventory \
@@ -36,6 +37,7 @@ go run ./cmd/patchline repo baseline \
 go run ./cmd/patchline repo propose \
   --from-report results/generated/repos/django-auth-baseline \
   --proposal-kind all \
+  --budget files=15,lines=120,tokens=50000,changes=3 \
   --out results/generated/repos/django-auth-proposal
 
 go run ./cmd/patchline repo compare \
@@ -47,6 +49,8 @@ go run ./cmd/patchline repo compare \
 Fetch writes `source.json` with source provenance, resolved GitHub commit, archive hash, timestamp, tool version, and cache metadata. Inventory writes `inventory.json`, `inventory.md`, `facts.jsonl`, and `project-map.md`. Baseline writes `baseline.json`, `baseline.md`, and `baseline.sarif`. Propose writes `prompt-context.json`, `prompt.txt`, `proposal.patch`, `proposal.json`, and generated untrusted artifacts under `patchline-proposals/`. Compare writes `compare.json` and `compare.md`.
 
 To plug in a local or hosted generator, pass `--llm-command '<cmd>'`; Patchline sends the prompt on stdin and stores the output as an untrusted artifact for deterministic compare. Use `--no-llm` when you want template-only analysis and rejection of any generator command.
+
+Use `--budget files=N,lines=N,tokens=N,changes=N` to bound generated scope before a patch is written. `changes` limits targeted risks, `files` limits generated artifacts, `lines` limits each artifact, and `tokens` limits approximate generated output tokens.
 
 For example, with an OpenAI key already exported as `OPENAI_API_KEY` or `openai_api_key`, you can pass a command that reads Patchline's prompt from stdin and writes generated text to stdout:
 

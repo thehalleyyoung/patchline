@@ -24,7 +24,7 @@ SCAN_ROOT="$(jq -r '.source.scanned_root' "$OUT/fetch.json")"
 go run ./cmd/patchline repo inventory "$SCAN_ROOT" --out "$INVENTORY_OUT" --json > "$OUT/inventory.json"
 go run ./cmd/patchline intake "$SCAN_ROOT" --out "$INTAKE_OUT" --json > "$OUT/intake.json"
 go run ./cmd/patchline repo baseline --inventory "$INVENTORY_OUT" --intake "$INTAKE_OUT" --out "$BASELINE_OUT" --json > "$OUT/baseline.json"
-go run ./cmd/patchline repo propose --from-report "$BASELINE_OUT" --proposal-kind all --out "$PROPOSAL_OUT" --json > "$OUT/proposal.json"
+go run ./cmd/patchline repo propose --from-report "$BASELINE_OUT" --proposal-kind all --budget files=15,lines=120,tokens=50000,changes=3 --out "$PROPOSAL_OUT" --json > "$OUT/proposal.json"
 go run ./cmd/patchline repo compare --before "$BASELINE_OUT" --after "$PROPOSAL_OUT" --out "$COMPARE_OUT" --json > "$OUT/compare.json"
 FACT_COUNT="$(wc -l < "$INVENTORY_OUT/facts.jsonl" | tr -d ' ')"
 
@@ -81,6 +81,7 @@ jq -n \
       kind: $proposal[0].kind,
       generator: $proposal[0].generator,
       trust: $proposal[0].trust,
+      scope_budget: ($proposal[0].scope_budget.raw // ""),
       files: ($proposal[0].generated_files | length),
       output_hash: $proposal[0].output_hash
     },
@@ -120,7 +121,8 @@ jq -n \
   echo
   echo "## Summary"
   echo
-  jq -r '"- files inventoried: \(.inventory.files)\n- project facts: \(.inventory.facts)\n- schema evolution findings: \(.inventory.schema_evolution)\n- native commands: \(.inventory.native_commands)\n- field evidence: \(.inventory.field_evidence)\n- intake high-risk SQL: \(.intake.high_risk)\n- problem candidates: \(.intake.problems)\n- candidate links: \(.intake.links)\n- baseline ranked risks: \(.baseline.risks)\n- baseline code-path risks: \(.baseline.code_path_risks)\n- ranking explanations: \(.baseline.ranking_explanations)\n- provenance slices: \(.baseline.provenance_slices)\n- datalog-style rows: \(.baseline.datalog_rows)\n- abstract effects: \(.baseline.abstract_effects)\n- symbolic checks: \(.baseline.symbolic_checks)\n- temporal windows: \(.baseline.temporal_windows)\n- recurrence patterns: \(.baseline.recurrences)\n- policy checks: \(.baseline.policy_checks)\n- repair proof summaries: \(.baseline.repair_proof_summaries)\n- baseline evidence links: \(.baseline.evidence_links)\n- generated proposal files: \(.proposal.files)\n- proposal output hash: \(.proposal.output_hash)\n- compare checks passed: \(.compare.checks_passed)\n- compare checks failed: \(.compare.checks_failed)\n- native checks run: \(.compare.native_checks_run)\n- native checks passed: \(.compare.native_checks_passed)\n- native checks failed: \(.compare.native_checks_failed)\n- native checks skipped: \(.compare.native_checks_skipped)\n- intervention loops: \(.compare.intervention_loops)\n- intervention accepted: \(.compare.intervention_accepted)\n- intervention rejected: \(.compare.intervention_rejected)"' "$OUT/summary.json"
+  jq -r '"- files inventoried: \(.inventory.files)\n- project facts: \(.inventory.facts)\n- schema evolution findings: \(.inventory.schema_evolution)\n- native commands: \(.inventory.native_commands)\n- field evidence: \(.inventory.field_evidence)\n- intake high-risk SQL: \(.intake.high_risk)\n- problem candidates: \(.intake.problems)\n- candidate links: \(.intake.links)\n- baseline ranked risks: \(.baseline.risks)\n- baseline code-path risks: \(.baseline.code_path_risks)\n- ranking explanations: \(.baseline.ranking_explanations)\n- provenance slices: \(.baseline.provenance_slices)\n- datalog-style rows: \(.baseline.datalog_rows)\n- abstract effects: \(.baseline.abstract_effects)\n- symbolic checks: \(.baseline.symbolic_checks)\n- temporal windows: \(.baseline.temporal_windows)\n- recurrence patterns: \(.baseline.recurrences)\n- policy checks: \(.baseline.policy_checks)\n- repair proof summaries: \(.baseline.repair_proof_summaries)\n- baseline evidence links: \(.baseline.evidence_links)\n- generated proposal files: \(.proposal.files)\n  - proposal scope budget: \(.proposal.scope_budget)
+  - proposal output hash: \(.proposal.output_hash)\n- compare checks passed: \(.compare.checks_passed)\n- compare checks failed: \(.compare.checks_failed)\n- native checks run: \(.compare.native_checks_run)\n- native checks passed: \(.compare.native_checks_passed)\n- native checks failed: \(.compare.native_checks_failed)\n- native checks skipped: \(.compare.native_checks_skipped)\n- intervention loops: \(.compare.intervention_loops)\n- intervention accepted: \(.compare.intervention_accepted)\n- intervention rejected: \(.compare.intervention_rejected)"' "$OUT/summary.json"
 } > "$OUT/summary.md"
 
 echo "repo analysis summary: $OUT/summary.md"

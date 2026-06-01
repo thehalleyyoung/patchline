@@ -653,6 +653,21 @@ func TestProposeWritesIsolatedPatchAndMetadata(t *testing.T) {
 	if output, err := exec.Command("git", "-C", repo, "apply", "--check", filepath.Join(out, "proposal.patch")).CombinedOutput(); err != nil {
 		t.Fatalf("proposal patch should apply cleanly: %v\n%s", err, string(output))
 	}
+	budgeted, err := Propose(ProposalOptions{BaselinePath: baselineDir, Kind: "all", Budget: "files=2,lines=8,tokens=300,changes=1", BudgetRisks: 3})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if budgeted.ScopeBudget.MaxFiles != 2 || budgeted.BudgetRisks != 1 || len(budgeted.GeneratedFiles) != 2 || len(budgeted.Warnings) == 0 {
+		t.Fatalf("expected bounded proposal artifacts: %#v", budgeted)
+	}
+	for _, artifact := range budgeted.Generated {
+		if len(strings.Split(strings.TrimSuffix(artifact.Content, "\n"), "\n")) > 8 {
+			t.Fatalf("artifact exceeded line budget: %s\n%s", artifact.Path, artifact.Content)
+		}
+	}
+	if _, err := Propose(ProposalOptions{BaselinePath: baselineDir, Kind: "all", Budget: "files=nope"}); err == nil {
+		t.Fatal("expected invalid budget to fail")
+	}
 }
 
 func TestProposeLLMCommandCapturesOutputAsUntrustedArtifact(t *testing.T) {

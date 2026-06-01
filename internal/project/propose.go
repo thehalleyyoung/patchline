@@ -10,6 +10,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"sort"
+	"strconv"
 	"strings"
 	"time"
 
@@ -24,6 +25,7 @@ type ProposalOptions struct {
 	OutDir       string
 	LLMCommand   string
 	NoLLM        bool
+	Budget       string
 	BudgetRisks  int
 }
 
@@ -35,6 +37,7 @@ type ProposalReport struct {
 	Deterministic  bool                `json:"deterministic_only"`
 	Trust          string              `json:"trust"`
 	BudgetRisks    int                 `json:"budget_risks"`
+	ScopeBudget    ProposalBudget      `json:"scope_budget,omitempty"`
 	TargetRiskIDs  []string            `json:"target_risk_ids"`
 	ContextHash    string              `json:"context_hash"`
 	PromptHash     string              `json:"prompt_hash"`
@@ -86,6 +89,14 @@ type GeneratedArtifact struct {
 	RiskIDs []string
 }
 
+type ProposalBudget struct {
+	Raw        string `json:"raw,omitempty"`
+	MaxFiles   int    `json:"files,omitempty"`
+	MaxLines   int    `json:"lines,omitempty"`
+	MaxTokens  int    `json:"tokens,omitempty"`
+	MaxChanges int    `json:"changes,omitempty"`
+}
+
 type RepairIntervention struct {
 	ID                 string   `json:"id"`
 	Stage              string   `json:"stage"`
@@ -110,6 +121,13 @@ func Propose(opts ProposalOptions) (ProposalReport, error) {
 	}
 	if opts.NoLLM && opts.LLMCommand != "" {
 		return ProposalReport{}, fmt.Errorf("--no-llm cannot be combined with --llm-command")
+	}
+	budget, err := parseProposalBudget(opts.Budget)
+	if err != nil {
+		return ProposalReport{}, err
+	}
+	if budget.MaxChanges > 0 && budget.MaxChanges < opts.BudgetRisks {
+		opts.BudgetRisks = budget.MaxChanges
 	}
 	if err := os.MkdirAll(opts.OutDir, 0o755); err != nil {
 		return ProposalReport{}, err
@@ -137,6 +155,7 @@ func Propose(opts ProposalOptions) (ProposalReport, error) {
 	} else {
 		generated = generateTemplateArtifacts(context)
 	}
+	generated, budgetWarnings := applyProposalBudget(generated, budget)
 	patch := renderProposalPatch(generated)
 	report := ProposalReport{
 		Version:       ProposalVersion,
@@ -146,6 +165,7 @@ func Propose(opts ProposalOptions) (ProposalReport, error) {
 		Deterministic: opts.LLMCommand == "",
 		Trust:         "untrusted-generated-proposal",
 		BudgetRisks:   opts.BudgetRisks,
+		ScopeBudget:   budget,
 		TargetRiskIDs: riskIDs(context.Risks),
 		ContextHash:   canonical.Hash(context),
 		PromptHash:    canonical.Hash(prompt),
@@ -160,6 +180,7 @@ func Propose(opts ProposalOptions) (ProposalReport, error) {
 		Generated: generated,
 		Patch:     patch,
 	}
+	report.Warnings = append(report.Warnings, budgetWarnings...)
 	report.Intervention = buildRepairIntervention(report.BaselineHash, report.OutputHash, report.TargetRiskIDs, generated)
 	for _, artifact := range generated {
 		report.GeneratedFiles = append(report.GeneratedFiles, GeneratedFile{Path: artifact.Path, Kind: artifact.Kind, ContentHash: "sha256:" + canonical.Hash(artifact.Content), RiskIDs: artifact.RiskIDs})
@@ -362,6 +383,99 @@ func expandProposalKinds(kind string) []string {
 	}
 }
 
+func parseProposalBudget(value string) (ProposalBudget, error) {
+	value = strings.TrimSpace(value)
+	if value == "" {
+		return ProposalBudget{}, nil
+	}
+	budget := ProposalBudget{Raw: value}
+	for _, part := range strings.Split(value, ",") {
+		part = strings.TrimSpace(part)
+		if part == "" {
+			continue
+		}
+		key, raw, ok := strings.Cut(part, "=")
+		if !ok {
+			return ProposalBudget{}, fmt.Errorf("budget item %q must be key=value", part)
+		}
+		key = strings.TrimSpace(strings.ToLower(key))
+		n, err := strconv.Atoi(strings.TrimSpace(raw))
+		if err != nil || n <= 0 {
+			return ProposalBudget{}, fmt.Errorf("budget %s must be a positive integer", key)
+		}
+		switch key {
+		case "files":
+			budget.MaxFiles = n
+		case "lines":
+			budget.MaxLines = n
+		case "tokens":
+			budget.MaxTokens = n
+		case "changes":
+			budget.MaxChanges = n
+		default:
+			return ProposalBudget{}, fmt.Errorf("unknown budget key %q", key)
+		}
+	}
+	return budget, nil
+}
+
+func applyProposalBudget(artifacts []GeneratedArtifact, budget ProposalBudget) ([]GeneratedArtifact, []string) {
+	if budget.Raw == "" {
+		return artifacts, nil
+	}
+	out := append([]GeneratedArtifact(nil), artifacts...)
+	var warnings []string
+	if budget.MaxFiles > 0 && len(out) > budget.MaxFiles {
+		warnings = append(warnings, fmt.Sprintf("budget files=%d dropped %d generated artifacts", budget.MaxFiles, len(out)-budget.MaxFiles))
+		out = out[:budget.MaxFiles]
+	}
+	if budget.MaxLines > 0 {
+		for i := range out {
+			trimmed, changed := truncateLines(out[i].Content, budget.MaxLines)
+			if changed {
+				warnings = append(warnings, fmt.Sprintf("budget lines=%d truncated %s", budget.MaxLines, out[i].Path))
+				out[i].Content = trimmed
+			}
+		}
+	}
+	if budget.MaxTokens > 0 {
+		out, warnings = applyTokenBudget(out, budget.MaxTokens, warnings)
+	}
+	return out, warnings
+}
+
+func truncateLines(content string, maxLines int) (string, bool) {
+	lines := strings.Split(strings.TrimSuffix(content, "\n"), "\n")
+	if len(lines) <= maxLines {
+		return content, false
+	}
+	return strings.Join(lines[:maxLines], "\n") + "\n", true
+}
+
+func applyTokenBudget(artifacts []GeneratedArtifact, maxTokens int, warnings []string) ([]GeneratedArtifact, []string) {
+	remainingChars := maxTokens * 4
+	var out []GeneratedArtifact
+	for _, artifact := range artifacts {
+		if remainingChars <= 0 {
+			warnings = append(warnings, fmt.Sprintf("budget tokens=%d dropped %s", maxTokens, artifact.Path))
+			continue
+		}
+		if len(artifact.Content) <= remainingChars {
+			remainingChars -= len(artifact.Content)
+			out = append(out, artifact)
+			continue
+		}
+		artifact.Content = artifact.Content[:remainingChars]
+		if !strings.HasSuffix(artifact.Content, "\n") {
+			artifact.Content += "\n"
+		}
+		warnings = append(warnings, fmt.Sprintf("budget tokens=%d truncated %s", maxTokens, artifact.Path))
+		remainingChars = 0
+		out = append(out, artifact)
+	}
+	return out, warnings
+}
+
 func buildRepairIntervention(baselineHash, outputHash string, riskIDs []string, artifacts []GeneratedArtifact) RepairIntervention {
 	kinds := make([]string, 0, len(artifacts))
 	for _, artifact := range artifacts {
@@ -507,6 +621,9 @@ func renderProposalMarkdown(report ProposalReport) string {
 	fmt.Fprintf(&b, "- generator: `%s`\n", report.Generator)
 	fmt.Fprintf(&b, "- deterministic_only: `%t`\n", report.Deterministic)
 	fmt.Fprintf(&b, "- trust: `%s`\n", report.Trust)
+	if report.ScopeBudget.Raw != "" {
+		fmt.Fprintf(&b, "- scope_budget: `%s`\n", report.ScopeBudget.Raw)
+	}
 	fmt.Fprintf(&b, "- output_hash: `%s`\n\n", report.OutputHash)
 	fmt.Fprintf(&b, "## Intervention\n\n")
 	fmt.Fprintf(&b, "- id: `%s`\n", report.Intervention.ID)
@@ -520,6 +637,12 @@ func renderProposalMarkdown(report ProposalReport) string {
 	fmt.Fprintf(&b, "\n## Constraints\n\n")
 	for _, constraint := range report.Constraints {
 		fmt.Fprintf(&b, "- %s\n", constraint)
+	}
+	if len(report.Warnings) > 0 {
+		fmt.Fprintf(&b, "\n## Warnings\n\n")
+		for _, warning := range report.Warnings {
+			fmt.Fprintf(&b, "- %s\n", warning)
+		}
 	}
 	return b.String()
 }
