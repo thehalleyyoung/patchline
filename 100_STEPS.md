@@ -99,7 +99,7 @@ Every addition to the repo should be judged by whether it makes that loop more a
 
 ## Stage 7: Make it industrially easy to run
 
-71. [ ] Add `patchline repo analyze --github owner/repo --stages inventory,baseline,propose,compare,deep`.
+71. [x] Add `patchline repo analyze --github owner/repo --stages inventory,baseline,propose,compare,deep`.
 72. [ ] Support `--no-llm` for deterministic-only analysis.
 73. [ ] Support `--llm-command <cmd>` so users can plug in local or hosted code generation without coupling Patchline to one provider.
 74. [ ] Support `--proposal-kind tests|guards|instrumentation|repair|all`.

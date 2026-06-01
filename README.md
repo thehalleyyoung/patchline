@@ -15,7 +15,10 @@ If you want a reproducible local workspace first, fetch and inventory the repo b
 go run ./cmd/patchline repo fetch django/django \
   --subpath django/contrib/auth/migrations \
   --out results/generated/repos/django-auth
-
+go run ./cmd/patchline repo analyze --github django/django \
+  --subpath django/contrib/auth/migrations \
+  --stages inventory,baseline,propose,compare,deep \
+  --out results/generated/repos/django-auth-analysis
 go run ./cmd/patchline repo inventory \
   results/generated/repos/django-auth/django-django-*/django/contrib/auth/migrations \
   --out results/generated/repos/django-auth-inventory
@@ -123,6 +126,7 @@ PATCHLINE_PLUGPLAY_CASES=$'My app|owner/repo|path/to/migrations\nOther app|owner
 | Finds | From |
 | --- | --- |
 | Source provenance | `source.json` from repo fetch: owner/repo, ref, resolved commit, subpath, archive hash, timestamp, tool version, and cache hit/path |
+| One-command analysis | `analyze.json` and `analyze.md` from repo analyze: fetch, inventory, baseline, proposal, compare, and deep-analysis summaries in one staged run |
 | Risky data-changing SQL | `.sql`, `.psql`, `.ddl`, and SQL snippets in text/source files |
 | Project facts | `facts.jsonl` from repo inventory: files, languages, migrations, schema evolution, native commands, unknown JSON/YAML/TOML/log fields, docs, evidence exports, tables, columns, models, endpoints, queues, jobs, deploys, timestamps, errors, and next commands |
 | Baseline ranking | `baseline.json`, `baseline.md`, and `baseline.sarif` from repo baseline: ranked SQL and code-path risks, ranking explanations with feature ablations, provenance slices, Datalog-style query rows, abstract effects, symbolic checks, temporal windows, recurrence patterns, policy checks, repair proof summaries, evidence links, native checks, and ablation counts |

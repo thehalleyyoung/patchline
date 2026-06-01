@@ -395,6 +395,7 @@ func usage() {
 Usage:
   patchline about
   patchline repo fetch <owner/repo|github-url|path|archive> [--ref ref] [--subpath path] [--out dir] [--download-dir dir] [--json]
+  patchline repo analyze [<path>|--github owner/repo] [--ref ref] [--subpath path] [--stages inventory,baseline,propose,compare,deep] [--out dir] [--json]
   patchline repo inventory <path> [--out dir] [--full] [--json]
   patchline repo baseline --inventory inventory-dir --intake intake-dir [--out dir] [--json]
   patchline repo propose --from-report baseline-dir --kind tests|guards|instrumentation|repair|explain|all [--out dir] [--json]
@@ -471,6 +472,7 @@ Usage:
 
 Examples:
   patchline repo fetch bytebase/bytebase --subpath backend/migrator/migration --out results/generated/repos/bytebase-migrations
+  patchline repo analyze --github bytebase/bytebase --subpath backend/migrator/migration --stages inventory,baseline,propose,compare,deep --out results/generated/repos/bytebase-analysis
   patchline repo inventory results/generated/repos/bytebase-migrations --out results/generated/repos/bytebase-migrations/inventory
   patchline repo baseline --inventory results/generated/repos/bytebase-migrations/inventory --intake results/generated/intake --out results/generated/repos/bytebase-migrations/baseline
   patchline repo propose --from-report results/generated/repos/bytebase-migrations/baseline --kind all --out results/generated/repos/bytebase-migrations/proposal
@@ -487,11 +489,13 @@ Examples:
 
 func repoCommand(args []string) error {
 	if len(args) == 0 {
-		return errors.New("usage: patchline repo <fetch|inventory|baseline|propose|compare> ...")
+		return errors.New("usage: patchline repo <fetch|analyze|inventory|baseline|propose|compare> ...")
 	}
 	switch args[0] {
 	case "fetch":
 		return repoFetch(args[1:])
+	case "analyze":
+		return repoAnalyze(args[1:])
 	case "inventory":
 		return repoInventory(args[1:])
 	case "baseline":
@@ -503,6 +507,220 @@ func repoCommand(args []string) error {
 	default:
 		return fmt.Errorf("unknown repo subcommand %q", args[0])
 	}
+}
+
+type repoAnalyzeReport struct {
+	Version      string                 `json:"version"`
+	Input        string                 `json:"input"`
+	Subpath      string                 `json:"subpath,omitempty"`
+	Stages       []string               `json:"stages"`
+	Outputs      map[string]string      `json:"outputs"`
+	Source       project.Source         `json:"source,omitempty"`
+	Summary      repoAnalyzeSummary     `json:"summary"`
+	DeepAnalysis repoAnalyzeDeepSummary `json:"deep_analysis,omitempty"`
+	NextCommands []project.Command      `json:"next_commands,omitempty"`
+	Hash         string                 `json:"hash"`
+}
+
+type repoAnalyzeSummary struct {
+	FilesScanned         int    `json:"files_scanned"`
+	Facts                int    `json:"facts"`
+	RankedRisks          int    `json:"ranked_risks"`
+	RankingExplanations  int    `json:"ranking_explanations"`
+	ProvenanceSlices     int    `json:"provenance_slices"`
+	PolicyChecks         int    `json:"policy_checks"`
+	RepairProofSummaries int    `json:"repair_proof_summaries"`
+	GeneratedFiles       int    `json:"generated_files"`
+	InterventionLoops    int    `json:"intervention_loops"`
+	CompareChecksFailed  int    `json:"compare_checks_failed"`
+	NativeChecksSkipped  int    `json:"native_checks_skipped"`
+	BaselineHash         string `json:"baseline_hash,omitempty"`
+	ProposalHash         string `json:"proposal_hash,omitempty"`
+	CompareHash          string `json:"compare_hash,omitempty"`
+}
+
+type repoAnalyzeDeepSummary struct {
+	AbstractEffects        int `json:"abstract_effects"`
+	SymbolicChecks         int `json:"symbolic_checks"`
+	TemporalWindows        int `json:"temporal_windows"`
+	Recurrences            int `json:"recurrences"`
+	RepairProofRefuted     int `json:"repair_proof_refuted"`
+	AblationSensitiveRisks int `json:"ablation_sensitive_risks"`
+}
+
+func repoAnalyze(args []string) error {
+	fs := flag.NewFlagSet("repo analyze", flag.ContinueOnError)
+	fs.SetOutput(ioDiscard{})
+	githubRepo := fs.String("github", "", "GitHub owner/repo to fetch and analyze")
+	ref := fs.String("ref", "", "git ref")
+	subpath := fs.String("subpath", "", "subpath to focus on")
+	stagesValue := fs.String("stages", "inventory,baseline,propose,compare,deep", "comma-separated stages: inventory,baseline,propose,compare,deep")
+	outPath := fs.String("out", filepath.Join("results", "generated", "repo-analysis"), "output directory")
+	downloadDir := fs.String("download-dir", "", "download/cache directory")
+	proposalKind := fs.String("proposal-kind", "all", "proposal kind: tests|guards|instrumentation|repair|explain|all")
+	budgetRisks := fs.Int("budget-risks", 3, "maximum ranked risks to include")
+	runNativeTests := fs.Bool("run-native-tests", false, "run safe allowlisted native test commands during compare")
+	jsonOut := fs.Bool("json", false, "emit JSON")
+	input, flagArgs, err := onePositionalWithFlags(args, map[string]bool{"--json": true, "--run-native-tests": true})
+	if err != nil {
+		return err
+	}
+	if err := fs.Parse(flagArgs); err != nil {
+		return err
+	}
+	if *githubRepo != "" {
+		input = *githubRepo
+	}
+	if input == "" || fs.NArg() != 0 {
+		return errors.New("usage: patchline repo analyze [<path>|--github owner/repo] [--ref ref] [--subpath path] [--stages inventory,baseline,propose,compare,deep] [--out dir] [--json]")
+	}
+	stages, err := parseAnalyzeStages(*stagesValue)
+	if err != nil {
+		return err
+	}
+	if err := os.MkdirAll(*outPath, 0o755); err != nil {
+		return err
+	}
+
+	report := repoAnalyzeReport{
+		Version: "patchline.repo-analyze/v1",
+		Input:   input,
+		Subpath: *subpath,
+		Stages:  stages,
+		Outputs: map[string]string{},
+	}
+	stageSet := analyzeStageSet(stages)
+	scanRoot := input
+	if *githubRepo != "" {
+		fetchOut := filepath.Join(*outPath, "fetch")
+		fetchResult, err := project.Fetch(context.Background(), project.FetchOptions{Input: *githubRepo, Ref: *ref, Subpath: *subpath, OutDir: fetchOut, DownloadDir: *downloadDir})
+		if err != nil {
+			return err
+		}
+		report.Source = fetchResult.Source
+		report.Outputs["fetch"] = fetchOut
+		scanRoot = fetchResult.Source.ScannedRoot
+	}
+
+	var inv project.Inventory
+	var intakeReport intake.Report
+	var baseline project.BaselineReport
+	var proposal project.ProposalReport
+	var compare project.CompareReport
+
+	if analyzeNeeds(stageSet, "inventory") {
+		inv, err = project.InventoryPath(project.InventoryOptions{Path: scanRoot})
+		if err != nil {
+			return err
+		}
+		inventoryOut := filepath.Join(*outPath, "inventory")
+		if err := project.WriteInventory(inventoryOut, inv); err != nil {
+			return err
+		}
+		report.Outputs["inventory"] = inventoryOut
+		report.Summary.FilesScanned = inv.FilesScanned
+		report.Summary.Facts = len(inv.Facts)
+	}
+	if analyzeNeeds(stageSet, "baseline") {
+		if inv.Root == "" {
+			inv, err = project.InventoryPath(project.InventoryOptions{Path: scanRoot})
+			if err != nil {
+				return err
+			}
+		}
+		intakeReport, err = intake.Run(context.Background(), intake.Options{Path: scanRoot})
+		if err != nil {
+			return err
+		}
+		intakeOut := filepath.Join(*outPath, "intake")
+		if err := intake.WriteReport(intakeOut, intakeReport); err != nil {
+			return err
+		}
+		report.Outputs["intake"] = intakeOut
+		baseline = project.Baseline(inv, inv.Facts, intakeReport)
+		baselineOut := filepath.Join(*outPath, "baseline")
+		if err := project.WriteBaseline(baselineOut, baseline); err != nil {
+			return err
+		}
+		report.Outputs["baseline"] = baselineOut
+		report.Summary.RankedRisks = baseline.Summary.RankedRisks
+		report.Summary.RankingExplanations = baseline.Summary.RankingExplanations
+		report.Summary.ProvenanceSlices = baseline.Summary.ProvenanceSlices
+		report.Summary.PolicyChecks = baseline.Summary.PolicyChecks
+		report.Summary.RepairProofSummaries = baseline.Summary.RepairProofs
+		report.Summary.BaselineHash = baseline.Hash
+		report.DeepAnalysis = repoAnalyzeDeepSummary{
+			AbstractEffects:        baseline.Summary.AbstractEffects,
+			SymbolicChecks:         baseline.Summary.SymbolicChecks,
+			TemporalWindows:        baseline.Summary.TemporalWindows,
+			Recurrences:            baseline.Summary.Recurrences,
+			RepairProofRefuted:     baseline.Summary.RepairProofRefuted,
+			AblationSensitiveRisks: baseline.Summary.AblationSensitive,
+		}
+		report.NextCommands = append(report.NextCommands, baseline.NativeChecks...)
+	}
+	if analyzeNeeds(stageSet, "propose") {
+		proposalOut := filepath.Join(*outPath, "proposal")
+		proposal, err = project.Propose(project.ProposalOptions{BaselinePath: filepath.Join(*outPath, "baseline"), Kind: *proposalKind, OutDir: proposalOut, BudgetRisks: *budgetRisks})
+		if err != nil {
+			return err
+		}
+		if err := project.WriteProposal(proposalOut, proposal); err != nil {
+			return err
+		}
+		report.Outputs["proposal"] = proposalOut
+		report.Summary.GeneratedFiles = len(proposal.GeneratedFiles)
+		report.Summary.ProposalHash = proposal.OutputHash
+	}
+	if analyzeNeeds(stageSet, "compare") {
+		if baseline.Hash == "" {
+			baseline, err = project.LoadBaseline(filepath.Join(*outPath, "baseline"))
+			if err != nil {
+				return err
+			}
+		}
+		if proposal.OutputHash == "" {
+			proposal, err = project.LoadProposal(filepath.Join(*outPath, "proposal"))
+			if err != nil {
+				return err
+			}
+		}
+		compare = project.CompareWithOptions(baseline, proposal, project.CompareOptions{RunNativeTests: *runNativeTests})
+		compareOut := filepath.Join(*outPath, "compare")
+		if err := project.WriteCompare(compareOut, compare); err != nil {
+			return err
+		}
+		report.Outputs["compare"] = compareOut
+		report.Summary.InterventionLoops = compare.Summary.InterventionLoops
+		report.Summary.CompareChecksFailed = compare.Summary.PatchlineChecksFailed
+		report.Summary.NativeChecksSkipped = compare.Summary.NativeChecksSkipped
+		report.Summary.CompareHash = compare.Hash
+	}
+	report.Hash = canonical.Hash(struct {
+		Version string                 `json:"version"`
+		Input   string                 `json:"input"`
+		Subpath string                 `json:"subpath,omitempty"`
+		Stages  []string               `json:"stages"`
+		Outputs map[string]string      `json:"outputs"`
+		Summary repoAnalyzeSummary     `json:"summary"`
+		Deep    repoAnalyzeDeepSummary `json:"deep_analysis,omitempty"`
+	}{report.Version, report.Input, report.Subpath, report.Stages, report.Outputs, report.Summary, report.DeepAnalysis})
+	if err := writeRepoAnalyzeReport(*outPath, report); err != nil {
+		return err
+	}
+	if *jsonOut {
+		return writeJSON(os.Stdout, report)
+	}
+	fmt.Printf("repo analyze input=%s stages=%s out=%s risks=%d generated=%d intervention_loops=%d hash=%s\n",
+		report.Input,
+		strings.Join(report.Stages, ","),
+		*outPath,
+		report.Summary.RankedRisks,
+		report.Summary.GeneratedFiles,
+		report.Summary.InterventionLoops,
+		report.Hash,
+	)
+	return nil
 }
 
 func repoFetch(args []string) error {
@@ -553,6 +771,94 @@ func repoFetch(args []string) error {
 	fmt.Println()
 	fmt.Printf("  source=%s\n", filepath.Join(result.Source.OutDir, "source.json"))
 	return nil
+}
+
+func parseAnalyzeStages(value string) ([]string, error) {
+	if strings.TrimSpace(value) == "" {
+		return nil, errors.New("--stages must include at least one stage")
+	}
+	allowed := map[string]bool{"inventory": true, "baseline": true, "propose": true, "compare": true, "deep": true}
+	seen := map[string]bool{}
+	var stages []string
+	for _, raw := range strings.Split(value, ",") {
+		stage := strings.ToLower(strings.TrimSpace(raw))
+		if stage == "" {
+			continue
+		}
+		if !allowed[stage] {
+			return nil, fmt.Errorf("unknown analyze stage %q", stage)
+		}
+		if !seen[stage] {
+			seen[stage] = true
+			stages = append(stages, stage)
+		}
+	}
+	if len(stages) == 0 {
+		return nil, errors.New("--stages must include at least one stage")
+	}
+	return stages, nil
+}
+
+func analyzeStageSet(stages []string) map[string]bool {
+	out := map[string]bool{}
+	for _, stage := range stages {
+		out[stage] = true
+	}
+	return out
+}
+
+func analyzeNeeds(stages map[string]bool, stage string) bool {
+	if stages[stage] {
+		return true
+	}
+	switch stage {
+	case "inventory":
+		return stages["baseline"] || stages["propose"] || stages["compare"] || stages["deep"]
+	case "baseline":
+		return stages["propose"] || stages["compare"] || stages["deep"]
+	case "propose":
+		return stages["compare"]
+	case "compare":
+		return stages["deep"]
+	default:
+		return false
+	}
+}
+
+func writeRepoAnalyzeReport(outDir string, report repoAnalyzeReport) error {
+	data, err := json.MarshalIndent(report, "", "  ")
+	if err != nil {
+		return err
+	}
+	if err := os.WriteFile(filepath.Join(outDir, "analyze.json"), append(data, '\n'), 0o644); err != nil {
+		return err
+	}
+	var b strings.Builder
+	fmt.Fprintf(&b, "# Patchline repo analyze\n\n")
+	fmt.Fprintf(&b, "- input: `%s`\n", report.Input)
+	fmt.Fprintf(&b, "- stages: `%s`\n", strings.Join(report.Stages, ","))
+	fmt.Fprintf(&b, "- hash: `%s`\n\n", report.Hash)
+	fmt.Fprintf(&b, "## Summary\n\n| area | count |\n| --- | ---: |\n")
+	fmt.Fprintf(&b, "| files scanned | %d |\n", report.Summary.FilesScanned)
+	fmt.Fprintf(&b, "| facts | %d |\n", report.Summary.Facts)
+	fmt.Fprintf(&b, "| ranked risks | %d |\n", report.Summary.RankedRisks)
+	fmt.Fprintf(&b, "| ranking explanations | %d |\n", report.Summary.RankingExplanations)
+	fmt.Fprintf(&b, "| provenance slices | %d |\n", report.Summary.ProvenanceSlices)
+	fmt.Fprintf(&b, "| policy checks | %d |\n", report.Summary.PolicyChecks)
+	fmt.Fprintf(&b, "| repair proof summaries | %d |\n", report.Summary.RepairProofSummaries)
+	fmt.Fprintf(&b, "| generated files | %d |\n", report.Summary.GeneratedFiles)
+	fmt.Fprintf(&b, "| intervention loops | %d |\n", report.Summary.InterventionLoops)
+	fmt.Fprintf(&b, "| compare checks failed | %d |\n\n", report.Summary.CompareChecksFailed)
+	fmt.Fprintf(&b, "## Outputs\n\n| stage | path |\n| --- | --- |\n")
+	keys := make([]string, 0, len(report.Outputs))
+	for key := range report.Outputs {
+		keys = append(keys, key)
+	}
+	sort.Strings(keys)
+	for _, key := range keys {
+		fmt.Fprintf(&b, "| %s | `%s` |\n", key, report.Outputs[key])
+	}
+	return os.WriteFile(filepath.Join(outDir, "analyze.md"), []byte(b.String()), 0o644)
 }
 
 func repoInventory(args []string) error {
