@@ -1,0 +1,37 @@
+{
+  "version": "patchline.quickstart-gates/v1",
+  "gates": [
+    {
+      "id": "forem-quickstart",
+      "status": "implemented",
+      "real_repo": "forem/forem",
+      "subpath": "db/migrate",
+      "command_count": 3,
+      "quickstart_claim": "quickstart emits exactly three copy/paste commands and expected artifacts for a public repo slice"
+    },
+    {
+      "id": "bytebase-quickstart",
+      "status": "implemented",
+      "real_repo": "bytebase/bytebase",
+      "subpath": "backend/migrator/migration",
+      "command_count": 3,
+      "quickstart_claim": "quickstart emits exactly three copy/paste commands and expected artifacts for a public repo slice"
+    },
+    {
+      "id": "mastodon-quickstart",
+      "status": "implemented",
+      "real_repo": "mastodon/mastodon",
+      "subpath": "db/migrate",
+      "command_count": 3,
+      "quickstart_claim": "quickstart emits exactly three copy/paste commands and expected artifacts for a public repo slice"
+    },
+    {
+      "id": "lobsters-quickstart",
+      "status": "implemented",
+      "real_repo": "lobsters/lobsters",
+      "subpath": "db/migrate",
+      "command_count": 3,
+      "quickstart_claim": "quickstart emits exactly three copy/paste commands and expected artifacts for a public repo slice"
+    }
+  ]
+}

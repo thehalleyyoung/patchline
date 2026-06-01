@@ -73,6 +73,31 @@ func TestRepoDoctorRejectsMissingInput(t *testing.T) {
 	}
 }
 
+func TestQuickstartEmitsExactlyThreeCommands(t *testing.T) {
+	out := filepath.Join(t.TempDir(), "quickstart")
+	report := buildQuickstartReport("lobsters/lobsters", "abc123", "db/migrate", out)
+	if report.Version != "patchline.quickstart/v1" || len(report.Commands) != 3 || len(report.ExpectedArtifacts) == 0 || report.Hash == "" {
+		t.Fatalf("unexpected quickstart report: %#v", report)
+	}
+	if !strings.Contains(report.Commands[0].Command, "doctor --github") || !strings.Contains(report.Commands[1].Command, "repo analyze --github") || !strings.HasPrefix(report.Commands[2].Command, "test -s ") {
+		t.Fatalf("unexpected commands: %#v", report.Commands)
+	}
+	if err := writeQuickstartReport(out, report); err != nil {
+		t.Fatal(err)
+	}
+	for _, name := range []string{"quickstart.json", "quickstart.md", "commands.sh"} {
+		if _, err := os.Stat(filepath.Join(out, name)); err != nil {
+			t.Fatal(err)
+		}
+	}
+}
+
+func TestQuickstartRequiresGitHubAndSubpath(t *testing.T) {
+	if err := quickstart([]string{"--github", "lobsters/lobsters", "--json"}); err == nil {
+		t.Fatal("expected missing subpath usage error")
+	}
+}
+
 func TestPhaseCheckInputKindResolvesImplicitInputs(t *testing.T) {
 	tests := []struct {
 		name string

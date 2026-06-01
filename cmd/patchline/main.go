@@ -87,6 +87,8 @@ func run(args []string) error {
 		return currentIntake(args[1:])
 	case "doctor":
 		return repoDoctor(args[1:])
+	case "quickstart":
+		return quickstart(args[1:])
 	case "repo":
 		return repoCommand(args[1:])
 	case "semantics-contract":
@@ -399,6 +401,7 @@ func usage() {
 Usage:
   patchline about
   patchline doctor [<path>|--github owner/repo] [--ref ref] [--subpath path] [--out dir] [--download-dir dir] [--json]
+  patchline quickstart --github owner/repo --subpath path [--ref ref] [--out dir] [--json]
   patchline repo doctor [<path>|--github owner/repo] [--ref ref] [--subpath path] [--out dir] [--download-dir dir] [--json]
   patchline repo fetch <owner/repo|github-url|path|archive> [--ref ref] [--subpath path] [--out dir] [--download-dir dir] [--json]
   patchline repo analyze [<path>|--github owner/repo] [--ref ref] [--subpath path] [--stages inventory,baseline,propose,compare,deep] [--proposal-kind tests|guards|instrumentation|repair|all] [--budget files=N,lines=N,tokens=N,changes=N] [--ci] [--redact] [--resume] [--no-llm] [--llm-command cmd] [--prompt-without-facts] [--out dir] [--json]
@@ -615,6 +618,24 @@ type repoDoctorSummary struct {
 	NativeChecksAvailable int  `json:"native_checks_available"`
 	ReadyForAnalyze       bool `json:"ready_for_analyze"`
 	NetworkFetchUsed      bool `json:"network_fetch_used"`
+}
+
+type quickstartReport struct {
+	Version           string               `json:"version"`
+	GitHub            string               `json:"github"`
+	Ref               string               `json:"ref,omitempty"`
+	Subpath           string               `json:"subpath"`
+	OutDir            string               `json:"out_dir"`
+	Commands          []project.Command    `json:"commands"`
+	ExpectedArtifacts []quickstartArtifact `json:"expected_artifacts"`
+	Hash              string               `json:"hash"`
+	Markdown          string               `json:"markdown,omitempty"`
+	Script            string               `json:"script,omitempty"`
+}
+
+type quickstartArtifact struct {
+	Path        string `json:"path"`
+	Description string `json:"description"`
 }
 
 func repoAnalyze(args []string) error {
@@ -1176,6 +1197,144 @@ func renderRepoDoctorMarkdown(report repoDoctorReport) string {
 			fmt.Fprintf(&b, "- `%s` — %s\n", command.Command, command.Reason)
 		}
 	}
+	return b.String()
+}
+
+func quickstart(args []string) error {
+	fs := flag.NewFlagSet("quickstart", flag.ContinueOnError)
+	fs.SetOutput(ioDiscard{})
+	githubRepo := fs.String("github", "", "GitHub owner/repo to analyze")
+	ref := fs.String("ref", "", "git ref")
+	subpath := fs.String("subpath", "", "subpath to focus on")
+	outPath := fs.String("out", "", "output directory")
+	jsonOut := fs.Bool("json", false, "emit JSON")
+	if err := fs.Parse(args); err != nil {
+		return err
+	}
+	if *githubRepo == "" || *subpath == "" || fs.NArg() != 0 {
+		return errors.New("usage: patchline quickstart --github owner/repo --subpath path [--ref ref] [--out dir] [--json]")
+	}
+	report := buildQuickstartReport(*githubRepo, *ref, *subpath, *outPath)
+	if report.OutDir != "" {
+		if err := writeQuickstartReport(report.OutDir, report); err != nil {
+			return err
+		}
+	}
+	if *jsonOut {
+		return writeJSON(os.Stdout, report)
+	}
+	fmt.Print(report.Markdown)
+	if report.OutDir != "" {
+		fmt.Printf("\nquickstart files written to %s\n", report.OutDir)
+	}
+	return nil
+}
+
+func buildQuickstartReport(githubRepo, ref, subpath, outDir string) quickstartReport {
+	if outDir == "" {
+		outDir = filepath.Join("results", "generated", "quickstart", quickstartSlug(githubRepo+"-"+subpath))
+	}
+	analysisOut := filepath.Join(outDir, "analysis")
+	doctorOut := filepath.Join(outDir, "doctor")
+	doctorCommand := fmt.Sprintf("go run ./cmd/patchline doctor --github %s%s --subpath %s --out %s", shellArg(githubRepo), refFlag(ref), shellArg(subpath), shellArg(doctorOut))
+	analyzeCommand := fmt.Sprintf("go run ./cmd/patchline repo analyze --github %s%s --subpath %s --stages inventory,baseline,propose,compare,deep --proposal-kind all --budget files=6,lines=120,tokens=20000,changes=3 --no-llm --out %s", shellArg(githubRepo), refFlag(ref), shellArg(subpath), shellArg(analysisOut))
+	verifyCommand := fmt.Sprintf("test -s %s && test -s %s && test -s %s", shellArg(filepath.Join(doctorOut, "doctor.json")), shellArg(filepath.Join(analysisOut, "analysis-bundle", "summary.md")), shellArg(filepath.Join(analysisOut, "commands.md")))
+	report := quickstartReport{
+		Version: "patchline.quickstart/v1",
+		GitHub:  githubRepo,
+		Ref:     ref,
+		Subpath: subpath,
+		OutDir:  filepath.ToSlash(outDir),
+		Commands: []project.Command{
+			{Command: doctorCommand, Reason: "diagnose tools, cache state, network fetch, and safe native checks before analysis"},
+			{Command: analyzeCommand, Reason: "run deterministic baseline, bounded proposal generation, compare, and deep analysis"},
+			{Command: verifyCommand, Reason: "verify expected quickstart artifacts were written"},
+		},
+		ExpectedArtifacts: []quickstartArtifact{
+			{Path: filepath.ToSlash(filepath.Join(doctorOut, "doctor.json")), Description: "preflight diagnostic JSON"},
+			{Path: filepath.ToSlash(filepath.Join(doctorOut, "doctor.md")), Description: "preflight diagnostic Markdown"},
+			{Path: filepath.ToSlash(filepath.Join(analysisOut, "analysis-bundle", "summary.md")), Description: "shareable analysis summary"},
+			{Path: filepath.ToSlash(filepath.Join(analysisOut, "analysis-bundle", "summary.sarif")), Description: "SARIF report for code-scanning systems"},
+			{Path: filepath.ToSlash(filepath.Join(analysisOut, "commands.md")), Description: "reproducible staged command report"},
+		},
+	}
+	report.Script = renderQuickstartScript(report)
+	report.Hash = quickstartHash(report)
+	report.Markdown = renderQuickstartMarkdown(report)
+	return report
+}
+
+func refFlag(ref string) string {
+	if strings.TrimSpace(ref) == "" {
+		return ""
+	}
+	return " --ref " + shellArg(ref)
+}
+
+func quickstartSlug(value string) string {
+	value = strings.ToLower(value)
+	value = regexp.MustCompile(`[^a-z0-9._-]+`).ReplaceAllString(value, "-")
+	value = strings.Trim(value, "-")
+	if value == "" {
+		return "repo"
+	}
+	if len(value) > 80 {
+		value = value[:80]
+	}
+	return value
+}
+
+func writeQuickstartReport(outDir string, report quickstartReport) error {
+	if err := os.MkdirAll(outDir, 0o755); err != nil {
+		return err
+	}
+	copy := report
+	copy.Markdown = ""
+	copy.Script = ""
+	data, err := json.MarshalIndent(copy, "", "  ")
+	if err != nil {
+		return err
+	}
+	if err := os.WriteFile(filepath.Join(outDir, "quickstart.json"), append(data, '\n'), 0o644); err != nil {
+		return err
+	}
+	if err := os.WriteFile(filepath.Join(outDir, "quickstart.md"), []byte(report.Markdown), 0o644); err != nil {
+		return err
+	}
+	return os.WriteFile(filepath.Join(outDir, "commands.sh"), []byte(report.Script), 0o755)
+}
+
+func quickstartHash(report quickstartReport) string {
+	copy := report
+	copy.Hash = ""
+	copy.Markdown = ""
+	copy.Script = ""
+	return canonical.Hash(copy)
+}
+
+func renderQuickstartScript(report quickstartReport) string {
+	var b strings.Builder
+	fmt.Fprintf(&b, "#!/usr/bin/env bash\nset -euo pipefail\n\n")
+	for _, command := range report.Commands {
+		fmt.Fprintf(&b, "%s\n", command.Command)
+	}
+	return b.String()
+}
+
+func renderQuickstartMarkdown(report quickstartReport) string {
+	var b strings.Builder
+	fmt.Fprintf(&b, "# Patchline quickstart\n\n")
+	fmt.Fprintf(&b, "Run these three commands from the Patchline checkout:\n\n")
+	fmt.Fprintf(&b, "```bash\n")
+	for _, command := range report.Commands {
+		fmt.Fprintf(&b, "%s\n", command.Command)
+	}
+	fmt.Fprintf(&b, "```\n\n")
+	fmt.Fprintf(&b, "## Expected artifacts\n\n")
+	for _, artifact := range report.ExpectedArtifacts {
+		fmt.Fprintf(&b, "- `%s` — %s\n", artifact.Path, artifact.Description)
+	}
+	fmt.Fprintf(&b, "\nHash: `%s`\n", report.Hash)
 	return b.String()
 }
 
