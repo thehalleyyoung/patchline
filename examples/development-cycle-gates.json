@@ -1,0 +1,20 @@
+{
+  "version": "patchline.development-cycle-gates/v1",
+  "gates": [
+    {
+      "id": "four-repo-development-cycle",
+      "status": "implemented",
+      "minimum_public_repos": 4,
+      "previous_cycle": "baseline-only analysis without generated intervention coverage",
+      "current_cycle": "baseline analysis plus bounded generated intervention plus deterministic compare and deep re-analysis",
+      "required_improvements": [
+        "generated_artifacts > 0",
+        "covered_risks > 0",
+        "deterministic_intervention_loops > 0",
+        "deterministic_failures == 0",
+        "deep_reanalysis_dimensions >= 5"
+      ],
+      "cycle_claim": "each development cycle ends with a real-repo demonstration where generated interventions and deterministic re-analysis add reviewable coverage beyond the previous baseline-only result"
+    }
+  ]
+}

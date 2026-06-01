@@ -134,7 +134,7 @@ Every addition to the repo should be judged by whether it makes that loop more a
 97. [x] Keep non-deterministic steps optional, bounded, auditable, and followed by deterministic analysis.
 98. [x] Make every new command runnable on a downloaded public repo in a few shell commands.
 99. [x] Keep industrial value and research novelty aligned: practical reports should also support rigorous experiments.
-100. [ ] End each development cycle with a real-repo demonstration where baseline analysis, generated intervention, and deeper re-analysis produce a better result than the previous version.
+100. [x] End each development cycle with a real-repo demonstration where baseline analysis, generated intervention, and deeper re-analysis produce a better result than the previous version.
 
 ## Stage 10: Make Patchline irresistible to real maintainers
 
