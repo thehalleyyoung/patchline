@@ -516,6 +516,12 @@ func TestBaselineBuildsProvenanceSlices(t *testing.T) {
 			Statements: migrationStatementsForTest{{
 				Index: 0, Kind: "update", Table: "accounts", Risk: "high", Reasons: []string{"unbounded update can rewrite an entire table"},
 			}}.asMigrationStatements(),
+		}, {
+			Path:       "db/migrate/002_accounts_retry.sql",
+			SourceKind: "sql_file",
+			Statements: migrationStatementsForTest{{
+				Index: 0, Kind: "update", Table: "accounts", Risk: "high", Reasons: []string{"unbounded update can rewrite an entire table"},
+			}}.asMigrationStatements(),
 		}},
 		Causes: []intake.CauseCandidate{{
 			ID: "cause:incident", Path: "docs/inc-42.md", Kind: "incident-or-postmortem-text", Identifiers: []string{"table:accounts", "incident:incident 42"}, Rationale: "incident text",
@@ -539,6 +545,9 @@ func TestBaselineBuildsProvenanceSlices(t *testing.T) {
 	}
 	if baseline.Summary.TemporalWindows == 0 || baseline.Summary.TemporalSignals < 3 {
 		t.Fatalf("expected temporal windows over migration/incident/repair signals: %#v", baseline.Summary)
+	}
+	if baseline.Summary.Recurrences == 0 || baseline.Summary.RecurringRisks < 2 {
+		t.Fatalf("expected recurring risk patterns: %#v", baseline.Summary)
 	}
 	var fullSlice ProvenanceSlice
 	for _, slice := range baseline.Provenance {

@@ -32,6 +32,7 @@ type BaselineReport struct {
 	AbstractEffects []effects.AbstractSummary `json:"abstract_effects,omitempty"`
 	SymbolicChecks  []SymbolicCheck           `json:"symbolic_checks,omitempty"`
 	TemporalWindows []TemporalWindow          `json:"temporal_windows,omitempty"`
+	Recurrences     []RecurrencePattern       `json:"recurrences,omitempty"`
 	NativeChecks    []Command                 `json:"native_checks,omitempty"`
 	Hash            string                    `json:"hash"`
 	Markdown        string                    `json:"markdown,omitempty"`
@@ -55,6 +56,8 @@ type BaselineSummary struct {
 	SymbolicFailed      int `json:"symbolic_failed"`
 	TemporalWindows     int `json:"temporal_windows"`
 	TemporalSignals     int `json:"temporal_signals"`
+	Recurrences         int `json:"recurrences"`
+	RecurringRisks      int `json:"recurring_risks"`
 	GrepOnlyMatches     int `json:"grep_only_matches"`
 	SQLOnlyRankedRisks  int `json:"sql_only_ranked_risks"`
 	IdentifierOnlyLinks int `json:"identifier_only_links"`
@@ -163,6 +166,21 @@ type TimeSignal struct {
 	Identifiers []Identifier `json:"identifiers,omitempty"`
 }
 
+type RecurrencePattern struct {
+	ID          string   `json:"id"`
+	Key         string   `json:"key"`
+	Table       string   `json:"table,omitempty"`
+	Kind        string   `json:"kind"`
+	Effect      string   `json:"effect,omitempty"`
+	RiskIDs     []string `json:"risk_ids"`
+	Paths       []string `json:"paths"`
+	RepairPaths []string `json:"repair_paths,omitempty"`
+	Count       int      `json:"count"`
+	Confidence  string   `json:"confidence"`
+	Rationale   string   `json:"rationale"`
+	NextCommand string   `json:"next_command,omitempty"`
+}
+
 func Baseline(inv Inventory, facts []Fact, intakeReport intake.Report) BaselineReport {
 	report := BaselineReport{Version: BaselineVersion, InventoryRoot: inv.Root, IntakeSource: intakeReport.Source.Input}
 	factIndex := indexFacts(facts)
@@ -176,6 +194,7 @@ func Baseline(inv Inventory, facts []Fact, intakeReport intake.Report) BaselineR
 	report.AbstractEffects = buildAbstractEffectSummaries(report.Risks, report.Provenance)
 	report.SymbolicChecks = buildSymbolicChecks(report.Risks, report.AbstractEffects, report.Provenance)
 	report.TemporalWindows = buildTemporalWindows(report.Risks, report.Provenance, intakeReport)
+	report.Recurrences = buildRecurrences(report.Risks, report.AbstractEffects, report.Provenance)
 	report.Summary = BaselineSummary{
 		RankedRisks:         len(report.Risks),
 		CodePathRankedRisks: countCodePathRisks(report.Risks),
@@ -194,6 +213,8 @@ func Baseline(inv Inventory, facts []Fact, intakeReport intake.Report) BaselineR
 		SymbolicFailed:      countSymbolicStatus(report.SymbolicChecks, "fail"),
 		TemporalWindows:     len(report.TemporalWindows),
 		TemporalSignals:     countTemporalSignals(report.TemporalWindows),
+		Recurrences:         len(report.Recurrences),
+		RecurringRisks:      countRecurringRisks(report.Recurrences),
 		GrepOnlyMatches:     grepOnlyMatches(inv.Root),
 		SQLOnlyRankedRisks:  sqlOnlyRankedRisks(intakeReport),
 		IdentifierOnlyLinks: countLinksByIdentifierKind(report.EvidenceLinks, false),
@@ -1617,6 +1638,125 @@ func countTemporalSignals(windows []TemporalWindow) int {
 	return count
 }
 
+func buildRecurrences(risks []BaselineRisk, summaries []effects.AbstractSummary, slices []ProvenanceSlice) []RecurrencePattern {
+	effectByRisk := map[string]string{}
+	for _, summary := range summaries {
+		for _, op := range summary.Operations {
+			effectByRisk[op.OperationID] = string(op.Effect)
+		}
+	}
+	sliceByRisk := map[string]ProvenanceSlice{}
+	for _, slice := range slices {
+		sliceByRisk[slice.RiskID] = slice
+	}
+	type bucket struct {
+		table       string
+		kind        string
+		effect      string
+		riskIDs     []string
+		paths       []string
+		repairPaths []string
+	}
+	buckets := map[string]*bucket{}
+	for _, risk := range risks {
+		table := firstNonEmpty(risk.Table, firstIdentifierValue(risk.Identifiers, "table"), firstIdentifierValue(risk.Identifiers, "model"))
+		if table == "" {
+			continue
+		}
+		kind := recurrenceKind(risk)
+		effect := effectByRisk[risk.ID]
+		key := table + "\x00" + kind + "\x00" + effect
+		b := buckets[key]
+		if b == nil {
+			b = &bucket{table: table, kind: kind, effect: effect}
+			buckets[key] = b
+		}
+		b.riskIDs = append(b.riskIDs, risk.ID)
+		b.paths = append(b.paths, risk.Path)
+		b.repairPaths = append(b.repairPaths, sliceByRisk[risk.ID].RepairPaths...)
+	}
+	var patterns []RecurrencePattern
+	for key, b := range buckets {
+		riskIDs := uniqueSortedStrings(b.riskIDs)
+		if len(riskIDs) < 2 {
+			continue
+		}
+		paths := capStrings(uniqueSortedStrings(b.paths), 12)
+		repairs := capStrings(uniqueSortedStrings(b.repairPaths), 12)
+		patterns = append(patterns, RecurrencePattern{
+			ID:          "recurrence:" + canonical.Hash(key)[:16],
+			Key:         strings.ReplaceAll(key, "\x00", "|"),
+			Table:       b.table,
+			Kind:        b.kind,
+			Effect:      b.effect,
+			RiskIDs:     capStrings(riskIDs, 20),
+			Paths:       paths,
+			RepairPaths: repairs,
+			Count:       len(riskIDs),
+			Confidence:  recurrenceConfidence(len(riskIDs), len(repairs)),
+			Rationale:   "multiple ranked risks in this repo share table, operation family, and abstract effect; inspect as a recurring data-change pattern",
+			NextCommand: fmt.Sprintf("patchline repo baseline %s --json", shellPath(firstNonEmpty(firstString(paths), "."))),
+		})
+	}
+	sort.Slice(patterns, func(i, j int) bool {
+		if patterns[i].Count != patterns[j].Count {
+			return patterns[i].Count > patterns[j].Count
+		}
+		return patterns[i].ID < patterns[j].ID
+	})
+	if len(patterns) > 100 {
+		patterns = patterns[:100]
+	}
+	return patterns
+}
+
+func recurrenceKind(risk BaselineRisk) string {
+	kind := strings.ToLower(risk.Kind)
+	switch {
+	case strings.Contains(kind, "delete"), strings.Contains(kind, "drop"), strings.Contains(kind, "truncate"):
+		return "destructive"
+	case strings.Contains(kind, "update"):
+		if riskHasFactor(risk, "broad-write") || riskHasFactor(risk, "write-breadth-unknown") {
+			return "broad-update"
+		}
+		return "update"
+	case strings.Contains(kind, "insert"):
+		return "insert"
+	case strings.Contains(kind, "schema"):
+		return "schema-change"
+	default:
+		return kind
+	}
+}
+
+func recurrenceConfidence(count, repairs int) string {
+	switch {
+	case count >= 5 && repairs > 0:
+		return "recurring-with-repair-evidence"
+	case count >= 5:
+		return "recurring"
+	default:
+		return "repeated"
+	}
+}
+
+func firstString(values []string) string {
+	if len(values) == 0 {
+		return ""
+	}
+	return values[0]
+}
+
+func countRecurringRisks(patterns []RecurrencePattern) int {
+	seen := map[string]bool{}
+	for _, pattern := range patterns {
+		for _, riskID := range pattern.RiskIDs {
+			seen[riskID] = true
+		}
+	}
+	return len(seen)
+}
+
 func sharedIdentifiers(left, right []Identifier) []Identifier {
 	rightSet := map[string]Identifier{}
 	for _, id := range right {
@@ -1785,6 +1925,8 @@ func renderBaselineMarkdown(report BaselineReport) string {
 	fmt.Fprintf(&b, "| symbolic failed | %d |\n", report.Summary.SymbolicFailed)
 	fmt.Fprintf(&b, "| temporal windows | %d |\n", report.Summary.TemporalWindows)
 	fmt.Fprintf(&b, "| temporal signals | %d |\n", report.Summary.TemporalSignals)
+	fmt.Fprintf(&b, "| recurrence patterns | %d |\n", report.Summary.Recurrences)
+	fmt.Fprintf(&b, "| recurring risks | %d |\n", report.Summary.RecurringRisks)
 	fmt.Fprintf(&b, "| grep-only matches | %d |\n", report.Summary.GrepOnlyMatches)
 	fmt.Fprintf(&b, "| SQL-only ranked risks | %d |\n", report.Summary.SQLOnlyRankedRisks)
 	fmt.Fprintf(&b, "| identifier-only links | %d |\n", report.Summary.IdentifierOnlyLinks)
@@ -1833,6 +1975,14 @@ func renderBaselineMarkdown(report BaselineReport) string {
 		limit := minInt(len(report.TemporalWindows), 20)
 		for _, window := range report.TemporalWindows[:limit] {
 			fmt.Fprintf(&b, "| %s..%s | `%s` | %s | %d | %s |\n", window.Start, window.End, window.RiskID, window.Table, len(window.Signals), window.Confidence)
+		}
+		fmt.Fprintf(&b, "\n")
+	}
+	if len(report.Recurrences) > 0 {
+		fmt.Fprintf(&b, "## Recurrence patterns\n\n| count | table | kind | effect | paths | confidence |\n| ---: | --- | --- | --- | ---: | --- |\n")
+		limit := minInt(len(report.Recurrences), 20)
+		for _, pattern := range report.Recurrences[:limit] {
+			fmt.Fprintf(&b, "| %d | %s | %s | %s | %d | %s |\n", pattern.Count, pattern.Table, pattern.Kind, pattern.Effect, len(pattern.Paths), pattern.Confidence)
 		}
 		fmt.Fprintf(&b, "\n")
 	}
