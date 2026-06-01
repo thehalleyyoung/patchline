@@ -409,6 +409,7 @@ Usage:
   patchline repo baseline --inventory inventory-dir --intake intake-dir [--out dir] [--json]
   patchline repo propose --from-report baseline-dir --proposal-kind tests|guards|instrumentation|repair|all [--budget files=N,lines=N,tokens=N,changes=N] [--no-llm] [--llm-command cmd] [--prompt-without-facts] [--out dir] [--json]
   patchline repo compare --before baseline-dir --after proposal-dir [--out dir] [--run-native-tests] [--json]
+  patchline repo suppressions --baseline baseline-dir --suppressions suppressions.json [--out dir] [--json]
   patchline intake <path> [--out results/generated/intake] [--json]
   patchline intake --github owner/repo [--ref ref] [--subpath path] [--out results/generated/intake] [--json]
   patchline semantics-contract [--json]
@@ -498,7 +499,7 @@ Examples:
 
 func repoCommand(args []string) error {
 	if len(args) == 0 {
-		return errors.New("usage: patchline repo <doctor|fetch|analyze|inventory|baseline|propose|compare> ...")
+		return errors.New("usage: patchline repo <doctor|fetch|analyze|inventory|baseline|propose|compare|suppressions> ...")
 	}
 	switch args[0] {
 	case "doctor":
@@ -515,6 +516,8 @@ func repoCommand(args []string) error {
 		return repoPropose(args[1:])
 	case "compare":
 		return repoCompare(args[1:])
+	case "suppressions":
+		return repoSuppressions(args[1:])
 	default:
 		return fmt.Errorf("unknown repo subcommand %q", args[0])
 	}
@@ -675,6 +678,47 @@ type quickstartReport struct {
 type quickstartArtifact struct {
 	Path        string `json:"path"`
 	Description string `json:"description"`
+}
+
+type suppressionLedger struct {
+	Version      string             `json:"version"`
+	Suppressions []suppressionEntry `json:"suppressions"`
+}
+
+type suppressionEntry struct {
+	StableID     string `json:"stable_id"`
+	Owner        string `json:"owner"`
+	Rationale    string `json:"rationale"`
+	Expires      string `json:"expires"`
+	EvidenceHash string `json:"evidence_hash"`
+}
+
+type suppressionReport struct {
+	Version      string              `json:"version"`
+	BaselineHash string              `json:"baseline_hash"`
+	Summary      suppressionSummary  `json:"summary"`
+	Results      []suppressionResult `json:"results"`
+	Hash         string              `json:"hash"`
+	Markdown     string              `json:"markdown,omitempty"`
+}
+
+type suppressionSummary struct {
+	Total     int `json:"total"`
+	Active    int `json:"active"`
+	Expired   int `json:"expired"`
+	Stale     int `json:"stale"`
+	Invalid   int `json:"invalid"`
+	Unmatched int `json:"unmatched"`
+}
+
+type suppressionResult struct {
+	StableID             string `json:"stable_id"`
+	Status               string `json:"status"`
+	Owner                string `json:"owner,omitempty"`
+	Expires              string `json:"expires,omitempty"`
+	ExpectedEvidenceHash string `json:"expected_evidence_hash,omitempty"`
+	ActualEvidenceHash   string `json:"actual_evidence_hash,omitempty"`
+	Reason               string `json:"reason"`
 }
 
 func repoAnalyze(args []string) error {
@@ -2333,6 +2377,211 @@ func repoCompare(args []string) error {
 		fmt.Printf("  out=%s\n", *outPath)
 	}
 	return nil
+}
+
+func repoSuppressions(args []string) error {
+	fs := flag.NewFlagSet("repo suppressions", flag.ContinueOnError)
+	fs.SetOutput(ioDiscard{})
+	baselinePath := fs.String("baseline", "", "baseline directory or baseline.json")
+	suppressionsPath := fs.String("suppressions", "", "suppression ledger JSON")
+	outPath := fs.String("out", "", "output directory")
+	jsonOut := fs.Bool("json", false, "emit JSON")
+	if err := fs.Parse(args); err != nil {
+		return err
+	}
+	if *baselinePath == "" || *suppressionsPath == "" || fs.NArg() != 0 {
+		return errors.New("usage: patchline repo suppressions --baseline baseline-dir --suppressions suppressions.json [--out dir] [--json]")
+	}
+	baseline, err := project.LoadBaseline(*baselinePath)
+	if err != nil {
+		return err
+	}
+	ledger, err := loadSuppressionLedger(*suppressionsPath)
+	if err != nil {
+		return err
+	}
+	report := evaluateSuppressions(baseline, ledger)
+	if *outPath != "" {
+		if err := writeSuppressionReport(*outPath, report); err != nil {
+			return err
+		}
+	}
+	if *jsonOut {
+		return writeJSON(os.Stdout, report)
+	}
+	fmt.Printf("suppressions baseline=%s total=%d active=%d expired=%d stale=%d invalid=%d unmatched=%d hash=%s\n",
+		report.BaselineHash,
+		report.Summary.Total,
+		report.Summary.Active,
+		report.Summary.Expired,
+		report.Summary.Stale,
+		report.Summary.Invalid,
+		report.Summary.Unmatched,
+		report.Hash,
+	)
+	if *outPath != "" {
+		fmt.Printf("  out=%s\n", *outPath)
+	}
+	return nil
+}
+
+func loadSuppressionLedger(path string) (suppressionLedger, error) {
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return suppressionLedger{}, err
+	}
+	var ledger suppressionLedger
+	if err := json.Unmarshal(data, &ledger); err != nil {
+		return suppressionLedger{}, err
+	}
+	if ledger.Version == "" {
+		return suppressionLedger{}, errors.New("suppression ledger version is required")
+	}
+	return ledger, nil
+}
+
+func evaluateSuppressions(baseline project.BaselineReport, ledger suppressionLedger) suppressionReport {
+	risks := map[string]project.BaselineRisk{}
+	for _, risk := range baseline.Risks {
+		if risk.StableID != "" {
+			risks[risk.StableID] = risk
+		}
+	}
+	report := suppressionReport{Version: "patchline.suppression-report/v1", BaselineHash: baseline.Hash}
+	now := time.Now().UTC()
+	for _, entry := range ledger.Suppressions {
+		result := evaluateSuppression(entry, risks, now)
+		report.Results = append(report.Results, result)
+		report.Summary.Total++
+		switch result.Status {
+		case "active":
+			report.Summary.Active++
+		case "expired":
+			report.Summary.Expired++
+		case "stale":
+			report.Summary.Stale++
+		case "unmatched":
+			report.Summary.Unmatched++
+		default:
+			report.Summary.Invalid++
+		}
+	}
+	report.Hash = suppressionReportHash(report)
+	report.Markdown = renderSuppressionMarkdown(report)
+	return report
+}
+
+func evaluateSuppression(entry suppressionEntry, risks map[string]project.BaselineRisk, now time.Time) suppressionResult {
+	result := suppressionResult{StableID: entry.StableID, Owner: entry.Owner, Expires: entry.Expires, ExpectedEvidenceHash: entry.EvidenceHash}
+	if strings.TrimSpace(entry.StableID) == "" || strings.TrimSpace(entry.Owner) == "" || strings.TrimSpace(entry.Rationale) == "" || strings.TrimSpace(entry.Expires) == "" || strings.TrimSpace(entry.EvidenceHash) == "" {
+		result.Status = "invalid"
+		result.Reason = "stable_id, owner, rationale, expires, and evidence_hash are required"
+		return result
+	}
+	expires, err := parseSuppressionExpiry(entry.Expires)
+	if err != nil {
+		result.Status = "invalid"
+		result.Reason = "expires must be YYYY-MM-DD or RFC3339"
+		return result
+	}
+	if !expires.After(now) {
+		result.Status = "expired"
+		result.Reason = "suppression expiry is in the past"
+		return result
+	}
+	risk, ok := risks[entry.StableID]
+	if !ok {
+		result.Status = "unmatched"
+		result.Reason = "stable_id no longer matches any ranked risk"
+		return result
+	}
+	actual := suppressionEvidenceHash(risk)
+	result.ActualEvidenceHash = actual
+	if entry.EvidenceHash != actual {
+		result.Status = "stale"
+		result.Reason = "evidence_hash does not match the current ranked risk"
+		return result
+	}
+	result.Status = "active"
+	result.Reason = "suppression is current and matches a ranked risk"
+	return result
+}
+
+func parseSuppressionExpiry(value string) (time.Time, error) {
+	if t, err := time.Parse("2006-01-02", value); err == nil {
+		return t, nil
+	}
+	return time.Parse(time.RFC3339, value)
+}
+
+func suppressionEvidenceHash(risk project.BaselineRisk) string {
+	if risk.EvidenceHash != "" {
+		return risk.EvidenceHash
+	}
+	return "sha256:" + canonical.Hash(strings.Join([]string{
+		risk.StableID,
+		strings.ToLower(strings.TrimSpace(risk.Table)),
+		operationFamilyForSuppression(risk.Kind),
+		risk.Severity,
+	}, "\x00"))
+}
+
+func operationFamilyForSuppression(kind string) string {
+	kind = strings.ToLower(strings.TrimSpace(kind))
+	switch {
+	case strings.Contains(kind, "delete"), strings.Contains(kind, "drop"), strings.Contains(kind, "truncate"):
+		return "destructive"
+	case strings.Contains(kind, "update"), strings.Contains(kind, "backfill"), strings.Contains(kind, "write"):
+		return "write"
+	case strings.Contains(kind, "schema"), strings.Contains(kind, "migration"):
+		return "schema"
+	case strings.Contains(kind, "sql"):
+		return "sql"
+	default:
+		return kind
+	}
+}
+
+func writeSuppressionReport(outDir string, report suppressionReport) error {
+	if err := os.MkdirAll(outDir, 0o755); err != nil {
+		return err
+	}
+	copy := report
+	copy.Markdown = ""
+	data, err := json.MarshalIndent(copy, "", "  ")
+	if err != nil {
+		return err
+	}
+	if err := os.WriteFile(filepath.Join(outDir, "suppressions.json"), append(data, '\n'), 0o644); err != nil {
+		return err
+	}
+	return os.WriteFile(filepath.Join(outDir, "suppressions.md"), []byte(report.Markdown), 0o644)
+}
+
+func suppressionReportHash(report suppressionReport) string {
+	copy := report
+	copy.Hash = ""
+	copy.Markdown = ""
+	return canonical.Hash(copy)
+}
+
+func renderSuppressionMarkdown(report suppressionReport) string {
+	var b strings.Builder
+	fmt.Fprintf(&b, "# Patchline suppressions\n\n")
+	fmt.Fprintf(&b, "- baseline_hash: `%s`\n", report.BaselineHash)
+	fmt.Fprintf(&b, "- hash: `%s`\n\n", report.Hash)
+	fmt.Fprintf(&b, "## Summary\n\n| status | count |\n| --- | ---: |\n")
+	fmt.Fprintf(&b, "| total | %d |\n", report.Summary.Total)
+	fmt.Fprintf(&b, "| active | %d |\n", report.Summary.Active)
+	fmt.Fprintf(&b, "| expired | %d |\n", report.Summary.Expired)
+	fmt.Fprintf(&b, "| stale | %d |\n", report.Summary.Stale)
+	fmt.Fprintf(&b, "| invalid | %d |\n", report.Summary.Invalid)
+	fmt.Fprintf(&b, "| unmatched | %d |\n\n", report.Summary.Unmatched)
+	fmt.Fprintf(&b, "## Results\n\n| stable id | status | owner | expires | reason |\n| --- | --- | --- | --- | --- |\n")
+	for _, result := range report.Results {
+		fmt.Fprintf(&b, "| `%s` | %s | %s | %s | %s |\n", result.StableID, result.Status, result.Owner, result.Expires, result.Reason)
+	}
+	return b.String()
 }
 
 type ioDiscard struct{}

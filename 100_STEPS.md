@@ -142,7 +142,7 @@ Every addition to the repo should be judged by whether it makes that loop more a
 102. [x] Add an interactive-free `patchline quickstart --github owner/repo --subpath path` command that emits exactly the next three copy/paste commands and expected artifacts.
 103. [x] Add a maintainer triage dashboard that groups findings by owner-relevant surfaces: migrations, app write paths, jobs, tests, incidents, runbooks, and generated interventions.
 104. [x] Add stable finding IDs that survive file moves and line drift by hashing normalized evidence, table identifiers, operation families, and provenance slices.
-105. [ ] Add suppression files with expiry dates, rationale, owner, evidence hash, and automatic stale-suppression detection.
+105. [x] Add suppression files with expiry dates, rationale, owner, evidence hash, and automatic stale-suppression detection.
 106. [ ] Add a "why now" report that highlights newly introduced risks relative to a previous commit, release tag, or stored baseline bundle.
 107. [ ] Add a "what changed since last run" report that compares facts, ranked risks, links, generated artifacts, and deterministic check outcomes.
 108. [ ] Add Slack/GitHub-friendly summaries with only the top maintainer action, top risk, reproduction command, and bundle link.

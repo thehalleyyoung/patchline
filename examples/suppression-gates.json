@@ -1,0 +1,33 @@
+{
+  "version": "patchline.suppression-gates/v1",
+  "gates": [
+    {
+      "id": "forem-suppressions",
+      "status": "implemented",
+      "real_repo": "forem/forem",
+      "subpath": "db/migrate",
+      "suppression_claim": "suppression files require owner, rationale, expiry, stable ID, and evidence hash while detecting stale entries"
+    },
+    {
+      "id": "bytebase-suppressions",
+      "status": "implemented",
+      "real_repo": "bytebase/bytebase",
+      "subpath": "backend/migrator/migration",
+      "suppression_claim": "suppression files require owner, rationale, expiry, stable ID, and evidence hash while detecting stale entries"
+    },
+    {
+      "id": "mastodon-suppressions",
+      "status": "implemented",
+      "real_repo": "mastodon/mastodon",
+      "subpath": "db/migrate",
+      "suppression_claim": "suppression files require owner, rationale, expiry, stable ID, and evidence hash while detecting stale entries"
+    },
+    {
+      "id": "lobsters-suppressions",
+      "status": "implemented",
+      "real_repo": "lobsters/lobsters",
+      "subpath": "db/migrate",
+      "suppression_claim": "suppression files require owner, rationale, expiry, stable ID, and evidence hash while detecting stale entries"
+    }
+  ]
+}

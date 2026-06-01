@@ -80,18 +80,19 @@ type BaselineSummary struct {
 }
 
 type BaselineRisk struct {
-	ID          string        `json:"id"`
-	StableID    string        `json:"stable_id,omitempty"`
-	Path        string        `json:"path"`
-	Statement   int           `json:"statement,omitempty"`
-	Kind        string        `json:"kind"`
-	Table       string        `json:"table,omitempty"`
-	Severity    string        `json:"severity"`
-	Score       int           `json:"score"`
-	Factors     []ScoreFactor `json:"factors,omitempty"`
-	Identifiers []Identifier  `json:"identifiers,omitempty"`
-	Rationale   string        `json:"rationale"`
-	NextCommand string        `json:"next_command,omitempty"`
+	ID           string        `json:"id"`
+	StableID     string        `json:"stable_id,omitempty"`
+	EvidenceHash string        `json:"evidence_hash,omitempty"`
+	Path         string        `json:"path"`
+	Statement    int           `json:"statement,omitempty"`
+	Kind         string        `json:"kind"`
+	Table        string        `json:"table,omitempty"`
+	Severity     string        `json:"severity"`
+	Score        int           `json:"score"`
+	Factors      []ScoreFactor `json:"factors,omitempty"`
+	Identifiers  []Identifier  `json:"identifiers,omitempty"`
+	Rationale    string        `json:"rationale"`
+	NextCommand  string        `json:"next_command,omitempty"`
 }
 
 type ScoreFactor struct {
@@ -483,6 +484,7 @@ func assignStableRiskIDs(risks []BaselineRisk, provenance []ProvenanceSlice) {
 	}
 	for i := range risks {
 		risks[i].StableID = stableRiskID(risks[i], provenanceByRisk[risks[i].ID])
+		risks[i].EvidenceHash = riskEvidenceHash(risks[i])
 	}
 }
 
@@ -529,6 +531,15 @@ func operationFamily(kind string) string {
 	default:
 		return kind
 	}
+}
+
+func riskEvidenceHash(risk BaselineRisk) string {
+	return "sha256:" + canonical.Hash(strings.Join([]string{
+		risk.StableID,
+		strings.ToLower(strings.TrimSpace(risk.Table)),
+		operationFamily(risk.Kind),
+		risk.Severity,
+	}, "\x00"))
 }
 
 func uniqueStringsForStableID(values []string) []string {

@@ -123,6 +123,27 @@ func TestMaintainerTriageGroupsOwnerSurfaces(t *testing.T) {
 	}
 }
 
+func TestEvaluateSuppressionsClassifiesStates(t *testing.T) {
+	risk := project.BaselineRisk{ID: "risk:1", StableID: "stable-risk:1234567890abcdef", Kind: "high-risk-sql", Table: "accounts", Severity: "high"}
+	activeHash := suppressionEvidenceHash(risk)
+	report := evaluateSuppressions(project.BaselineReport{Hash: "baseline-hash", Risks: []project.BaselineRisk{risk}}, suppressionLedger{
+		Version: "patchline.suppressions/v1",
+		Suppressions: []suppressionEntry{
+			{StableID: risk.StableID, Owner: "db-team", Rationale: "accepted for test", Expires: "2999-01-01", EvidenceHash: activeHash},
+			{StableID: risk.StableID, Owner: "db-team", Rationale: "old", Expires: "2000-01-01", EvidenceHash: activeHash},
+			{StableID: risk.StableID, Owner: "db-team", Rationale: "stale", Expires: "2999-01-01", EvidenceHash: "sha256:bad"},
+			{StableID: "stable-risk:ffffffffffffffff", Owner: "db-team", Rationale: "gone", Expires: "2999-01-01", EvidenceHash: activeHash},
+			{StableID: risk.StableID, Expires: "2999-01-01", EvidenceHash: activeHash},
+		},
+	})
+	if report.Summary.Active != 1 || report.Summary.Expired != 1 || report.Summary.Stale != 1 || report.Summary.Unmatched != 1 || report.Summary.Invalid != 1 {
+		t.Fatalf("unexpected suppression summary: %#v", report.Summary)
+	}
+	if report.Hash == "" || !strings.Contains(report.Markdown, "Patchline suppressions") {
+		t.Fatalf("expected hash and markdown: %#v", report)
+	}
+}
+
 func TestPhaseCheckInputKindResolvesImplicitInputs(t *testing.T) {
 	tests := []struct {
 		name string
