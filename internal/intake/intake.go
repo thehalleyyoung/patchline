@@ -45,6 +45,7 @@ type Report struct {
 	Causes           []CauseCandidate          `json:"cause_candidates,omitempty"`
 	RepairCandidates []RepairCandidate         `json:"repair_candidates,omitempty"`
 	Links            []CandidateLink           `json:"candidate_links,omitempty"`
+	TimeSignals      []TimeSignal              `json:"time_signals,omitempty"`
 	UnknownInputs    []UnknownInput            `json:"unknown_inputs,omitempty"`
 	Suggestions      []Suggestion              `json:"suggestions,omitempty"`
 	Warnings         []string                  `json:"warnings,omitempty"`
@@ -77,6 +78,7 @@ type Summary struct {
 	CauseCandidates         int   `json:"cause_candidates"`
 	RepairCandidates        int   `json:"repair_candidates"`
 	LinkedCandidates        int   `json:"linked_candidates"`
+	TimeSignals             int   `json:"time_signals"`
 	UnknownJSONFiles        int   `json:"unknown_json_files"`
 }
 
@@ -150,6 +152,15 @@ type CandidateLink struct {
 	Confidence  string   `json:"confidence"`
 }
 
+type TimeSignal struct {
+	ID          string   `json:"id"`
+	Path        string   `json:"path"`
+	Timestamp   string   `json:"timestamp"`
+	Source      string   `json:"source"`
+	Confidence  string   `json:"confidence"`
+	Identifiers []string `json:"identifiers,omitempty"`
+}
+
 type UnknownInput struct {
 	Path   string `json:"path"`
 	Kind   string `json:"kind"`
@@ -208,6 +219,7 @@ func Run(ctx context.Context, opts Options) (Report, error) {
 		report.scanEvidence(file, content)
 		report.scanRepairManifest(file, content)
 		report.scanTextCandidates(file, content)
+		report.scanTimeSignals(file, content)
 	}
 	report.finalize()
 	return report, nil
@@ -614,6 +626,63 @@ func (report *Report) scanTextCandidates(file scanFile, content []byte) {
 	}
 }
 
+func (report *Report) scanTimeSignals(file scanFile, content []byte) {
+	ids := textIdentifiers(file.Rel + "\n" + string(content[:min(len(content), 4096)]))
+	for _, signal := range timeSignalsFromText(file.Rel, file.Rel, "path", ids, 4) {
+		report.TimeSignals = append(report.TimeSignals, signal)
+	}
+	if isTextLike(file.Rel, content) {
+		for _, signal := range timeSignalsFromText(file.Rel, string(content), "content", ids, 4) {
+			report.TimeSignals = append(report.TimeSignals, signal)
+		}
+	}
+}
+
+var (
+	dateDashPattern  = regexp.MustCompile(`(?:^|[^0-9])((20[0-9]{2})[-_/](0[1-9]|1[0-2])[-_/]([0-2][0-9]|3[0-1]))(?:$|[^0-9])`)
+	datePlainPattern = regexp.MustCompile(`(?:^|[^0-9])((20[0-9]{2})(0[1-9]|1[0-2])([0-2][0-9]|3[0-1])(?:[0-2][0-9][0-5][0-9][0-5][0-9])?)(?:$|[^0-9])`)
+)
+
+func timeSignalsFromText(path, text, source string, ids []string, limit int) []TimeSignal {
+	seen := map[string]bool{}
+	var out []TimeSignal
+	add := func(raw, year, month, day string) {
+		if len(out) >= limit {
+			return
+		}
+		normalized := year + "-" + month + "-" + day
+		if _, err := time.Parse("2006-01-02", normalized); err != nil {
+			return
+		}
+		key := source + "\x00" + normalized
+		if seen[key] {
+			return
+		}
+		seen[key] = true
+		out = append(out, TimeSignal{
+			ID:          candidateID("time", path, source+raw),
+			Path:        path,
+			Timestamp:   normalized,
+			Source:      source,
+			Confidence:  "temporal",
+			Identifiers: ids,
+		})
+	}
+	for _, match := range dateDashPattern.FindAllStringSubmatch(text, limit) {
+		add(match[1], match[2], match[3], match[4])
+	}
+	for _, match := range datePlainPattern.FindAllStringSubmatch(text, limit) {
+		add(match[1], match[2], match[3], match[4])
+	}
+	sort.Slice(out, func(i, j int) bool {
+		if out[i].Timestamp != out[j].Timestamp {
+			return out[i].Timestamp < out[j].Timestamp
+		}
+		return out[i].Source < out[j].Source
+	})
+	return out
+}
+
 func identifiersForStatement(statement migration.Statement) []string {
 	var ids []string
 	if statement.Table != "" {
@@ -814,11 +883,13 @@ func (report *Report) finalize() {
 	report.Problems = uniqueProblems(report.Problems)
 	report.Causes = uniqueCauses(report.Causes)
 	report.RepairCandidates = uniqueRepairCandidates(report.RepairCandidates)
+	report.TimeSignals = uniqueTimeSignals(report.TimeSignals)
 	report.Links = buildCandidateLinks(report.Problems, report.Causes, report.RepairCandidates)
 	report.Summary.ProblemCandidates = len(report.Problems)
 	report.Summary.CauseCandidates = len(report.Causes)
 	report.Summary.RepairCandidates = len(report.RepairCandidates)
 	report.Summary.LinkedCandidates = len(report.Links)
+	report.Summary.TimeSignals = len(report.TimeSignals)
 	sort.Slice(report.SQL, func(i, j int) bool {
 		if report.SQL[i].Path != report.SQL[j].Path {
 			return report.SQL[i].Path < report.SQL[j].Path
@@ -827,6 +898,15 @@ func (report *Report) finalize() {
 	})
 	sort.Slice(report.Evidence, func(i, j int) bool { return report.Evidence[i].Path < report.Evidence[j].Path })
 	sort.Slice(report.Repairs, func(i, j int) bool { return report.Repairs[i].Path < report.Repairs[j].Path })
+	sort.Slice(report.TimeSignals, func(i, j int) bool {
+		if report.TimeSignals[i].Timestamp != report.TimeSignals[j].Timestamp {
+			return report.TimeSignals[i].Timestamp < report.TimeSignals[j].Timestamp
+		}
+		if report.TimeSignals[i].Path != report.TimeSignals[j].Path {
+			return report.TimeSignals[i].Path < report.TimeSignals[j].Path
+		}
+		return report.TimeSignals[i].Source < report.TimeSignals[j].Source
+	})
 	report.Suggestions = uniqueSuggestions(report.Suggestions)
 	report.Hash = hashReport(*report)
 	report.Markdown = renderMarkdown(*report)
@@ -886,6 +966,20 @@ func uniqueRepairCandidates(in []RepairCandidate) []RepairCandidate {
 		}
 		return out[i].ID < out[j].ID
 	})
+	return out
+}
+
+func uniqueTimeSignals(in []TimeSignal) []TimeSignal {
+	seen := map[string]bool{}
+	var out []TimeSignal
+	for _, item := range in {
+		if item.ID == "" || seen[item.ID] {
+			continue
+		}
+		seen[item.ID] = true
+		sort.Strings(item.Identifiers)
+		out = append(out, item)
+	}
 	return out
 }
 
@@ -995,7 +1089,8 @@ func renderMarkdown(report Report) string {
 	fmt.Fprintf(&b, "| problem candidates | %d |\n", report.Summary.ProblemCandidates)
 	fmt.Fprintf(&b, "| cause candidates | %d |\n", report.Summary.CauseCandidates)
 	fmt.Fprintf(&b, "| repair candidates | %d |\n", report.Summary.RepairCandidates)
-	fmt.Fprintf(&b, "| linked candidates | %d |\n\n", report.Summary.LinkedCandidates)
+	fmt.Fprintf(&b, "| linked candidates | %d |\n", report.Summary.LinkedCandidates)
+	fmt.Fprintf(&b, "| time signals | %d |\n\n", report.Summary.TimeSignals)
 	if len(report.Suggestions) > 0 {
 		fmt.Fprintf(&b, "## Commands that should run on this checkout/export\n\n")
 		for _, suggestion := range report.Suggestions {
@@ -1035,6 +1130,13 @@ func renderMarkdown(report Report) string {
 		fmt.Fprintf(&b, "## Candidate links\n\nThese are identifier-grounded links, not proof of causality.\n\n| kind | from | to | identifiers | confidence |\n| --- | --- | --- | --- | --- |\n")
 		for _, link := range report.Links {
 			fmt.Fprintf(&b, "| %s | `%s` | `%s` | %s | %s |\n", link.Kind, link.From, link.To, strings.Join(link.Identifiers, ", "), link.Confidence)
+		}
+		fmt.Fprintf(&b, "\n")
+	}
+	if len(report.TimeSignals) > 0 {
+		fmt.Fprintf(&b, "## Time signals\n\nDates found in existing filenames and text can help slice a checkout/export around likely migration, incident, deploy, or repair windows.\n\n| date | path | source | identifiers |\n| --- | --- | --- | --- |\n")
+		for _, signal := range report.TimeSignals {
+			fmt.Fprintf(&b, "| %s | %s | %s | %s |\n", signal.Timestamp, signal.Path, signal.Source, strings.Join(signal.Identifiers, ", "))
 		}
 		fmt.Fprintf(&b, "\n")
 	}

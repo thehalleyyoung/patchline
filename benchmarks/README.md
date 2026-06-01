@@ -22,7 +22,7 @@ benchmarks/
 3. a during-repair replay/proof label;
 4. an archive-only semantic regression label.
 
-The smoke set is not a paper-scale evaluation. Its purpose is to make the artifact protocol executable before adding the larger public corpora described in `NEWEST_PLAN.md`.
+The smoke set is intentionally small. Its purpose is to make the artifact protocol executable before adding larger public corpora.
 
 ## Executable manifests and golden reports
 

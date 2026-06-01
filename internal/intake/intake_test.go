@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 )
 
@@ -73,6 +74,12 @@ Remediation: restore table accounts from backup and reconcile missing rows.`)
 	}
 	if report.Summary.LinkedCandidates == 0 {
 		t.Fatalf("expected identifier-grounded links: problems=%#v causes=%#v repairs=%#v", report.Problems, report.Causes, report.RepairCandidates)
+	}
+	if report.Summary.TimeSignals == 0 {
+		t.Fatalf("expected filename/content dates to produce time signals: %#v", report.TimeSignals)
+	}
+	if !strings.Contains(report.Markdown, "## Time signals") {
+		t.Fatalf("expected Markdown to describe discovered time signals:\n%s", report.Markdown)
 	}
 	for _, link := range report.Links {
 		if len(link.Identifiers) == 0 {

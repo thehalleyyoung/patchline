@@ -8,7 +8,7 @@ The artifact validation claim is:
 
 > Patchline converts historical production data-repair incidents into executable semantic artifacts that can replay repairs, prove scope and frame obligations, and detect recurrence across future migrations.
 
-This guide is for artifact reviewers. Start with `patchline intake <path>` or `patchline intake --github owner/repo --subpath path` for arbitrary current data; the rest of this guide separates the implemented evaluator path from the larger roadmap in `NEWEST_PLAN.md`.
+This guide is for artifact reviewers. Start with `patchline intake <path>` or `patchline intake --github owner/repo --subpath path` for arbitrary current data; the rest of this guide separates the implemented evaluator path from longer-range validation work that is not yet claimed by the artifact path.
 
 ## Implemented in this artifact path
 
@@ -376,7 +376,7 @@ make public-corpus
 
 ## Roadmap not yet claimed by the smoke path
 
-The following are planned in `NEWEST_PLAN.md` but are not yet claimed as fully implemented artifact results:
+The following are useful extensions but are not yet claimed as fully implemented artifact results:
 
 - large public migration benchmark with hundreds or thousands of statements;
 - multi-incident public postmortem benchmark with precision/recall;

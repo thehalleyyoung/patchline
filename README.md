@@ -63,11 +63,11 @@ results/generated/plug-and-play-demo/cases/*/summary.sarif
 
 Current default projects:
 
-| Project slice | Files | SQL files | Loose SQL | High-risk SQL | Problems | Causes | Repairs | Links |
-| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
-| Bytebase migrations (`bytebase/bytebase:backend/migrator/migration`) | 251 | 251 | 0 | 378 | 339 | 339 | 16 | 10243 |
-| Django auth migrations (`django/django:django/contrib/auth/migrations`) | 13 | 0 | 3 | 3 | 2 | 2 | 0 | 2 |
-| Mastodon migrations (`mastodon/mastodon:db/migrate`) | 514 | 0 | 97 | 58 | 44 | 44 | 6 | 76 |
+| Project slice | Files | SQL files | Loose SQL | High-risk SQL | Problems | Causes | Repairs | Links | Time signals |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| Bytebase migrations (`bytebase/bytebase:backend/migrator/migration`) | 251 | 251 | 0 | 378 | 339 | 339 | 16 | 10243 | 2 |
+| Django auth migrations (`django/django:django/contrib/auth/migrations`) | 13 | 0 | 3 | 3 | 2 | 2 | 0 | 2 | 0 |
+| Mastodon migrations (`mastodon/mastodon:db/migrate`) | 514 | 0 | 97 | 58 | 44 | 44 | 6 | 76 | 525 |
 
 Each case directory contains the full intake report, SARIF for code-scanning systems, and command log. To scan your own project list:
 
@@ -86,6 +86,7 @@ PATCHLINE_PLUGPLAY_CASES=$'My app|owner/repo|path/to/migrations\nOther app|owner
 | Embedded/source SQL | Go, Python, Ruby, JavaScript/TypeScript, Java, C#, shell, and SQL files |
 | Cause candidates | risky migrations, deploy/trace/commit/migration signals, incident-like notes, export fields |
 | Repair candidates | repair manifests, rollback/revert/restore/backfill/reconcile/fix clues in SQL/docs/scripts |
+| Time signals | dates in filenames and text that can slice a repo/export around likely migration, incident, deploy, or repair windows |
 | Existing evidence | JSONL evidence, Datadog/OTLP/GitHub/Postgres/migration-runner exports when recognizable |
 | Unknown JSON signals | generic SQL/trace/deploy/commit/record fields without requiring a known schema |
 | SARIF output | `summary.sarif` for CI/code-scanning integration |

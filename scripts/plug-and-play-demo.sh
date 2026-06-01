@@ -41,6 +41,7 @@ while IFS='|' read -r label repo subpath; do
       causes: .summary.cause_candidates,
       repair_candidates: .summary.repair_candidates,
       links: .summary.linked_candidates,
+      time_signals: .summary.time_signals,
       sample_problem: (.problem_candidates[0] // null),
       sample_repair: (.repair_candidates[0] // null)
     }' "$case_out/summary.json" > "$row"
@@ -54,9 +55,9 @@ jq -s '{version:"patchline.plug-play-demo/v1", cases: .}' "${rows[@]}" > "$OUT/s
   echo
   echo "These are real public GitHub project subpaths scanned with \`patchline intake --github ... --subpath ...\`."
   echo
-  echo "| Project slice | Files | SQL files | Loose SQL | High-risk SQL | Problems | Causes | Repairs | Links |"
-  echo "| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |"
-  jq -r '.cases[] | "| \(.label) (`\(.repo):\(.subpath)`) | \(.files) | \(.sql_files) | \(.loose_sql) | \(.high_risk) | \(.problems) | \(.causes) | \(.repair_candidates) | \(.links) |"' "$OUT/summary.json"
+  echo "| Project slice | Files | SQL files | Loose SQL | High-risk SQL | Problems | Causes | Repairs | Links | Time signals |"
+  echo "| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |"
+  jq -r '.cases[] | "| \(.label) (`\(.repo):\(.subpath)`) | \(.files) | \(.sql_files) | \(.loose_sql) | \(.high_risk) | \(.problems) | \(.causes) | \(.repair_candidates) | \(.links) | \(.time_signals) |"' "$OUT/summary.json"
   echo
   echo "## Example findings"
   echo
