@@ -62,7 +62,7 @@ jq -s '{version:"patchline.plug-play-demo/v1", cases: .}' "${rows[@]}" > "$OUT/s
   echo
   jq -r '.cases[] | select(.sample_problem != null) | "- **\(.label)**: `\(.sample_problem.path)` table=`\(.sample_problem.table // "")` — \(.sample_problem.rationale)"' "$OUT/summary.json"
   echo
-  echo "Each case directory contains the full intake \`summary.json\`, \`summary.md\`, and command log."
+  echo "Each case directory contains the full intake \`summary.json\`, \`summary.md\`, \`summary.sarif\`, and command log."
 } > "$OUT/summary.md"
 
 echo "plug-and-play summary: $OUT/summary.md"

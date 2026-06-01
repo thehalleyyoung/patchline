@@ -224,7 +224,14 @@ func WriteReport(outDir string, report Report) error {
 	if err := os.WriteFile(filepath.Join(outDir, "summary.json"), append(data, '\n'), 0o644); err != nil {
 		return err
 	}
-	return os.WriteFile(filepath.Join(outDir, "summary.md"), []byte(report.Markdown), 0o644)
+	if err := os.WriteFile(filepath.Join(outDir, "summary.md"), []byte(report.Markdown), 0o644); err != nil {
+		return err
+	}
+	sarifData, err := json.MarshalIndent(renderSARIF(report), "", "  ")
+	if err != nil {
+		return err
+	}
+	return os.WriteFile(filepath.Join(outDir, "summary.sarif"), append(sarifData, '\n'), 0o644)
 }
 
 func resolveSource(ctx context.Context, opts Options) (string, Source, error) {
@@ -1038,6 +1045,127 @@ func renderMarkdown(report Report) string {
 		}
 	}
 	return b.String()
+}
+
+type sarifLog struct {
+	Version string     `json:"version"`
+	Schema  string     `json:"$schema"`
+	Runs    []sarifRun `json:"runs"`
+}
+
+type sarifRun struct {
+	Tool    sarifTool     `json:"tool"`
+	Results []sarifResult `json:"results"`
+}
+
+type sarifTool struct {
+	Driver sarifDriver `json:"driver"`
+}
+
+type sarifDriver struct {
+	Name           string      `json:"name"`
+	InformationURI string      `json:"informationUri,omitempty"`
+	Rules          []sarifRule `json:"rules"`
+}
+
+type sarifRule struct {
+	ID               string       `json:"id"`
+	Name             string       `json:"name"`
+	ShortDescription sarifMessage `json:"shortDescription"`
+	FullDescription  sarifMessage `json:"fullDescription"`
+}
+
+type sarifResult struct {
+	RuleID              string            `json:"ruleId"`
+	Level               string            `json:"level"`
+	Message             sarifMessage      `json:"message"`
+	Locations           []sarifLocation   `json:"locations,omitempty"`
+	PartialFingerprints map[string]string `json:"partialFingerprints,omitempty"`
+	Properties          map[string]any    `json:"properties,omitempty"`
+}
+
+type sarifMessage struct {
+	Text string `json:"text"`
+}
+
+type sarifLocation struct {
+	PhysicalLocation sarifPhysicalLocation `json:"physicalLocation"`
+}
+
+type sarifPhysicalLocation struct {
+	ArtifactLocation sarifArtifactLocation `json:"artifactLocation"`
+}
+
+type sarifArtifactLocation struct {
+	URI string `json:"uri"`
+}
+
+func renderSARIF(report Report) sarifLog {
+	results := make([]sarifResult, 0, len(report.Problems)+len(report.Causes)+len(report.RepairCandidates))
+	for _, problem := range report.Problems {
+		results = append(results, sarifResult{
+			RuleID:              "patchline.problem.high-risk-sql",
+			Level:               "warning",
+			Message:             sarifMessage{Text: problem.Rationale},
+			Locations:           []sarifLocation{sarifFileLocation(problem.Path)},
+			PartialFingerprints: map[string]string{"patchlineCandidateId": problem.ID},
+			Properties: map[string]any{
+				"kind":        problem.Kind,
+				"severity":    problem.Severity,
+				"table":       problem.Table,
+				"confidence":  problem.Confidence,
+				"identifiers": problem.Identifiers,
+			},
+		})
+	}
+	for _, cause := range report.Causes {
+		results = append(results, sarifResult{
+			RuleID:              "patchline.cause.candidate",
+			Level:               "note",
+			Message:             sarifMessage{Text: cause.Rationale},
+			Locations:           []sarifLocation{sarifFileLocation(cause.Path)},
+			PartialFingerprints: map[string]string{"patchlineCandidateId": cause.ID},
+			Properties: map[string]any{
+				"kind":        cause.Kind,
+				"confidence":  cause.Confidence,
+				"identifiers": cause.Identifiers,
+			},
+		})
+	}
+	for _, repair := range report.RepairCandidates {
+		results = append(results, sarifResult{
+			RuleID:              "patchline.repair.candidate",
+			Level:               "note",
+			Message:             sarifMessage{Text: repair.Rationale},
+			Locations:           []sarifLocation{sarifFileLocation(repair.Path)},
+			PartialFingerprints: map[string]string{"patchlineCandidateId": repair.ID},
+			Properties: map[string]any{
+				"kind":        repair.Kind,
+				"table":       repair.Table,
+				"confidence":  repair.Confidence,
+				"identifiers": repair.Identifiers,
+			},
+		})
+	}
+	return sarifLog{
+		Version: "2.1.0",
+		Schema:  "https://json.schemastore.org/sarif-2.1.0.json",
+		Runs: []sarifRun{{
+			Tool: sarifTool{Driver: sarifDriver{
+				Name: "Patchline",
+				Rules: []sarifRule{
+					{ID: "patchline.problem.high-risk-sql", Name: "High-risk data-changing SQL", ShortDescription: sarifMessage{Text: "Patchline found high-risk SQL in existing project data."}, FullDescription: sarifMessage{Text: "High-risk SQL findings are derived from deterministic migration/source SQL analysis over the scanned project."}},
+					{ID: "patchline.cause.candidate", Name: "Cause candidate", ShortDescription: sarifMessage{Text: "Patchline found a possible cause signal."}, FullDescription: sarifMessage{Text: "Cause candidates are leads from risky migrations, deploy/trace/commit/migration signals, or incident-like text; they are not proof of causality."}},
+					{ID: "patchline.repair.candidate", Name: "Repair candidate", ShortDescription: sarifMessage{Text: "Patchline found a possible repair or rollback signal."}, FullDescription: sarifMessage{Text: "Repair candidates are leads from manifests, SQL, scripts, or docs with repair/rollback/reconcile evidence."}},
+				},
+			}},
+			Results: results,
+		}},
+	}
+}
+
+func sarifFileLocation(path string) sarifLocation {
+	return sarifLocation{PhysicalLocation: sarifPhysicalLocation{ArtifactLocation: sarifArtifactLocation{URI: filepath.ToSlash(path)}}}
 }
 
 func firstNonEmpty(values ...string) string {

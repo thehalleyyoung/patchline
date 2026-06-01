@@ -2,6 +2,7 @@ package intake
 
 import (
 	"context"
+	"encoding/json"
 	"os"
 	"path/filepath"
 	"testing"
@@ -90,6 +91,40 @@ func TestParseGitHubRepo(t *testing.T) {
 	}
 	if _, _, err := parseGitHubRepo("../bad/repo"); err == nil {
 		t.Fatalf("expected unsafe repo to fail")
+	}
+}
+
+func TestWriteReportEmitsSARIF(t *testing.T) {
+	root := t.TempDir()
+	writeFile(t, root, "db/migrate/001_bad.sql", "UPDATE accounts SET disabled = true;")
+	report, err := Run(context.Background(), Options{Path: root})
+	if err != nil {
+		t.Fatal(err)
+	}
+	out := filepath.Join(root, "out")
+	if err := WriteReport(out, report); err != nil {
+		t.Fatal(err)
+	}
+	data, err := os.ReadFile(filepath.Join(out, "summary.sarif"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	var sarif struct {
+		Version string `json:"version"`
+		Runs    []struct {
+			Results []struct {
+				RuleID string `json:"ruleId"`
+			} `json:"results"`
+		} `json:"runs"`
+	}
+	if err := json.Unmarshal(data, &sarif); err != nil {
+		t.Fatal(err)
+	}
+	if sarif.Version != "2.1.0" || len(sarif.Runs) != 1 || len(sarif.Runs[0].Results) == 0 {
+		t.Fatalf("unexpected SARIF output: %s", string(data))
+	}
+	if sarif.Runs[0].Results[0].RuleID != "patchline.problem.high-risk-sql" {
+		t.Fatalf("expected problem rule, got %#v", sarif.Runs[0].Results[0])
 	}
 }
 

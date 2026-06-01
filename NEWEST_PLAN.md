@@ -28,7 +28,6 @@ Patchline now has a current-data intake path plus the artifact-review scaffold:
 - Ground-truth validation now enforces a fixed phase/input availability model, so an `allowed_inputs` entry cannot first become available after the case's declared phase.
 - `make artifact-benchmark-refresh` and `make artifact-studies-refresh` are the explicit maintainer paths for regenerating committed golden reports/manifests after deliberate semantic changes; compare targets remain separate so refresh is not presented as validation.
 - `make artifact-full && make verify-usefulness` has passed after the executable benchmark runner, golden-refresh workflow, and public migration corpus were added.
-- `100_STEPS.md`, `PLAN.md`, and `NEW_PLAN.md` are untracked/ignored; this file remains the tracked implementation roadmap.
 
 The latest refinement adds an artifact-wide provenance receipt on top of the anti-cheating fixes. Independent baselines read raw SQL bytes through a fixed lexical rule pack instead of Patchline analyzer summaries; evaluation-only metadata such as expected hashes and ground-truth paths no longer inflates actionability; `artifact-numbers` and `artifact-tables` record regenerated benchmark reports only after their hashes match the frozen expected reports; and `artifact-provenance` independently re-hashes public corpus cache files and rejects stale or incomplete generated bundles.
 

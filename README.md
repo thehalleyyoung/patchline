@@ -58,6 +58,7 @@ The demo downloads real GitHub project subpaths and writes:
 ```text
 results/generated/plug-and-play-demo/summary.md
 results/generated/plug-and-play-demo/summary.json
+results/generated/plug-and-play-demo/cases/*/summary.sarif
 ```
 
 Current default projects:
@@ -68,7 +69,7 @@ Current default projects:
 | Django auth migrations (`django/django:django/contrib/auth/migrations`) | 13 | 0 | 3 | 3 | 2 | 2 | 0 | 2 |
 | Mastodon migrations (`mastodon/mastodon:db/migrate`) | 514 | 0 | 97 | 58 | 44 | 44 | 6 | 76 |
 
-Each case directory contains the full intake report and command log. To scan your own project list:
+Each case directory contains the full intake report, SARIF for code-scanning systems, and command log. To scan your own project list:
 
 ```bash
 PATCHLINE_PLUGPLAY_CASES=$'My app|owner/repo|path/to/migrations\nOther app|owner2/repo2|db/migrate' \
@@ -87,6 +88,7 @@ PATCHLINE_PLUGPLAY_CASES=$'My app|owner/repo|path/to/migrations\nOther app|owner
 | Repair candidates | repair manifests, rollback/revert/restore/backfill/reconcile/fix clues in SQL/docs/scripts |
 | Existing evidence | JSONL evidence, Datadog/OTLP/GitHub/Postgres/migration-runner exports when recognizable |
 | Unknown JSON signals | generic SQL/trace/deploy/commit/record fields without requiring a known schema |
+| SARIF output | `summary.sarif` for CI/code-scanning integration |
 | Next commands | exact commands that should run on discovered files |
 
 Candidate links are conservative: Patchline links problems, causes, and repairs only through shared identifiers such as table names, incident IDs, or commits. A link is a lead to inspect, not proof of causality.
@@ -105,6 +107,12 @@ go run ./cmd/patchline intake --github bytebase/bytebase --subpath backend/migra
 
 # Compare several existing public projects
 make plug-and-play-demo
+
+# Use as a GitHub Action in another repo
+# - uses: thehalleyyoung/patchline@main
+#   with:
+#     path: .
+#     out: results/patchline-intake
 
 # Analyze one migration directly
 go run ./cmd/patchline analyze-migration path/to/migration.sql --json

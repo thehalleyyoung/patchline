@@ -1,0 +1,44 @@
+name: Patchline intake
+description: Run Patchline against an existing project checkout or a public GitHub repo/subpath.
+
+inputs:
+  path:
+    description: Local path to scan when github-repo is not set.
+    required: false
+    default: "."
+  github-repo:
+    description: Optional owner/repo to download and scan.
+    required: false
+    default: ""
+  ref:
+    description: Git ref for github-repo mode.
+    required: false
+    default: "HEAD"
+  subpath:
+    description: Subpath to scan in github-repo mode.
+    required: false
+    default: ""
+  out:
+    description: Output directory for summary.json, summary.md, and summary.sarif.
+    required: false
+    default: "results/patchline-intake"
+
+runs:
+  using: composite
+  steps:
+    - name: Run Patchline intake on GitHub repo
+      if: ${{ inputs.github-repo != '' }}
+      shell: bash
+      run: |
+        go run github.com/thehalleyyoung/patchline/cmd/patchline@main intake \
+          --github "${{ inputs.github-repo }}" \
+          --ref "${{ inputs.ref }}" \
+          --subpath "${{ inputs.subpath }}" \
+          --out "${{ inputs.out }}"
+    - name: Run Patchline intake on checkout
+      if: ${{ inputs.github-repo == '' }}
+      shell: bash
+      run: |
+        go run github.com/thehalleyyoung/patchline/cmd/patchline@main intake \
+          "${{ inputs.path }}" \
+          --out "${{ inputs.out }}"
