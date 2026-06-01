@@ -1,0 +1,33 @@
+{
+  "version": "patchline.stale-ref-gates/v1",
+  "sources": [
+    {
+      "id": "forem-rails-migrations",
+      "repo": "forem/forem",
+      "ref": "9c5509c3aeecd4a86a8950206fa937ebcbc2f8d1",
+      "subpath": "db/migrate",
+      "expected_archive_hash": "sha256:20e4eb4fd407a784b4dd1c1e2a35e3220ac6096d5f974f0022d577d31c3fc0db"
+    },
+    {
+      "id": "bytebase-go-migrator",
+      "repo": "bytebase/bytebase",
+      "ref": "0765652ea2dbdf8e93ae44bff5acafc1b97a92cc",
+      "subpath": "backend/migrator/migration",
+      "expected_archive_hash": "sha256:54a09fd81c12fcd1e6946f618b3399110386493036766e20fca3fa0dfc8703b3"
+    },
+    {
+      "id": "mastodon-rails-migrations",
+      "repo": "mastodon/mastodon",
+      "ref": "facb552c9cdbe8a2ebff0b94ebf2c9e9ec385347",
+      "subpath": "db/migrate",
+      "expected_archive_hash": "sha256:9149120649ad5e2b6c56ab340e2e58ac31686611f18c9f670db6e2d36659dcdc"
+    },
+    {
+      "id": "lobsters-rails-migrations",
+      "repo": "lobsters/lobsters",
+      "ref": "3b80b47aa5aaba37ec44413e7d1dc96fcf1585b6",
+      "subpath": "db/migrate",
+      "expected_archive_hash": "sha256:4c21f07f9c9f215a09742619b009fb56a1399106d9c8c4eba91340dfe22826ac"
+    }
+  ]
+}
