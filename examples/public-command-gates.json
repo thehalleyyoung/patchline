@@ -1,0 +1,37 @@
+{
+  "version": "patchline.public-command-gates/v1",
+  "gates": [
+    {
+      "id": "forem-downloaded-analysis",
+      "status": "implemented",
+      "real_repo": "forem/forem",
+      "subpath": "db/migrate",
+      "max_shell_commands": 3,
+      "command_claim": "fetch a public repo slice, analyze the downloaded path, and inspect reproducible commands in three shell commands"
+    },
+    {
+      "id": "bytebase-downloaded-analysis",
+      "status": "implemented",
+      "real_repo": "bytebase/bytebase",
+      "subpath": "backend/migrator/migration",
+      "max_shell_commands": 3,
+      "command_claim": "fetch a public repo slice, analyze the downloaded path, and inspect reproducible commands in three shell commands"
+    },
+    {
+      "id": "mastodon-downloaded-analysis",
+      "status": "implemented",
+      "real_repo": "mastodon/mastodon",
+      "subpath": "db/migrate",
+      "max_shell_commands": 3,
+      "command_claim": "fetch a public repo slice, analyze the downloaded path, and inspect reproducible commands in three shell commands"
+    },
+    {
+      "id": "lobsters-downloaded-analysis",
+      "status": "implemented",
+      "real_repo": "lobsters/lobsters",
+      "subpath": "db/migrate",
+      "max_shell_commands": 3,
+      "command_claim": "fetch a public repo slice, analyze the downloaded path, and inspect reproducible commands in three shell commands"
+    }
+  ]
+}
