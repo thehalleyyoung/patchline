@@ -1,0 +1,33 @@
+{
+  "version": "patchline.minimizer-gates/v1",
+  "gates": [
+    {
+      "id": "forem-minimizer",
+      "status": "implemented",
+      "real_repo": "forem/forem",
+      "subpath": "db/migrate",
+      "minimizer_claim": "repo minimize extracts the smallest source subpaths preserving findings, evidence links, and generated intervention metadata"
+    },
+    {
+      "id": "bytebase-minimizer",
+      "status": "implemented",
+      "real_repo": "bytebase/bytebase",
+      "subpath": "backend/migrator/migration",
+      "minimizer_claim": "repo minimize extracts the smallest source subpaths preserving findings, evidence links, and generated intervention metadata"
+    },
+    {
+      "id": "mastodon-minimizer",
+      "status": "implemented",
+      "real_repo": "mastodon/mastodon",
+      "subpath": "db/migrate",
+      "minimizer_claim": "repo minimize extracts the smallest source subpaths preserving findings, evidence links, and generated intervention metadata"
+    },
+    {
+      "id": "lobsters-minimizer",
+      "status": "implemented",
+      "real_repo": "lobsters/lobsters",
+      "subpath": "db/migrate",
+      "minimizer_claim": "repo minimize extracts the smallest source subpaths preserving findings, evidence links, and generated intervention metadata"
+    }
+  ]
+}

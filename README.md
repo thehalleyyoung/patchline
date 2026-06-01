@@ -154,6 +154,7 @@ make corpus-fairness-gate
 make stratified-benchmark-gate
 make stale-ref-gate
 make issue-template-gate
+make minimizer-gate
 ```
 
 The demo downloads real GitHub project subpaths and writes:
@@ -221,6 +222,8 @@ The real-repo slice matrix is backed by `examples/real-repo-slices.json` and `ex
 `make stale-ref-gate` checks pinned public refs still resolve and downloaded archive hashes match expected values.
 
 `make issue-template-gate` validates the public real-repo nomination issue form for required repo, ref, subpath, ecosystem, evidence, and failure-mode fields.
+
+`make minimizer-gate` runs `repo minimize` on four public slices and proves minimized source copies preserve findings, evidence links, and generated intervention metadata.
 
 Current default projects:
 

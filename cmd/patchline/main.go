@@ -409,6 +409,7 @@ Usage:
   patchline repo why-now --previous baseline-dir --current baseline-dir [--out dir] [--json]
   patchline repo changes --previous analysis-dir --current analysis-dir [--out dir] [--json]
   patchline repo notify-summary --analysis analysis-dir [--bundle-link url] [--out dir] [--json]
+  patchline repo minimize --analysis analysis-dir [--out dir] [--json]
   patchline intake <path> [--out results/generated/intake] [--json]
   patchline intake --github owner/repo [--ref ref] [--subpath path] [--out results/generated/intake] [--json]
   patchline semantics-contract [--json]
@@ -498,7 +499,7 @@ Examples:
 
 func repoCommand(args []string) error {
 	if len(args) == 0 {
-		return errors.New("usage: patchline repo <doctor|fetch|analyze|inventory|baseline|propose|compare|suppressions|why-now|changes|notify-summary> ...")
+		return errors.New("usage: patchline repo <doctor|fetch|analyze|inventory|baseline|propose|compare|suppressions|why-now|changes|notify-summary|minimize> ...")
 	}
 	switch args[0] {
 	case "doctor":
@@ -523,6 +524,8 @@ func repoCommand(args []string) error {
 		return repoChanges(args[1:])
 	case "notify-summary":
 		return repoNotifySummary(args[1:])
+	case "minimize":
+		return repoMinimize(args[1:])
 	default:
 		return fmt.Errorf("unknown repo subcommand %q", args[0])
 	}
@@ -821,6 +824,38 @@ type notifySummaryRisk struct {
 	Severity string `json:"severity"`
 	Score    int    `json:"score"`
 	Reason   string `json:"reason,omitempty"`
+}
+
+type corpusMinimizerReport struct {
+	Version           string                 `json:"version"`
+	Analysis          string                 `json:"analysis"`
+	Source            project.Source         `json:"source"`
+	Summary           corpusMinimizerSummary `json:"summary"`
+	Entries           []corpusMinimizerEntry `json:"entries"`
+	ExtractedSubpaths []string               `json:"extracted_subpaths"`
+	Hash              string                 `json:"hash"`
+	Markdown          string                 `json:"markdown,omitempty"`
+}
+
+type corpusMinimizerSummary struct {
+	Risks             int `json:"risks"`
+	Entries           int `json:"entries"`
+	UniqueSourceFiles int `json:"unique_source_files"`
+	EvidenceLinks     int `json:"evidence_links"`
+	GeneratedFiles    int `json:"generated_files"`
+	CopiedFiles       int `json:"copied_files"`
+}
+
+type corpusMinimizerEntry struct {
+	RiskID           string                  `json:"risk_id"`
+	StableID         string                  `json:"stable_id,omitempty"`
+	Severity         string                  `json:"severity"`
+	Score            int                     `json:"score"`
+	PublicSubpath    string                  `json:"public_subpath"`
+	SourcePaths      []string                `json:"source_paths"`
+	EvidenceLinks    []project.EvidenceLink  `json:"evidence_links,omitempty"`
+	GeneratedFiles   []project.GeneratedFile `json:"generated_files,omitempty"`
+	PreservationNote string                  `json:"preservation_note"`
 }
 
 func repoAnalyze(args []string) error {
@@ -3282,6 +3317,253 @@ func renderNotifySummaryMarkdown(report notifySummaryReport) string {
 	fmt.Fprintf(&b, "- hash: `%s`\n\n", report.Hash)
 	fmt.Fprintf(&b, "## Slack\n\n%s\n\n", report.SlackText)
 	fmt.Fprintf(&b, "## GitHub\n\n%s", report.GitHubMarkdown)
+	return b.String()
+}
+
+func repoMinimize(args []string) error {
+	fs := flag.NewFlagSet("repo minimize", flag.ContinueOnError)
+	fs.SetOutput(ioDiscard{})
+	analysisPath := fs.String("analysis", "", "repo analyze output directory")
+	outPath := fs.String("out", filepath.Join("results", "generated", "corpus-minimized"), "output directory")
+	jsonOut := fs.Bool("json", false, "emit JSON")
+	if err := fs.Parse(args); err != nil {
+		return err
+	}
+	if *analysisPath == "" || fs.NArg() != 0 {
+		return errors.New("usage: patchline repo minimize --analysis analysis-dir [--out dir] [--json]")
+	}
+	report, err := buildCorpusMinimizerReport(*analysisPath, *outPath)
+	if err != nil {
+		return err
+	}
+	if err := writeCorpusMinimizerReport(*outPath, report); err != nil {
+		return err
+	}
+	if *jsonOut {
+		return writeJSON(os.Stdout, report)
+	}
+	fmt.Printf("corpus minimize risks=%d files=%d subpaths=%d copied=%d hash=%s\n",
+		report.Summary.Risks,
+		report.Summary.UniqueSourceFiles,
+		len(report.ExtractedSubpaths),
+		report.Summary.CopiedFiles,
+		report.Hash,
+	)
+	fmt.Printf("  out=%s\n", *outPath)
+	return nil
+}
+
+func buildCorpusMinimizerReport(analysisPath, outPath string) (corpusMinimizerReport, error) {
+	baseline, err := project.LoadBaseline(filepath.Join(analysisPath, "baseline"))
+	if err != nil {
+		return corpusMinimizerReport{}, err
+	}
+	source, err := loadSource(filepath.Join(analysisPath, "fetch", "source.json"))
+	if err != nil {
+		source = project.Source{Input: analysisPath, ScannedRoot: filepath.ToSlash(filepath.Join(analysisPath, "fetch"))}
+	}
+	generated, err := loadGeneratedFilesMetadata(filepath.Join(analysisPath, "proposal", "proposal.json"))
+	if err != nil {
+		return corpusMinimizerReport{}, err
+	}
+	generatedByRisk := map[string][]project.GeneratedFile{}
+	for _, file := range generated {
+		for _, riskID := range file.RiskIDs {
+			generatedByRisk[riskID] = append(generatedByRisk[riskID], file)
+		}
+	}
+	linksByRisk := map[string][]project.EvidenceLink{}
+	for _, link := range baseline.EvidenceLinks {
+		linksByRisk[link.RiskID] = append(linksByRisk[link.RiskID], link)
+	}
+	uniqueFiles := map[string]bool{}
+	uniqueSubpaths := map[string]bool{}
+	report := corpusMinimizerReport{
+		Version:  "patchline.corpus-minimizer/v1",
+		Analysis: filepath.ToSlash(analysisPath),
+		Source:   source,
+	}
+	for _, risk := range baseline.Risks {
+		sourcePaths := minimizerSourcePaths(risk, linksByRisk[risk.ID])
+		for _, path := range sourcePaths {
+			uniqueFiles[path] = true
+		}
+		publicSubpath := minimizerPublicSubpath(source.Subpath, sourcePaths)
+		uniqueSubpaths[publicSubpath] = true
+		entry := corpusMinimizerEntry{
+			RiskID:           risk.ID,
+			StableID:         risk.StableID,
+			Severity:         risk.Severity,
+			Score:            risk.Score,
+			PublicSubpath:    publicSubpath,
+			SourcePaths:      sourcePaths,
+			EvidenceLinks:    linksByRisk[risk.ID],
+			GeneratedFiles:   generatedByRisk[risk.ID],
+			PreservationNote: "copy these source paths and rerun deterministic analysis to preserve the ranked finding, evidence links, and generated intervention context",
+		}
+		report.Summary.EvidenceLinks += len(entry.EvidenceLinks)
+		report.Summary.GeneratedFiles += len(entry.GeneratedFiles)
+		report.Entries = append(report.Entries, entry)
+	}
+	report.Summary.Risks = len(baseline.Risks)
+	report.Summary.Entries = len(report.Entries)
+	report.Summary.UniqueSourceFiles = len(uniqueFiles)
+	report.ExtractedSubpaths = boolKeys(uniqueSubpaths)
+	copied, err := copyMinimizerFiles(source.ScannedRoot, filepath.Join(outPath, "minimized-source"), boolKeys(uniqueFiles))
+	if err != nil {
+		return corpusMinimizerReport{}, err
+	}
+	report.Summary.CopiedFiles = copied
+	report.Hash = corpusMinimizerHash(report)
+	report.Markdown = renderCorpusMinimizerMarkdown(report)
+	return report, nil
+}
+
+func loadGeneratedFilesMetadata(path string) ([]project.GeneratedFile, error) {
+	data, err := os.ReadFile(path)
+	if errors.Is(err, os.ErrNotExist) {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+	var report project.ProposalReport
+	if err := json.Unmarshal(data, &report); err != nil {
+		return nil, err
+	}
+	return report.GeneratedFiles, nil
+}
+
+func minimizerSourcePaths(risk project.BaselineRisk, links []project.EvidenceLink) []string {
+	seen := map[string]bool{}
+	add := func(path string) {
+		path = strings.Trim(filepath.ToSlash(path), "/")
+		if path == "" || strings.Contains(path, "..") {
+			return
+		}
+		seen[path] = true
+	}
+	add(risk.Path)
+	for _, link := range links {
+		add(link.Path)
+	}
+	return boolKeys(seen)
+}
+
+func minimizerPublicSubpath(base string, paths []string) string {
+	dir := commonPathDir(paths)
+	base = strings.Trim(filepath.ToSlash(base), "/")
+	if dir == "." || dir == "" {
+		if base == "" {
+			return "."
+		}
+		return base
+	}
+	if base == "" {
+		return dir
+	}
+	return filepath.ToSlash(filepath.Join(base, dir))
+}
+
+func commonPathDir(paths []string) string {
+	if len(paths) == 0 {
+		return "."
+	}
+	parts := strings.Split(strings.Trim(filepath.ToSlash(filepath.Dir(paths[0])), "/"), "/")
+	if len(parts) == 1 && parts[0] == "." {
+		parts = nil
+	}
+	for _, path := range paths[1:] {
+		current := strings.Split(strings.Trim(filepath.ToSlash(filepath.Dir(path)), "/"), "/")
+		if len(current) == 1 && current[0] == "." {
+			current = nil
+		}
+		limit := len(parts)
+		if len(current) < limit {
+			limit = len(current)
+		}
+		i := 0
+		for i < limit && parts[i] == current[i] {
+			i++
+		}
+		parts = parts[:i]
+	}
+	if len(parts) == 0 {
+		return "."
+	}
+	return strings.Join(parts, "/")
+}
+
+func copyMinimizerFiles(root, outDir string, paths []string) (int, error) {
+	copied := 0
+	for _, rel := range paths {
+		src := filepath.Join(filepath.FromSlash(root), filepath.FromSlash(rel))
+		info, err := os.Stat(src)
+		if err != nil {
+			return copied, err
+		}
+		if info.IsDir() {
+			return copied, fmt.Errorf("minimizer source path %q is a directory", rel)
+		}
+		dst := filepath.Join(outDir, filepath.FromSlash(rel))
+		if err := os.MkdirAll(filepath.Dir(dst), 0o755); err != nil {
+			return copied, err
+		}
+		data, err := os.ReadFile(src)
+		if err != nil {
+			return copied, err
+		}
+		if err := os.WriteFile(dst, data, 0o644); err != nil {
+			return copied, err
+		}
+		copied++
+	}
+	return copied, nil
+}
+
+func writeCorpusMinimizerReport(outDir string, report corpusMinimizerReport) error {
+	if err := os.MkdirAll(outDir, 0o755); err != nil {
+		return err
+	}
+	copy := report
+	copy.Markdown = ""
+	data, err := json.MarshalIndent(copy, "", "  ")
+	if err != nil {
+		return err
+	}
+	if err := os.WriteFile(filepath.Join(outDir, "minimizer.json"), append(data, '\n'), 0o644); err != nil {
+		return err
+	}
+	return os.WriteFile(filepath.Join(outDir, "minimizer.md"), []byte(report.Markdown), 0o644)
+}
+
+func corpusMinimizerHash(report corpusMinimizerReport) string {
+	copy := report
+	copy.Hash = ""
+	copy.Markdown = ""
+	return canonical.Hash(copy)
+}
+
+func renderCorpusMinimizerMarkdown(report corpusMinimizerReport) string {
+	var b strings.Builder
+	fmt.Fprintf(&b, "# Patchline corpus minimizer\n\n")
+	fmt.Fprintf(&b, "- analysis: `%s`\n", report.Analysis)
+	fmt.Fprintf(&b, "- source: `%s`\n", report.Source.Input)
+	fmt.Fprintf(&b, "- hash: `%s`\n\n", report.Hash)
+	fmt.Fprintf(&b, "## Summary\n\n| area | count |\n| --- | ---: |\n")
+	fmt.Fprintf(&b, "| risks | %d |\n", report.Summary.Risks)
+	fmt.Fprintf(&b, "| unique source files | %d |\n", report.Summary.UniqueSourceFiles)
+	fmt.Fprintf(&b, "| evidence links | %d |\n", report.Summary.EvidenceLinks)
+	fmt.Fprintf(&b, "| generated files | %d |\n", report.Summary.GeneratedFiles)
+	fmt.Fprintf(&b, "| copied files | %d |\n\n", report.Summary.CopiedFiles)
+	fmt.Fprintf(&b, "## Minimal public subpaths\n\n| finding | subpath | files | generated |\n| --- | --- | ---: | ---: |\n")
+	for _, entry := range report.Entries {
+		id := entry.StableID
+		if id == "" {
+			id = entry.RiskID
+		}
+		fmt.Fprintf(&b, "| `%s` | `%s` | %d | %d |\n", id, entry.PublicSubpath, len(entry.SourcePaths), len(entry.GeneratedFiles))
+	}
 	return b.String()
 }
 
@@ -7637,6 +7919,15 @@ func keys(values map[string]string) []string {
 	for key := range values {
 		out = append(out, key)
 	}
+	return out
+}
+
+func boolKeys(values map[string]bool) []string {
+	out := make([]string, 0, len(values))
+	for key := range values {
+		out = append(out, key)
+	}
+	sort.Strings(out)
 	return out
 }
 

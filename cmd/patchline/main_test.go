@@ -241,6 +241,51 @@ func TestBuildFindingExplainReportJoinsEvidenceAndProofHoles(t *testing.T) {
 	}
 }
 
+func TestBuildCorpusMinimizerReportCopiesPreservingSlice(t *testing.T) {
+	root := t.TempDir()
+	analysis := filepath.Join(root, "analysis")
+	sourceRoot := filepath.Join(analysis, "fetch", "repo", "db", "migrate")
+	writeMainTestFile(t, sourceRoot, "001_accounts.sql", "update accounts set active = true;\n")
+	writeMainTestFile(t, analysis, "fetch/source.json", `{
+  "version": "patchline.project/v1",
+  "mode": "github",
+  "input": "example/repo",
+  "owner": "example",
+  "repo": "repo",
+  "ref": "abc",
+  "subpath": "db/migrate",
+  "scanned_root": "`+filepath.ToSlash(sourceRoot)+`"
+}
+`)
+	writeMainTestFile(t, analysis, "baseline/baseline.json", `{
+  "version": "patchline.baseline/v1",
+  "risks": [{"id":"risk:top","stable_id":"stable-risk:top0000000000000","path":"001_accounts.sql","severity":"high","score":100}],
+  "evidence_links": [{"risk_id":"risk:top","fact_id":"fact:top","fact_kind":"sql","path":"001_accounts.sql","confidence":"high"}],
+  "hash": "baseline"
+}
+`)
+	writeMainTestFile(t, analysis, "proposal/proposal.json", `{
+  "version": "patchline.proposal/v1",
+  "generated_files": [{"path":"generated/guard.sql","content_hash":"sha256:guard","risk_ids":["risk:top"]}],
+  "hash": "proposal"
+}
+`)
+	out := filepath.Join(root, "minimized")
+	report, err := buildCorpusMinimizerReport(analysis, out)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if report.Summary.Risks != 1 || report.Summary.UniqueSourceFiles != 1 || report.Summary.EvidenceLinks != 1 || report.Summary.GeneratedFiles != 1 || report.Summary.CopiedFiles != 1 {
+		t.Fatalf("unexpected minimizer summary: %#v", report.Summary)
+	}
+	if report.Entries[0].PublicSubpath != "db/migrate" || len(report.Entries[0].GeneratedFiles) != 1 || report.Hash == "" || !strings.Contains(report.Markdown, "Minimal public subpaths") {
+		t.Fatalf("unexpected minimizer report: %#v", report)
+	}
+	if _, err := os.Stat(filepath.Join(out, "minimized-source", "001_accounts.sql")); err != nil {
+		t.Fatalf("expected copied minimized source: %v", err)
+	}
+}
+
 func writeAnalysisSnapshotForTest(t *testing.T, root, factID, stableID, generatedPath, generatedHash string, failures, passed int) {
 	t.Helper()
 	writeMainTestFile(t, root, "inventory/facts.jsonl", `{"id":"`+factID+`","kind":"sql","path":"db/migrate/001.sql"}`+"\n")
