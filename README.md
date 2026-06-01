@@ -120,6 +120,7 @@ To run the staged fetch -> inventory -> intake -> baseline path on real GitHub r
 ```bash
 make repo-demo
 make four-repo-demo
+make repo-slice-matrix
 ```
 
 The demo downloads real GitHub project subpaths and writes:
@@ -128,7 +129,11 @@ The demo downloads real GitHub project subpaths and writes:
 results/generated/plug-and-play-demo/summary.md
 results/generated/plug-and-play-demo/summary.json
 results/generated/plug-and-play-demo/cases/*/summary.sarif
+results/generated/real-repo-slice-matrix/slice-matrix.md
+results/generated/real-repo-slice-matrix/slice-matrix.json
 ```
+
+The real-repo slice matrix is backed by `examples/real-repo-slices.json` and reports each public slice by ecosystem, migration framework, repo size class, available evidence types, fetched commit, coverage counts, risks, generated artifacts, and cache proof.
 
 Current default projects:
 

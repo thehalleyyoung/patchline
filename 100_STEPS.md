@@ -112,7 +112,7 @@ Every addition to the repo should be judged by whether it makes that loop more a
 
 ## Stage 8: Evaluate novelty on real projects
 
-81. [ ] Maintain a public matrix of real repo slices by ecosystem, migration framework, repo size, and available evidence types.
+81. [x] Maintain a public matrix of real repo slices by ecosystem, migration framework, repo size, and available evidence types.
 82. [ ] For each slice, report inventory coverage, risks, linked candidates, time signals, generated artifacts, and before/after deltas.
 83. [ ] Compare against grep-only risk detection.
 84. [ ] Compare against SQL-only analysis without code/docs/evidence links.

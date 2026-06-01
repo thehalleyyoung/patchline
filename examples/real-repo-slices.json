@@ -1,0 +1,74 @@
+{
+  "version": "patchline.real-repo-slices/v1",
+  "slices": [
+    {
+      "id": "forem-rails-migrations",
+      "label": "Forem migrations",
+      "repo": "forem/forem",
+      "ref": "9c5509c3aeecd4a86a8950206fa937ebcbc2f8d1",
+      "subpath": "db/migrate",
+      "ecosystem": "Ruby on Rails",
+      "migration_framework": "Active Record migrations",
+      "repo_size_class": "large",
+      "available_evidence_types": [
+        "migration files",
+        "schema evolution",
+        "native commands",
+        "time signals",
+        "generated intervention checks"
+      ]
+    },
+    {
+      "id": "bytebase-go-migrator",
+      "label": "Bytebase migrations",
+      "repo": "bytebase/bytebase",
+      "ref": "0765652ea2dbdf8e93ae44bff5acafc1b97a92cc",
+      "subpath": "backend/migrator/migration",
+      "ecosystem": "Go",
+      "migration_framework": "Bytebase migrator SQL",
+      "repo_size_class": "large",
+      "available_evidence_types": [
+        "migration SQL",
+        "schema evolution",
+        "native commands",
+        "field evidence",
+        "generated intervention checks"
+      ]
+    },
+    {
+      "id": "mastodon-rails-migrations",
+      "label": "Mastodon migrations",
+      "repo": "mastodon/mastodon",
+      "ref": "facb552c9cdbe8a2ebff0b94ebf2c9e9ec385347",
+      "subpath": "db/migrate",
+      "ecosystem": "Ruby on Rails",
+      "migration_framework": "Active Record migrations",
+      "repo_size_class": "large",
+      "available_evidence_types": [
+        "migration files",
+        "schema evolution",
+        "native commands",
+        "time signals",
+        "repair-like files",
+        "generated intervention checks"
+      ]
+    },
+    {
+      "id": "lobsters-rails-migrations",
+      "label": "Lobsters migrations",
+      "repo": "lobsters/lobsters",
+      "ref": "3b80b47aa5aaba37ec44413e7d1dc96fcf1585b6",
+      "subpath": "db/migrate",
+      "ecosystem": "Ruby on Rails",
+      "migration_framework": "Active Record migrations",
+      "repo_size_class": "small",
+      "available_evidence_types": [
+        "migration files",
+        "schema evolution",
+        "native commands",
+        "time signals",
+        "generated intervention checks"
+      ]
+    }
+  ]
+}

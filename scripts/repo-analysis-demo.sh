@@ -6,6 +6,7 @@ cd "$ROOT"
 
 OUT="${1:-results/generated/repo-analysis-demo}"
 REPO="${PATCHLINE_REPO_DEMO_REPO:-django/django}"
+REF="${PATCHLINE_REPO_DEMO_REF:-}"
 SUBPATH="${PATCHLINE_REPO_DEMO_SUBPATH:-django/contrib/auth/migrations}"
 
 rm -rf "$OUT"
@@ -18,7 +19,11 @@ BASELINE_OUT="$OUT/baseline"
 PROPOSAL_OUT="$OUT/proposal"
 COMPARE_OUT="$OUT/compare"
 
-go run ./cmd/patchline repo fetch "$REPO" --subpath "$SUBPATH" --out "$FETCH_OUT" --json > "$OUT/fetch.json"
+fetch_cmd=(go run ./cmd/patchline repo fetch "$REPO" --subpath "$SUBPATH" --out "$FETCH_OUT" --json)
+if [[ -n "$REF" ]]; then
+  fetch_cmd+=(--ref "$REF")
+fi
+"${fetch_cmd[@]}" > "$OUT/fetch.json"
 SCAN_ROOT="$(jq -r '.source.scanned_root' "$OUT/fetch.json")"
 
 go run ./cmd/patchline repo inventory "$SCAN_ROOT" --out "$INVENTORY_OUT" --json > "$OUT/inventory.json"

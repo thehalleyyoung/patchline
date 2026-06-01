@@ -5,28 +5,38 @@ ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$ROOT"
 
 OUT="${1:-results/generated/four-repo-analysis-demo}"
-CASES="${PATCHLINE_FOUR_REPO_CASES:-Forem migrations|forem/forem|db/migrate
-Bytebase migrations|bytebase/bytebase|backend/migrator/migration
-Mastodon migrations|mastodon/mastodon|db/migrate
-Lobsters migrations|lobsters/lobsters|db/migrate}"
+if [[ -n "${PATCHLINE_FOUR_REPO_CASES:-}" ]]; then
+  CASES="$PATCHLINE_FOUR_REPO_CASES"
+else
+  CASES="$(jq -r '.slices[] | [.label, .repo, .ref, .subpath, .ecosystem, .migration_framework, .repo_size_class, (.available_evidence_types | join(","))] | @tsv' examples/real-repo-slices.json)"
+fi
 
 rm -rf "$OUT"
 mkdir -p "$OUT/cases"
 
 rows=()
-while IFS='|' read -r label repo subpath; do
+while IFS=$'\t|' read -r label repo ref subpath ecosystem migration_framework repo_size_class evidence_types; do
   [[ -z "${label// }" ]] && continue
+  if [[ -z "${subpath:-}" && -n "${ref:-}" && "$ref" != [0-9a-f][0-9a-f][0-9a-f][0-9a-f]* ]]; then
+    subpath="$ref"
+    ref=""
+  fi
+  ecosystem="${ecosystem:-unknown}"
+  migration_framework="${migration_framework:-unknown}"
+  repo_size_class="${repo_size_class:-unknown}"
+  evidence_types="${evidence_types:-unknown}"
   slug="$(printf '%s-%s' "$repo" "$subpath" | tr '/[:space:]' '--' | tr -cd '[:alnum:]_.-')"
   case_out="$OUT/cases/$slug"
 
   echo "==> $label ($repo:$subpath)"
   PATCHLINE_REPO_DEMO_REPO="$repo" \
+    PATCHLINE_REPO_DEMO_REF="$ref" \
     PATCHLINE_REPO_DEMO_SUBPATH="$subpath" \
     bash scripts/repo-analysis-demo.sh "$case_out"
   go run ./cmd/patchline repo propose --from-report "$case_out/baseline" --proposal-kind tests --budget files=1,lines=120,tokens=4000,changes=3 --llm-command cat --out "$case_out/llm-proposal" --json > "$case_out/llm-proposal.json"
   go run ./cmd/patchline repo compare --before "$case_out/baseline" --after "$case_out/llm-proposal" --out "$case_out/llm-compare" --json > "$case_out/llm-compare.json"
-  go run ./cmd/patchline repo fetch "$repo" --subpath "$subpath" --out "$case_out/cache-proof" --json > "$case_out/cache-proof.json"
-  go run ./cmd/patchline repo analyze --github "$repo" --subpath "$subpath" --stages inventory,baseline,propose,compare,deep --proposal-kind all --budget files=15,lines=120,tokens=50000,changes=3 --ci --redact --no-llm --out "$case_out/analyze" --json > "$case_out/analyze.json"
+  go run ./cmd/patchline repo fetch "$repo" --ref "$ref" --subpath "$subpath" --out "$case_out/cache-proof" --json > "$case_out/cache-proof.json"
+  go run ./cmd/patchline repo analyze --github "$repo" --ref "$ref" --subpath "$subpath" --stages inventory,baseline,propose,compare,deep --proposal-kind all --budget files=15,lines=120,tokens=50000,changes=3 --ci --redact --no-llm --out "$case_out/analyze" --json > "$case_out/analyze.json"
   jq -e '.input | startswith("[redacted:")' "$case_out/analyze/analysis-bundle/source.json" > /dev/null
   test -s "$case_out/analyze/ci/summary.md"
   grep -q "upload-sarif" "$case_out/analyze/ci/github-actions-upload.yml"
@@ -34,19 +44,24 @@ while IFS='|' read -r label repo subpath; do
   test -s "$case_out/analyze/commands.md"
   grep -q "repo analyze" "$case_out/analyze/commands.md"
   grep -q "repo compare" "$case_out/analyze/commands.md"
-  go run ./cmd/patchline repo analyze --github "$repo" --subpath "$subpath" --stages inventory,baseline,propose,compare,deep --proposal-kind all --budget files=15,lines=120,tokens=50000,changes=3 --ci --redact --no-llm --resume --out "$case_out/analyze" --json > "$case_out/analyze-resume.json"
+  go run ./cmd/patchline repo analyze --github "$repo" --ref "$ref" --subpath "$subpath" --stages inventory,baseline,propose,compare,deep --proposal-kind all --budget files=15,lines=120,tokens=50000,changes=3 --ci --redact --no-llm --resume --out "$case_out/analyze" --json > "$case_out/analyze-resume.json"
   bundle_files="$(find "$case_out/analyze/analysis-bundle" -maxdepth 1 -type f | wc -l | tr -d ' ')"
   for required in source.json facts.jsonl baseline.json proposal.patch compare.json summary.md summary.sarif; do
     test -s "$case_out/analyze/analysis-bundle/$required"
   done
-  go run ./cmd/patchline repo fetch "$repo" --subpath ".github/workflows" --out "$case_out/structured-fetch" --json > "$case_out/structured-fetch.json"
+  go run ./cmd/patchline repo fetch "$repo" --ref "$ref" --subpath ".github/workflows" --out "$case_out/structured-fetch" --json > "$case_out/structured-fetch.json"
   structured_root="$(jq -r '.source.scanned_root' "$case_out/structured-fetch.json")"
   go run ./cmd/patchline repo inventory "$structured_root" --out "$case_out/structured-inventory" --json > "$case_out/structured-inventory.json"
 
   jq \
     --arg label "$label" \
     --arg repo "$repo" \
+    --arg ref "$ref" \
     --arg subpath "$subpath" \
+    --arg ecosystem "$ecosystem" \
+    --arg migration_framework "$migration_framework" \
+    --arg repo_size_class "$repo_size_class" \
+    --arg evidence_types "$evidence_types" \
     --argjson bundle_files "$bundle_files" \
     --slurpfile llm "$case_out/llm-proposal.json" \
     --slurpfile llmcompare "$case_out/llm-compare.json" \
@@ -54,7 +69,7 @@ while IFS='|' read -r label repo subpath; do
     --slurpfile analyze "$case_out/analyze.json" \
     --slurpfile resume "$case_out/analyze-resume.json" \
     --slurpfile structured "$case_out/structured-inventory.json" \
-    '. + {label: $label, repo: $repo, subpath: $subpath, case_dir: "'"$case_out"'", llm_command_proof: {generator: $llm[0].generator, deterministic_only: $llm[0].deterministic_only, scope_budget: ($llm[0].scope_budget.raw // ""), generated_files: ($llm[0].generated_files | length), intervention_loops: $llmcompare[0].summary.intervention_loops, checks_failed: $llmcompare[0].summary.patchline_checks_failed}, cache_proof: {hit: $cache[0].source.cache_hit, archive_hash: $cache[0].source.archive_hash, resolved_commit: $cache[0].source.resolved_commit}, analyze_proof: {stages: $analyze[0].stages, ci: $analyze[0].ci, commands: ($analyze[0].commands_path // ""), ci_summary: ($analyze[0].ci_artifacts.summary_path // ""), ci_sarif: ($analyze[0].ci_artifacts.sarif_path // ""), redact: $analyze[0].redact, scope_budget: ($analyze[0].summary.scope_budget // ""), ranked_risks: $analyze[0].summary.ranked_risks, generated_files: $analyze[0].summary.generated_files, intervention_loops: $analyze[0].summary.intervention_loops, bundle_files: $bundle_files, hash: $analyze[0].hash}, resume_proof: {resume: $resume[0].resume, reused_stages: ($resume[0].reused_stages | length), ranked_risks: $resume[0].summary.ranked_risks, generated_files: $resume[0].summary.generated_files, intervention_loops: $resume[0].summary.intervention_loops}, structured_proof: {files: $structured[0].files_scanned, field_evidence: ($structured[0].summary_by_category.field_evidence // 0)}}' \
+    '. + {label: $label, repo: $repo, ref: $ref, subpath: $subpath, ecosystem: $ecosystem, migration_framework: $migration_framework, repo_size_class: $repo_size_class, available_evidence_types: ($evidence_types | split(",") | map(select(length > 0))), case_dir: "'"$case_out"'", llm_command_proof: {generator: $llm[0].generator, deterministic_only: $llm[0].deterministic_only, scope_budget: ($llm[0].scope_budget.raw // ""), generated_files: ($llm[0].generated_files | length), intervention_loops: $llmcompare[0].summary.intervention_loops, checks_failed: $llmcompare[0].summary.patchline_checks_failed}, cache_proof: {hit: $cache[0].source.cache_hit, archive_hash: $cache[0].source.archive_hash, resolved_commit: $cache[0].source.resolved_commit}, analyze_proof: {stages: $analyze[0].stages, ci: $analyze[0].ci, commands: ($analyze[0].commands_path // ""), ci_summary: ($analyze[0].ci_artifacts.summary_path // ""), ci_sarif: ($analyze[0].ci_artifacts.sarif_path // ""), redact: $analyze[0].redact, scope_budget: ($analyze[0].summary.scope_budget // ""), ranked_risks: $analyze[0].summary.ranked_risks, generated_files: $analyze[0].summary.generated_files, intervention_loops: $analyze[0].summary.intervention_loops, bundle_files: $bundle_files, hash: $analyze[0].hash}, resume_proof: {resume: $resume[0].resume, reused_stages: ($resume[0].reused_stages | length), ranked_risks: $resume[0].summary.ranked_risks, generated_files: $resume[0].summary.generated_files, intervention_loops: $resume[0].summary.intervention_loops}, structured_proof: {files: $structured[0].files_scanned, field_evidence: ($structured[0].summary_by_category.field_evidence // 0)}}' \
     "$case_out/summary.json" > "$case_out/row.json"
   rows+=("$case_out/row.json")
 done <<< "$CASES"
@@ -63,8 +78,34 @@ jq -s '{version:"patchline.four-repo-demo/v1", cases: .}' "${rows[@]}" > "$OUT/s
 
 jq -e '
   (.cases | length) >= 4 and
-  all(.cases[]; .source.owner != null and .source.repo != null and (.source.resolved_commit | test("^[0-9a-f]{40}$")) and (.source.archive_hash | startswith("sha256:")) and (.source.fetched_at | length > 0) and .inventory.files > 0 and .inventory.facts >= .inventory.files and .inventory.schema_evolution > 0 and .inventory.native_commands > 0 and .structured_proof.files > 0 and .structured_proof.field_evidence > 0 and .baseline.risks > 0 and .baseline.code_path_risks > 0 and .baseline.ranking_explanations > 0 and .baseline.provenance_slices > 0 and .baseline.datalog_rows > 0 and .baseline.abstract_effects > 0 and .baseline.symbolic_checks > 0 and .baseline.temporal_windows > 0 and .baseline.recurrences > 0 and .baseline.policy_checks > 0 and .baseline.repair_proof_summaries > 0 and .proposal.files > 0 and .compare.intervention_loops > 0 and .compare.checks_failed == 0 and (.compare.native_checks_failed // 0) == 0 and .llm_command_proof.generator == "llm-command" and .llm_command_proof.deterministic_only == false and .llm_command_proof.scope_budget != "" and .llm_command_proof.generated_files > 0 and .llm_command_proof.intervention_loops > 0 and .llm_command_proof.checks_failed == 0 and .analyze_proof.ci == true and .analyze_proof.commands != "" and .analyze_proof.ci_summary != "" and .analyze_proof.ci_sarif != "" and .analyze_proof.redact == true and .analyze_proof.scope_budget != "" and .analyze_proof.bundle_files >= 7 and .analyze_proof.ranked_risks > 0 and .analyze_proof.generated_files > 0 and .analyze_proof.intervention_loops > 0 and (.analyze_proof.stages | index("deep")) and .resume_proof.resume == true and .resume_proof.reused_stages >= 5 and .resume_proof.ranked_risks == .analyze_proof.ranked_risks and .resume_proof.generated_files == .analyze_proof.generated_files and .resume_proof.intervention_loops == .analyze_proof.intervention_loops and .cache_proof.hit == true and (.cache_proof.resolved_commit | test("^[0-9a-f]{40}$")))
+  all(.cases[]; .ecosystem != "unknown" and .migration_framework != "unknown" and .repo_size_class != "unknown" and (.available_evidence_types | length) > 0 and .source.owner != null and .source.repo != null and (.source.resolved_commit | test("^[0-9a-f]{40}$")) and (.source.archive_hash | startswith("sha256:")) and (.source.fetched_at | length > 0) and .inventory.files > 0 and .inventory.facts >= .inventory.files and .inventory.schema_evolution > 0 and .inventory.native_commands > 0 and .structured_proof.files > 0 and .structured_proof.field_evidence > 0 and .baseline.risks > 0 and .baseline.code_path_risks > 0 and .baseline.ranking_explanations > 0 and .baseline.provenance_slices > 0 and .baseline.datalog_rows > 0 and .baseline.abstract_effects > 0 and .baseline.symbolic_checks > 0 and .baseline.temporal_windows > 0 and .baseline.recurrences > 0 and .baseline.policy_checks > 0 and .baseline.repair_proof_summaries > 0 and .proposal.files > 0 and .compare.intervention_loops > 0 and .compare.checks_failed == 0 and (.compare.native_checks_failed // 0) == 0 and .llm_command_proof.generator == "llm-command" and .llm_command_proof.deterministic_only == false and .llm_command_proof.scope_budget != "" and .llm_command_proof.generated_files > 0 and .llm_command_proof.intervention_loops > 0 and .llm_command_proof.checks_failed == 0 and .analyze_proof.ci == true and .analyze_proof.commands != "" and .analyze_proof.ci_summary != "" and .analyze_proof.ci_sarif != "" and .analyze_proof.redact == true and .analyze_proof.scope_budget != "" and .analyze_proof.bundle_files >= 7 and .analyze_proof.ranked_risks > 0 and .analyze_proof.generated_files > 0 and .analyze_proof.intervention_loops > 0 and (.analyze_proof.stages | index("deep")) and .resume_proof.resume == true and .resume_proof.reused_stages >= 5 and .resume_proof.ranked_risks == .analyze_proof.ranked_risks and .resume_proof.generated_files == .analyze_proof.generated_files and .resume_proof.intervention_loops == .analyze_proof.intervention_loops and .cache_proof.hit == true and (.cache_proof.resolved_commit | test("^[0-9a-f]{40}$")))
 ' "$OUT/summary.json" > /dev/null
+
+jq '{
+  version: "patchline.real-repo-slice-matrix/v1",
+  generated_from: "real public repository analysis",
+  slices: [.cases[] | {
+    label,
+    repo,
+    ref,
+    subpath,
+    ecosystem,
+    migration_framework,
+    repo_size_class,
+    available_evidence_types,
+    resolved_commit: .source.resolved_commit,
+    archive_hash: .source.archive_hash,
+    files_scanned: .inventory.files,
+    facts: .inventory.facts,
+    schema_evolution: .inventory.schema_evolution,
+    native_commands: .inventory.native_commands,
+    high_risk_sql: .intake.high_risk,
+    ranked_risks: .baseline.risks,
+    generated_artifacts: .proposal.files,
+    intervention_loops: .compare.intervention_loops,
+    cache_hit: .cache_proof.hit
+  }]
+}' "$OUT/summary.json" > "$OUT/slice-matrix.json"
 
 {
   echo "# Patchline four-repo analysis demo"
@@ -78,4 +119,15 @@ jq -e '
   echo 'Each case directory contains fetch metadata, inventory outputs, `facts.jsonl`, `project-map.md`, intake outputs, baseline JSON/Markdown/SARIF, isolated proposal artifacts, and compare reports.'
 } > "$OUT/summary.md"
 
+{
+  echo "# Real repo slice matrix"
+  echo
+  echo "This matrix is generated from public repository slices that were fetched and analyzed by Patchline."
+  echo
+  echo "| Project slice | Ecosystem | Migration framework | Size class | Evidence types | Commit | Files | Facts | Risks | Generated artifacts | Cache hit |"
+  echo "| --- | --- | --- | --- | --- | --- | ---: | ---: | ---: | ---: | --- |"
+  jq -r '.slices[] | "| \(.label) (`\(.repo):\(.subpath)`) | \(.ecosystem) | \(.migration_framework) | \(.repo_size_class) | \(.available_evidence_types | join(", ")) | `\(.resolved_commit[0:12])` | \(.files_scanned) | \(.facts) | \(.ranked_risks) | \(.generated_artifacts) | \(.cache_hit) |"' "$OUT/slice-matrix.json"
+} > "$OUT/slice-matrix.md"
+
 echo "four-repo analysis summary: $OUT/summary.md"
+echo "real repo slice matrix: $OUT/slice-matrix.md"
