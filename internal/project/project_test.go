@@ -258,6 +258,47 @@ incident-42 PR-77 2025-01-02T03:04:05Z 0123456789abcdef0123456789abcdef01234567
 	}
 }
 
+func TestInventoryInfersSchemaEvolutionFromMigrationsAndORM(t *testing.T) {
+	root := t.TempDir()
+	writeFile(t, root, "db/migrate/001.sql", "CREATE TABLE accounts (id int, email text); ALTER TABLE accounts ADD COLUMN status text;")
+	writeFile(t, root, "app/migrations/0002_user.py", `from django.db import migrations
+class Migration(migrations.Migration):
+    operations = [
+        migrations.CreateModel(name='Profile', fields=[('id', models.BigAutoField(primary_key=True))]),
+        migrations.AddField(model_name='Profile', name='display_name', field=models.CharField(max_length=100)),
+    ]`)
+	writeFile(t, root, "prisma/schema.prisma", `model Invoice {
+  id Int @id
+  total Decimal
+}`)
+
+	inv, err := InventoryPath(InventoryOptions{Path: root})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(inv.SchemaEvolution) == 0 {
+		t.Fatalf("expected schema evolution findings: %#v", inv)
+	}
+	var sawSQLColumn, sawDjangoField, sawPrismaField bool
+	for _, fact := range inv.Facts {
+		if fact.Kind != "schema_evolution" {
+			continue
+		}
+		if fact.Properties["source"] == "sql" && fact.Properties["table"] == "accounts" && fact.Properties["column"] == "status" {
+			sawSQLColumn = true
+		}
+		if fact.Properties["source"] == "django-migration" && fact.Properties["table"] == "profile" && fact.Properties["column"] == "display_name" {
+			sawDjangoField = true
+		}
+		if fact.Properties["source"] == "prisma-schema" && fact.Properties["table"] == "invoice" && fact.Properties["column"] == "total" {
+			sawPrismaField = true
+		}
+	}
+	if !sawSQLColumn || !sawDjangoField || !sawPrismaField {
+		t.Fatalf("missing schema facts sql=%v django=%v prisma=%v facts=%#v", sawSQLColumn, sawDjangoField, sawPrismaField, inv.Facts)
+	}
+}
+
 func TestInventoryTreatsMigrationsRootAsMigrationEvidence(t *testing.T) {
 	root := filepath.Join(t.TempDir(), "django", "contrib", "auth", "migrations")
 	writeFile(t, root, "0001_initial.py", "class Migration: pass")

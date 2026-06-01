@@ -24,6 +24,7 @@ import (
 	"unicode/utf8"
 
 	"github.com/thehalleyyoung/patchline/internal/canonical"
+	"github.com/thehalleyyoung/patchline/internal/migration"
 )
 
 const Version = "patchline.project/v1"
@@ -80,6 +81,7 @@ type Inventory struct {
 	DeployConfig      []Finding      `json:"deploy_config,omitempty"`
 	TestCommands      []Command      `json:"test_commands,omitempty"`
 	SourceSQLHints    []Finding      `json:"source_sql_hints,omitempty"`
+	SchemaEvolution   []Finding      `json:"schema_evolution,omitempty"`
 	OperationalDocs   []Finding      `json:"operational_docs,omitempty"`
 	EvidenceExports   []Finding      `json:"evidence_exports,omitempty"`
 	NextCommands      []Command      `json:"next_commands,omitempty"`
@@ -957,6 +959,12 @@ var (
 	identifierReportPattern = regexp.MustCompile(`(?i)\b(?:report|dashboard)\s*[:=]\s*["']?([A-Za-z0-9_.:/-]{3,})|([A-Za-z0-9_.-]*report[A-Za-z0-9_.-]*)`)
 	identifierDeployPattern = regexp.MustCompile(`(?i)\b(?:deploy(?:ment)?|release|build)\s*[:=#-]\s*["']?([A-Za-z0-9][A-Za-z0-9_.-]{2,})`)
 	identifierErrorPattern  = regexp.MustCompile(`(?i)\b([A-Za-z][A-Za-z0-9_]*(?:Error|Exception))\b|\b(?:error|exception|panic)\s*[:=]\s*["']?([A-Za-z_][A-Za-z0-9_.:-]+)`)
+
+	djangoCreateModelPattern = regexp.MustCompile(`(?is)migrations\.CreateModel\(\s*name\s*=\s*['"]([A-Za-z_][A-Za-z0-9_]*)['"]`)
+	djangoAddFieldPattern    = regexp.MustCompile(`(?is)migrations\.AddField\([^)]*model_name\s*=\s*['"]([A-Za-z_][A-Za-z0-9_]*)['"][^)]*name\s*=\s*['"]([A-Za-z_][A-Za-z0-9_]*)['"]`)
+	railsCreateTablePattern  = regexp.MustCompile(`(?i)\bcreate_table\s+[:'"]([A-Za-z_][A-Za-z0-9_]*)`)
+	railsAddColumnPattern    = regexp.MustCompile(`(?i)\badd_column\s+[:'"]([A-Za-z_][A-Za-z0-9_]*)['"]?\s*,\s*[:'"]([A-Za-z_][A-Za-z0-9_]*)`)
+	prismaModelPattern       = regexp.MustCompile(`(?s)\bmodel\s+([A-Za-z_][A-Za-z0-9_]*)\s*\{([^}]*)\}`)
 )
 
 func (inv *Inventory) addFileFact(file scanFile, language string) {
@@ -986,6 +994,9 @@ func (inv *Inventory) addFileFact(file scanFile, language string) {
 		Identifiers: identifiersFromText(text),
 		Properties:  props,
 	})
+	if prefix != "" {
+		inv.inferSchemaEvolution(file, prefix, language)
+	}
 }
 
 func (inv *Inventory) addFindingFact(category string, finding Finding) {
@@ -998,6 +1009,107 @@ func (inv *Inventory) addFindingFact(category string, finding Finding) {
 		Identifiers: identifiersFromText(finding.Path + "\n" + finding.Kind),
 		Properties:  map[string]string{"kind": finding.Kind},
 	})
+}
+
+func (inv *Inventory) inferSchemaEvolution(file scanFile, text, language string) {
+	lower := strings.ToLower(file.Rel)
+	if strings.HasSuffix(lower, ".sql") || strings.HasSuffix(lower, ".psql") || strings.HasSuffix(lower, ".ddl") {
+		report, err := migration.AnalyzeMigrationSemantics(file.Rel, []byte(text), migration.DialectGeneric, migration.SchemaState{Version: migration.SchemaVersion})
+		if err == nil {
+			for _, transformation := range report.Transformations {
+				inv.addSchemaEvolutionFact(file.Rel, "sql", transformation.Kind, transformation.Table, schemaColumnName(transformation.Column), schemaColumnType(transformation.Column), fmt.Sprintf("%d", transformation.Index))
+			}
+		}
+	}
+	switch language {
+	case "Python":
+		for _, match := range djangoCreateModelPattern.FindAllStringSubmatch(text, -1) {
+			inv.addSchemaEvolutionFact(file.Rel, "django-migration", "create_model", match[1], "", "", "")
+		}
+		for _, match := range djangoAddFieldPattern.FindAllStringSubmatch(text, -1) {
+			inv.addSchemaEvolutionFact(file.Rel, "django-migration", "add_field", match[1], match[2], "", "")
+		}
+	case "Ruby":
+		for _, match := range railsCreateTablePattern.FindAllStringSubmatch(text, -1) {
+			inv.addSchemaEvolutionFact(file.Rel, "rails-migration", "create_table", match[1], "", "", "")
+		}
+		for _, match := range railsAddColumnPattern.FindAllStringSubmatch(text, -1) {
+			inv.addSchemaEvolutionFact(file.Rel, "rails-migration", "add_column", match[1], match[2], "", "")
+		}
+	case "Prisma", "JavaScript", "TypeScript":
+		for _, match := range prismaModelPattern.FindAllStringSubmatch(text, -1) {
+			table := match[1]
+			inv.addSchemaEvolutionFact(file.Rel, "prisma-schema", "model", table, "", "", "")
+			for _, column := range prismaModelColumns(match[2]) {
+				inv.addSchemaEvolutionFact(file.Rel, "prisma-schema", "field", table, column.Name, column.Type, "")
+			}
+		}
+	}
+}
+
+func (inv *Inventory) addSchemaEvolutionFact(path, source, operation, table, column, columnType, index string) {
+	table = normalizeProjectIdentifierValue("table", table)
+	column = normalizeProjectIdentifierValue("column", column)
+	if operation == "" || (table == "" && column == "") {
+		return
+	}
+	findingKind := source + ":" + operation
+	inv.SchemaEvolution = append(inv.SchemaEvolution, Finding{Kind: findingKind, Path: path, Confidence: "derived", Rationale: "schema evolution inferred from project-native migration or ORM declaration"})
+	props := map[string]string{"source": source, "operation": operation}
+	var ids []Identifier
+	if table != "" {
+		props["table"] = table
+		ids = append(ids, Identifier{Kind: "table", Value: table}, Identifier{Kind: "model", Value: table})
+	}
+	if column != "" {
+		props["column"] = column
+		ids = append(ids, Identifier{Kind: "column", Value: column})
+	}
+	if columnType != "" {
+		props["column_type"] = columnType
+	}
+	if index != "" {
+		props["statement_index"] = index
+	}
+	inv.addFact(Fact{
+		Version:     Version,
+		Kind:        "schema_evolution",
+		Path:        path,
+		Confidence:  "derived",
+		Rationale:   "schema evolution inferred without requiring a pre-authored Patchline schema",
+		Identifiers: ids,
+		Properties:  props,
+	})
+}
+
+func schemaColumnName(column *migration.SchemaColumn) string {
+	if column == nil {
+		return ""
+	}
+	return column.Name
+}
+
+func schemaColumnType(column *migration.SchemaColumn) string {
+	if column == nil {
+		return ""
+	}
+	return column.Type
+}
+
+func prismaModelColumns(body string) []migration.SchemaColumn {
+	var columns []migration.SchemaColumn
+	for _, line := range strings.Split(body, "\n") {
+		fields := strings.Fields(strings.TrimSpace(line))
+		if len(fields) < 2 || strings.HasPrefix(fields[0], "//") || strings.HasPrefix(fields[0], "@") {
+			continue
+		}
+		name := normalizeProjectIdentifierValue("column", fields[0])
+		if name == "" {
+			continue
+		}
+		columns = append(columns, migration.SchemaColumn{Name: name, Type: strings.ToLower(fields[1])})
+	}
+	return columns
 }
 
 func (inv *Inventory) addCommandFact(kind string, command Command) {
@@ -1089,7 +1201,7 @@ func normalizeProjectIdentifierValue(kind, value string) string {
 		if !strings.HasPrefix(value, "/") {
 			return ""
 		}
-	case "column", "model", "queue", "job", "report", "deploy", "error":
+	case "table", "column", "model", "queue", "job", "report", "deploy", "error":
 		if isSQLIdentifierStopword(value) {
 			return ""
 		}
@@ -1174,6 +1286,7 @@ func (inv *Inventory) finalize() {
 	inv.CI = uniqueFindings(inv.CI)
 	inv.DeployConfig = uniqueFindings(inv.DeployConfig)
 	inv.SourceSQLHints = capFindings(uniqueFindings(inv.SourceSQLHints), 50)
+	inv.SchemaEvolution = capFindings(uniqueFindings(inv.SchemaEvolution), 50)
 	inv.OperationalDocs = capFindings(uniqueFindings(inv.OperationalDocs), 50)
 	inv.EvidenceExports = capFindings(uniqueFindings(inv.EvidenceExports), 50)
 	inv.TestCommands = uniqueCommands(inv.TestCommands)
@@ -1203,6 +1316,7 @@ func (inv *Inventory) finalize() {
 		"frameworks":        len(inv.Frameworks),
 		"migration_roots":   len(inv.MigrationRoots),
 		"migration_systems": len(inv.MigrationSystems),
+		"schema_evolution":  len(inv.SchemaEvolution),
 		"operational_docs":  len(inv.OperationalDocs),
 		"source_sql_hints":  len(inv.SourceSQLHints),
 	}
@@ -1237,6 +1351,7 @@ func renderMarkdown(inv Inventory) string {
 	writeFindings("Frameworks", inv.Frameworks)
 	writeFindings("Migration systems", inv.MigrationSystems)
 	writeFindings("Migration roots", inv.MigrationRoots)
+	writeFindings("Schema evolution", inv.SchemaEvolution)
 	writeFindings("CI", inv.CI)
 	writeFindings("Deploy config", inv.DeployConfig)
 	writeFindings("Operational docs", inv.OperationalDocs)
@@ -1260,6 +1375,7 @@ func renderProjectMap(inv Inventory) string {
 	fmt.Fprintf(&b, "| languages | %d |\n", len(inv.Languages))
 	fmt.Fprintf(&b, "| migration roots | %d |\n", len(inv.MigrationRoots))
 	fmt.Fprintf(&b, "| migration systems | %d |\n", len(inv.MigrationSystems))
+	fmt.Fprintf(&b, "| schema evolution | %d |\n", len(inv.SchemaEvolution))
 	fmt.Fprintf(&b, "| source SQL hints | %d |\n", len(inv.SourceSQLHints))
 	fmt.Fprintf(&b, "| operational docs | %d |\n", len(inv.OperationalDocs))
 	fmt.Fprintf(&b, "| evidence exports | %d |\n\n", len(inv.EvidenceExports))
@@ -1275,6 +1391,7 @@ func renderProjectMap(inv Inventory) string {
 	}
 	writePaths("Migration roots", inv.MigrationRoots)
 	writePaths("Migration systems", inv.MigrationSystems)
+	writePaths("Schema evolution", inv.SchemaEvolution)
 	writePaths("Source SQL candidates", inv.SourceSQLHints)
 	writePaths("Operational docs", inv.OperationalDocs)
 	writePaths("Evidence exports", inv.EvidenceExports)
@@ -1301,6 +1418,8 @@ func languageFor(path string) string {
 		return "JavaScript"
 	case ".ts", ".tsx":
 		return "TypeScript"
+	case ".prisma":
+		return "Prisma"
 	case ".java":
 		return "Java"
 	case ".cs":
