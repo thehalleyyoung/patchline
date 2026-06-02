@@ -179,6 +179,8 @@ Run `make comparison-pages-gate` to regenerate comparison pages against code sca
 
 Run `make roadmap-board-gate` to regenerate the public roadmap board where every planned feature links to a real-repo failure mode, proof gate, and expected artifact; see [docs/roadmap-board.md](docs/roadmap-board.md).
 
+Run `make reproducibility-report-gate` to regenerate monthly reproducibility reports that rerun public gates and publish cache status, failures, fixes, and benchmark trends; see [docs/reproducibility-reports.md](docs/reproducibility-reports.md).
+
 Add `--redact` to write `analysis-bundle/` copies with stable redaction tokens for identifiers, literals, customer-like strings, and secret-like values while preserving joins and existing artifact hashes.
 
 Add `--ci` to write `ci/summary.md` plus upload snippets and code-quality artifacts for GitHub Actions, GitLab CI, and Bitbucket Pipelines: SARIF under `analysis-bundle/summary.sarif`, GitLab `ci/gl-code-quality-report.json`, and Bitbucket `ci/bitbucket-code-insights.json`.

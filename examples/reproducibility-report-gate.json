@@ -1,0 +1,49 @@
+{
+  "version": "patchline.reproducibility-report-gate/v1",
+  "claim": "Patchline publishes monthly reproducibility reports that rerun public proof gates, summarize cache status, record failures and fixes, and show benchmark trends against prior public-code runs.",
+  "report_month": "2026-06",
+  "minimum_gates": 3,
+  "minimum_public_repos": 2,
+  "required_sections": [
+    "cache status",
+    "failures",
+    "fixes",
+    "benchmark trends",
+    "public gates"
+  ],
+  "gates": [
+    {
+      "id": "landing-readme",
+      "target": "make landing-readme-gate",
+      "script": "scripts/landing-readme-gate.sh",
+      "spec": "examples/landing-readme-gate.json",
+      "summary": "summary.json",
+      "public_repos": ["lobsters/lobsters"],
+      "trend_metric": "ranked_risks",
+      "previous_value": 328,
+      "expected_fix": "Update README demo numbers, screenshot text, or pinned public-code ref if the regenerated landing demo changes intentionally."
+    },
+    {
+      "id": "comparison-pages",
+      "target": "make comparison-pages-gate",
+      "script": "scripts/comparison-pages-gate.sh",
+      "spec": "examples/comparison-pages-gate.json",
+      "summary": "gate-summary.json",
+      "public_repos": ["lobsters/lobsters", "grafana/grafana"],
+      "trend_metric": "ranked_risks",
+      "previous_value": 733,
+      "expected_fix": "Refresh generated comparison evidence and page wording when public-code risk totals or CI artifacts change intentionally."
+    },
+    {
+      "id": "roadmap-board",
+      "target": "make roadmap-board-gate",
+      "script": "scripts/roadmap-board-gate.sh",
+      "spec": "examples/roadmap-board-gate.json",
+      "summary": "gate-summary.json",
+      "public_repos": ["lobsters/lobsters", "forem/forem", "grafana/grafana", "django/django"],
+      "trend_metric": "occurrences",
+      "previous_value": 2917,
+      "expected_fix": "Refresh roadmap cards when regenerated failure taxonomy changes feature-to-failure-mode links."
+    }
+  ]
+}
