@@ -1,0 +1,16 @@
+{
+  "version": "patchline.failure-injection-suite-gate/v1",
+  "claim": "Patchline includes a failure-injection suite proving artifact checks fail loudly when public refs, cached archives, or generated evidence drift from the expected public-code artifacts.",
+  "minimum_probes": 3,
+  "required_probe_kinds": ["ref-drift", "cache-drift", "generated-evidence-drift"],
+  "minimum_public_repos": 4,
+  "independent_replication_spec": "examples/independent-replication-gate.json",
+  "required_outputs": [
+    "failure-injection-results.json",
+    "failure-injection-results.md",
+    "probes/ref-drift.log",
+    "probes/cache-drift.log",
+    "probes/generated-evidence-drift.log",
+    "evidence/independent-replication/independent-replication.json"
+  ]
+}
