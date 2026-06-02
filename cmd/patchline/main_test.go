@@ -361,6 +361,36 @@ func TestRepoRejectedGeneratedExamplesExplainPlausibleRejectedCode(t *testing.T)
 	}
 }
 
+func TestRepoReviewabilityExamplesDoNotClaimFullRepair(t *testing.T) {
+	root := t.TempDir()
+	writeMainTestFile(t, root, "db/migrate/001_update_accounts.sql", "UPDATE accounts SET status = 'active';\n")
+	outAnalysis := filepath.Join(t.TempDir(), "analysis")
+	if err := run([]string{"repo", "analyze", root, "--stages", "inventory,baseline,propose,compare", "--proposal-kind", "all", "--budget", "files=10,lines=100,tokens=8000,changes=2", "--no-llm", "--out", outAnalysis, "--json"}); err != nil {
+		t.Fatalf("analysis failed: %v", err)
+	}
+	out := filepath.Join(t.TempDir(), "reviewability")
+	if err := run([]string{"repo", "reviewability-examples", "--analyses", outAnalysis, "--out", out, "--json"}); err != nil {
+		t.Fatalf("reviewability examples failed: %v", err)
+	}
+	var report repoReviewabilityExamplesReport
+	readMainTestJSON(t, filepath.Join(out, "reviewability-examples.json"), &report)
+	if report.Version != "patchline.repo-reviewability-examples/v1" || report.Summary.Examples == 0 || report.Summary.TestExamples == 0 || report.Summary.GuardExamples == 0 || report.Summary.NoFullRepairClaims != report.Summary.Examples || report.Hash == "" {
+		t.Fatalf("unexpected reviewability report: %#v", report)
+	}
+	for _, example := range report.Examples {
+		if example.ReviewabilityGain == "" || !strings.Contains(example.NonRepairClaim, "does not claim to repair") || example.DeterministicOutcome == "" || example.MaintainerAction == "" || len(example.ContentExcerpt) == 0 || len(example.ProofHoles) == 0 {
+			t.Fatalf("example missing reviewability/non-repair fields: %#v", example)
+		}
+	}
+	markdown, err := os.ReadFile(filepath.Join(out, "reviewability-examples.md"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(string(markdown), "generated reviewability examples") || !strings.Contains(string(markdown), "non-repair claim") || !strings.Contains(string(markdown), "proof holes preserved") {
+		t.Fatalf("expected reviewability markdown, got:\n%s", string(markdown))
+	}
+}
+
 func TestGoldenFixtureGenerateCommand(t *testing.T) {
 	root := t.TempDir()
 	writeMainTestFile(t, root, "db/migrate/001_delete_events.sql", "DELETE FROM account_events;\n")

@@ -115,6 +115,8 @@ Run `make cross-file-examples-gate` to generate side-by-side examples where Patc
 
 Run `make rejected-generated-gate` to show plausible generated-code diffs being rejected by deterministic re-analysis before they can be trusted; see [docs/rejected-generated-examples.md](docs/rejected-generated-examples.md).
 
+Run `make reviewability-examples-gate` to show generated tests and guards improving reviewability while preserving proof holes and avoiding full-repair claims; see [docs/reviewability-examples.md](docs/reviewability-examples.md).
+
 Add `--redact` to write `analysis-bundle/` copies with stable redaction tokens for identifiers, literals, customer-like strings, and secret-like values while preserving joins and existing artifact hashes.
 
 Add `--ci` to write `ci/summary.md` plus upload snippets and code-quality artifacts for GitHub Actions, GitLab CI, and Bitbucket Pipelines: SARIF under `analysis-bundle/summary.sarif`, GitLab `ci/gl-code-quality-report.json`, and Bitbucket `ci/bitbucket-code-insights.json`.

@@ -458,6 +458,7 @@ Usage:
   patchline repo qualitative-notes --analyses analysis-dir[,analysis-dir...] [--out dir] [--json]
   patchline repo cross-file-examples --analyses analysis-dir[,analysis-dir...] [--out dir] [--json]
   patchline repo rejected-generated --analyses analysis-dir[,analysis-dir...] [--out dir] [--json]
+  patchline repo reviewability-examples --analyses analysis-dir[,analysis-dir...] [--out dir] [--json]
   patchline intake <path> [--out results/generated/intake] [--json]
   patchline intake --github owner/repo [--ref ref] [--subpath path] [--out results/generated/intake] [--json]
   patchline semantics-contract [--json]
@@ -600,6 +601,8 @@ func repoCommand(args []string) error {
 		return repoCrossFileExamples(args[1:])
 	case "rejected-generated":
 		return repoRejectedGenerated(args[1:])
+	case "reviewability-examples":
+		return repoReviewabilityExamples(args[1:])
 	default:
 		return fmt.Errorf("unknown repo subcommand %q", args[0])
 	}
@@ -927,6 +930,44 @@ type repoRejectedGeneratedExample struct {
 	ContentExcerpt         []string `json:"content_excerpt"`
 	RequiredNextActions    []string `json:"required_next_actions"`
 	MaintainerAction       string   `json:"maintainer_action"`
+}
+
+type repoReviewabilityExamplesReport struct {
+	Version  string                     `json:"version"`
+	Summary  repoReviewabilitySummary   `json:"summary"`
+	Examples []repoReviewabilityExample `json:"examples"`
+	Corpus   []repoTaxonomyRepo         `json:"corpus"`
+	Hash     string                     `json:"hash"`
+	Markdown string                     `json:"markdown,omitempty"`
+}
+
+type repoReviewabilitySummary struct {
+	Analyses                  int `json:"analyses"`
+	PublicRepos               int `json:"public_repos"`
+	Examples                  int `json:"examples"`
+	TestExamples              int `json:"test_examples"`
+	GuardExamples             int `json:"guard_examples"`
+	AcceptedForReview         int `json:"accepted_for_review"`
+	ProofHolesListed          int `json:"proof_holes_listed"`
+	NoFullRepairClaims        int `json:"no_full_repair_claims"`
+	DeterministicChecksPassed int `json:"deterministic_checks_passed"`
+}
+
+type repoReviewabilityExample struct {
+	ID                   string   `json:"id"`
+	Repo                 string   `json:"repo"`
+	Ref                  string   `json:"ref,omitempty"`
+	Subpath              string   `json:"subpath,omitempty"`
+	GeneratedPath        string   `json:"generated_path"`
+	GeneratedKind        string   `json:"generated_kind"`
+	RiskIDs              []string `json:"risk_ids,omitempty"`
+	ReviewabilityGain    string   `json:"reviewability_gain"`
+	NonRepairClaim       string   `json:"non_repair_claim"`
+	DeterministicOutcome string   `json:"deterministic_outcome"`
+	ProofHoles           []string `json:"proof_holes"`
+	ContentExcerpt       []string `json:"content_excerpt"`
+	MaintainerAction     string   `json:"maintainer_action"`
+	RequiredReanalysis   []string `json:"required_reanalysis"`
 }
 
 type repoAnalyzeCIArtifacts struct {
@@ -8091,6 +8132,219 @@ func renderRepoRejectedGeneratedMarkdown(report repoRejectedGeneratedReport) str
 }
 
 func repoRejectedGeneratedHash(report repoRejectedGeneratedReport) string {
+	copy := report
+	copy.Hash = ""
+	copy.Markdown = ""
+	return canonical.Hash(copy)
+}
+
+func repoReviewabilityExamples(args []string) error {
+	fs := flag.NewFlagSet("repo reviewability-examples", flag.ContinueOnError)
+	fs.SetOutput(ioDiscard{})
+	analysesValue := fs.String("analyses", "", "comma-separated repo analyze output directories")
+	outPath := fs.String("out", filepath.Join("results", "generated", "repo-reviewability-examples"), "output directory")
+	jsonOut := fs.Bool("json", false, "emit JSON")
+	if err := fs.Parse(args); err != nil {
+		return err
+	}
+	if *analysesValue == "" || fs.NArg() != 0 {
+		return errors.New("usage: patchline repo reviewability-examples --analyses analysis-dir[,analysis-dir...] [--out dir] [--json]")
+	}
+	report, err := buildRepoReviewabilityExamplesReport(splitNonEmpty(*analysesValue, ","))
+	if err != nil {
+		return err
+	}
+	if err := writeRepoReviewabilityExamplesReport(*outPath, report); err != nil {
+		return err
+	}
+	if *jsonOut {
+		return writeJSON(os.Stdout, report)
+	}
+	fmt.Printf("repo reviewability-examples examples=%d tests=%d guards=%d repos=%d hash=%s\n", report.Summary.Examples, report.Summary.TestExamples, report.Summary.GuardExamples, report.Summary.PublicRepos, report.Hash)
+	fmt.Printf("  out=%s\n", *outPath)
+	return nil
+}
+
+func buildRepoReviewabilityExamplesReport(analyses []string) (repoReviewabilityExamplesReport, error) {
+	if len(analyses) == 0 {
+		return repoReviewabilityExamplesReport{}, errors.New("at least one analysis directory is required")
+	}
+	report := repoReviewabilityExamplesReport{Version: "patchline.repo-reviewability-examples/v1"}
+	repos := map[string]bool{}
+	for _, analysis := range analyses {
+		analyze, err := loadRepoAnalyzeReport(filepath.Join(analysis, "analyze.json"))
+		if err != nil {
+			return repoReviewabilityExamplesReport{}, err
+		}
+		proposal, err := project.LoadProposal(filepath.Join(analysis, "proposal"))
+		if err != nil {
+			return repoReviewabilityExamplesReport{}, err
+		}
+		compare, err := loadCompareReport(filepath.Join(analysis, "compare", "compare.json"))
+		if err != nil {
+			return repoReviewabilityExamplesReport{}, err
+		}
+		repo := firstNonEmpty(analyze.Input, analyze.Source.Input)
+		repos[repo] = true
+		report.Corpus = append(report.Corpus, repoTaxonomyRepo{Repo: repo, Ref: analyze.Source.ResolvedCommit, Subpath: analyze.Subpath})
+		report.Summary.DeterministicChecksPassed += compare.Summary.PatchlineChecksPassed
+		report.Summary.ProofHolesListed += len(compare.ReviewBadge.ProofHoles)
+		report.Examples = append(report.Examples, reviewabilityExamplesForAnalysis(analysis, repo, analyze, proposal, compare)...)
+	}
+	sort.Slice(report.Examples, func(i, j int) bool {
+		if report.Examples[i].GeneratedKind != report.Examples[j].GeneratedKind {
+			return report.Examples[i].GeneratedKind < report.Examples[j].GeneratedKind
+		}
+		if report.Examples[i].Repo != report.Examples[j].Repo {
+			return report.Examples[i].Repo < report.Examples[j].Repo
+		}
+		return report.Examples[i].GeneratedPath < report.Examples[j].GeneratedPath
+	})
+	report.Summary.Analyses = len(analyses)
+	report.Summary.PublicRepos = len(repos)
+	report.Summary.Examples = len(report.Examples)
+	for _, example := range report.Examples {
+		if example.GeneratedKind == "tests" {
+			report.Summary.TestExamples++
+		}
+		if example.GeneratedKind == "guards" {
+			report.Summary.GuardExamples++
+		}
+		if strings.Contains(example.DeterministicOutcome, "accepted-for-review") {
+			report.Summary.AcceptedForReview++
+		}
+		if strings.TrimSpace(example.NonRepairClaim) != "" {
+			report.Summary.NoFullRepairClaims++
+		}
+	}
+	report.Hash = repoReviewabilityExamplesHash(report)
+	report.Markdown = renderRepoReviewabilityExamplesMarkdown(report)
+	return report, nil
+}
+
+func reviewabilityExamplesForAnalysis(analysis, repo string, analyze repoAnalyzeReport, proposal project.ProposalReport, compare project.CompareReport) []repoReviewabilityExample {
+	checks := map[string]project.GeneratedCheck{}
+	for _, check := range compare.GeneratedChecks {
+		if check.Status == "pass" {
+			checks[check.Path] = check
+		}
+	}
+	var examples []repoReviewabilityExample
+	for _, file := range proposal.GeneratedFiles {
+		if file.Kind != "tests" && file.Kind != "guards" {
+			continue
+		}
+		if _, ok := checks[file.Path]; !ok {
+			continue
+		}
+		excerpt := readGeneratedExcerpt(filepath.Join(analysis, "proposal"), file.Path)
+		example := repoReviewabilityExample{
+			Repo:                 repo,
+			Ref:                  analyze.Source.ResolvedCommit,
+			Subpath:              analyze.Subpath,
+			GeneratedPath:        file.Path,
+			GeneratedKind:        file.Kind,
+			RiskIDs:              append([]string(nil), file.RiskIDs...),
+			ReviewabilityGain:    reviewabilityGain(file.Kind),
+			NonRepairClaim:       "This artifact improves reviewability by making assumptions checkable, but it does not claim to repair the underlying data-change risk or prove production safety.",
+			DeterministicOutcome: fmt.Sprintf("%s with badge %s and %d passed generated checks", compare.Intervention.Status, compare.ReviewBadge.Status, compare.Summary.PatchlineChecksPassed),
+			ProofHoles:           capStringList(append([]string(nil), compare.ReviewBadge.ProofHoles...), 5),
+			ContentExcerpt:       excerpt,
+			MaintainerAction:     reviewabilityMaintainerAction(file.Kind),
+			RequiredReanalysis:   append([]string(nil), compare.Intervention.RequiredNextActions...),
+		}
+		example.ID = "reviewability:" + canonical.Hash(strings.Join([]string{repo, example.Ref, example.Subpath, example.GeneratedPath, strings.Join(example.RiskIDs, "\x00")}, "\x00"))[:16]
+		examples = append(examples, example)
+	}
+	return examples
+}
+
+func reviewabilityGain(kind string) string {
+	switch kind {
+	case "tests":
+		return "Generated test guidance gives reviewers concrete assertions for affected and unaffected rows, scoped predicates, row counts, and rollback behavior."
+	case "guards":
+		return "Generated guard SQL gives reviewers fail-closed table existence, candidate row-count, and rollback-only checks before any risky change is applied."
+	default:
+		return "Generated artifact makes review assumptions explicit without claiming a completed repair."
+	}
+}
+
+func reviewabilityMaintainerAction(kind string) string {
+	switch kind {
+	case "tests":
+		return "Turn the suggested assertions into project-native tests, run them in an isolated branch, then rerun Patchline compare before trusting the intervention."
+	case "guards":
+		return "Run the guard only as a review aid or dry-run check, inspect row counts, and keep rollback/proof holes open until stronger evidence is supplied."
+	default:
+		return "Use the artifact as review scaffolding, not as an applied repair."
+	}
+}
+
+func capStringList(values []string, limit int) []string {
+	if limit >= 0 && len(values) > limit {
+		return values[:limit]
+	}
+	return values
+}
+
+func writeRepoReviewabilityExamplesReport(outDir string, report repoReviewabilityExamplesReport) error {
+	if err := os.MkdirAll(outDir, 0o755); err != nil {
+		return err
+	}
+	copy := report
+	copy.Markdown = ""
+	data, err := json.MarshalIndent(copy, "", "  ")
+	if err != nil {
+		return err
+	}
+	if err := os.WriteFile(filepath.Join(outDir, "reviewability-examples.json"), append(data, '\n'), 0o644); err != nil {
+		return err
+	}
+	return os.WriteFile(filepath.Join(outDir, "reviewability-examples.md"), []byte(report.Markdown), 0o644)
+}
+
+func renderRepoReviewabilityExamplesMarkdown(report repoReviewabilityExamplesReport) string {
+	var b strings.Builder
+	fmt.Fprintf(&b, "# Patchline generated reviewability examples\n\n")
+	fmt.Fprintf(&b, "- analyses: `%d`\n", report.Summary.Analyses)
+	fmt.Fprintf(&b, "- public repos: `%d`\n", report.Summary.PublicRepos)
+	fmt.Fprintf(&b, "- examples: `%d`\n", report.Summary.Examples)
+	fmt.Fprintf(&b, "- test examples: `%d`\n", report.Summary.TestExamples)
+	fmt.Fprintf(&b, "- guard examples: `%d`\n", report.Summary.GuardExamples)
+	fmt.Fprintf(&b, "- no full repair claims: `%d`\n", report.Summary.NoFullRepairClaims)
+	fmt.Fprintf(&b, "- hash: `%s`\n\n", report.Hash)
+	fmt.Fprintf(&b, "## Corpus coverage\n\n")
+	for _, repo := range report.Corpus {
+		fmt.Fprintf(&b, "- `%s` `%s` `%s`\n", repo.Repo, repo.Subpath, repo.Ref)
+	}
+	fmt.Fprintf(&b, "\n## Examples\n\n")
+	for _, example := range report.Examples {
+		fmt.Fprintf(&b, "### %s `%s`\n\n", example.Repo, example.ID)
+		fmt.Fprintf(&b, "- generated path: `%s`\n", example.GeneratedPath)
+		fmt.Fprintf(&b, "- generated kind: `%s`\n", example.GeneratedKind)
+		fmt.Fprintf(&b, "- reviewability gain: %s\n", example.ReviewabilityGain)
+		fmt.Fprintf(&b, "- non-repair claim: %s\n", example.NonRepairClaim)
+		fmt.Fprintf(&b, "- deterministic outcome: %s\n", example.DeterministicOutcome)
+		fmt.Fprintf(&b, "- maintainer action: %s\n", example.MaintainerAction)
+		if len(example.ContentExcerpt) > 0 {
+			fmt.Fprintf(&b, "- content excerpt:\n")
+			for _, line := range example.ContentExcerpt {
+				fmt.Fprintf(&b, "  - `%s`\n", strings.ReplaceAll(line, "`", "'"))
+			}
+		}
+		if len(example.ProofHoles) > 0 {
+			fmt.Fprintf(&b, "- proof holes preserved:\n")
+			for _, hole := range example.ProofHoles {
+				fmt.Fprintf(&b, "  - %s\n", hole)
+			}
+		}
+		fmt.Fprintf(&b, "\n")
+	}
+	return b.String()
+}
+
+func repoReviewabilityExamplesHash(report repoReviewabilityExamplesReport) string {
 	copy := report
 	copy.Hash = ""
 	copy.Markdown = ""
