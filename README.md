@@ -211,6 +211,8 @@ Run `make failure-injection-suite-gate` to prove artifact checks fail loudly whe
 
 Run `make longitudinal-public-reruns-gate` to rerun public-corpus slices over multiple historical commits per repository and summarize risk/evidence deltas; see [docs/longitudinal-public-reruns.md](docs/longitudinal-public-reruns.md).
 
+Run `make migration-age-stratification-gate` to stratify real public migrations by age band (recent vs old) and change type (schema-only vs backfill-heavy) and compare ranked-risk density across strata; see [docs/migration-age-stratification.md](docs/migration-age-stratification.md).
+
 Add `--redact` to write `analysis-bundle/` copies with stable redaction tokens for identifiers, literals, customer-like strings, and secret-like values while preserving joins and existing artifact hashes.
 
 Add `--ci` to write `ci/summary.md` plus upload snippets and code-quality artifacts for GitHub Actions, GitLab CI, and Bitbucket Pipelines: SARIF under `analysis-bundle/summary.sarif`, GitLab `ci/gl-code-quality-report.json`, and Bitbucket `ci/bitbucket-code-insights.json`.
