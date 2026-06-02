@@ -219,6 +219,8 @@ Run `make repository-size-stratification-gate` to stratify the catalog into smal
 
 Run `make maintainer-action-simulation-gate` to label every ranked finding with a simulated maintainer decision (accept, revise, reject, defer, needs-runtime-evidence) from deterministic signals across real repos; see [docs/maintainer-action-simulation.md](docs/maintainer-action-simulation.md).
 
+Run `make severity-calibration-gate` to validate severity against independent danger evidence (incident/cause clusters, rollback/fix migrations, recurrences) and report the calibration lift across real repos; see [docs/severity-calibration.md](docs/severity-calibration.md).
+
 Add `--redact` to write `analysis-bundle/` copies with stable redaction tokens for identifiers, literals, customer-like strings, and secret-like values while preserving joins and existing artifact hashes.
 
 Add `--ci` to write `ci/summary.md` plus upload snippets and code-quality artifacts for GitHub Actions, GitLab CI, and Bitbucket Pipelines: SARIF under `analysis-bundle/summary.sarif`, GitLab `ci/gl-code-quality-report.json`, and Bitbucket `ci/bitbucket-code-insights.json`.
