@@ -1,0 +1,33 @@
+{
+  "version": "patchline.invariant-inference-gate/v1",
+  "claim": "Patchline infers likely invariants over extracted fixtures in the style of dynamic invariant detection, then emits a proof obligation for each so inferred properties are checked rather than assumed. The worker keeps invariants that hold across every fixture observation, discards those with a counterexample, and attaches a proof obligation to each survivor. The gate proves every surviving invariant holds on all fixtures and carries an obligation, and that an invariant with an observed counterexample is discarded.",
+  "real_repo": "patchline (self): invariant-inference",
+  "observations": [
+    {
+      "x": 5,
+      "y": 10
+    },
+    {
+      "x": 3,
+      "y": 6
+    },
+    {
+      "x": 7,
+      "y": 14
+    }
+  ],
+  "candidate_invariants": [
+    {
+      "expr": "y == 2*x",
+      "holds": true
+    },
+    {
+      "expr": "x > 0",
+      "holds": true
+    },
+    {
+      "expr": "x > 6",
+      "holds": false
+    }
+  ]
+}

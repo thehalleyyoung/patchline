@@ -1,0 +1,17 @@
+{
+  "version": "patchline.transfer-learning-study-gate/v1",
+  "claim": "Patchline runs a transfer-learning study measuring zero-shot generalization across ecosystems, training on one ecosystem and evaluating on a disjoint one to quantify cross-ecosystem transfer. The worker confirms the train and test ecosystems are disjoint, computes the zero-shot accuracy on the target, and checks it clears a meaningful transfer threshold. The gate proves the ecosystems are disjoint and zero-shot accuracy clears the threshold, and that an overlapping train/test split is rejected.",
+  "real_repo": "patchline (self): transfer-learning-study",
+  "train_ecosystems": [
+    "python",
+    "ruby"
+  ],
+  "test_ecosystem": "javascript",
+  "zero_shot_accuracy": 0.88,
+  "threshold": 0.75,
+  "leaked_train": [
+    "python",
+    "ruby",
+    "javascript"
+  ]
+}

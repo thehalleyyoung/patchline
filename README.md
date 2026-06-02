@@ -478,6 +478,21 @@ Run `make governance-policy-gate` for a governance policy with semver and a **de
 Run `make citation-doi-gate` for a citation file and archival **DOI** with complete bibliographic fields, rejecting a malformed DOI; see [docs/citation-doi.md](docs/citation-doi.md).
 Run `make sustainability-plan-gate` for a sustainability plan checking CI cost, maintainer load, and **bus-factor**, flagging a single-maintainer project; see [docs/sustainability-plan.md](docs/sustainability-plan.md).
 Run `make roadmap-burndown-gate` for a 1.0-to-2.0 **milestone** burndown where every open milestone is gate-backed and an evidence-free completion is rejected; see [docs/roadmap-burndown.md](docs/roadmap-burndown.md).
+Run `make learned-risk-model-gate` for a learned risk model evaluated on a **held-out** split that beats the majority baseline; see [docs/learned-risk-model.md](docs/learned-risk-model.md).
+Run `make neuro-symbolic-verdict-gate` for neuro-symbolic verdicts where deterministic gates act as hard **constraint**s that override a confidently-wrong learned prior; see [docs/neuro-symbolic-verdict.md](docs/neuro-symbolic-verdict.md).
+Run `make backfill-synthesis-gate` to synthesize a safe backfill from a declarative **invariant** spec and verify it establishes the invariant while a no-op fails; see [docs/backfill-synthesis.md](docs/backfill-synthesis.md).
+Run `make llm-judge-harness-gate` for an LLM-judge harness with a deterministic rubric and **inter-rater** agreement, flagging a chance-level judge pair; see [docs/llm-judge-harness.md](docs/llm-judge-harness.md).
+Run `make invariant-inference-gate` to infer invariants over fixtures and emit a **proof obligation** per survivor, discarding any with a counterexample; see [docs/invariant-inference.md](docs/invariant-inference.md).
+Run `make differential-semantics-gate` to differentially test the analyzer against a **reference semantics** for a migration DSL, detecting a seeded divergence; see [docs/differential-semantics.md](docs/differential-semantics.md).
+Run `make incident-forecaster-gate` for an incident-risk forecaster evaluated with a proper **scoring rule** that beats an uninformative baseline; see [docs/incident-forecaster.md](docs/incident-forecaster.md).
+Run `make counterfactual-explanation-gate` for minimal **counterfactual** explanations that flip a hazard to safe, rejecting a non-flipping change; see [docs/counterfactual-explanation.md](docs/counterfactual-explanation.md).
+Run `make transfer-learning-study-gate` for a **zero-shot** cross-ecosystem transfer study with disjoint train/test, rejecting an overlapping split; see [docs/transfer-learning-study.md](docs/transfer-learning-study.md).
+Run `make causal-effect-estimate-gate` to estimate Patchline's effect on incident rates with **confounder** control, flagging a naive unadjusted estimate; see [docs/causal-effect-estimate.md](docs/causal-effect-estimate.md).
+Run `make theorem-prover-backend-gate` for a theorem-proving backend that emits a machine-checkable **proof** per obligation and reports an unprovable one as unproved; see [docs/theorem-prover-backend.md](docs/theorem-prover-backend.md).
+Run `make rl-reviewer-gate` for a learned triage order that lowers **reviewer cost** below a random ordering, flagging a degenerate policy; see [docs/rl-reviewer.md](docs/rl-reviewer.md).
+Run `make multimodal-finding-gate` for **multimodal** findings (diagram + text + code) checked for cross-modal consistency, flagging disagreement; see [docs/multimodal-finding.md](docs/multimodal-finding.md).
+Run `make abstention-policy-gate` for an uncertainty-aware **abstention** policy with a guaranteed selective-accuracy floor, shown to fail under forced full coverage; see [docs/abstention-policy.md](docs/abstention-policy.md).
+Run `make self-improving-loop-gate` for a loop that mines candidate gates from **unexplained** corpus failures, rejecting a proposal with no backing failure; see [docs/self-improving-loop.md](docs/self-improving-loop.md).
 
 Add `--redact` to write `analysis-bundle/` copies with stable redaction tokens for identifiers, literals, customer-like strings, and secret-like values while preserving joins and existing artifact hashes.
 

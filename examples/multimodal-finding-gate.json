@@ -1,0 +1,25 @@
+{
+  "version": "patchline.multimodal-finding-gate/v1",
+  "claim": "Patchline represents each finding multimodally \u2014 a schema diagram, a textual explanation, and the code span \u2014 and asserts the three modalities are mutually consistent, referencing the same table and column. The worker checks every finding carries all three modalities and that they agree on the referenced entity. The gate proves all findings are complete and cross-modally consistent and that a finding whose diagram and code disagree is flagged.",
+  "real_repo": "patchline (self): multimodal-finding",
+  "findings": [
+    {
+      "id": "f1",
+      "diagram_entity": "users.email",
+      "text_entity": "users.email",
+      "code_entity": "users.email"
+    },
+    {
+      "id": "f2",
+      "diagram_entity": "orders.total",
+      "text_entity": "orders.total",
+      "code_entity": "orders.total"
+    }
+  ],
+  "inconsistent": {
+    "id": "f3",
+    "diagram_entity": "users.email",
+    "text_entity": "users.email",
+    "code_entity": "users.name"
+  }
+}

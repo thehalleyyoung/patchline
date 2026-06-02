@@ -1,0 +1,26 @@
+{
+  "version": "patchline.self-improving-loop-gate/v1",
+  "claim": "Patchline runs a self-improving loop that mines new gate ideas from unexplained corpus failures \u2014 cases the current gates neither flag nor justify \u2014 and proposes a candidate gate for each, growing coverage from real blind spots. The worker isolates the unexplained failures, proposes a candidate gate per cluster, and verifies each proposal references the failure that motivated it. The gate proves every unexplained failure yields a motivated candidate gate and that a proposal with no backing failure is rejected.",
+  "real_repo": "patchline (self): self-improving-loop",
+  "failures": [
+    {
+      "id": "u1",
+      "explained": false,
+      "proposed_gate": "g-u1"
+    },
+    {
+      "id": "u2",
+      "explained": false,
+      "proposed_gate": "g-u2"
+    },
+    {
+      "id": "e1",
+      "explained": true,
+      "proposed_gate": ""
+    }
+  ],
+  "unbacked_proposal": {
+    "proposed_gate": "g-x",
+    "backing_failure": ""
+  }
+}

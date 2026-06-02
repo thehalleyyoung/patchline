@@ -1,0 +1,31 @@
+{
+  "version": "patchline.neuro-symbolic-verdict-gate/v1",
+  "claim": "Patchline combines a learned prior with the deterministic gates as hard constraints, so the final verdict can never contradict a proven gate even when the learned prior disagrees. The worker takes the learned probability and the gate constraint, and emits a verdict that defers to the gate whenever the gate is decisive. The gate proves the constraint overrides a confidently-wrong prior and that, where gates are silent, the learned prior is allowed to decide.",
+  "real_repo": "patchline (self): neuro-symbolic-verdict",
+  "cases": [
+    {
+      "id": "gate-says-hazard",
+      "prior": 0.05,
+      "gate": "hazard",
+      "expected": "hazard"
+    },
+    {
+      "id": "gate-says-safe",
+      "prior": 0.95,
+      "gate": "safe",
+      "expected": "safe"
+    },
+    {
+      "id": "gate-silent-high",
+      "prior": 0.9,
+      "gate": "unknown",
+      "expected": "hazard"
+    },
+    {
+      "id": "gate-silent-low",
+      "prior": 0.1,
+      "gate": "unknown",
+      "expected": "safe"
+    }
+  ]
+}

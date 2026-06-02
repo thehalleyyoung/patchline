@@ -1,0 +1,17 @@
+{
+  "version": "patchline.counterfactual-explanation-gate/v1",
+  "claim": "Patchline generates a minimal counterfactual explanation for each hazard verdict \u2014 the smallest change that flips it to safe \u2014 and proves the proposed change is both sufficient to flip the verdict and minimal. The worker checks the counterfactual flips the verdict and that removing any single edit from it no longer flips, establishing minimality. The gate proves the counterfactual is sufficient and minimal and that a non-flipping counterfactual is rejected.",
+  "real_repo": "patchline (self): counterfactual-explanation",
+  "base_verdict": "hazard",
+  "counterfactual_edits": [
+    "add backfill"
+  ],
+  "flipped_verdict": "safe",
+  "minimal": true,
+  "non_flipping": {
+    "edits": [
+      "add comment"
+    ],
+    "flipped_verdict": "hazard"
+  }
+}

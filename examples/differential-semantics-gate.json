@@ -1,0 +1,27 @@
+{
+  "version": "patchline.differential-semantics-gate/v1",
+  "claim": "Patchline differentially tests its analyzer against an independent reference semantics for a small migration DSL, flagging any input where the two disagree so divergences surface immediately. The worker compares the analyzer verdict to the reference verdict on every DSL program and counts disagreements. The gate proves the analyzer agrees with the reference semantics on every program and that a seeded divergence is detected.",
+  "real_repo": "patchline (self): differential-semantics",
+  "programs": [
+    {
+      "id": "p1",
+      "analyzer": "hazard",
+      "reference": "hazard"
+    },
+    {
+      "id": "p2",
+      "analyzer": "safe",
+      "reference": "safe"
+    },
+    {
+      "id": "p3",
+      "analyzer": "hazard",
+      "reference": "hazard"
+    }
+  ],
+  "divergent": {
+    "id": "p4",
+    "analyzer": "safe",
+    "reference": "hazard"
+  }
+}

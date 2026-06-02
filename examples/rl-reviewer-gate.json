@@ -1,0 +1,9 @@
+{
+  "version": "patchline.rl-reviewer-gate/v1",
+  "claim": "Patchline learns a triage ordering that minimizes measured reviewer cost, and proves the learned policy reaches a target detection faster than a random ordering on recorded review sessions. The worker computes the cumulative reviewer cost to find all true hazards under the learned order versus a random order. The gate proves the learned policy's cost is strictly lower than random and that a degenerate policy no better than random is flagged.",
+  "real_repo": "patchline (self): rl-reviewer",
+  "learned_order_cost": 12,
+  "random_order_cost": 28,
+  "optimal_cost": 10,
+  "degenerate_order_cost": 28
+}

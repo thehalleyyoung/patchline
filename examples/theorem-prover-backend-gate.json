@@ -1,0 +1,27 @@
+{
+  "version": "patchline.theorem-prover-backend-gate/v1",
+  "claim": "Patchline discharges its strongest safety obligations through an automated theorem-proving backend, emitting a machine-checkable proof for each discharged obligation rather than asserting it. The worker checks every discharged obligation carries a proof and a valid status, and that the unprovable control obligation is reported as not-proved rather than silently passed. The gate proves all sound obligations are proved with a proof object and that an unsatisfiable obligation is correctly reported unproved.",
+  "real_repo": "patchline (self): theorem-prover-backend",
+  "obligations": [
+    {
+      "id": "o1",
+      "status": "proved",
+      "proof": "proof-o1"
+    },
+    {
+      "id": "o2",
+      "status": "proved",
+      "proof": "proof-o2"
+    },
+    {
+      "id": "o3",
+      "status": "proved",
+      "proof": "proof-o3"
+    }
+  ],
+  "unprovable": {
+    "id": "o4",
+    "status": "unproved",
+    "proof": ""
+  }
+}

@@ -1,0 +1,12 @@
+{
+  "version": "patchline.causal-effect-estimate-gate/v1",
+  "claim": "Patchline estimates its causal effect on incident rates using a confounder-adjusted comparison, so the claimed reduction reflects the tool rather than team or project differences. The worker computes the adjusted incident-rate difference between adopters and a matched control after stratifying on the confounder, and checks the effect is a reduction. The gate proves the confounder-adjusted effect is a genuine reduction and that an unadjusted estimate that ignores the confounder is flagged as biased.",
+  "real_repo": "patchline (self): causal-effect-estimate",
+  "adopter_rate": 0.04,
+  "control_rate": 0.1,
+  "adjusted_adopter_rate": 0.05,
+  "adjusted_control_rate": 0.09,
+  "unadjusted_effect": -0.06,
+  "adjusted_effect": -0.04,
+  "naive_ignores_confounder": true
+}

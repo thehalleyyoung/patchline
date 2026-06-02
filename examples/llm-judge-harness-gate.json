@@ -1,0 +1,43 @@
+{
+  "version": "patchline.llm-judge-harness-gate/v1",
+  "claim": "Patchline runs an LLM-judge harness with a deterministic scoring rubric and reports inter-rater agreement, so subjective judgments are anchored to a rubric and measured for consistency. The worker computes the agreement rate between two judges over the rubric-scored items and checks it meets a minimum reliability threshold. The gate proves the judges agree above threshold under the rubric and that a pair of judges scoring at chance is flagged as unreliable.",
+  "real_repo": "patchline (self): llm-judge-harness",
+  "items": [
+    {
+      "id": "i1",
+      "judge_a": 1,
+      "judge_b": 1
+    },
+    {
+      "id": "i2",
+      "judge_a": 0,
+      "judge_b": 0
+    },
+    {
+      "id": "i3",
+      "judge_a": 1,
+      "judge_b": 1
+    },
+    {
+      "id": "i4",
+      "judge_a": 0,
+      "judge_b": 0
+    },
+    {
+      "id": "i5",
+      "judge_a": 1,
+      "judge_b": 1
+    }
+  ],
+  "min_agreement": 0.8,
+  "unreliable": [
+    {
+      "judge_a": 1,
+      "judge_b": 0
+    },
+    {
+      "judge_a": 0,
+      "judge_b": 1
+    }
+  ]
+}

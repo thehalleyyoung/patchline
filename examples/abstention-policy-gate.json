@@ -1,0 +1,33 @@
+{
+  "version": "patchline.abstention-policy-gate/v1",
+  "claim": "Patchline supports an uncertainty-aware abstention policy that declines to rule on low-confidence cases, trading coverage for accuracy with a guaranteed floor on the accuracy of the cases it does decide. The worker abstains below a confidence threshold, computes coverage and selective accuracy on the decided subset, and checks selective accuracy meets the guaranteed floor. The gate proves selective accuracy meets the floor at the achieved coverage and that forcing full coverage drops accuracy below the floor.",
+  "real_repo": "patchline (self): abstention-policy",
+  "cases": [
+    {
+      "conf": 0.95,
+      "correct": true
+    },
+    {
+      "conf": 0.9,
+      "correct": true
+    },
+    {
+      "conf": 0.85,
+      "correct": true
+    },
+    {
+      "conf": 0.4,
+      "correct": false
+    },
+    {
+      "conf": 0.55,
+      "correct": true
+    },
+    {
+      "conf": 0.3,
+      "correct": false
+    }
+  ],
+  "abstain_below": 0.8,
+  "accuracy_floor": 0.95
+}

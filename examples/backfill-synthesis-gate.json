@@ -1,0 +1,14 @@
+{
+  "version": "patchline.backfill-synthesis-gate/v1",
+  "claim": "Patchline synthesizes a safe backfill program from a declarative specification of the target invariant, then verifies the synthesized program actually establishes the invariant on the model state. The worker applies the synthesized steps to the pre-state and checks the post-state satisfies the declared invariant, while an empty synthesis leaves the invariant violated. The gate proves the synthesized backfill establishes the invariant and that a no-op synthesis fails to satisfy it.",
+  "real_repo": "patchline (self): backfill-synthesis",
+  "invariant": "all rows have non-null email",
+  "pre_state_null_rows": 1000,
+  "synthesized_steps": [
+    "set default",
+    "backfill nulls",
+    "add not-null constraint"
+  ],
+  "post_state_null_rows": 0,
+  "noop_post_null_rows": 1000
+}

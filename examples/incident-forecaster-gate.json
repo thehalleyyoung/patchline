@@ -1,0 +1,28 @@
+{
+  "version": "patchline.incident-forecaster-gate/v1",
+  "claim": "Patchline forecasts the probability of a post-merge incident and evaluates the forecasts with a proper scoring rule, so probabilistic risk claims are scored honestly rather than thresholded away. The worker computes the Brier score over the forecast/outcome pairs and checks it beats an uninformative constant-0.5 forecaster. The gate proves the forecaster's proper score beats the uninformative baseline and that a forecaster always predicting 0.5 scores no better than baseline.",
+  "real_repo": "patchline (self): incident-forecaster",
+  "forecasts": [
+    {
+      "p": 0.9,
+      "outcome": 1
+    },
+    {
+      "p": 0.1,
+      "outcome": 0
+    },
+    {
+      "p": 0.8,
+      "outcome": 1
+    },
+    {
+      "p": 0.2,
+      "outcome": 0
+    },
+    {
+      "p": 0.95,
+      "outcome": 1
+    }
+  ],
+  "baseline_p": 0.5
+}
