@@ -1,6 +1,7 @@
 package main
 
 import (
+	"encoding/json"
 	"errors"
 	"fmt"
 	"os"
@@ -284,6 +285,48 @@ func TestBuildCorpusMinimizerReportCopiesPreservingSlice(t *testing.T) {
 	if _, err := os.Stat(filepath.Join(out, "minimized-source", "001_accounts.sql")); err != nil {
 		t.Fatalf("expected copied minimized source: %v", err)
 	}
+}
+
+func TestBuildRecurrenceReportRedactsPathsAcrossProjects(t *testing.T) {
+	root := t.TempDir()
+	left := filepath.Join(root, "left")
+	right := filepath.Join(root, "right")
+	writeRecurrenceAnalysisForTest(t, left, "owner/left", "risk:left", "stable-risk:left000000000000", "db/migrate/private_left.sql")
+	writeRecurrenceAnalysisForTest(t, right, "owner/right", "risk:right", "stable-risk:right00000000000", "db/migrate/private_right.sql")
+
+	report, err := buildRecurrenceReport([]string{left, right})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if report.Summary.Repeated != 1 || report.Recurrences[0].ProjectCount != 2 || report.Hash == "" {
+		t.Fatalf("unexpected recurrence report: %#v", report)
+	}
+	data, err := json.Marshal(report)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if strings.Contains(string(data), "private_left.sql") || strings.Contains(string(data), "private_right.sql") {
+		t.Fatalf("recurrence report leaked source paths: %s", data)
+	}
+}
+
+func writeRecurrenceAnalysisForTest(t *testing.T, root, project, riskID, stableID, path string) {
+	t.Helper()
+	writeMainTestFile(t, root, "analyze.json", `{"input":"`+project+`"}`)
+	writeMainTestFile(t, root, "baseline/baseline.json", `{
+  "version": "patchline.baseline/v1",
+  "risks": [{
+    "id":"`+riskID+`",
+    "stable_id":"`+stableID+`",
+    "path":"`+path+`",
+    "kind":"high-risk-sql",
+    "severity":"high",
+    "score":90,
+    "factors":[{"name":"destructive-sql","weight":80,"reason":"test"}]
+  }],
+  "hash": "baseline"
+}
+`)
 }
 
 func writeAnalysisSnapshotForTest(t *testing.T, root, factID, stableID, generatedPath, generatedHash string, failures, passed int) {

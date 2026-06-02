@@ -1,0 +1,16 @@
+{
+  "version": "patchline.recurrence-gates/v1",
+  "gates": [
+    {
+      "id": "four-repo-recurrence",
+      "status": "implemented",
+      "real_repos": [
+        "forem/forem",
+        "bytebase/bytebase",
+        "mastodon/mastodon",
+        "lobsters/lobsters"
+      ],
+      "recurrence_claim": "repo recurrence identifies repeated data-change failure-mode signatures across unrelated projects without emitting source paths, SQL text, or table identifiers"
+    }
+  ]
+}

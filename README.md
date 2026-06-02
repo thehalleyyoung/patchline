@@ -155,6 +155,7 @@ make stratified-benchmark-gate
 make stale-ref-gate
 make issue-template-gate
 make minimizer-gate
+make recurrence-gate
 ```
 
 The demo downloads real GitHub project subpaths and writes:
@@ -224,6 +225,8 @@ The real-repo slice matrix is backed by `examples/real-repo-slices.json` and `ex
 `make issue-template-gate` validates the public real-repo nomination issue form for required repo, ref, subpath, ecosystem, evidence, and failure-mode fields.
 
 `make minimizer-gate` runs `repo minimize` on four public slices and proves minimized source copies preserve findings, evidence links, and generated intervention metadata.
+
+`make recurrence-gate` runs cross-repo recurrence analysis on four unrelated public slices and verifies repeated failure-mode signatures are reported without source paths, SQL text, or table identifiers.
 
 Current default projects:
 

@@ -410,6 +410,7 @@ Usage:
   patchline repo changes --previous analysis-dir --current analysis-dir [--out dir] [--json]
   patchline repo notify-summary --analysis analysis-dir [--bundle-link url] [--out dir] [--json]
   patchline repo minimize --analysis analysis-dir [--out dir] [--json]
+  patchline repo recurrence --analyses analysis-dir[,analysis-dir...] [--out dir] [--json]
   patchline intake <path> [--out results/generated/intake] [--json]
   patchline intake --github owner/repo [--ref ref] [--subpath path] [--out results/generated/intake] [--json]
   patchline semantics-contract [--json]
@@ -499,7 +500,7 @@ Examples:
 
 func repoCommand(args []string) error {
 	if len(args) == 0 {
-		return errors.New("usage: patchline repo <doctor|fetch|analyze|inventory|baseline|propose|compare|suppressions|why-now|changes|notify-summary|minimize> ...")
+		return errors.New("usage: patchline repo <doctor|fetch|analyze|inventory|baseline|propose|compare|suppressions|why-now|changes|notify-summary|minimize|recurrence> ...")
 	}
 	switch args[0] {
 	case "doctor":
@@ -526,6 +527,8 @@ func repoCommand(args []string) error {
 		return repoNotifySummary(args[1:])
 	case "minimize":
 		return repoMinimize(args[1:])
+	case "recurrence":
+		return repoRecurrence(args[1:])
 	default:
 		return fmt.Errorf("unknown repo subcommand %q", args[0])
 	}
@@ -856,6 +859,43 @@ type corpusMinimizerEntry struct {
 	EvidenceLinks    []project.EvidenceLink  `json:"evidence_links,omitempty"`
 	GeneratedFiles   []project.GeneratedFile `json:"generated_files,omitempty"`
 	PreservationNote string                  `json:"preservation_note"`
+}
+
+type recurrenceReport struct {
+	Version     string              `json:"version"`
+	Analyses    []string            `json:"analyses"`
+	Summary     recurrenceSummary   `json:"summary"`
+	Recurrences []recurrenceCluster `json:"recurrences"`
+	Hash        string              `json:"hash"`
+	Markdown    string              `json:"markdown,omitempty"`
+}
+
+type recurrenceSummary struct {
+	Analyses          int `json:"analyses"`
+	Risks             int `json:"risks"`
+	Signatures        int `json:"signatures"`
+	Repeated          int `json:"repeated"`
+	RedactedFields    int `json:"redacted_fields"`
+	UnrelatedProjects int `json:"unrelated_projects"`
+}
+
+type recurrenceCluster struct {
+	Signature       string                 `json:"signature"`
+	RiskKind        string                 `json:"risk_kind"`
+	Severity        string                 `json:"severity"`
+	FactorNames     []string               `json:"factor_names"`
+	OccurrenceCount int                    `json:"occurrence_count"`
+	ProjectCount    int                    `json:"project_count"`
+	Occurrences     []recurrenceOccurrence `json:"occurrences"`
+}
+
+type recurrenceOccurrence struct {
+	Analysis string `json:"analysis"`
+	Project  string `json:"project"`
+	RiskID   string `json:"risk_id"`
+	StableID string `json:"stable_id,omitempty"`
+	Severity string `json:"severity"`
+	Score    int    `json:"score"`
 }
 
 func repoAnalyze(args []string) error {
@@ -3563,6 +3603,174 @@ func renderCorpusMinimizerMarkdown(report corpusMinimizerReport) string {
 			id = entry.RiskID
 		}
 		fmt.Fprintf(&b, "| `%s` | `%s` | %d | %d |\n", id, entry.PublicSubpath, len(entry.SourcePaths), len(entry.GeneratedFiles))
+	}
+	return b.String()
+}
+
+func repoRecurrence(args []string) error {
+	fs := flag.NewFlagSet("repo recurrence", flag.ContinueOnError)
+	fs.SetOutput(ioDiscard{})
+	analysesValue := fs.String("analyses", "", "comma-separated repo analyze output directories")
+	outPath := fs.String("out", filepath.Join("results", "generated", "repo-recurrence"), "output directory")
+	jsonOut := fs.Bool("json", false, "emit JSON")
+	if err := fs.Parse(args); err != nil {
+		return err
+	}
+	if *analysesValue == "" || fs.NArg() != 0 {
+		return errors.New("usage: patchline repo recurrence --analyses analysis-dir[,analysis-dir...] [--out dir] [--json]")
+	}
+	analyses := splitNonEmpty(*analysesValue, ",")
+	report, err := buildRecurrenceReport(analyses)
+	if err != nil {
+		return err
+	}
+	if err := writeRecurrenceReport(*outPath, report); err != nil {
+		return err
+	}
+	if *jsonOut {
+		return writeJSON(os.Stdout, report)
+	}
+	fmt.Printf("repo recurrence analyses=%d repeated=%d signatures=%d hash=%s\n", report.Summary.Analyses, report.Summary.Repeated, report.Summary.Signatures, report.Hash)
+	fmt.Printf("  out=%s\n", *outPath)
+	return nil
+}
+
+func buildRecurrenceReport(analyses []string) (recurrenceReport, error) {
+	clusters := map[string]*recurrenceCluster{}
+	totalRisks := 0
+	projectSet := map[string]bool{}
+	for _, analysis := range analyses {
+		baseline, err := project.LoadBaseline(filepath.Join(analysis, "baseline"))
+		if err != nil {
+			return recurrenceReport{}, err
+		}
+		projectName := recurrenceProjectName(analysis)
+		if analyzeData, err := os.ReadFile(filepath.Join(analysis, "analyze.json")); err == nil {
+			var analyze repoAnalyzeReport
+			if err := json.Unmarshal(analyzeData, &analyze); err != nil {
+				return recurrenceReport{}, err
+			}
+			if analyze.Input != "" {
+				projectName = analyze.Input
+			}
+		} else if !errors.Is(err, os.ErrNotExist) {
+			return recurrenceReport{}, err
+		}
+		projectSet[projectName] = true
+		for _, risk := range baseline.Risks {
+			totalRisks++
+			signature, factorNames := recurrenceSignature(risk)
+			cluster := clusters[signature]
+			if cluster == nil {
+				cluster = &recurrenceCluster{Signature: signature, RiskKind: risk.Kind, Severity: risk.Severity, FactorNames: factorNames}
+				clusters[signature] = cluster
+			}
+			cluster.Occurrences = append(cluster.Occurrences, recurrenceOccurrence{
+				Analysis: filepath.ToSlash(analysis),
+				Project:  projectName,
+				RiskID:   risk.ID,
+				StableID: risk.StableID,
+				Severity: risk.Severity,
+				Score:    risk.Score,
+			})
+		}
+	}
+	var repeated []recurrenceCluster
+	for _, cluster := range clusters {
+		projects := map[string]bool{}
+		for _, occurrence := range cluster.Occurrences {
+			projects[occurrence.Project] = true
+		}
+		cluster.OccurrenceCount = len(cluster.Occurrences)
+		cluster.ProjectCount = len(projects)
+		sort.Slice(cluster.Occurrences, func(i, j int) bool {
+			if cluster.Occurrences[i].Project != cluster.Occurrences[j].Project {
+				return cluster.Occurrences[i].Project < cluster.Occurrences[j].Project
+			}
+			return cluster.Occurrences[i].StableID < cluster.Occurrences[j].StableID
+		})
+		if cluster.ProjectCount >= 2 {
+			repeated = append(repeated, *cluster)
+		}
+	}
+	sort.Slice(repeated, func(i, j int) bool {
+		if repeated[i].ProjectCount != repeated[j].ProjectCount {
+			return repeated[i].ProjectCount > repeated[j].ProjectCount
+		}
+		if repeated[i].OccurrenceCount != repeated[j].OccurrenceCount {
+			return repeated[i].OccurrenceCount > repeated[j].OccurrenceCount
+		}
+		return repeated[i].Signature < repeated[j].Signature
+	})
+	report := recurrenceReport{
+		Version:     "patchline.repo-recurrence/v1",
+		Analyses:    sortedStrings(analyses),
+		Recurrences: repeated,
+		Summary: recurrenceSummary{
+			Analyses:          len(analyses),
+			Risks:             totalRisks,
+			Signatures:        len(clusters),
+			Repeated:          len(repeated),
+			RedactedFields:    3,
+			UnrelatedProjects: len(projectSet),
+		},
+	}
+	report.Hash = recurrenceHash(report)
+	report.Markdown = renderRecurrenceMarkdown(report)
+	return report, nil
+}
+
+func recurrenceProjectName(analysis string) string {
+	base := filepath.Base(filepath.Clean(analysis))
+	if base == "." || base == string(filepath.Separator) || base == "" {
+		return filepath.ToSlash(analysis)
+	}
+	return base
+}
+
+func recurrenceSignature(risk project.BaselineRisk) (string, []string) {
+	factors := make([]string, 0, len(risk.Factors))
+	for _, factor := range risk.Factors {
+		factors = append(factors, factor.Name)
+	}
+	sort.Strings(factors)
+	material := strings.Join([]string{risk.Kind, risk.Severity, strings.Join(factors, ",")}, "\x00")
+	return "recurrence:" + canonical.Hash(material)[:16], factors
+}
+
+func writeRecurrenceReport(outDir string, report recurrenceReport) error {
+	if err := os.MkdirAll(outDir, 0o755); err != nil {
+		return err
+	}
+	copy := report
+	copy.Markdown = ""
+	data, err := json.MarshalIndent(copy, "", "  ")
+	if err != nil {
+		return err
+	}
+	if err := os.WriteFile(filepath.Join(outDir, "recurrence.json"), append(data, '\n'), 0o644); err != nil {
+		return err
+	}
+	return os.WriteFile(filepath.Join(outDir, "recurrence.md"), []byte(report.Markdown), 0o644)
+}
+
+func recurrenceHash(report recurrenceReport) string {
+	copy := report
+	copy.Hash = ""
+	copy.Markdown = ""
+	return canonical.Hash(copy)
+}
+
+func renderRecurrenceMarkdown(report recurrenceReport) string {
+	var b strings.Builder
+	fmt.Fprintf(&b, "# Patchline cross-repo recurrence\n\n")
+	fmt.Fprintf(&b, "- analyses: `%d`\n", report.Summary.Analyses)
+	fmt.Fprintf(&b, "- repeated signatures: `%d`\n", report.Summary.Repeated)
+	fmt.Fprintf(&b, "- redacted fields: paths, SQL text, table identifiers\n")
+	fmt.Fprintf(&b, "- hash: `%s`\n\n", report.Hash)
+	fmt.Fprintf(&b, "## Repeated failure-mode signatures\n\n| signature | kind | severity | projects | occurrences | factors |\n| --- | --- | --- | ---: | ---: | --- |\n")
+	for _, cluster := range report.Recurrences {
+		fmt.Fprintf(&b, "| `%s` | %s | %s | %d | %d | %s |\n", cluster.Signature, cluster.RiskKind, cluster.Severity, cluster.ProjectCount, cluster.OccurrenceCount, strings.Join(cluster.FactorNames, ", "))
 	}
 	return b.String()
 }
@@ -7928,6 +8136,17 @@ func boolKeys(values map[string]bool) []string {
 		out = append(out, key)
 	}
 	sort.Strings(out)
+	return out
+}
+
+func splitNonEmpty(value, sep string) []string {
+	var out []string
+	for _, part := range strings.Split(value, sep) {
+		part = strings.TrimSpace(part)
+		if part != "" {
+			out = append(out, part)
+		}
+	}
 	return out
 }
 
