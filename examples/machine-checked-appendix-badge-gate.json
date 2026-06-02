@@ -1,0 +1,27 @@
+{
+  "version": "patchline.machine-checked-appendix-badge-gate/v1",
+  "claim": "Patchline ships a machine-checked appendix re-verified on every commit with a public proof-status badge. The worker loads a frozen, content-addressed spec and checks every item is scored and references concrete backing evidence; the gate then re-runs the worker, confirms every item is scored and evidenced, and rejects an unsupported item with empty evidence, so the proof-status badge claim is reproducible on real Patchline self-data via `make machine-checked-appendix-badge-gate`.",
+  "real_repo": "patchline (self): machine-checked-appendix-badge",
+  "items": [
+    {
+      "criterion": "soundness",
+      "scored": true,
+      "evidence": "formal-methods-appendix-gate"
+    },
+    {
+      "criterion": "reproducibility",
+      "scored": true,
+      "evidence": "paper-appendix-gate"
+    },
+    {
+      "criterion": "evidence-trace",
+      "scored": true,
+      "evidence": "artifact-badges-gate"
+    }
+  ],
+  "bad": {
+    "criterion": "unsupported",
+    "scored": true,
+    "evidence": ""
+  }
+}

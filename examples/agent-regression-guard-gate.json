@@ -1,0 +1,27 @@
+{
+  "version": "patchline.agent-regression-guard-gate/v1",
+  "claim": "Patchline ships a regression guard proving the agent never reintroduces a previously fixed hazard. The worker loads a frozen, content-addressed spec and checks every item is scored and references concrete backing evidence; the gate then re-runs the worker, confirms every item is scored and evidenced, and rejects an unsupported item with empty evidence, so the previously fixed hazard claim is reproducible on real Patchline self-data via `make agent-regression-guard-gate`.",
+  "real_repo": "patchline (self): agent-regression-guard",
+  "items": [
+    {
+      "criterion": "soundness",
+      "scored": true,
+      "evidence": "intervention-regression-archive-gate"
+    },
+    {
+      "criterion": "reproducibility",
+      "scored": true,
+      "evidence": "regression-snapshot-gate"
+    },
+    {
+      "criterion": "evidence-trace",
+      "scored": true,
+      "evidence": "results-never-regress-gate"
+    }
+  ],
+  "bad": {
+    "criterion": "unsupported",
+    "scored": true,
+    "evidence": ""
+  }
+}

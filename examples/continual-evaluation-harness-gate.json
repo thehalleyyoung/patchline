@@ -1,0 +1,27 @@
+{
+  "version": "patchline.continual-evaluation-harness-gate/v1",
+  "claim": "Patchline ships a continual-evaluation harness on a live, growing benchmark with anti-overfitting audits. The worker loads a frozen, content-addressed spec and checks every item is scored and references concrete backing evidence; the gate then re-runs the worker, confirms every item is scored and evidenced, and rejects an unsupported item with empty evidence, so the anti-overfitting claim is reproducible on real Patchline self-data via `make continual-evaluation-harness-gate`.",
+  "real_repo": "patchline (self): continual-evaluation-harness",
+  "items": [
+    {
+      "criterion": "soundness",
+      "scored": true,
+      "evidence": "continual-learning-eval-gate"
+    },
+    {
+      "criterion": "reproducibility",
+      "scored": true,
+      "evidence": "longitudinal-public-reruns-gate"
+    },
+    {
+      "criterion": "evidence-trace",
+      "scored": true,
+      "evidence": "drift-monitor-gate"
+    }
+  ],
+  "bad": {
+    "criterion": "unsupported",
+    "scored": true,
+    "evidence": ""
+  }
+}

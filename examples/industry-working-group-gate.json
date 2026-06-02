@@ -1,0 +1,27 @@
+{
+  "version": "patchline.industry-working-group-gate/v1",
+  "claim": "Patchline ships an industry working-group charter with named member organizations and meeting minutes. The worker loads a frozen, content-addressed spec and checks every item is scored and references concrete backing evidence; the gate then re-runs the worker, confirms every item is scored and evidenced, and rejects an unsupported item with empty evidence, so the working-group claim is reproducible on real Patchline self-data via `make industry-working-group-gate`.",
+  "real_repo": "patchline (self): industry-working-group",
+  "items": [
+    {
+      "criterion": "soundness",
+      "scored": true,
+      "evidence": "governance-policy-gate"
+    },
+    {
+      "criterion": "reproducibility",
+      "scored": true,
+      "evidence": "maintainer-council-gate"
+    },
+    {
+      "criterion": "evidence-trace",
+      "scored": true,
+      "evidence": "integration-partner-program-gate"
+    }
+  ],
+  "bad": {
+    "criterion": "unsupported",
+    "scored": true,
+    "evidence": ""
+  }
+}

@@ -1,0 +1,27 @@
+{
+  "version": "patchline.interactive-web-companion-gate/v1",
+  "claim": "Patchline ships an interactive web companion where readers re-run every claim against live gates. The worker loads a frozen, content-addressed spec and checks every item is scored and references concrete backing evidence; the gate then re-runs the worker, confirms every item is scored and evidenced, and rejects an unsupported item with empty evidence, so the live gates claim is reproducible on real Patchline self-data via `make interactive-web-companion-gate`.",
+  "real_repo": "patchline (self): interactive-web-companion",
+  "items": [
+    {
+      "criterion": "soundness",
+      "scored": true,
+      "evidence": "reproducibility-portal-gate"
+    },
+    {
+      "criterion": "reproducibility",
+      "scored": true,
+      "evidence": "docs-site-gate"
+    },
+    {
+      "criterion": "evidence-trace",
+      "scored": true,
+      "evidence": "claims-evidence-gate"
+    }
+  ],
+  "bad": {
+    "criterion": "unsupported",
+    "scored": true,
+    "evidence": ""
+  }
+}

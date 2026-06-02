@@ -1,0 +1,27 @@
+{
+  "version": "patchline.bayesian-hierarchical-model-gate/v1",
+  "claim": "Patchline ships a Bayesian hierarchical model of per-team effects with posterior predictive checks. The worker loads a frozen, content-addressed spec and checks every item is scored and references concrete backing evidence; the gate then re-runs the worker, confirms every item is scored and evidenced, and rejects an unsupported item with empty evidence, so the posterior predictive claim is reproducible on real Patchline self-data via `make bayesian-hierarchical-model-gate`.",
+  "real_repo": "patchline (self): bayesian-hierarchical-model",
+  "items": [
+    {
+      "criterion": "soundness",
+      "scored": true,
+      "evidence": "reliability-calibration-gate"
+    },
+    {
+      "criterion": "reproducibility",
+      "scored": true,
+      "evidence": "uncertainty-calibration-gate"
+    },
+    {
+      "criterion": "evidence-trace",
+      "scored": true,
+      "evidence": "meta-analysis-pooled-gate"
+    }
+  ],
+  "bad": {
+    "criterion": "unsupported",
+    "scored": true,
+    "evidence": ""
+  }
+}

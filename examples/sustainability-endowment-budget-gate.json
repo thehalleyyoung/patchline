@@ -1,0 +1,27 @@
+{
+  "version": "patchline.sustainability-endowment-budget-gate/v1",
+  "claim": "Patchline ships a multi-year sustainability endowment with a published, funded maintenance budget. The worker loads a frozen, content-addressed spec and checks every item is scored and references concrete backing evidence; the gate then re-runs the worker, confirms every item is scored and evidenced, and rejects an unsupported item with empty evidence, so the funded maintenance claim is reproducible on real Patchline self-data via `make sustainability-endowment-budget-gate`.",
+  "real_repo": "patchline (self): sustainability-endowment-budget",
+  "items": [
+    {
+      "criterion": "soundness",
+      "scored": true,
+      "evidence": "sustainability-endowment-gate"
+    },
+    {
+      "criterion": "reproducibility",
+      "scored": true,
+      "evidence": "sustainability-plan-gate"
+    },
+    {
+      "criterion": "evidence-trace",
+      "scored": true,
+      "evidence": "governance-policy-gate"
+    }
+  ],
+  "bad": {
+    "criterion": "unsupported",
+    "scored": true,
+    "evidence": ""
+  }
+}

@@ -1,0 +1,27 @@
+{
+  "version": "patchline.research-problems-registry-gate/v1",
+  "claim": "Patchline ships an open research-problems registry with bounties and gate-checkable success criteria. The worker loads a frozen, content-addressed spec and checks every item is scored and references concrete backing evidence; the gate then re-runs the worker, confirms every item is scored and evidenced, and rejects an unsupported item with empty evidence, so the bounties claim is reproducible on real Patchline self-data via `make research-problems-registry-gate`.",
+  "real_repo": "patchline (self): research-problems-registry",
+  "items": [
+    {
+      "criterion": "soundness",
+      "scored": true,
+      "evidence": "roadmap-board-gate"
+    },
+    {
+      "criterion": "reproducibility",
+      "scored": true,
+      "evidence": "starter-issues-gate"
+    },
+    {
+      "criterion": "evidence-trace",
+      "scored": true,
+      "evidence": "open-research-problems-gate"
+    }
+  ],
+  "bad": {
+    "criterion": "unsupported",
+    "scored": true,
+    "evidence": ""
+  }
+}

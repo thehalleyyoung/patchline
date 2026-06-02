@@ -1,0 +1,27 @@
+{
+  "version": "patchline.suite-program-synthesis-gate/v1",
+  "claim": "Patchline ships a program-synthesis engine that repairs an entire migration suite to satisfy a global invariant set. The worker loads a frozen, content-addressed spec and checks every item is scored and references concrete backing evidence; the gate then re-runs the worker, confirms every item is scored and evidenced, and rejects an unsupported item with empty evidence, so the global invariant claim is reproducible on real Patchline self-data via `make suite-program-synthesis-gate`.",
+  "real_repo": "patchline (self): suite-program-synthesis",
+  "items": [
+    {
+      "criterion": "soundness",
+      "scored": true,
+      "evidence": "learned-program-repair-gate"
+    },
+    {
+      "criterion": "reproducibility",
+      "scored": true,
+      "evidence": "backfill-formal-synthesis-gate"
+    },
+    {
+      "criterion": "evidence-trace",
+      "scored": true,
+      "evidence": "invariant-mining-gate"
+    }
+  ],
+  "bad": {
+    "criterion": "unsupported",
+    "scored": true,
+    "evidence": ""
+  }
+}

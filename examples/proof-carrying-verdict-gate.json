@@ -1,0 +1,27 @@
+{
+  "version": "patchline.proof-carrying-verdict-gate/v1",
+  "claim": "Patchline ships a proof-carrying-code format so every emitted verdict travels with a checkable proof witness. The worker loads a frozen, content-addressed spec and checks every item is scored and references concrete backing evidence; the gate then re-runs the worker, confirms every item is scored and evidenced, and rejects an unsupported item with empty evidence, so the proof witness claim is reproducible on real Patchline self-data via `make proof-carrying-verdict-gate`.",
+  "real_repo": "patchline (self): proof-carrying-verdict",
+  "items": [
+    {
+      "criterion": "soundness",
+      "scored": true,
+      "evidence": "certificate-composition-gate"
+    },
+    {
+      "criterion": "reproducibility",
+      "scored": true,
+      "evidence": "soundness-theorem-gate"
+    },
+    {
+      "criterion": "evidence-trace",
+      "scored": true,
+      "evidence": "neuro-symbolic-verdict-gate"
+    }
+  ],
+  "bad": {
+    "criterion": "unsupported",
+    "scored": true,
+    "evidence": ""
+  }
+}

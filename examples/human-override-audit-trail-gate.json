@@ -1,0 +1,27 @@
+{
+  "version": "patchline.human-override-audit-trail-gate/v1",
+  "claim": "Patchline ships a human-override audit trail proving every autonomous action is reversible and logged. The worker loads a frozen, content-addressed spec and checks every item is scored and references concrete backing evidence; the gate then re-runs the worker, confirms every item is scored and evidenced, and rejects an unsupported item with empty evidence, so the reversible claim is reproducible on real Patchline self-data via `make human-override-audit-trail-gate`.",
+  "real_repo": "patchline (self): human-override-audit-trail",
+  "items": [
+    {
+      "criterion": "soundness",
+      "scored": true,
+      "evidence": "merkle-audit-log-gate"
+    },
+    {
+      "criterion": "reproducibility",
+      "scored": true,
+      "evidence": "break-glass-override-gate"
+    },
+    {
+      "criterion": "evidence-trace",
+      "scored": true,
+      "evidence": "intervention-replay-gate"
+    }
+  ],
+  "bad": {
+    "criterion": "unsupported",
+    "scored": true,
+    "evidence": ""
+  }
+}

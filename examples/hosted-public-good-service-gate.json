@@ -1,0 +1,27 @@
+{
+  "version": "patchline.hosted-public-good-service-gate/v1",
+  "claim": "Patchline ships a hosted public good service analyzing open-source PRs for free with transparent cost reporting. The worker loads a frozen, content-addressed spec and checks every item is scored and references concrete backing evidence; the gate then re-runs the worker, confirms every item is scored and evidenced, and rejects an unsupported item with empty evidence, so the transparent cost claim is reproducible on real Patchline self-data via `make hosted-public-good-service-gate`.",
+  "real_repo": "patchline (self): hosted-public-good-service",
+  "items": [
+    {
+      "criterion": "soundness",
+      "scored": true,
+      "evidence": "realtime-pr-checks-gate"
+    },
+    {
+      "criterion": "reproducibility",
+      "scored": true,
+      "evidence": "github-app-install-gate"
+    },
+    {
+      "criterion": "evidence-trace",
+      "scored": true,
+      "evidence": "usage-metering-gate"
+    }
+  ],
+  "bad": {
+    "criterion": "unsupported",
+    "scored": true,
+    "evidence": ""
+  }
+}

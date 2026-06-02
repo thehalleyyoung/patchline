@@ -1,0 +1,27 @@
+{
+  "version": "patchline.developer-productivity-study-gate/v1",
+  "claim": "Patchline ships a measured developer-productivity study showing reduced migration review time at scale. The worker loads a frozen, content-addressed spec and checks every item is scored and references concrete backing evidence; the gate then re-runs the worker, confirms every item is scored and evidenced, and rejects an unsupported item with empty evidence, so the review time claim is reproducible on real Patchline self-data via `make developer-productivity-study-gate`.",
+  "real_repo": "patchline (self): developer-productivity-study",
+  "items": [
+    {
+      "criterion": "soundness",
+      "scored": true,
+      "evidence": "human-timing-study-gate"
+    },
+    {
+      "criterion": "reproducibility",
+      "scored": true,
+      "evidence": "human-factors-study-gate"
+    },
+    {
+      "criterion": "evidence-trace",
+      "scored": true,
+      "evidence": "maintainer-action-simulation-gate"
+    }
+  ],
+  "bad": {
+    "criterion": "unsupported",
+    "scored": true,
+    "evidence": ""
+  }
+}

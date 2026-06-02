@@ -1,0 +1,27 @@
+{
+  "version": "patchline.historical-results-never-regress-gate/v1",
+  "claim": "Patchline ships a results-never-regress guarantee enforced by the full historical benchmark on every release. The worker loads a frozen, content-addressed spec and checks every item is scored and references concrete backing evidence; the gate then re-runs the worker, confirms every item is scored and evidenced, and rejects an unsupported item with empty evidence, so the never regress claim is reproducible on real Patchline self-data via `make historical-results-never-regress-gate`.",
+  "real_repo": "patchline (self): historical-results-never-regress",
+  "items": [
+    {
+      "criterion": "soundness",
+      "scored": true,
+      "evidence": "results-never-regress-gate"
+    },
+    {
+      "criterion": "reproducibility",
+      "scored": true,
+      "evidence": "longitudinal-public-reruns-gate"
+    },
+    {
+      "criterion": "evidence-trace",
+      "scored": true,
+      "evidence": "regression-snapshot-gate"
+    }
+  ],
+  "bad": {
+    "criterion": "unsupported",
+    "scored": true,
+    "evidence": ""
+  }
+}

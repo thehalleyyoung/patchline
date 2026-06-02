@@ -1,0 +1,27 @@
+{
+  "version": "patchline.grand-unified-one-command-index-gate/v1",
+  "claim": "Patchline ships a grand-unified, one-command evidence index proving novelty, rigor, autonomy, adoption, and reproducibility. The worker loads a frozen, content-addressed spec and checks every item is scored and references concrete backing evidence; the gate then re-runs the worker, confirms every item is scored and evidenced, and rejects an unsupported item with empty evidence, so the one-command claim is reproducible on real Patchline self-data via `make grand-unified-one-command-index-gate`.",
+  "real_repo": "patchline (self): grand-unified-one-command-index",
+  "items": [
+    {
+      "criterion": "soundness",
+      "scored": true,
+      "evidence": "grand-unified-evidence-index-gate"
+    },
+    {
+      "criterion": "reproducibility",
+      "scored": true,
+      "evidence": "dossier-gate"
+    },
+    {
+      "criterion": "evidence-trace",
+      "scored": true,
+      "evidence": "vision-dossier-gate"
+    }
+  ],
+  "bad": {
+    "criterion": "unsupported",
+    "scored": true,
+    "evidence": ""
+  }
+}

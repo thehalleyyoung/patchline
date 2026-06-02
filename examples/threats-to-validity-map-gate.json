@@ -1,0 +1,27 @@
+{
+  "version": "patchline.threats-to-validity-map-gate/v1",
+  "claim": "Patchline ships a threats-to-validity section where each threat maps to a robustness or ablation experiment. The worker loads a frozen, content-addressed spec and checks every item is scored and references concrete backing evidence; the gate then re-runs the worker, confirms every item is scored and evidenced, and rejects an unsupported item with empty evidence, so the threats-to-validity claim is reproducible on real Patchline self-data via `make threats-to-validity-map-gate`.",
+  "real_repo": "patchline (self): threats-to-validity-map",
+  "items": [
+    {
+      "criterion": "soundness",
+      "scored": true,
+      "evidence": "threats-to-validity-gate"
+    },
+    {
+      "criterion": "reproducibility",
+      "scored": true,
+      "evidence": "sensitivity-analysis-gate"
+    },
+    {
+      "criterion": "evidence-trace",
+      "scored": true,
+      "evidence": "ablation-study-gate"
+    }
+  ],
+  "bad": {
+    "criterion": "unsupported",
+    "scored": true,
+    "evidence": ""
+  }
+}

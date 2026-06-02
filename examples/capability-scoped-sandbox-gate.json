@@ -1,0 +1,27 @@
+{
+  "version": "patchline.capability-scoped-sandbox-gate/v1",
+  "claim": "Patchline ships a capability-scoped sandbox for the agent with a proven no-side-effect-outside-scope property. The worker loads a frozen, content-addressed spec and checks every item is scored and references concrete backing evidence; the gate then re-runs the worker, confirms every item is scored and evidenced, and rejects an unsupported item with empty evidence, so the no-side-effect-outside-scope claim is reproducible on real Patchline self-data via `make capability-scoped-sandbox-gate`.",
+  "real_repo": "patchline (self): capability-scoped-sandbox",
+  "items": [
+    {
+      "criterion": "soundness",
+      "scored": true,
+      "evidence": "native-sandbox-profile-gate"
+    },
+    {
+      "criterion": "reproducibility",
+      "scored": true,
+      "evidence": "offline-validation-gate"
+    },
+    {
+      "criterion": "evidence-trace",
+      "scored": true,
+      "evidence": "disposable-worktree-gate"
+    }
+  ],
+  "bad": {
+    "criterion": "unsupported",
+    "scored": true,
+    "evidence": ""
+  }
+}

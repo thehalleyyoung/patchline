@@ -1,0 +1,27 @@
+{
+  "version": "patchline.theorem-discovery-loop-gate/v1",
+  "claim": "Patchline ships an automated theorem-discovery loop proposing and proving new safety lemmas. The worker loads a frozen, content-addressed spec and checks every item is scored and references concrete backing evidence; the gate then re-runs the worker, confirms every item is scored and evidenced, and rejects an unsupported item with empty evidence, so the theorem-discovery claim is reproducible on real Patchline self-data via `make theorem-discovery-loop-gate`.",
+  "real_repo": "patchline (self): theorem-discovery-loop",
+  "items": [
+    {
+      "criterion": "soundness",
+      "scored": true,
+      "evidence": "theorem-prover-backend-gate"
+    },
+    {
+      "criterion": "reproducibility",
+      "scored": true,
+      "evidence": "soundness-theorem-gate"
+    },
+    {
+      "criterion": "evidence-trace",
+      "scored": true,
+      "evidence": "self-improving-loop-gate"
+    }
+  ],
+  "bad": {
+    "criterion": "unsupported",
+    "scored": true,
+    "evidence": ""
+  }
+}

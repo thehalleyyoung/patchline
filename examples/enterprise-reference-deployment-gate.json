@@ -1,0 +1,27 @@
+{
+  "version": "patchline.enterprise-reference-deployment-gate/v1",
+  "claim": "Patchline ships a reference enterprise deployment serving a real multi-team org with published SLOs for a quarter. The worker loads a frozen, content-addressed spec and checks every item is scored and references concrete backing evidence; the gate then re-runs the worker, confirms every item is scored and evidenced, and rejects an unsupported item with empty evidence, so the published SLOs claim is reproducible on real Patchline self-data via `make enterprise-reference-deployment-gate`.",
+  "real_repo": "patchline (self): enterprise-reference-deployment",
+  "items": [
+    {
+      "criterion": "soundness",
+      "scored": true,
+      "evidence": "saas-reference-deployment-gate"
+    },
+    {
+      "criterion": "reproducibility",
+      "scored": true,
+      "evidence": "multi-tenant-isolation-gate"
+    },
+    {
+      "criterion": "evidence-trace",
+      "scored": true,
+      "evidence": "admin-analytics-dashboard-gate"
+    }
+  ],
+  "bad": {
+    "criterion": "unsupported",
+    "scored": true,
+    "evidence": ""
+  }
+}

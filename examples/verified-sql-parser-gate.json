@@ -1,0 +1,27 @@
+{
+  "version": "patchline.verified-sql-parser-gate/v1",
+  "claim": "Patchline ships a verified SQL parser front-end with a proof that the AST round-trips the source. The worker loads a frozen, content-addressed spec and checks every item is scored and references concrete backing evidence; the gate then re-runs the worker, confirms every item is scored and evidenced, and rejects an unsupported item with empty evidence, so the round-trip claim is reproducible on real Patchline self-data via `make verified-sql-parser-gate`.",
+  "real_repo": "patchline (self): verified-sql-parser",
+  "items": [
+    {
+      "criterion": "soundness",
+      "scored": true,
+      "evidence": "sql-dialect-normalization-gate"
+    },
+    {
+      "criterion": "reproducibility",
+      "scored": true,
+      "evidence": "canonical-json-gate"
+    },
+    {
+      "criterion": "evidence-trace",
+      "scored": true,
+      "evidence": "mechanized-operational-semantics-gate"
+    }
+  ],
+  "bad": {
+    "criterion": "unsupported",
+    "scored": true,
+    "evidence": ""
+  }
+}

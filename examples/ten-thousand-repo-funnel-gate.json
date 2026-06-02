@@ -1,0 +1,27 @@
+{
+  "version": "patchline.ten-thousand-repo-funnel-gate/v1",
+  "claim": "Patchline ships a measured ten-thousand-repository activation funnel with retention and expansion metrics. The worker loads a frozen, content-addressed spec and checks every item is scored and references concrete backing evidence; the gate then re-runs the worker, confirms every item is scored and evidenced, and rejects an unsupported item with empty evidence, so the retention claim is reproducible on real Patchline self-data via `make ten-thousand-repo-funnel-gate`.",
+  "real_repo": "patchline (self): ten-thousand-repo-funnel",
+  "items": [
+    {
+      "criterion": "soundness",
+      "scored": true,
+      "evidence": "thousand-star-growth-gate"
+    },
+    {
+      "criterion": "reproducibility",
+      "scored": true,
+      "evidence": "self-serve-onboarding-gate"
+    },
+    {
+      "criterion": "evidence-trace",
+      "scored": true,
+      "evidence": "community-impact-report-gate"
+    }
+  ],
+  "bad": {
+    "criterion": "unsupported",
+    "scored": true,
+    "evidence": ""
+  }
+}

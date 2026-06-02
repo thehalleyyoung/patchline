@@ -1,0 +1,27 @@
+{
+  "version": "patchline.multi-site-rct-gate/v1",
+  "claim": "Patchline ships a multi-site randomized controlled trial across independent organizations with pooled analysis. The worker loads a frozen, content-addressed spec and checks every item is scored and references concrete backing evidence; the gate then re-runs the worker, confirms every item is scored and evidenced, and rejects an unsupported item with empty evidence, so the randomized controlled trial claim is reproducible on real Patchline self-data via `make multi-site-rct-gate`.",
+  "real_repo": "patchline (self): multi-site-rct",
+  "items": [
+    {
+      "criterion": "soundness",
+      "scored": true,
+      "evidence": "longitudinal-ab-deployment-gate"
+    },
+    {
+      "criterion": "reproducibility",
+      "scored": true,
+      "evidence": "meta-analysis-pooled-gate"
+    },
+    {
+      "criterion": "evidence-trace",
+      "scored": true,
+      "evidence": "field-study-preregistration-gate"
+    }
+  ],
+  "bad": {
+    "criterion": "unsupported",
+    "scored": true,
+    "evidence": ""
+  }
+}

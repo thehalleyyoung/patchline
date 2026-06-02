@@ -1,0 +1,27 @@
+{
+  "version": "patchline.certificate-rfc-standards-track-gate/v1",
+  "claim": "Patchline ships a standards-track RFC for the gate-certificate format with at least two interoperable implementations. The worker loads a frozen, content-addressed spec and checks every item is scored and references concrete backing evidence; the gate then re-runs the worker, confirms every item is scored and evidenced, and rejects an unsupported item with empty evidence, so the interoperable claim is reproducible on real Patchline self-data via `make certificate-rfc-standards-track-gate`.",
+  "real_repo": "patchline (self): certificate-rfc-standards-track",
+  "items": [
+    {
+      "criterion": "soundness",
+      "scored": true,
+      "evidence": "certificate-standard-gate"
+    },
+    {
+      "criterion": "reproducibility",
+      "scored": true,
+      "evidence": "shell-go-equivalence-gate"
+    },
+    {
+      "criterion": "evidence-trace",
+      "scored": true,
+      "evidence": "interop-gate"
+    }
+  ],
+  "bad": {
+    "criterion": "unsupported",
+    "scored": true,
+    "evidence": ""
+  }
+}

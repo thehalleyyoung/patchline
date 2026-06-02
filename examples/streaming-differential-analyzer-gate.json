@@ -1,0 +1,27 @@
+{
+  "version": "patchline.streaming-differential-analyzer-gate/v1",
+  "claim": "Patchline ships a streaming differential analyzer that reports hazard deltas between any two repo revisions. The worker loads a frozen, content-addressed spec and checks every item is scored and references concrete backing evidence; the gate then re-runs the worker, confirms every item is scored and evidenced, and rejects an unsupported item with empty evidence, so the hazard delta claim is reproducible on real Patchline self-data via `make streaming-differential-analyzer-gate`.",
+  "real_repo": "patchline (self): streaming-differential-analyzer",
+  "items": [
+    {
+      "criterion": "soundness",
+      "scored": true,
+      "evidence": "streaming-analyzer-gate"
+    },
+    {
+      "criterion": "reproducibility",
+      "scored": true,
+      "evidence": "git-history-streaming-gate"
+    },
+    {
+      "criterion": "evidence-trace",
+      "scored": true,
+      "evidence": "schema-diff-gate"
+    }
+  ],
+  "bad": {
+    "criterion": "unsupported",
+    "scored": true,
+    "evidence": ""
+  }
+}

@@ -1,0 +1,27 @@
+{
+  "version": "patchline.citation-adoption-tracking-gate/v1",
+  "claim": "Patchline ships a citation- and adoption-tracking dashboard tying impact to the DOI-pinned artifact. The worker loads a frozen, content-addressed spec and checks every item is scored and references concrete backing evidence; the gate then re-runs the worker, confirms every item is scored and evidenced, and rejects an unsupported item with empty evidence, so the DOI-pinned claim is reproducible on real Patchline self-data via `make citation-adoption-tracking-gate`.",
+  "real_repo": "patchline (self): citation-adoption-tracking",
+  "items": [
+    {
+      "criterion": "soundness",
+      "scored": true,
+      "evidence": "citation-tracking-dashboard-gate"
+    },
+    {
+      "criterion": "reproducibility",
+      "scored": true,
+      "evidence": "citation-doi-gate"
+    },
+    {
+      "criterion": "evidence-trace",
+      "scored": true,
+      "evidence": "community-impact-report-gate"
+    }
+  ],
+  "bad": {
+    "criterion": "unsupported",
+    "scored": true,
+    "evidence": ""
+  }
+}

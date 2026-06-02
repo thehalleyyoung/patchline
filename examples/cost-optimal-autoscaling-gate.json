@@ -1,0 +1,27 @@
+{
+  "version": "patchline.cost-optimal-autoscaling-gate/v1",
+  "claim": "Patchline ships a cost-optimal autoscaling policy with a proven throughput-per-dollar lower bound. The worker loads a frozen, content-addressed spec and checks every item is scored and references concrete backing evidence; the gate then re-runs the worker, confirms every item is scored and evidenced, and rejects an unsupported item with empty evidence, so the throughput-per-dollar claim is reproducible on real Patchline self-data via `make cost-optimal-autoscaling-gate`.",
+  "real_repo": "patchline (self): cost-optimal-autoscaling",
+  "items": [
+    {
+      "criterion": "soundness",
+      "scored": true,
+      "evidence": "work-stealing-scheduler-gate"
+    },
+    {
+      "criterion": "reproducibility",
+      "scored": true,
+      "evidence": "hardware-cost-model-gate"
+    },
+    {
+      "criterion": "evidence-trace",
+      "scored": true,
+      "evidence": "resource-budgets-gate"
+    }
+  ],
+  "bad": {
+    "criterion": "unsupported",
+    "scored": true,
+    "evidence": ""
+  }
+}

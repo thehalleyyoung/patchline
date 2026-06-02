@@ -1,0 +1,27 @@
+{
+  "version": "patchline.office-hours-triage-sla-gate/v1",
+  "claim": "Patchline ships a public office-hours and triage rotation with published response-time SLAs met for a year. The worker loads a frozen, content-addressed spec and checks every item is scored and references concrete backing evidence; the gate then re-runs the worker, confirms every item is scored and evidenced, and rejects an unsupported item with empty evidence, so the response-time SLA claim is reproducible on real Patchline self-data via `make office-hours-triage-sla-gate`.",
+  "real_repo": "patchline (self): office-hours-triage-sla",
+  "items": [
+    {
+      "criterion": "soundness",
+      "scored": true,
+      "evidence": "office-hours-rotation-gate"
+    },
+    {
+      "criterion": "reproducibility",
+      "scored": true,
+      "evidence": "office-hours-gate"
+    },
+    {
+      "criterion": "evidence-trace",
+      "scored": true,
+      "evidence": "feedback-forms-gate"
+    }
+  ],
+  "bad": {
+    "criterion": "unsupported",
+    "scored": true,
+    "evidence": ""
+  }
+}

@@ -1,0 +1,27 @@
+{
+  "version": "patchline.corpus-bias-correction-gate/v1",
+  "claim": "Patchline ships a corpus-bias correction estimator with post-stratification weights and diagnostics. The worker loads a frozen, content-addressed spec and checks every item is scored and references concrete backing evidence; the gate then re-runs the worker, confirms every item is scored and evidenced, and rejects an unsupported item with empty evidence, so the post-stratification claim is reproducible on real Patchline self-data via `make corpus-bias-correction-gate`.",
+  "real_repo": "patchline (self): corpus-bias-correction",
+  "items": [
+    {
+      "criterion": "soundness",
+      "scored": true,
+      "evidence": "stratified-sampler-gate"
+    },
+    {
+      "criterion": "reproducibility",
+      "scored": true,
+      "evidence": "corpus-fairness-gate"
+    },
+    {
+      "criterion": "evidence-trace",
+      "scored": true,
+      "evidence": "prevalence-estimator-gate"
+    }
+  ],
+  "bad": {
+    "criterion": "unsupported",
+    "scored": true,
+    "evidence": ""
+  }
+}

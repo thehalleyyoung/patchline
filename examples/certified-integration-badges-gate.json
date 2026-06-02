@@ -1,0 +1,27 @@
+{
+  "version": "patchline.certified-integration-badges-gate/v1",
+  "claim": "Patchline ships a certified-integration badge program with at least ten third-party tools passing conformance. The worker loads a frozen, content-addressed spec and checks every item is scored and references concrete backing evidence; the gate then re-runs the worker, confirms every item is scored and evidenced, and rejects an unsupported item with empty evidence, so the conformance claim is reproducible on real Patchline self-data via `make certified-integration-badges-gate`.",
+  "real_repo": "patchline (self): certified-integration-badges",
+  "items": [
+    {
+      "criterion": "soundness",
+      "scored": true,
+      "evidence": "ecosystem-certification-gate"
+    },
+    {
+      "criterion": "reproducibility",
+      "scored": true,
+      "evidence": "plugin-conformance-gate"
+    },
+    {
+      "criterion": "evidence-trace",
+      "scored": true,
+      "evidence": "ci-integrations-marketplace-gate"
+    }
+  ],
+  "bad": {
+    "criterion": "unsupported",
+    "scored": true,
+    "evidence": ""
+  }
+}

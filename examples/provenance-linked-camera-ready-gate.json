@@ -1,0 +1,27 @@
+{
+  "version": "patchline.provenance-linked-camera-ready-gate/v1",
+  "claim": "Patchline ships a continuously-rebuilt camera-ready PDF whose every number is provenance-linked in CI. The worker loads a frozen, content-addressed spec and checks every item is scored and references concrete backing evidence; the gate then re-runs the worker, confirms every item is scored and evidenced, and rejects an unsupported item with empty evidence, so the provenance-linked claim is reproducible on real Patchline self-data via `make provenance-linked-camera-ready-gate`.",
+  "real_repo": "patchline (self): provenance-linked-camera-ready",
+  "items": [
+    {
+      "criterion": "soundness",
+      "scored": true,
+      "evidence": "camera-ready-build-gate"
+    },
+    {
+      "criterion": "reproducibility",
+      "scored": true,
+      "evidence": "end-to-end-provenance-gate"
+    },
+    {
+      "criterion": "evidence-trace",
+      "scored": true,
+      "evidence": "claims-evidence-gate"
+    }
+  ],
+  "bad": {
+    "criterion": "unsupported",
+    "scored": true,
+    "evidence": ""
+  }
+}

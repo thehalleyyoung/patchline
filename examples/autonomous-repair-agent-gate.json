@@ -1,0 +1,27 @@
+{
+  "version": "patchline.autonomous-repair-agent-gate/v1",
+  "claim": "Patchline ships an end-to-end autonomous repair agent that opens, defends, and merges verified migration PRs. The worker loads a frozen, content-addressed spec and checks every item is scored and references concrete backing evidence; the gate then re-runs the worker, confirms every item is scored and evidenced, and rejects an unsupported item with empty evidence, so the autonomous claim is reproducible on real Patchline self-data via `make autonomous-repair-agent-gate`.",
+  "real_repo": "patchline (self): autonomous-repair-agent",
+  "items": [
+    {
+      "criterion": "soundness",
+      "scored": true,
+      "evidence": "pr-comment-workflow-gate"
+    },
+    {
+      "criterion": "reproducibility",
+      "scored": true,
+      "evidence": "intervention-replay-gate"
+    },
+    {
+      "criterion": "evidence-trace",
+      "scored": true,
+      "evidence": "verifier-in-the-loop-gate"
+    }
+  ],
+  "bad": {
+    "criterion": "unsupported",
+    "scored": true,
+    "evidence": ""
+  }
+}

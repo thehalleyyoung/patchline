@@ -1,0 +1,27 @@
+{
+  "version": "patchline.robustness-certificate-gate/v1",
+  "claim": "Patchline ships a formal robustness certificate against bounded perturbations of the input migration. The worker loads a frozen, content-addressed spec and checks every item is scored and references concrete backing evidence; the gate then re-runs the worker, confirms every item is scored and evidenced, and rejects an unsupported item with empty evidence, so the bounded perturbations claim is reproducible on real Patchline self-data via `make robustness-certificate-gate`.",
+  "real_repo": "patchline (self): robustness-certificate",
+  "items": [
+    {
+      "criterion": "soundness",
+      "scored": true,
+      "evidence": "perturbation-robustness-gate"
+    },
+    {
+      "criterion": "reproducibility",
+      "scored": true,
+      "evidence": "adversarial-robustness-gate"
+    },
+    {
+      "criterion": "evidence-trace",
+      "scored": true,
+      "evidence": "soundness-theorem-gate"
+    }
+  ],
+  "bad": {
+    "criterion": "unsupported",
+    "scored": true,
+    "evidence": ""
+  }
+}

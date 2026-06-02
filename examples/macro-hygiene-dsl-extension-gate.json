@@ -1,0 +1,27 @@
+{
+  "version": "patchline.macro-hygiene-dsl-extension-gate/v1",
+  "claim": "Patchline ships a verified-by-construction DSL extension mechanism with macro-hygiene proofs. The worker loads a frozen, content-addressed spec and checks every item is scored and references concrete backing evidence; the gate then re-runs the worker, confirms every item is scored and evidenced, and rejects an unsupported item with empty evidence, so the macro-hygiene claim is reproducible on real Patchline self-data via `make macro-hygiene-dsl-extension-gate`.",
+  "real_repo": "patchline (self): macro-hygiene-dsl-extension",
+  "items": [
+    {
+      "criterion": "soundness",
+      "scored": true,
+      "evidence": "plugin-interface-gate"
+    },
+    {
+      "criterion": "reproducibility",
+      "scored": true,
+      "evidence": "verified-dsl-compiler-gate"
+    },
+    {
+      "criterion": "evidence-trace",
+      "scored": true,
+      "evidence": "certificate-composition-gate"
+    }
+  ],
+  "bad": {
+    "criterion": "unsupported",
+    "scored": true,
+    "evidence": ""
+  }
+}

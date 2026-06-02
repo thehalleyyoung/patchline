@@ -1,0 +1,27 @@
+{
+  "version": "patchline.agent-budget-enforcer-gate/v1",
+  "claim": "Patchline ships a cost-and-latency budget enforcer for the agent with a hard ceiling and graceful degradation. The worker loads a frozen, content-addressed spec and checks every item is scored and references concrete backing evidence; the gate then re-runs the worker, confirms every item is scored and evidenced, and rejects an unsupported item with empty evidence, so the hard ceiling claim is reproducible on real Patchline self-data via `make agent-budget-enforcer-gate`.",
+  "real_repo": "patchline (self): agent-budget-enforcer",
+  "items": [
+    {
+      "criterion": "soundness",
+      "scored": true,
+      "evidence": "resource-budgets-gate"
+    },
+    {
+      "criterion": "reproducibility",
+      "scored": true,
+      "evidence": "intervention-budget-tuning-gate"
+    },
+    {
+      "criterion": "evidence-trace",
+      "scored": true,
+      "evidence": "performance-budget-gate"
+    }
+  ],
+  "bad": {
+    "criterion": "unsupported",
+    "scored": true,
+    "evidence": ""
+  }
+}

@@ -1,0 +1,27 @@
+{
+  "version": "patchline.abstraction-selection-policy-gate/v1",
+  "claim": "Patchline ships a learned abstraction-selection policy proven to never weaken soundness. The worker loads a frozen, content-addressed spec and checks every item is scored and references concrete backing evidence; the gate then re-runs the worker, confirms every item is scored and evidenced, and rejects an unsupported item with empty evidence, so the never weaken soundness claim is reproducible on real Patchline self-data via `make abstraction-selection-policy-gate`.",
+  "real_repo": "patchline (self): abstraction-selection-policy",
+  "items": [
+    {
+      "criterion": "soundness",
+      "scored": true,
+      "evidence": "cegar-termination-gate"
+    },
+    {
+      "criterion": "reproducibility",
+      "scored": true,
+      "evidence": "soundness-boundary-gate"
+    },
+    {
+      "criterion": "evidence-trace",
+      "scored": true,
+      "evidence": "learned-risk-model-gate"
+    }
+  ],
+  "bad": {
+    "criterion": "unsupported",
+    "scored": true,
+    "evidence": ""
+  }
+}

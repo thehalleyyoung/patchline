@@ -1,0 +1,27 @@
+{
+  "version": "patchline.community-gate-marketplace-gate/v1",
+  "claim": "Patchline ships a marketplace of community gates with signing, review, and reproducibility requirements. The worker loads a frozen, content-addressed spec and checks every item is scored and references concrete backing evidence; the gate then re-runs the worker, confirms every item is scored and evidenced, and rejects an unsupported item with empty evidence, so the signing claim is reproducible on real Patchline self-data via `make community-gate-marketplace-gate`.",
+  "real_repo": "patchline (self): community-gate-marketplace",
+  "items": [
+    {
+      "criterion": "soundness",
+      "scored": true,
+      "evidence": "plugin-conformance-gate"
+    },
+    {
+      "criterion": "reproducibility",
+      "scored": true,
+      "evidence": "supply-chain-provenance-gate"
+    },
+    {
+      "criterion": "evidence-trace",
+      "scored": true,
+      "evidence": "ci-integrations-marketplace-gate"
+    }
+  ],
+  "bad": {
+    "criterion": "unsupported",
+    "scored": true,
+    "evidence": ""
+  }
+}

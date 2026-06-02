@@ -1,0 +1,27 @@
+{
+  "version": "patchline.regression-discontinuity-study-gate/v1",
+  "claim": "Patchline ships a regression-discontinuity study around adoption thresholds with a placebo test. The worker loads a frozen, content-addressed spec and checks every item is scored and references concrete backing evidence; the gate then re-runs the worker, confirms every item is scored and evidenced, and rejects an unsupported item with empty evidence, so the regression-discontinuity claim is reproducible on real Patchline self-data via `make regression-discontinuity-study-gate`.",
+  "real_repo": "patchline (self): regression-discontinuity-study",
+  "items": [
+    {
+      "criterion": "soundness",
+      "scored": true,
+      "evidence": "causal-effect-estimate-gate"
+    },
+    {
+      "criterion": "reproducibility",
+      "scored": true,
+      "evidence": "longitudinal-ab-deployment-gate"
+    },
+    {
+      "criterion": "evidence-trace",
+      "scored": true,
+      "evidence": "negative-controls-gate"
+    }
+  ],
+  "bad": {
+    "criterion": "unsupported",
+    "scored": true,
+    "evidence": ""
+  }
+}

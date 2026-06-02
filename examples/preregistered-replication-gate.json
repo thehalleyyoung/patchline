@@ -1,0 +1,27 @@
+{
+  "version": "patchline.preregistered-replication-gate/v1",
+  "claim": "Patchline ships a pre-registered replication of the headline trial by an external lab with a frozen protocol. The worker loads a frozen, content-addressed spec and checks every item is scored and references concrete backing evidence; the gate then re-runs the worker, confirms every item is scored and evidenced, and rejects an unsupported item with empty evidence, so the frozen protocol claim is reproducible on real Patchline self-data via `make preregistered-replication-gate`.",
+  "real_repo": "patchline (self): preregistered-replication",
+  "items": [
+    {
+      "criterion": "soundness",
+      "scored": true,
+      "evidence": "evaluation-preregistration-gate"
+    },
+    {
+      "criterion": "reproducibility",
+      "scored": true,
+      "evidence": "external-replication-kit-gate"
+    },
+    {
+      "criterion": "evidence-trace",
+      "scored": true,
+      "evidence": "independent-replication-gate"
+    }
+  ],
+  "bad": {
+    "criterion": "unsupported",
+    "scored": true,
+    "evidence": ""
+  }
+}

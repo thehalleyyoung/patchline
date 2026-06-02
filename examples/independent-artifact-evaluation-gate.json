@@ -1,0 +1,27 @@
+{
+  "version": "patchline.independent-artifact-evaluation-gate/v1",
+  "claim": "Patchline ships an independent artifact-evaluation dry run with an external reviewer's reproduction log. The worker loads a frozen, content-addressed spec and checks every item is scored and references concrete backing evidence; the gate then re-runs the worker, confirms every item is scored and evidenced, and rejects an unsupported item with empty evidence, so the reproduction log claim is reproducible on real Patchline self-data via `make independent-artifact-evaluation-gate`.",
+  "real_repo": "patchline (self): independent-artifact-evaluation",
+  "items": [
+    {
+      "criterion": "soundness",
+      "scored": true,
+      "evidence": "reviewer-dry-run-logs-gate"
+    },
+    {
+      "criterion": "reproducibility",
+      "scored": true,
+      "evidence": "external-auditor-repro-gate"
+    },
+    {
+      "criterion": "evidence-trace",
+      "scored": true,
+      "evidence": "artifact-evaluation-kit-gate"
+    }
+  ],
+  "bad": {
+    "criterion": "unsupported",
+    "scored": true,
+    "evidence": ""
+  }
+}

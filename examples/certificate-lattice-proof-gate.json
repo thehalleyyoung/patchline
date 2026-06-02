@@ -1,0 +1,27 @@
+{
+  "version": "patchline.certificate-lattice-proof-gate/v1",
+  "claim": "Patchline ships a mechanized proof that gate-certificate composition forms a lattice with a top safe element. The worker loads a frozen, content-addressed spec and checks every item is scored and references concrete backing evidence; the gate then re-runs the worker, confirms every item is scored and evidenced, and rejects an unsupported item with empty evidence, so the lattice claim is reproducible on real Patchline self-data via `make certificate-lattice-proof-gate`.",
+  "real_repo": "patchline (self): certificate-lattice-proof",
+  "items": [
+    {
+      "criterion": "soundness",
+      "scored": true,
+      "evidence": "certificate-composition-gate"
+    },
+    {
+      "criterion": "reproducibility",
+      "scored": true,
+      "evidence": "soundness-theorem-gate"
+    },
+    {
+      "criterion": "evidence-trace",
+      "scored": true,
+      "evidence": "bisimulation-equivalence-gate"
+    }
+  ],
+  "bad": {
+    "criterion": "unsupported",
+    "scored": true,
+    "evidence": ""
+  }
+}

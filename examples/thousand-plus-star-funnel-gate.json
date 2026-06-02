@@ -1,0 +1,27 @@
+{
+  "version": "patchline.thousand-plus-star-funnel-gate/v1",
+  "claim": "Patchline ships a thousand-plus-star growth result with a reproducible, measured acquisition funnel. The worker loads a frozen, content-addressed spec and checks every item is scored and references concrete backing evidence; the gate then re-runs the worker, confirms every item is scored and evidenced, and rejects an unsupported item with empty evidence, so the acquisition funnel claim is reproducible on real Patchline self-data via `make thousand-plus-star-funnel-gate`.",
+  "real_repo": "patchline (self): thousand-plus-star-funnel",
+  "items": [
+    {
+      "criterion": "soundness",
+      "scored": true,
+      "evidence": "thousand-star-growth-gate"
+    },
+    {
+      "criterion": "reproducibility",
+      "scored": true,
+      "evidence": "community-impact-report-gate"
+    },
+    {
+      "criterion": "evidence-trace",
+      "scored": true,
+      "evidence": "five-minute-landing-gate"
+    }
+  ],
+  "bad": {
+    "criterion": "unsupported",
+    "scored": true,
+    "evidence": ""
+  }
+}

@@ -1,0 +1,27 @@
+{
+  "version": "patchline.provable-kill-switch-gate/v1",
+  "claim": "Patchline ships a provable kill-switch that halts all autonomy and leaves the repo in a safe state. The worker loads a frozen, content-addressed spec and checks every item is scored and references concrete backing evidence; the gate then re-runs the worker, confirms every item is scored and evidenced, and rejects an unsupported item with empty evidence, so the kill-switch claim is reproducible on real Patchline self-data via `make provable-kill-switch-gate`.",
+  "real_repo": "patchline (self): provable-kill-switch",
+  "items": [
+    {
+      "criterion": "soundness",
+      "scored": true,
+      "evidence": "break-glass-override-gate"
+    },
+    {
+      "criterion": "reproducibility",
+      "scored": true,
+      "evidence": "offline-validation-gate"
+    },
+    {
+      "criterion": "evidence-trace",
+      "scored": true,
+      "evidence": "rollback-check-gate"
+    }
+  ],
+  "bad": {
+    "criterion": "unsupported",
+    "scored": true,
+    "evidence": ""
+  }
+}

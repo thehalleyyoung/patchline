@@ -1,0 +1,27 @@
+{
+  "version": "patchline.registered-report-gate/v1",
+  "claim": "Patchline ships a registered-report submission with in-principle acceptance before results. The worker loads a frozen, content-addressed spec and checks every item is scored and references concrete backing evidence; the gate then re-runs the worker, confirms every item is scored and evidenced, and rejects an unsupported item with empty evidence, so the in-principle acceptance claim is reproducible on real Patchline self-data via `make registered-report-gate`.",
+  "real_repo": "patchline (self): registered-report",
+  "items": [
+    {
+      "criterion": "soundness",
+      "scored": true,
+      "evidence": "evaluation-preregistration-gate"
+    },
+    {
+      "criterion": "reproducibility",
+      "scored": true,
+      "evidence": "field-study-preregistration-gate"
+    },
+    {
+      "criterion": "evidence-trace",
+      "scored": true,
+      "evidence": "data-availability-statement-gate"
+    }
+  ],
+  "bad": {
+    "criterion": "unsupported",
+    "scored": true,
+    "evidence": ""
+  }
+}

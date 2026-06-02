@@ -1,0 +1,27 @@
+{
+  "version": "patchline.adversarial-collaboration-gate/v1",
+  "claim": "Patchline ships an adversarial-collaboration study with a skeptic co-author and an agreed analysis plan. The worker loads a frozen, content-addressed spec and checks every item is scored and references concrete backing evidence; the gate then re-runs the worker, confirms every item is scored and evidenced, and rejects an unsupported item with empty evidence, so the adversarial-collaboration claim is reproducible on real Patchline self-data via `make adversarial-collaboration-gate`.",
+  "real_repo": "patchline (self): adversarial-collaboration",
+  "items": [
+    {
+      "criterion": "soundness",
+      "scored": true,
+      "evidence": "tool-comparison-frozen-gate"
+    },
+    {
+      "criterion": "reproducibility",
+      "scored": true,
+      "evidence": "external-auditor-repro-gate"
+    },
+    {
+      "criterion": "evidence-trace",
+      "scored": true,
+      "evidence": "negative-results-section-gate"
+    }
+  ],
+  "bad": {
+    "criterion": "unsupported",
+    "scored": true,
+    "evidence": ""
+  }
+}

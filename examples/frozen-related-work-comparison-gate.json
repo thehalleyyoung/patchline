@@ -1,0 +1,27 @@
+{
+  "version": "patchline.frozen-related-work-comparison-gate/v1",
+  "claim": "Patchline ships a comprehensive related-work comparison generated from a shared, frozen benchmark harness. The worker loads a frozen, content-addressed spec and checks every item is scored and references concrete backing evidence; the gate then re-runs the worker, confirms every item is scored and evidenced, and rejects an unsupported item with empty evidence, so the frozen benchmark claim is reproducible on real Patchline self-data via `make frozen-related-work-comparison-gate`.",
+  "real_repo": "patchline (self): frozen-related-work-comparison",
+  "items": [
+    {
+      "criterion": "soundness",
+      "scored": true,
+      "evidence": "related-work-table-gate"
+    },
+    {
+      "criterion": "reproducibility",
+      "scored": true,
+      "evidence": "tool-comparison-frozen-gate"
+    },
+    {
+      "criterion": "evidence-trace",
+      "scored": true,
+      "evidence": "linter-baseline-compare-gate"
+    }
+  ],
+  "bad": {
+    "criterion": "unsupported",
+    "scored": true,
+    "evidence": ""
+  }
+}

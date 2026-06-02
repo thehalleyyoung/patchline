@@ -1,0 +1,27 @@
+{
+  "version": "patchline.long-horizon-cohort-study-gate/v1",
+  "claim": "Patchline ships a long-horizon cohort study tracking adopters for twelve months with attrition analysis. The worker loads a frozen, content-addressed spec and checks every item is scored and references concrete backing evidence; the gate then re-runs the worker, confirms every item is scored and evidenced, and rejects an unsupported item with empty evidence, so the attrition claim is reproducible on real Patchline self-data via `make long-horizon-cohort-study-gate`.",
+  "real_repo": "patchline (self): long-horizon-cohort-study",
+  "items": [
+    {
+      "criterion": "soundness",
+      "scored": true,
+      "evidence": "survival-analysis-gate"
+    },
+    {
+      "criterion": "reproducibility",
+      "scored": true,
+      "evidence": "longitudinal-public-reruns-gate"
+    },
+    {
+      "criterion": "evidence-trace",
+      "scored": true,
+      "evidence": "calibration-over-time-gate"
+    }
+  ],
+  "bad": {
+    "criterion": "unsupported",
+    "scored": true,
+    "evidence": ""
+  }
+}

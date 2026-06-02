@@ -1,0 +1,27 @@
+{
+  "version": "patchline.localization-accessibility-parity-gate/v1",
+  "claim": "Patchline ships a localization and accessibility conformance covering twenty languages with parity gates. The worker loads a frozen, content-addressed spec and checks every item is scored and references concrete backing evidence; the gate then re-runs the worker, confirms every item is scored and evidenced, and rejects an unsupported item with empty evidence, so the twenty languages claim is reproducible on real Patchline self-data via `make localization-accessibility-parity-gate`.",
+  "real_repo": "patchline (self): localization-accessibility-parity",
+  "items": [
+    {
+      "criterion": "soundness",
+      "scored": true,
+      "evidence": "localization-parity-gate"
+    },
+    {
+      "criterion": "reproducibility",
+      "scored": true,
+      "evidence": "accessibility-conformance-gate"
+    },
+    {
+      "criterion": "evidence-trace",
+      "scored": true,
+      "evidence": "a11y-i18n-output-gate"
+    }
+  ],
+  "bad": {
+    "criterion": "unsupported",
+    "scored": true,
+    "evidence": ""
+  }
+}

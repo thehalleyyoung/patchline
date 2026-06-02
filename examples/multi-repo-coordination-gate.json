@@ -1,0 +1,27 @@
+{
+  "version": "patchline.multi-repo-coordination-gate/v1",
+  "claim": "Patchline ships a multi-repository coordination protocol for cross-service migrations with two-phase safety. The worker loads a frozen, content-addressed spec and checks every item is scored and references concrete backing evidence; the gate then re-runs the worker, confirms every item is scored and evidenced, and rejects an unsupported item with empty evidence, so the two-phase claim is reproducible on real Patchline self-data via `make multi-repo-coordination-gate`.",
+  "real_repo": "patchline (self): multi-repo-coordination",
+  "items": [
+    {
+      "criterion": "soundness",
+      "scored": true,
+      "evidence": "cross-repo-dependency-analysis-gate"
+    },
+    {
+      "criterion": "reproducibility",
+      "scored": true,
+      "evidence": "monorepo-boundary-gate"
+    },
+    {
+      "criterion": "evidence-trace",
+      "scored": true,
+      "evidence": "infra-ordering-gate"
+    }
+  ],
+  "bad": {
+    "criterion": "unsupported",
+    "scored": true,
+    "evidence": ""
+  }
+}

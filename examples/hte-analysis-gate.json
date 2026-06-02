@@ -1,0 +1,27 @@
+{
+  "version": "patchline.hte-analysis-gate/v1",
+  "claim": "Patchline ships a heterogeneity-of-treatment-effects analysis identifying who benefits most. The worker loads a frozen, content-addressed spec and checks every item is scored and references concrete backing evidence; the gate then re-runs the worker, confirms every item is scored and evidenced, and rejects an unsupported item with empty evidence, so the heterogeneity claim is reproducible on real Patchline self-data via `make hte-analysis-gate`.",
+  "real_repo": "patchline (self): hte-analysis",
+  "items": [
+    {
+      "criterion": "soundness",
+      "scored": true,
+      "evidence": "effect-size-strata-gate"
+    },
+    {
+      "criterion": "reproducibility",
+      "scored": true,
+      "evidence": "generalization-study-gate"
+    },
+    {
+      "criterion": "evidence-trace",
+      "scored": true,
+      "evidence": "causal-effect-estimate-gate"
+    }
+  ],
+  "bad": {
+    "criterion": "unsupported",
+    "scored": true,
+    "evidence": ""
+  }
+}

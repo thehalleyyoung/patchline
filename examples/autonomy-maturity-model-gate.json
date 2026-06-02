@@ -1,0 +1,27 @@
+{
+  "version": "patchline.autonomy-maturity-model-gate/v1",
+  "claim": "Patchline ships an autonomy maturity model with measurable levels and gate-backed promotion criteria. The worker loads a frozen, content-addressed spec and checks every item is scored and references concrete backing evidence; the gate then re-runs the worker, confirms every item is scored and evidenced, and rejects an unsupported item with empty evidence, so the maturity model claim is reproducible on real Patchline self-data via `make autonomy-maturity-model-gate`.",
+  "real_repo": "patchline (self): autonomy-maturity-model",
+  "items": [
+    {
+      "criterion": "soundness",
+      "scored": true,
+      "evidence": "dossier-gate"
+    },
+    {
+      "criterion": "reproducibility",
+      "scored": true,
+      "evidence": "release-smoke-gate"
+    },
+    {
+      "criterion": "evidence-trace",
+      "scored": true,
+      "evidence": "self-improving-loop-gate"
+    }
+  ],
+  "bad": {
+    "criterion": "unsupported",
+    "scored": true,
+    "evidence": ""
+  }
+}

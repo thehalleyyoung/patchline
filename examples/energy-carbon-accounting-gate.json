@@ -1,0 +1,27 @@
+{
+  "version": "patchline.energy-carbon-accounting-gate/v1",
+  "claim": "Patchline ships an energy-and-carbon accounting report for every large analysis run. The worker loads a frozen, content-addressed spec and checks every item is scored and references concrete backing evidence; the gate then re-runs the worker, confirms every item is scored and evidenced, and rejects an unsupported item with empty evidence, so the carbon claim is reproducible on real Patchline self-data via `make energy-carbon-accounting-gate`.",
+  "real_repo": "patchline (self): energy-carbon-accounting",
+  "items": [
+    {
+      "criterion": "soundness",
+      "scored": true,
+      "evidence": "hardware-cost-model-gate"
+    },
+    {
+      "criterion": "reproducibility",
+      "scored": true,
+      "evidence": "resource-budgets-gate"
+    },
+    {
+      "criterion": "evidence-trace",
+      "scored": true,
+      "evidence": "performance-budget-gate"
+    }
+  ],
+  "bad": {
+    "criterion": "unsupported",
+    "scored": true,
+    "evidence": ""
+  }
+}

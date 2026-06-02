@@ -1,0 +1,27 @@
+{
+  "version": "patchline.economic-field-study-gate/v1",
+  "claim": "Patchline ships an economic field study monetizing incident reductions with confidence intervals. The worker loads a frozen, content-addressed spec and checks every item is scored and references concrete backing evidence; the gate then re-runs the worker, confirms every item is scored and evidenced, and rejects an unsupported item with empty evidence, so the confidence interval claim is reproducible on real Patchline self-data via `make economic-field-study-gate`.",
+  "real_repo": "patchline (self): economic-field-study",
+  "items": [
+    {
+      "criterion": "soundness",
+      "scored": true,
+      "evidence": "cost-benefit-analysis-gate"
+    },
+    {
+      "criterion": "reproducibility",
+      "scored": true,
+      "evidence": "error-cost-model-gate"
+    },
+    {
+      "criterion": "evidence-trace",
+      "scored": true,
+      "evidence": "bootstrap-confidence-gate"
+    }
+  ],
+  "bad": {
+    "criterion": "unsupported",
+    "scored": true,
+    "evidence": ""
+  }
+}

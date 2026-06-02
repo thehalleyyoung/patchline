@@ -1,0 +1,27 @@
+{
+  "version": "patchline.global-hazard-prevalence-map-gate/v1",
+  "claim": "Patchline ships a real-time global hazard-prevalence map refreshed from public commits hourly. The worker loads a frozen, content-addressed spec and checks every item is scored and references concrete backing evidence; the gate then re-runs the worker, confirms every item is scored and evidenced, and rejects an unsupported item with empty evidence, so the prevalence map claim is reproducible on real Patchline self-data via `make global-hazard-prevalence-map-gate`.",
+  "real_repo": "patchline (self): global-hazard-prevalence-map",
+  "items": [
+    {
+      "criterion": "soundness",
+      "scored": true,
+      "evidence": "prevalence-estimator-gate"
+    },
+    {
+      "criterion": "reproducibility",
+      "scored": true,
+      "evidence": "git-history-streaming-gate"
+    },
+    {
+      "criterion": "evidence-trace",
+      "scored": true,
+      "evidence": "corpus-refresh-pipeline-gate"
+    }
+  ],
+  "bad": {
+    "criterion": "unsupported",
+    "scored": true,
+    "evidence": ""
+  }
+}

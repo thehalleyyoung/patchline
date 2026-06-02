@@ -1,0 +1,27 @@
+{
+  "version": "patchline.best-paper-best-artifact-dossier-gate/v1",
+  "claim": "Patchline ships a best-paper-and-best-artifact readiness dossier scored against published award rubrics with evidence. The worker loads a frozen, content-addressed spec and checks every item is scored and references concrete backing evidence; the gate then re-runs the worker, confirms every item is scored and evidenced, and rejects an unsupported item with empty evidence, so the award rubrics claim is reproducible on real Patchline self-data via `make best-paper-best-artifact-dossier-gate`.",
+  "real_repo": "patchline (self): best-paper-best-artifact-dossier",
+  "items": [
+    {
+      "criterion": "soundness",
+      "scored": true,
+      "evidence": "best-paper-readiness-gate"
+    },
+    {
+      "criterion": "reproducibility",
+      "scored": true,
+      "evidence": "artifact-badge-audit-gate"
+    },
+    {
+      "criterion": "evidence-trace",
+      "scored": true,
+      "evidence": "grand-unified-evidence-index-gate"
+    }
+  ],
+  "bad": {
+    "criterion": "unsupported",
+    "scored": true,
+    "evidence": ""
+  }
+}

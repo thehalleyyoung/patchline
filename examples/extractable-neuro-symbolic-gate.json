@@ -1,0 +1,27 @@
+{
+  "version": "patchline.extractable-neuro-symbolic-gate/v1",
+  "claim": "Patchline ships a neuro-symbolic model whose symbolic core is extractable and independently checkable. The worker loads a frozen, content-addressed spec and checks every item is scored and references concrete backing evidence; the gate then re-runs the worker, confirms every item is scored and evidenced, and rejects an unsupported item with empty evidence, so the extractable claim is reproducible on real Patchline self-data via `make extractable-neuro-symbolic-gate`.",
+  "real_repo": "patchline (self): extractable-neuro-symbolic",
+  "items": [
+    {
+      "criterion": "soundness",
+      "scored": true,
+      "evidence": "neuro-symbolic-verdict-gate"
+    },
+    {
+      "criterion": "reproducibility",
+      "scored": true,
+      "evidence": "neurosymbolic-explanations-gate"
+    },
+    {
+      "criterion": "evidence-trace",
+      "scored": true,
+      "evidence": "interpretability-probe-gate"
+    }
+  ],
+  "bad": {
+    "criterion": "unsupported",
+    "scored": true,
+    "evidence": ""
+  }
+}

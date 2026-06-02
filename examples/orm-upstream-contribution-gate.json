@@ -1,0 +1,27 @@
+{
+  "version": "patchline.orm-upstream-contribution-gate/v1",
+  "claim": "Patchline ships an upstream contribution wiring Patchline gates into a major ORM's official tooling. The worker loads a frozen, content-addressed spec and checks every item is scored and references concrete backing evidence; the gate then re-runs the worker, confirms every item is scored and evidenced, and rejects an unsupported item with empty evidence, so the upstream claim is reproducible on real Patchline self-data via `make orm-upstream-contribution-gate`.",
+  "real_repo": "patchline (self): orm-upstream-contribution",
+  "items": [
+    {
+      "criterion": "soundness",
+      "scored": true,
+      "evidence": "plugin-conformance-gate"
+    },
+    {
+      "criterion": "reproducibility",
+      "scored": true,
+      "evidence": "ci-integrations-marketplace-gate"
+    },
+    {
+      "criterion": "evidence-trace",
+      "scored": true,
+      "evidence": "orm-normalizer-gate"
+    }
+  ],
+  "bad": {
+    "criterion": "unsupported",
+    "scored": true,
+    "evidence": ""
+  }
+}

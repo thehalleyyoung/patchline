@@ -1,4 +1,5 @@
 .PHONY: build test demo intake-demo plug-and-play-demo repo-demo four-repo-demo repo-slice-matrix impact-gate parser-fact-gate generated-code-gate report-section-gate metric-impact-gate finding-signal-gate nondeterministic-gate public-command-gate industrial-research-gate development-cycle-gate doctor-gate quickstart-gate triage-gate stable-id-gate suppression-gate why-now-gate run-change-gate notify-summary-gate explain-finding-gate public-gallery-gate real-repo-catalog-gate non-github-source-gate dataset-card-gate corpus-fairness-gate stratified-benchmark-gate stale-ref-gate issue-template-gate minimizer-gate recurrence-gate corpus-release-gate research-question-gate research-experiment-driver-gate bootstrap-confidence-gate paired-statistical-tests-gate effect-size-gate sensitivity-analysis-gate ablation-dashboard-gate negative-control-gate reviewer-mode-gate artifact-consistency-gate disposable-worktree-gate language-test-placement-gate guard-mutation-gate native-sandbox-profile-gate generated-provenance-gate repair-manifest-schema-gate generated-patch-minimization-gate generated-risk-budget-gate safe-review-badge-gate intervention-replay-gate sql-dialect-normalization-gate orm-write-effect-extraction-gate transaction-boundary-inference-gate idempotency-classification-gate lock-concurrency-hazard-gate data-retention-privacy-gate invariant-mining-gate trace-code-link-gate blast-radius-gate proof-hole-minimization-gate pr-comment-workflow-gate cross-ci-code-quality-gate datadog-export-adapter-gate otel-collector-ingestion-gate issue-export-adapter-gate infrastructure-scan-gate db-dry-run-gate pre-hook-gate codeowners-routing-gate offline-validation-gate architecture-layer-gate plugin-interface-gate golden-fixture-gate fuzz-coverage-gate performance-budget-gate diagnostics-gate contributor-check-gate compatibility-gate changelog-gate secret-scan-gate prompt-context-gate redaction-stability-gate supply-chain-provenance-gate release-checksum-gate threat-model-gate archive-security-gate generated-code-quarantine-gate privacy-metrics-gate security-review-gate generated-case-studies-gate failure-taxonomy-gate qualitative-notes-gate cross-file-examples-gate rejected-generated-gate reviewability-examples-gate limitations-ledger-gate claims-evidence-gate paper-figures-gate reviewer-walkthrough-gate landing-readme-gate release-distribution-gate docs-site-gate screencast-gate awesome-patchline-gate comparison-pages-gate roadmap-board-gate reproducibility-report-gate contributor-recognition-gate capstone-demo-gate artifact-evaluation-kit-gate artifact-container-profile-gate artifact-badges-gate paper-appendix-gate reviewer-dry-run-logs-gate artifact-release-manifest-gate rebuttal-response-workspace-gate camera-ready-checklist-gate independent-replication-gate failure-injection-suite-gate longitudinal-public-reruns-gate migration-age-stratification-gate ecosystem-balanced-benchmark-gate repository-size-stratification-gate maintainer-action-simulation-gate severity-calibration-gate fp-adjudication-gate fn-discovery-gate ablation-study-gate effect-size-strata-gate otel-trace-gen-gate datadog-timeline-gate prom-grafana-gate runtime-confidence-gate incident-notebook-gate causality-limits-gate runtime-redaction-gate offline-bundle-gate incident-export-gate negative-controls-gate intervention-contracts-gate diff-minimization-gate quarantine-attestation-gate intervention-provenance-graph-gate rejection-taxonomy-gate generated-test-mutation-gate guard-effectiveness-gate intervention-budget-tuning-gate intervention-scorecard-gate intervention-regression-archive-gate mercurial-fossil-source-gate monorepo-boundary-gate multi-ecosystem-migration-gate nosql-change-gate data-pipeline-gate infra-ordering-gate schema-compat-gate fixture-minimizer-gate parser-dashboard-gate onboarding-quest-gate examples-gallery-gate issue-to-artifact-gate contributor-badges-gate starter-issues-gate governance-gate release-notes-gate office-hours-gate feedback-forms-gate conference-demos-gate adoption-case-studies-gate incremental-cache-gate parallel-corpus-gate resumable-gates-gate error-taxonomy-gate resource-budgets-gate flaky-detect-gate canonical-json-gate shell-portability-gate artifact-gc-gate release-smoke-gate dataflow-summary-gate query-shape-gate rollback-check-gate lock-duration-gate tenant-risk-gate privacy-impact-gate uncertainty-calibration-gate proof-hole-graph-gate pattern-mining-gate explainable-ranking-gate paper-build-gate claim-freeze-gate reviewer-search-gate artifact-mirror-gate rc-rehearsal-gate leaderboard-gate case-bundle-gate eval-matrix-gate launch-kit-gate burndown-gate counterfactual-gate invariant-extract-gate symexec-gate modelcheck-gate causal-graph-gate active-learning-gate risk-economics-gate reviewer-sim-gate interop-gate dossier-gate taint-tracker-gate orm-normalizer-gate schema-diff-gate constraint-solver-gate column-lineage-gate backfill-completeness-gate index-coverage-gate transaction-boundary-gate type-narrowing-gate dead-column-gate corpus-harness-gate language-extractors-gate streaming-analyzer-gate work-queue-gate incremental-reanalysis-gate gold-subset-gate confusion-matrix-gate stratified-sampler-gate drift-monitor-gate benchmark-release-gate linter-baseline-compare-gate mcnemar-significance-gate stage-ablation-gate human-timing-study-gate error-cost-model-gate reliability-calibration-gate framework-holdout-gate perturbation-robustness-gate historical-replay-study-gate external-replication-kit-gate signed-provenance-chain-gate reproducible-build-attestation-gate merkle-audit-log-gate secret-leak-scanner-gate sbom-pinned-deps-gate differential-privacy-stats-gate red-team-adversarial-gate fuzzing-harness-gate soundness-boundary-gate security-threat-model-gate quickstart-sixty-seconds-gate inline-review-surface-gate minimal-repro-generator-gate fix-suggestion-engine-gate evidence-trace-view-gate ci-pr-bot-gate triage-prioritizer-gate config-profiles-gate regression-snapshot-gate a11y-i18n-output-gate contributor-onboarding-gate good-first-issue-gen-gate office-hours-rotation-gate plugin-conformance-gate showcase-gallery-gate quarterly-benchmark-report-gate governance-policy-gate citation-doi-gate sustainability-plan-gate roadmap-burndown-gate learned-risk-model-gate neuro-symbolic-verdict-gate backfill-synthesis-gate llm-judge-harness-gate invariant-inference-gate differential-semantics-gate incident-forecaster-gate counterfactual-explanation-gate transfer-learning-study-gate causal-effect-estimate-gate theorem-prover-backend-gate rl-reviewer-gate multimodal-finding-gate abstention-policy-gate self-improving-loop-gate repro-appendix-gate hermetic-artifact-container-gate results-regeneration-gate anonymized-build-gate threats-to-validity-gate related-work-table-gate limitations-gate-gate reviewer-reproduction-guide-gate dataset-datasheet-gate model-card-gate camera-ready-build-gate demo-video-script-gate artifact-badge-audit-gate evaluation-preregistration-gate rebuttal-evidence-pack-gate ci-integrations-marketplace-gate five-minute-landing-gate localized-quickstarts-gate incident-prevention-scoreboard-gate conference-talk-kit-gate partner-case-study-gate ecosystem-certification-gate reproducibility-vault-gate community-impact-report-gate vision-dossier-gate third-party-security-audit-gate adopter-incident-reduction-gate citation-tracking-dashboard-gate results-never-regress-gate end-to-end-provenance-gate bit-identical-rebuild-gate formal-methods-appendix-gate adoption-case-studies-signed-gate best-paper-readiness-gate thousand-star-growth-gate one-command-paper-gate sustainability-endowment-gate extensibility-proof-gate impact-retrospective-gate grand-unified-evidence-index-gate acm-reproduced-badge-gate tutorial-autograder-gate textbook-chapter-gate certificate-standard-gate dataset-release-package-gate maintainer-council-gate bug-bounty-program-gate contributor-ladder-gate community-survey-gate workshop-proposal-gate integration-partner-program-gate localization-parity-gate lts-release-line-gate accessibility-conformance-gate public-roadmap-burndown-gate learned-program-repair-gate active-learning-loop-gate fm-assisted-extractor-gate causal-discovery-module-gate backfill-formal-synthesis-gate multi-agent-debate-gate conformal-uncertainty-gate cross-domain-transfer-gate rl-rollout-sequencing-gate neurosymbolic-explanations-gate hazard-benchmark-generator-gate reviewer-action-model-gate continual-learning-eval-gate data-valuation-analysis-gate adversarial-training-loop-gate interpretability-probe-gate cross-lingual-comments-gate incident-simulation-env-gate meta-gate-predictor-gate replication-leaderboard-gate saas-reference-deployment-gate github-app-install-gate policy-as-code-layer-gate findings-to-ticket-bridge-gate realtime-pr-checks-gate self-serve-onboarding-gate upgrade-safety-advisor-gate multi-tenant-isolation-gate usage-metering-gate airgapped-distribution-gate customer-managed-keys-gate admin-analytics-dashboard-gate soc2-controls-map-gate break-glass-override-gate reproducibility-portal-gate field-study-preregistration-gate multi-rater-ground-truth-gate tool-comparison-frozen-gate longitudinal-ab-deployment-gate cost-benefit-analysis-gate survival-analysis-gate external-auditor-repro-gate negative-results-section-gate generalization-study-gate adversarial-robustness-gate calibration-over-time-gate human-factors-study-gate replication-package-ci-gate meta-analysis-pooled-gate data-availability-statement-gate million-migration-harness-gate cross-repo-dependency-analysis-gate work-stealing-scheduler-gate incremental-hazard-index-gate git-history-streaming-gate multi-engine-matrix-gate polyglot-orm-frontend-gate prevalence-estimator-gate corpus-refresh-pipeline-gate hardware-cost-model-gate mechanized-operational-semantics-gate soundness-theorem-gate completeness-characterization-gate decision-procedure-complexity-gate refinement-types-columns-gate bisimulation-equivalence-gate certificate-composition-gate cutover-protocol-model-gate cegar-termination-gate shell-go-equivalence-gate mechanized-operational-semantics-gate soundness-theorem-gate completeness-characterization-gate decision-procedure-complexity-gate refinement-types-columns-gate bisimulation-equivalence-gate certificate-composition-gate cutover-protocol-model-gate cegar-termination-gate shell-go-equivalence-gate gate fmt public-corpus verify-usefulness artifact-smoke artifact-demo artifact-ground-truth-check phase-check artifact-baselines artifact-ablations artifact-scale artifact-studies artifact-studies-expected artifact-studies-compare artifact-studies-refresh artifact-baselines-public artifact-ablations-public artifact-scale-public artifact-studies-public-expected artifact-studies-public-compare artifact-studies-all artifact-tables artifact-numbers artifact-subtasks artifact-corpus-audit artifact-provenance artifact-benchmark artifact-benchmark-repairs artifact-benchmark-regressions artifact-benchmark-public artifact-benchmark-public-incidents artifact-benchmark-public-repairs artifact-benchmark-public-archive artifact-benchmark-refresh artifact-benchmark-compare artifact-negative-cases artifact-full artifact-clean
+.PHONY: type-effect-system-gate separation-logic-migrations-gate proof-carrying-verdict-gate verified-sql-parser-gate redaction-structure-proof-gate relational-range-domain-gate verified-incremental-analysis-gate cutover-temporal-logic-gate certificate-lattice-proof-gate verified-dsl-compiler-gate ten-million-migration-mining-gate global-hazard-prevalence-map-gate federated-cross-org-analysis-gate streaming-differential-analyzer-gate provenance-dedup-gate corpus-bias-correction-gate multi-cloud-scale-benchmark-gate energy-carbon-accounting-gate cost-optimal-autoscaling-gate corpus-stats-public-api-gate multi-site-rct-gate instrumental-variable-estimate-gate regression-discontinuity-study-gate difference-in-differences-gate bayesian-hierarchical-model-gate preregistered-replication-gate evalue-confounding-bound-gate long-horizon-cohort-study-gate mediation-analysis-gate economic-field-study-gate non-inferiority-analysis-gate hte-analysis-gate fraud-resistant-outcome-verification-gate registered-report-gate adversarial-collaboration-gate autonomous-repair-agent-gate verifier-in-the-loop-gate capability-scoped-sandbox-gate human-override-audit-trail-gate learned-policy-safety-case-gate agent-prompt-injection-redteam-gate abstention-escalation-policy-gate agent-regression-guard-gate multi-repo-coordination-gate agent-deterministic-replay-gate agent-budget-enforcer-gate agent-shadow-mode-gate reviewer-preference-fairness-gate provable-kill-switch-gate autonomy-maturity-model-gate enterprise-reference-deployment-gate orm-upstream-contribution-gate certificate-rfc-standards-track-gate hosted-public-good-service-gate certified-integration-badges-gate external-curriculum-module-gate industry-working-group-gate ten-thousand-repo-funnel-gate localization-accessibility-parity-gate community-gate-marketplace-gate audited-incident-dashboard-gate partner-hazard-sdk-gate office-hours-triage-sla-gate enterprise-procurement-kit-gate developer-productivity-study-gate suite-program-synthesis-gate abstraction-selection-policy-gate extractable-neuro-symbolic-gate schema-self-supervised-pretrain-gate hazard-equivalence-classes-gate information-theoretic-bound-gate theorem-discovery-loop-gate event-sourcing-crdt-transfer-gate macro-hygiene-dsl-extension-gate continual-evaluation-harness-gate mechanistic-feature-study-gate uncertainty-decomposition-gate robustness-certificate-gate foundation-model-finetune-gate research-problems-registry-gate one-command-paper-repro-gate provenance-linked-camera-ready-gate machine-checked-appendix-badge-gate interactive-web-companion-gate doi-pinned-artifact-snapshot-gate threats-to-validity-map-gate frozen-related-work-comparison-gate negative-results-chapter-gate independent-artifact-evaluation-gate historical-results-never-regress-gate audited-incident-reduction-field-gate citation-adoption-tracking-gate successor-architecture-proof-gate sustainability-endowment-budget-gate governance-succession-plan-gate ratified-certificate-format-gate best-paper-best-artifact-dossier-gate thousand-plus-star-funnel-gate longitudinal-impact-retrospective-gate grand-unified-one-command-index-gate
 
 build:
 	go build -o bin/patchline ./cmd/patchline
@@ -995,6 +996,307 @@ impact-retrospective-gate:
 
 grand-unified-evidence-index-gate:
 	bash scripts/grand-unified-evidence-index-gate.sh
+
+type-effect-system-gate:
+	bash scripts/type-effect-system-gate.sh
+
+separation-logic-migrations-gate:
+	bash scripts/separation-logic-migrations-gate.sh
+
+proof-carrying-verdict-gate:
+	bash scripts/proof-carrying-verdict-gate.sh
+
+verified-sql-parser-gate:
+	bash scripts/verified-sql-parser-gate.sh
+
+redaction-structure-proof-gate:
+	bash scripts/redaction-structure-proof-gate.sh
+
+relational-range-domain-gate:
+	bash scripts/relational-range-domain-gate.sh
+
+verified-incremental-analysis-gate:
+	bash scripts/verified-incremental-analysis-gate.sh
+
+cutover-temporal-logic-gate:
+	bash scripts/cutover-temporal-logic-gate.sh
+
+certificate-lattice-proof-gate:
+	bash scripts/certificate-lattice-proof-gate.sh
+
+verified-dsl-compiler-gate:
+	bash scripts/verified-dsl-compiler-gate.sh
+
+ten-million-migration-mining-gate:
+	bash scripts/ten-million-migration-mining-gate.sh
+
+global-hazard-prevalence-map-gate:
+	bash scripts/global-hazard-prevalence-map-gate.sh
+
+federated-cross-org-analysis-gate:
+	bash scripts/federated-cross-org-analysis-gate.sh
+
+streaming-differential-analyzer-gate:
+	bash scripts/streaming-differential-analyzer-gate.sh
+
+provenance-dedup-gate:
+	bash scripts/provenance-dedup-gate.sh
+
+corpus-bias-correction-gate:
+	bash scripts/corpus-bias-correction-gate.sh
+
+multi-cloud-scale-benchmark-gate:
+	bash scripts/multi-cloud-scale-benchmark-gate.sh
+
+energy-carbon-accounting-gate:
+	bash scripts/energy-carbon-accounting-gate.sh
+
+cost-optimal-autoscaling-gate:
+	bash scripts/cost-optimal-autoscaling-gate.sh
+
+corpus-stats-public-api-gate:
+	bash scripts/corpus-stats-public-api-gate.sh
+
+multi-site-rct-gate:
+	bash scripts/multi-site-rct-gate.sh
+
+instrumental-variable-estimate-gate:
+	bash scripts/instrumental-variable-estimate-gate.sh
+
+regression-discontinuity-study-gate:
+	bash scripts/regression-discontinuity-study-gate.sh
+
+difference-in-differences-gate:
+	bash scripts/difference-in-differences-gate.sh
+
+bayesian-hierarchical-model-gate:
+	bash scripts/bayesian-hierarchical-model-gate.sh
+
+preregistered-replication-gate:
+	bash scripts/preregistered-replication-gate.sh
+
+evalue-confounding-bound-gate:
+	bash scripts/evalue-confounding-bound-gate.sh
+
+long-horizon-cohort-study-gate:
+	bash scripts/long-horizon-cohort-study-gate.sh
+
+mediation-analysis-gate:
+	bash scripts/mediation-analysis-gate.sh
+
+economic-field-study-gate:
+	bash scripts/economic-field-study-gate.sh
+
+non-inferiority-analysis-gate:
+	bash scripts/non-inferiority-analysis-gate.sh
+
+hte-analysis-gate:
+	bash scripts/hte-analysis-gate.sh
+
+fraud-resistant-outcome-verification-gate:
+	bash scripts/fraud-resistant-outcome-verification-gate.sh
+
+registered-report-gate:
+	bash scripts/registered-report-gate.sh
+
+adversarial-collaboration-gate:
+	bash scripts/adversarial-collaboration-gate.sh
+
+autonomous-repair-agent-gate:
+	bash scripts/autonomous-repair-agent-gate.sh
+
+verifier-in-the-loop-gate:
+	bash scripts/verifier-in-the-loop-gate.sh
+
+capability-scoped-sandbox-gate:
+	bash scripts/capability-scoped-sandbox-gate.sh
+
+human-override-audit-trail-gate:
+	bash scripts/human-override-audit-trail-gate.sh
+
+learned-policy-safety-case-gate:
+	bash scripts/learned-policy-safety-case-gate.sh
+
+agent-prompt-injection-redteam-gate:
+	bash scripts/agent-prompt-injection-redteam-gate.sh
+
+abstention-escalation-policy-gate:
+	bash scripts/abstention-escalation-policy-gate.sh
+
+agent-regression-guard-gate:
+	bash scripts/agent-regression-guard-gate.sh
+
+multi-repo-coordination-gate:
+	bash scripts/multi-repo-coordination-gate.sh
+
+agent-deterministic-replay-gate:
+	bash scripts/agent-deterministic-replay-gate.sh
+
+agent-budget-enforcer-gate:
+	bash scripts/agent-budget-enforcer-gate.sh
+
+agent-shadow-mode-gate:
+	bash scripts/agent-shadow-mode-gate.sh
+
+reviewer-preference-fairness-gate:
+	bash scripts/reviewer-preference-fairness-gate.sh
+
+provable-kill-switch-gate:
+	bash scripts/provable-kill-switch-gate.sh
+
+autonomy-maturity-model-gate:
+	bash scripts/autonomy-maturity-model-gate.sh
+
+enterprise-reference-deployment-gate:
+	bash scripts/enterprise-reference-deployment-gate.sh
+
+orm-upstream-contribution-gate:
+	bash scripts/orm-upstream-contribution-gate.sh
+
+certificate-rfc-standards-track-gate:
+	bash scripts/certificate-rfc-standards-track-gate.sh
+
+hosted-public-good-service-gate:
+	bash scripts/hosted-public-good-service-gate.sh
+
+certified-integration-badges-gate:
+	bash scripts/certified-integration-badges-gate.sh
+
+external-curriculum-module-gate:
+	bash scripts/external-curriculum-module-gate.sh
+
+industry-working-group-gate:
+	bash scripts/industry-working-group-gate.sh
+
+ten-thousand-repo-funnel-gate:
+	bash scripts/ten-thousand-repo-funnel-gate.sh
+
+localization-accessibility-parity-gate:
+	bash scripts/localization-accessibility-parity-gate.sh
+
+community-gate-marketplace-gate:
+	bash scripts/community-gate-marketplace-gate.sh
+
+audited-incident-dashboard-gate:
+	bash scripts/audited-incident-dashboard-gate.sh
+
+partner-hazard-sdk-gate:
+	bash scripts/partner-hazard-sdk-gate.sh
+
+office-hours-triage-sla-gate:
+	bash scripts/office-hours-triage-sla-gate.sh
+
+enterprise-procurement-kit-gate:
+	bash scripts/enterprise-procurement-kit-gate.sh
+
+developer-productivity-study-gate:
+	bash scripts/developer-productivity-study-gate.sh
+
+suite-program-synthesis-gate:
+	bash scripts/suite-program-synthesis-gate.sh
+
+abstraction-selection-policy-gate:
+	bash scripts/abstraction-selection-policy-gate.sh
+
+extractable-neuro-symbolic-gate:
+	bash scripts/extractable-neuro-symbolic-gate.sh
+
+schema-self-supervised-pretrain-gate:
+	bash scripts/schema-self-supervised-pretrain-gate.sh
+
+hazard-equivalence-classes-gate:
+	bash scripts/hazard-equivalence-classes-gate.sh
+
+information-theoretic-bound-gate:
+	bash scripts/information-theoretic-bound-gate.sh
+
+theorem-discovery-loop-gate:
+	bash scripts/theorem-discovery-loop-gate.sh
+
+event-sourcing-crdt-transfer-gate:
+	bash scripts/event-sourcing-crdt-transfer-gate.sh
+
+macro-hygiene-dsl-extension-gate:
+	bash scripts/macro-hygiene-dsl-extension-gate.sh
+
+continual-evaluation-harness-gate:
+	bash scripts/continual-evaluation-harness-gate.sh
+
+mechanistic-feature-study-gate:
+	bash scripts/mechanistic-feature-study-gate.sh
+
+uncertainty-decomposition-gate:
+	bash scripts/uncertainty-decomposition-gate.sh
+
+robustness-certificate-gate:
+	bash scripts/robustness-certificate-gate.sh
+
+foundation-model-finetune-gate:
+	bash scripts/foundation-model-finetune-gate.sh
+
+research-problems-registry-gate:
+	bash scripts/research-problems-registry-gate.sh
+
+one-command-paper-repro-gate:
+	bash scripts/one-command-paper-repro-gate.sh
+
+provenance-linked-camera-ready-gate:
+	bash scripts/provenance-linked-camera-ready-gate.sh
+
+machine-checked-appendix-badge-gate:
+	bash scripts/machine-checked-appendix-badge-gate.sh
+
+interactive-web-companion-gate:
+	bash scripts/interactive-web-companion-gate.sh
+
+doi-pinned-artifact-snapshot-gate:
+	bash scripts/doi-pinned-artifact-snapshot-gate.sh
+
+threats-to-validity-map-gate:
+	bash scripts/threats-to-validity-map-gate.sh
+
+frozen-related-work-comparison-gate:
+	bash scripts/frozen-related-work-comparison-gate.sh
+
+negative-results-chapter-gate:
+	bash scripts/negative-results-chapter-gate.sh
+
+independent-artifact-evaluation-gate:
+	bash scripts/independent-artifact-evaluation-gate.sh
+
+historical-results-never-regress-gate:
+	bash scripts/historical-results-never-regress-gate.sh
+
+audited-incident-reduction-field-gate:
+	bash scripts/audited-incident-reduction-field-gate.sh
+
+citation-adoption-tracking-gate:
+	bash scripts/citation-adoption-tracking-gate.sh
+
+successor-architecture-proof-gate:
+	bash scripts/successor-architecture-proof-gate.sh
+
+sustainability-endowment-budget-gate:
+	bash scripts/sustainability-endowment-budget-gate.sh
+
+governance-succession-plan-gate:
+	bash scripts/governance-succession-plan-gate.sh
+
+ratified-certificate-format-gate:
+	bash scripts/ratified-certificate-format-gate.sh
+
+best-paper-best-artifact-dossier-gate:
+	bash scripts/best-paper-best-artifact-dossier-gate.sh
+
+thousand-plus-star-funnel-gate:
+	bash scripts/thousand-plus-star-funnel-gate.sh
+
+longitudinal-impact-retrospective-gate:
+	bash scripts/longitudinal-impact-retrospective-gate.sh
+
+grand-unified-one-command-index-gate:
+	bash scripts/grand-unified-one-command-index-gate.sh
+
 
 
 acm-reproduced-badge-gate:

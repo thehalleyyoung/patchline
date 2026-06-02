@@ -1,0 +1,27 @@
+{
+  "version": "patchline.federated-cross-org-analysis-gate/v1",
+  "claim": "Patchline ships a cross-organization federated analysis that shares hazards without sharing source. The worker loads a frozen, content-addressed spec and checks every item is scored and references concrete backing evidence; the gate then re-runs the worker, confirms every item is scored and evidenced, and rejects an unsupported item with empty evidence, so the federated claim is reproducible on real Patchline self-data via `make federated-cross-org-analysis-gate`.",
+  "real_repo": "patchline (self): federated-cross-org-analysis",
+  "items": [
+    {
+      "criterion": "soundness",
+      "scored": true,
+      "evidence": "differential-privacy-stats-gate"
+    },
+    {
+      "criterion": "reproducibility",
+      "scored": true,
+      "evidence": "redaction-stability-gate"
+    },
+    {
+      "criterion": "evidence-trace",
+      "scored": true,
+      "evidence": "multi-tenant-isolation-gate"
+    }
+  ],
+  "bad": {
+    "criterion": "unsupported",
+    "scored": true,
+    "evidence": ""
+  }
+}

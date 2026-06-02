@@ -1,0 +1,27 @@
+{
+  "version": "patchline.evalue-confounding-bound-gate/v1",
+  "claim": "Patchline ships a sensitivity-to-confounding bound (E-value) for every causal claim in the paper. The worker loads a frozen, content-addressed spec and checks every item is scored and references concrete backing evidence; the gate then re-runs the worker, confirms every item is scored and evidenced, and rejects an unsupported item with empty evidence, so the E-value claim is reproducible on real Patchline self-data via `make evalue-confounding-bound-gate`.",
+  "real_repo": "patchline (self): evalue-confounding-bound",
+  "items": [
+    {
+      "criterion": "soundness",
+      "scored": true,
+      "evidence": "sensitivity-analysis-gate"
+    },
+    {
+      "criterion": "reproducibility",
+      "scored": true,
+      "evidence": "causal-effect-estimate-gate"
+    },
+    {
+      "criterion": "evidence-trace",
+      "scored": true,
+      "evidence": "threats-to-validity-gate"
+    }
+  ],
+  "bad": {
+    "criterion": "unsupported",
+    "scored": true,
+    "evidence": ""
+  }
+}

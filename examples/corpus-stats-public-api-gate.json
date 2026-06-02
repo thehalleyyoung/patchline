@@ -1,0 +1,27 @@
+{
+  "version": "patchline.corpus-stats-public-api-gate/v1",
+  "claim": "Patchline ships a public, versioned API serving corpus-scale hazard statistics with rate-limited reproducibility. The worker loads a frozen, content-addressed spec and checks every item is scored and references concrete backing evidence; the gate then re-runs the worker, confirms every item is scored and evidenced, and rejects an unsupported item with empty evidence, so the rate-limited claim is reproducible on real Patchline self-data via `make corpus-stats-public-api-gate`.",
+  "real_repo": "patchline (self): corpus-stats-public-api",
+  "items": [
+    {
+      "criterion": "soundness",
+      "scored": true,
+      "evidence": "benchmark-release-gate"
+    },
+    {
+      "criterion": "reproducibility",
+      "scored": true,
+      "evidence": "corpus-release-gate"
+    },
+    {
+      "criterion": "evidence-trace",
+      "scored": true,
+      "evidence": "prevalence-estimator-gate"
+    }
+  ],
+  "bad": {
+    "criterion": "unsupported",
+    "scored": true,
+    "evidence": ""
+  }
+}

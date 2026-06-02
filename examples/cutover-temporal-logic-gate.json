@@ -1,0 +1,27 @@
+{
+  "version": "patchline.cutover-temporal-logic-gate/v1",
+  "claim": "Patchline ships a temporal-logic specification of cutover safety model-checked over all interleavings. The worker loads a frozen, content-addressed spec and checks every item is scored and references concrete backing evidence; the gate then re-runs the worker, confirms every item is scored and evidenced, and rejects an unsupported item with empty evidence, so the temporal-logic claim is reproducible on real Patchline self-data via `make cutover-temporal-logic-gate`.",
+  "real_repo": "patchline (self): cutover-temporal-logic",
+  "items": [
+    {
+      "criterion": "soundness",
+      "scored": true,
+      "evidence": "modelcheck-gate"
+    },
+    {
+      "criterion": "reproducibility",
+      "scored": true,
+      "evidence": "cutover-protocol-model-gate"
+    },
+    {
+      "criterion": "evidence-trace",
+      "scored": true,
+      "evidence": "symexec-gate"
+    }
+  ],
+  "bad": {
+    "criterion": "unsupported",
+    "scored": true,
+    "evidence": ""
+  }
+}

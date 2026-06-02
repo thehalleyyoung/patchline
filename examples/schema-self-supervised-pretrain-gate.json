@@ -1,0 +1,27 @@
+{
+  "version": "patchline.schema-self-supervised-pretrain-gate/v1",
+  "claim": "Patchline ships a self-supervised pretraining objective over schemas with a downstream-accuracy gate. The worker loads a frozen, content-addressed spec and checks every item is scored and references concrete backing evidence; the gate then re-runs the worker, confirms every item is scored and evidenced, and rejects an unsupported item with empty evidence, so the self-supervised claim is reproducible on real Patchline self-data via `make schema-self-supervised-pretrain-gate`.",
+  "real_repo": "patchline (self): schema-self-supervised-pretrain",
+  "items": [
+    {
+      "criterion": "soundness",
+      "scored": true,
+      "evidence": "transfer-learning-study-gate"
+    },
+    {
+      "criterion": "reproducibility",
+      "scored": true,
+      "evidence": "continual-learning-eval-gate"
+    },
+    {
+      "criterion": "evidence-trace",
+      "scored": true,
+      "evidence": "framework-holdout-gate"
+    }
+  ],
+  "bad": {
+    "criterion": "unsupported",
+    "scored": true,
+    "evidence": ""
+  }
+}

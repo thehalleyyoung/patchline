@@ -1,0 +1,27 @@
+{
+  "version": "patchline.agent-deterministic-replay-gate/v1",
+  "claim": "Patchline ships a deterministic replay of any agent session reproducing every decision from logs. The worker loads a frozen, content-addressed spec and checks every item is scored and references concrete backing evidence; the gate then re-runs the worker, confirms every item is scored and evidenced, and rejects an unsupported item with empty evidence, so the deterministic replay claim is reproducible on real Patchline self-data via `make agent-deterministic-replay-gate`.",
+  "real_repo": "patchline (self): agent-deterministic-replay",
+  "items": [
+    {
+      "criterion": "soundness",
+      "scored": true,
+      "evidence": "intervention-replay-gate"
+    },
+    {
+      "criterion": "reproducibility",
+      "scored": true,
+      "evidence": "replay-gate"
+    },
+    {
+      "criterion": "evidence-trace",
+      "scored": true,
+      "evidence": "historical-replay-study-gate"
+    }
+  ],
+  "bad": {
+    "criterion": "unsupported",
+    "scored": true,
+    "evidence": ""
+  }
+}

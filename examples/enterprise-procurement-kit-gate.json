@@ -1,0 +1,27 @@
+{
+  "version": "patchline.enterprise-procurement-kit-gate/v1",
+  "claim": "Patchline ships an enterprise procurement kit (security, legal, SLA) backed by automated evidence. The worker loads a frozen, content-addressed spec and checks every item is scored and references concrete backing evidence; the gate then re-runs the worker, confirms every item is scored and evidenced, and rejects an unsupported item with empty evidence, so the procurement claim is reproducible on real Patchline self-data via `make enterprise-procurement-kit-gate`.",
+  "real_repo": "patchline (self): enterprise-procurement-kit",
+  "items": [
+    {
+      "criterion": "soundness",
+      "scored": true,
+      "evidence": "soc2-controls-map-gate"
+    },
+    {
+      "criterion": "reproducibility",
+      "scored": true,
+      "evidence": "threat-model-gate"
+    },
+    {
+      "criterion": "evidence-trace",
+      "scored": true,
+      "evidence": "security-review-gate"
+    }
+  ],
+  "bad": {
+    "criterion": "unsupported",
+    "scored": true,
+    "evidence": ""
+  }
+}

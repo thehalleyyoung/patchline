@@ -1,0 +1,27 @@
+{
+  "version": "patchline.reviewer-preference-fairness-gate/v1",
+  "claim": "Patchline ships a learned reviewer-preference model gated by a fairness-across-teams constraint. The worker loads a frozen, content-addressed spec and checks every item is scored and references concrete backing evidence; the gate then re-runs the worker, confirms every item is scored and evidenced, and rejects an unsupported item with empty evidence, so the fairness-across-teams claim is reproducible on real Patchline self-data via `make reviewer-preference-fairness-gate`.",
+  "real_repo": "patchline (self): reviewer-preference-fairness",
+  "items": [
+    {
+      "criterion": "soundness",
+      "scored": true,
+      "evidence": "reviewer-action-model-gate"
+    },
+    {
+      "criterion": "reproducibility",
+      "scored": true,
+      "evidence": "rl-reviewer-gate"
+    },
+    {
+      "criterion": "evidence-trace",
+      "scored": true,
+      "evidence": "severity-calibration-gate"
+    }
+  ],
+  "bad": {
+    "criterion": "unsupported",
+    "scored": true,
+    "evidence": ""
+  }
+}

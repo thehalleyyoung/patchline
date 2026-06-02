@@ -1,0 +1,27 @@
+{
+  "version": "patchline.longitudinal-impact-retrospective-gate/v1",
+  "claim": "Patchline ships a longitudinal impact-retrospective tying every major decision to a measured, published outcome. The worker loads a frozen, content-addressed spec and checks every item is scored and references concrete backing evidence; the gate then re-runs the worker, confirms every item is scored and evidenced, and rejects an unsupported item with empty evidence, so the measured claim is reproducible on real Patchline self-data via `make longitudinal-impact-retrospective-gate`.",
+  "real_repo": "patchline (self): longitudinal-impact-retrospective",
+  "items": [
+    {
+      "criterion": "soundness",
+      "scored": true,
+      "evidence": "impact-retrospective-gate"
+    },
+    {
+      "criterion": "reproducibility",
+      "scored": true,
+      "evidence": "longitudinal-public-reruns-gate"
+    },
+    {
+      "criterion": "evidence-trace",
+      "scored": true,
+      "evidence": "community-impact-report-gate"
+    }
+  ],
+  "bad": {
+    "criterion": "unsupported",
+    "scored": true,
+    "evidence": ""
+  }
+}

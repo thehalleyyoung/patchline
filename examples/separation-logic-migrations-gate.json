@@ -1,0 +1,27 @@
+{
+  "version": "patchline.separation-logic-migrations-gate/v1",
+  "claim": "Patchline ships a separation-logic model of concurrent migrations proving freedom from lost-update anomalies. The worker loads a frozen, content-addressed spec and checks every item is scored and references concrete backing evidence; the gate then re-runs the worker, confirms every item is scored and evidenced, and rejects an unsupported item with empty evidence, so the separation-logic claim is reproducible on real Patchline self-data via `make separation-logic-migrations-gate`.",
+  "real_repo": "patchline (self): separation-logic-migrations",
+  "items": [
+    {
+      "criterion": "soundness",
+      "scored": true,
+      "evidence": "lock-concurrency-hazard-gate"
+    },
+    {
+      "criterion": "reproducibility",
+      "scored": true,
+      "evidence": "transaction-boundary-inference-gate"
+    },
+    {
+      "criterion": "evidence-trace",
+      "scored": true,
+      "evidence": "cutover-protocol-model-gate"
+    }
+  ],
+  "bad": {
+    "criterion": "unsupported",
+    "scored": true,
+    "evidence": ""
+  }
+}

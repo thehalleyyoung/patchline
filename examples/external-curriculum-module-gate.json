@@ -1,0 +1,27 @@
+{
+  "version": "patchline.external-curriculum-module-gate/v1",
+  "claim": "Patchline ships a curriculum module adopted by an external course with graded, gate-backed assignments. The worker loads a frozen, content-addressed spec and checks every item is scored and references concrete backing evidence; the gate then re-runs the worker, confirms every item is scored and evidenced, and rejects an unsupported item with empty evidence, so the graded claim is reproducible on real Patchline self-data via `make external-curriculum-module-gate`.",
+  "real_repo": "patchline (self): external-curriculum-module",
+  "items": [
+    {
+      "criterion": "soundness",
+      "scored": true,
+      "evidence": "tutorial-autograder-gate"
+    },
+    {
+      "criterion": "reproducibility",
+      "scored": true,
+      "evidence": "textbook-chapter-gate"
+    },
+    {
+      "criterion": "evidence-trace",
+      "scored": true,
+      "evidence": "onboarding-quest-gate"
+    }
+  ],
+  "bad": {
+    "criterion": "unsupported",
+    "scored": true,
+    "evidence": ""
+  }
+}

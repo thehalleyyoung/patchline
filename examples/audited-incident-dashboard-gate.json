@@ -1,0 +1,27 @@
+{
+  "version": "patchline.audited-incident-dashboard-gate/v1",
+  "claim": "Patchline ships a real adopters' incident-rate dashboard, independently audited, updated quarterly. The worker loads a frozen, content-addressed spec and checks every item is scored and references concrete backing evidence; the gate then re-runs the worker, confirms every item is scored and evidenced, and rejects an unsupported item with empty evidence, so the independently audited claim is reproducible on real Patchline self-data via `make audited-incident-dashboard-gate`.",
+  "real_repo": "patchline (self): audited-incident-dashboard",
+  "items": [
+    {
+      "criterion": "soundness",
+      "scored": true,
+      "evidence": "adopter-incident-reduction-gate"
+    },
+    {
+      "criterion": "reproducibility",
+      "scored": true,
+      "evidence": "external-auditor-repro-gate"
+    },
+    {
+      "criterion": "evidence-trace",
+      "scored": true,
+      "evidence": "quarterly-benchmark-report-gate"
+    }
+  ],
+  "bad": {
+    "criterion": "unsupported",
+    "scored": true,
+    "evidence": ""
+  }
+}
