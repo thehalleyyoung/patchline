@@ -89,6 +89,7 @@ type Inventory struct {
 	OperationalDocs   []Finding      `json:"operational_docs,omitempty"`
 	EvidenceExports   []Finding      `json:"evidence_exports,omitempty"`
 	Infrastructure    []Finding      `json:"infrastructure_scans,omitempty"`
+	NoSQLChanges      []Finding      `json:"nosql_changes,omitempty"`
 	PackageBoundaries []PackageBoundary `json:"package_boundaries,omitempty"`
 	NextCommands      []Command      `json:"next_commands,omitempty"`
 	SkippedDirs       []string       `json:"skipped_dirs,omitempty"`
@@ -1356,6 +1357,7 @@ func (inv *Inventory) addFileFact(file scanFile, language string) {
 		inv.inferSchemaEvolution(file, prefix, language)
 		inv.preserveFieldEvidence(file, prefix)
 		inv.scanInfrastructure(file, prefix)
+		inv.scanNoSQL(file, prefix)
 	}
 }
 
@@ -1604,6 +1606,116 @@ func (inv *Inventory) scanInfrastructure(file scanFile, text string) {
 		inv.scanKubernetesConfig(file.Rel, text)
 	case strings.HasSuffix(lower, ".tf") || strings.HasSuffix(lower, ".tfvars"):
 		inv.scanTerraformConfig(file.Rel, text)
+	}
+}
+
+type nosqlRule struct {
+	pattern     *regexp.Regexp
+	operation   string
+	destructive bool
+}
+
+var (
+	nosqlMongoSignal = regexp.MustCompile(`(?i)\bdb\.[a-z0-9_]+|\.collection\s*\(|dropdatabase|migrate-mongo|getcollection\(|usedb\(`)
+	nosqlMongoRules  = []nosqlRule{
+		{regexp.MustCompile(`(?i)dropdatabase\s*\(`), "dropDatabase", true},
+		{regexp.MustCompile(`(?i)\.drop\s*\(`), "dropCollection", true},
+		{regexp.MustCompile(`(?i)\.deletemany\s*\(`), "deleteMany", true},
+		{regexp.MustCompile(`(?i)\.deleteone\s*\(`), "deleteOne", true},
+		{regexp.MustCompile(`(?i)\$unset`), "unsetField", true},
+		{regexp.MustCompile(`(?i)\.renamecollection\s*\(`), "renameCollection", true},
+		{regexp.MustCompile(`(?i)\.createcollection\s*\(|\.createindex\s*\(`), "createCollectionOrIndex", false},
+	}
+	nosqlCassandraSignal = regexp.MustCompile(`(?i)\bkeyspace\b|\bcreate\s+table\b|\busing\s+ttl\b|\bcassandra\b|\.cql\b`)
+	nosqlCassandraRules  = []nosqlRule{
+		{regexp.MustCompile(`(?i)\bdrop\s+keyspace\b`), "dropKeyspace", true},
+		{regexp.MustCompile(`(?i)\bdrop\s+table\b`), "dropTable", true},
+		{regexp.MustCompile(`(?i)\btruncate\s+`), "truncate", true},
+		{regexp.MustCompile(`(?i)\balter\s+table\s+[a-z0-9_."]+\s+drop\b`), "dropColumn", true},
+		{regexp.MustCompile(`(?i)\bcreate\s+table\b`), "createTable", false},
+	}
+	nosqlElasticSignal = regexp.MustCompile(`(?i)elasticsearch|_delete_by_query|_bulk|_mapping|opensearch|/_cat/|index_template`)
+	nosqlElasticRules  = []nosqlRule{
+		{regexp.MustCompile(`(?i)_delete_by_query`), "deleteByQuery", true},
+		{regexp.MustCompile(`(?i)(?:-x\s*)?delete\s+["']?https?://[^"'\s]+`), "deleteIndex", true},
+		{regexp.MustCompile(`(?i)"?delete"?\s*:\s*\{`), "bulkDelete", true},
+		{regexp.MustCompile(`(?i)put\s+["']?https?://[^"'\s]+/_mapping`), "putMapping", false},
+	}
+	nosqlRedisSignal = regexp.MustCompile(`(?i)redis-cli|\bredis\b|\.redis\b`)
+	nosqlRedisRules  = []nosqlRule{
+		{regexp.MustCompile(`(?i)\bflushall\b`), "flushAll", true},
+		{regexp.MustCompile(`(?i)\bflushdb\b`), "flushDb", true},
+		{regexp.MustCompile(`(?i)\bdel\s+\S+`), "del", true},
+		{regexp.MustCompile(`(?i)\brename\s+\S+\s+\S+`), "rename", true},
+	}
+	nosqlDynamoSignal = regexp.MustCompile(`(?i)dynamodb`)
+	nosqlDynamoRules  = []nosqlRule{
+		{regexp.MustCompile(`(?i)delete-table|deletetable`), "deleteTable", true},
+		{regexp.MustCompile(`(?i)deleterequest`), "batchDelete", true},
+		{regexp.MustCompile(`(?i)update-table|updatetable`), "updateTable", false},
+	}
+)
+
+// scanNoSQL detects schema-change and data-migration operations against NoSQL engines (MongoDB,
+// Cassandra, Elasticsearch, Redis, DynamoDB). Each engine is only scanned when a signal confirms
+// the file targets it, and each matched operation is recorded as searchable evidence with a
+// destructive flag so destructive NoSQL changes surface alongside SQL migration risks.
+func (inv *Inventory) scanNoSQL(file scanFile, text string) {
+	lower := strings.ToLower(file.Rel)
+	// Skip obvious non-script payloads to limit false positives.
+	if strings.HasSuffix(lower, ".lock") || strings.HasSuffix(lower, ".min.js") {
+		return
+	}
+	type engine struct {
+		name   string
+		signal *regexp.Regexp
+		rules  []nosqlRule
+	}
+	engines := []engine{
+		{"mongodb", nosqlMongoSignal, nosqlMongoRules},
+		{"cassandra", nosqlCassandraSignal, nosqlCassandraRules},
+		{"elasticsearch", nosqlElasticSignal, nosqlElasticRules},
+		{"redis", nosqlRedisSignal, nosqlRedisRules},
+		{"dynamodb", nosqlDynamoSignal, nosqlDynamoRules},
+	}
+	pathOrText := lower + "\n" + text
+	for _, e := range engines {
+		if !e.signal.MatchString(pathOrText) {
+			continue
+		}
+		for _, rule := range e.rules {
+			if !rule.pattern.MatchString(text) {
+				continue
+			}
+			destructive := "false"
+			confidence := "observed"
+			if rule.destructive {
+				destructive = "true"
+			}
+			finding := Finding{
+				Kind:       e.name + ":" + rule.operation,
+				Path:       file.Rel,
+				Confidence: confidence,
+				Rationale:  e.name + " " + rule.operation + " operation detected (destructive=" + destructive + ")",
+			}
+			inv.NoSQLChanges = append(inv.NoSQLChanges, finding)
+			inv.addFact(Fact{
+				Version:    Version,
+				Kind:       "nosql_change",
+				Path:       file.Rel,
+				Confidence: confidence,
+				Rationale:  finding.Rationale,
+				Identifiers: append([]Identifier{
+					{Kind: "nosql_engine", Value: e.name},
+					{Kind: "nosql_operation", Value: rule.operation},
+				}, identifiersFromText(file.Rel)...),
+				Properties: map[string]string{
+					"engine":      e.name,
+					"operation":   rule.operation,
+					"destructive": destructive,
+				},
+			})
+		}
 	}
 }
 

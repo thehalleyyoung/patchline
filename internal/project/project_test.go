@@ -177,6 +177,67 @@ func TestProposalPromptContextMinimizesUnselectedEvidence(t *testing.T) {
 	}
 }
 
+func TestInventoryDetectsNoSQLDestructiveChanges(t *testing.T) {
+	cases := []struct {
+		rel      string
+		content  string
+		engine   string
+		op       string
+		destruct bool
+	}{
+		{"migrations/001_drop.js", "module.exports.up = async (db) => { await db.collection('users').drop(); };", "mongodb", "dropCollection", true},
+		{"migrations/002_unset.js", "db.users.updateMany({}, { $unset: { legacy: 1 } });", "mongodb", "unsetField", true},
+		{"schema/001_drop.cql", "DROP TABLE accounts;\nDROP KEYSPACE billing;", "cassandra", "dropTable", true},
+		{"scripts/reindex.sh", "curl -X DELETE \"http://localhost:9200/orders\"\n# _bulk reindex", "elasticsearch", "deleteIndex", true},
+		{"ops/flush.redis", "redis-cli FLUSHALL\nDEL session:1", "redis", "flushAll", true},
+		{"infra/dynamo.sh", "aws dynamodb delete-table --table-name Orders", "dynamodb", "deleteTable", true},
+	}
+	for _, c := range cases {
+		root := t.TempDir()
+		writeFile(t, root, c.rel, c.content)
+		inv, err := InventoryPath(InventoryOptions{Path: root})
+		if err != nil {
+			t.Fatalf("%s: %v", c.rel, err)
+		}
+		found := false
+		for _, f := range inv.NoSQLChanges {
+			if f.Kind == c.engine+":"+c.op {
+				found = true
+			}
+		}
+		if !found {
+			t.Fatalf("%s: expected %s:%s, got %#v", c.rel, c.engine, c.op, inv.NoSQLChanges)
+		}
+		// Destructive operations must be flagged as such in a fact.
+		destructiveFact := false
+		for _, fact := range inv.Facts {
+			if fact.Kind == "nosql_change" && fact.Properties["engine"] == c.engine && fact.Properties["destructive"] == "true" {
+				destructiveFact = true
+			}
+		}
+		if c.destruct && !destructiveFact {
+			t.Fatalf("%s: expected destructive nosql_change fact for %s", c.rel, c.engine)
+		}
+	}
+}
+
+func TestInventoryDoesNotFlagNoSQLWithoutSignal(t *testing.T) {
+	root := t.TempDir()
+	// A plain prose file mentioning "drop" must not be classified as a NoSQL change.
+	writeFile(t, root, "docs/notes.md", "We had to drop the old plan and rename our approach. FLUSHALL of ideas.\n")
+	inv, err := InventoryPath(InventoryOptions{Path: root})
+	if err != nil {
+		t.Fatal(err)
+	}
+	// "redis" signal could match ".redis" only; notes.md has no redis-cli/redis signal in path or
+	// text, so no redis change should be recorded.
+	for _, f := range inv.NoSQLChanges {
+		if strings.HasPrefix(f.Kind, "redis:") || strings.HasPrefix(f.Kind, "mongodb:") {
+			t.Fatalf("unexpected NoSQL change from prose: %#v", inv.NoSQLChanges)
+		}
+	}
+}
+
 func TestInventoryDetectsMultiEcosystemMigrationFrameworks(t *testing.T) {
 	cases := []struct {
 		rel    string

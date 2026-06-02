@@ -275,6 +275,8 @@ Run `make monorepo-boundary-gate` to detect **package boundaries** in monorepos 
 
 Run `make multi-ecosystem-migration-gate` to detect **Laravel, Ecto, Diesel, Sequelize, Knex, Doctrine, and Rails multi-db** migrations and their native commands — proven on the real laravel/laravel repo plus a seven-framework unit matrix; see [docs/multi-ecosystem-migration.md](docs/multi-ecosystem-migration.md).
 
+Run `make nosql-change-gate` to detect destructive **NoSQL** changes across MongoDB, Cassandra, Elasticsearch, Redis, and DynamoDB — proven on a real Cassandra repo (DROP KEYSPACE/TABLE) plus a five-engine unit matrix with a no-false-positive rule; see [docs/nosql-change.md](docs/nosql-change.md).
+
 Add `--redact` to write `analysis-bundle/` copies with stable redaction tokens for identifiers, literals, customer-like strings, and secret-like values while preserving joins and existing artifact hashes.
 
 Add `--ci` to write `ci/summary.md` plus upload snippets and code-quality artifacts for GitHub Actions, GitLab CI, and Bitbucket Pipelines: SARIF under `analysis-bundle/summary.sarif`, GitLab `ci/gl-code-quality-report.json`, and Bitbucket `ci/bitbucket-code-insights.json`.

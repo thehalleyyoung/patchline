@@ -1,0 +1,12 @@
+{
+  "version": "patchline.nosql-change-gate/v1",
+  "claim": "Patchline detects schema-change and data-migration operations against NoSQL engines, not only relational databases. The inventory recognizes MongoDB, Cassandra, Elasticsearch, Redis, and DynamoDB scripts from engine-specific signals and flags destructive operations such as dropping a collection or keyspace, unsetting fields, deleting an index, flushing a key space, or deleting a table. The gate proves Cassandra destructive-change detection against the real laaksomavrick/twitter-go repository fetched from GitHub, and proves the full five-engine matrix plus a no-false-positive rule for prose through deterministic unit tests.",
+  "real_repo": {
+    "repo": "laaksomavrick/twitter-go",
+    "ref": "master",
+    "subpath": "migrations",
+    "expected_engine": "cassandra",
+    "minimum_destructive": 3
+  },
+  "engines": ["mongodb", "cassandra", "elasticsearch", "redis", "dynamodb"]
+}
