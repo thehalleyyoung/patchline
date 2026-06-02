@@ -1,0 +1,17 @@
+{
+  "version": "patchline.reviewer-search-gate/v1",
+  "claim": "Patchline provides a reviewer-question search over the paper's claims, limitations, artifacts, and roadmap cards so that a reviewer asking a question is answered with the specific backing entry and its source type rather than a generated guess, and an out-of-scope question returns nothing instead of a hallucinated answer. The worker tokenizes a typed corpus of claims, limitations, artifacts, and roadmap cards, scores each entry against a query by token overlap, and returns the ranked matches with their source type. The gate proves a determinism question retrieves the determinism claim, a limitations question retrieves a limitation entry, an artifact question retrieves an artifact, and an out-of-scope query returns zero results.",
+  "real_repo": "patchline (self): reviewer Q&A retrieval over typed corpus",
+  "corpus": [
+    {"type": "claim", "id": "cl-determinism", "text": "Every gate is deterministic and produces byte-identical output across repeated runs"},
+    {"type": "limitation", "id": "lim-llm", "text": "Generated interventions are gated and never trusted without a passing proof gate"},
+    {"type": "artifact", "id": "art-factschema", "text": "The fact schema reference describes every fact emitted by the analyzer"},
+    {"type": "roadmap", "id": "rm-symbolic", "text": "Future work adds symbolic execution hooks for deeper path analysis"}
+  ],
+  "queries": [
+    {"q": "is the output deterministic across runs", "expect_type": "claim", "expect_id": "cl-determinism"},
+    {"q": "what are the limitations of generated interventions", "expect_type": "limitation", "expect_id": "lim-llm"},
+    {"q": "where is the fact schema artifact", "expect_type": "artifact", "expect_id": "art-factschema"},
+    {"q": "quantum teleportation blockchain", "expect_type": null, "expect_id": null}
+  ]
+}
