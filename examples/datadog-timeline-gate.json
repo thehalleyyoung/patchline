@@ -1,0 +1,14 @@
+{
+  "version": "patchline.datadog-timeline-gate/v1",
+  "claim": "Datadog-style incident timeline fixtures situate real Patchline data-change findings on a reconstructed incident timeline: a deploy marker, an APM span, an error log, and a monitor alert per finding, all tagged with the affected table and finding id and ordered deploy < span < log < alert. The fixtures let reviewers exercise deploy-to-data-change correlation offline without a live observability backend.",
+  "real_repo": {
+    "repo": "lobsters/lobsters",
+    "ref": "3b80b47aa5aaba37ec44413e7d1dc96fcf1585b6",
+    "subpath": "db/migrate"
+  },
+  "service_name": "lobsters-web",
+  "incident_title": "Elevated write errors after migration deploy",
+  "max_findings": 10,
+  "minimum_findings": 5,
+  "minimum_correlation_coverage": 1.0
+}
