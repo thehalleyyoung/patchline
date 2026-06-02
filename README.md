@@ -183,6 +183,8 @@ Run `make reproducibility-report-gate` to regenerate monthly reproducibility rep
 
 Run `make contributor-recognition-gate` to regenerate contributor recognition for new real-repo slices, ecosystem parsers, false-positive reductions, and artifact improvements from public proof gates; see [docs/contributor-recognition.md](docs/contributor-recognition.md).
 
+Run `make capstone-demo-gate` to regenerate the release-quality capstone demo where a fresh user analyzes four unfamiliar repos, generates bounded interventions, rejects bad output, and rebuilds experiment-ready evidence; see [docs/capstone-demo.md](docs/capstone-demo.md).
+
 Add `--redact` to write `analysis-bundle/` copies with stable redaction tokens for identifiers, literals, customer-like strings, and secret-like values while preserving joins and existing artifact hashes.
 
 Add `--ci` to write `ci/summary.md` plus upload snippets and code-quality artifacts for GitHub Actions, GitLab CI, and Bitbucket Pipelines: SARIF under `analysis-bundle/summary.sarif`, GitLab `ci/gl-code-quality-report.json`, and Bitbucket `ci/bitbucket-code-insights.json`.
