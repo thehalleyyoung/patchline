@@ -1,0 +1,12 @@
+{
+  "version": "patchline.active-learning-gate/v1",
+  "claim": "Patchline maintains an active-learning queue that decides which migration examples a human should label next by prioritizing the most informative ones — those whose model confidence sits closest to the decision boundary — while excluding examples that are already labeled and deprioritizing confidently-classified ones, so scarce human review effort is spent where it most reduces uncertainty. The worker scores each unlabeled example by boundary proximity, drops already-labeled examples, and returns a top-k queue ordered by informativeness. The gate proves the most boundary-uncertain example heads the queue, a confidently-classified example ranks below it, and an already-labeled example never appears.",
+  "real_repo": "patchline (self): uncertainty-prioritized active-learning queue",
+  "top_k": 2,
+  "examples": [
+    {"id": "ex_boundary", "confidence": 0.52, "labeled": false},
+    {"id": "ex_midconf", "confidence": 0.70, "labeled": false},
+    {"id": "ex_confident", "confidence": 0.98, "labeled": false},
+    {"id": "ex_done", "confidence": 0.51, "labeled": true}
+  ]
+}

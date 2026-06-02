@@ -379,6 +379,8 @@ Run `make modelcheck-gate` to **model check** a migration rollout state machine 
 
 Run `make causal-graph-gate` to build a **causal graph** of failure factors — it computes the true **root cause** ancestors of the failure, excludes a mere correlate with no path to failure, and rejects a cyclic graph; see [docs/causal-graph.md](docs/causal-graph.md).
 
+Run `make active-learning-gate` to build an **active-learning queue** that prioritizes the most informative examples nearest the decision **boundary** for human labeling while excluding already-labeled ones; see [docs/active-learning.md](docs/active-learning.md).
+
 Add `--redact` to write `analysis-bundle/` copies with stable redaction tokens for identifiers, literals, customer-like strings, and secret-like values while preserving joins and existing artifact hashes.
 
 Add `--ci` to write `ci/summary.md` plus upload snippets and code-quality artifacts for GitHub Actions, GitLab CI, and Bitbucket Pipelines: SARIF under `analysis-bundle/summary.sarif`, GitLab `ci/gl-code-quality-report.json`, and Bitbucket `ci/bitbucket-code-insights.json`.
