@@ -459,12 +459,16 @@ func inferDialect(path string, content []byte) migration.Dialect {
 		return migration.DialectSQLite
 	case strings.Contains(lower, "sqlserver"), strings.Contains(lower, "nvarchar"), strings.Contains(lower, " top ("):
 		return migration.DialectSQLServer
+	case strings.Contains(lower, "oracle"), strings.Contains(lower, "varchar2"), strings.Contains(lower, "pl/sql"), strings.Contains(lower, ".nextval"):
+		return migration.DialectOracle
+	case strings.Contains(lower, "bigquery"), strings.Contains(lower, "create or replace table"), strings.Contains(lower, "partition by"):
+		return migration.DialectBigQuery
 	default:
 		return migration.DialectGeneric
 	}
 }
 
-var looseSQLPattern = regexp.MustCompile(`(?i)\b(update|delete\s+from|insert\s+into|alter\s+table|drop\s+table|truncate\s+table|create\s+table)\b[^;\n]*(;)?`)
+var looseSQLPattern = regexp.MustCompile(`(?i)\b(update|delete\s+from|insert\s+into|merge\s+into|alter\s+table|drop\s+table|truncate\s+table|create\s+(?:or\s+replace\s+)?table)\b[^;\n]*(;)?`)
 
 func (report *Report) scanLooseSQL(file scanFile, content []byte) {
 	if isSQLPath(file.Rel) || !isTextLike(file.Rel, content) {

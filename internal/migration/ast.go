@@ -32,6 +32,8 @@ func parseStatementAST(tokens []string) StatementAST {
 		ast.Table = tableAfterInsert(tokens)
 	case "replace":
 		ast.Table = tableAfterReplace(tokens)
+	case "merge":
+		ast.Table = tokenAfter(tokens, "into")
 	case "create":
 		ast.Table = tableAfterCreate(tokens)
 	case "select":

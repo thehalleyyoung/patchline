@@ -24,6 +24,8 @@ const (
 	DialectMySQL     Dialect = "mysql"
 	DialectSQLite    Dialect = "sqlite"
 	DialectSQLServer Dialect = "sqlserver"
+	DialectOracle    Dialect = "oracle"
+	DialectBigQuery  Dialect = "bigquery"
 )
 
 type Risk string
@@ -47,6 +49,7 @@ type Statement struct {
 	Kind        string   `json:"kind"`
 	Table       string   `json:"table,omitempty"`
 	HasWhere    bool     `json:"has_where"`
+	Normalized  string   `json:"normalized_sql"`
 	Fingerprint string   `json:"fingerprint"`
 	Risk        Risk     `json:"risk"`
 	Effect      string   `json:"effect"`
@@ -125,7 +128,7 @@ func AnalyzeBytesWithDialect(source string, content []byte, dialect Dialect) (Re
 
 func ValidateDialect(dialect Dialect) error {
 	switch dialect {
-	case DialectGeneric, DialectPostgres, DialectMySQL, DialectSQLite, DialectSQLServer:
+	case DialectGeneric, DialectPostgres, DialectMySQL, DialectSQLite, DialectSQLServer, DialectOracle, DialectBigQuery:
 		return nil
 	default:
 		return fmt.Errorf("unsupported SQL dialect %q", dialect)
@@ -134,15 +137,16 @@ func ValidateDialect(dialect Dialect) error {
 
 func analyzeStatement(index int, sql string, dialect Dialect) Statement {
 	stripped := stripComments(sql)
-	dialectSQL := normalizeDialectSyntax(stripped, dialect)
-	tokens := tokenize(dialectSQL)
+	normalized := NormalizeSQLWithDialect(stripped, dialect)
+	tokens := tokenize(normalized)
 	ast := parseStatementAST(tokens)
 	statement := Statement{
 		Index:       index,
 		Kind:        ast.Kind,
 		Table:       ast.Table,
 		HasWhere:    ast.HasWhere,
-		Fingerprint: Fingerprint(stripped),
+		Normalized:  normalized,
+		Fingerprint: normalized,
 		Risk:        RiskLow,
 		Effect:      string(effects.EffectNoop),
 	}
@@ -190,6 +194,10 @@ func analyzeStatement(index int, sql string, dialect Dialect) Statement {
 		statement.Risk = RiskMedium
 		statement.Effect = string(effects.EffectUnknown)
 		statement.Reasons = append(statement.Reasons, "insert changes persistent data and may need provenance")
+	case "merge":
+		statement.Risk = RiskHigh
+		statement.Effect = string(effects.EffectUnknown)
+		statement.Reasons = append(statement.Reasons, "merge can update or insert many persistent rows")
 	case "create":
 		statement.Risk = RiskLow
 		statement.Effect = string(effects.EffectNoop)
@@ -204,8 +212,13 @@ func analyzeStatement(index int, sql string, dialect Dialect) Statement {
 }
 
 func Fingerprint(sql string) string {
+	return NormalizeSQLWithDialect(sql, DialectGeneric)
+}
+
+func NormalizeSQLWithDialect(sql string, dialect Dialect) string {
 	withoutComments := stripComments(sql)
-	normalizedStrings := replaceStringLiterals(withoutComments)
+	dialectSQL := normalizeDialectSyntax(withoutComments, dialect)
+	normalizedStrings := replaceStringLiterals(dialectSQL)
 	normalizedNumbers := regexp.MustCompile(`\b\d+(\.\d+)?\b`).ReplaceAllString(normalizedStrings, "?")
 	normalizedWhitespace := strings.Join(strings.Fields(strings.ToLower(normalizedNumbers)), " ")
 	return strings.TrimSpace(normalizedWhitespace)
@@ -429,6 +442,14 @@ func normalizeDialectSyntax(sql string, dialect Dialect) string {
 	case DialectSQLServer:
 		replacer := strings.NewReplacer("[", "", "]", "")
 		return replacer.Replace(sql)
+	case DialectOracle:
+		sql = regexp.MustCompile(`(?i)\bnumber\s*\(\s*\d+\s*,\s*\d+\s*\)`).ReplaceAllString(sql, "numeric")
+		sql = regexp.MustCompile(`(?i)\bvarchar2\s*\(\s*\d+\s*(?:byte|char)?\s*\)`).ReplaceAllString(sql, "varchar")
+		return regexp.MustCompile(`(?i)\bnow\s*\(\s*\)`).ReplaceAllString(sql, "current_timestamp")
+	case DialectBigQuery:
+		sql = strings.ReplaceAll(sql, "`", "")
+		sql = regexp.MustCompile(`(?i)\bcreate\s+or\s+replace\s+table\b`).ReplaceAllString(sql, "create table")
+		return regexp.MustCompile(`(?i)\bmerge\s+into\b`).ReplaceAllString(sql, "merge into")
 	default:
 		return sql
 	}
@@ -449,6 +470,10 @@ func applyDialectRules(statement *Statement, tokens []string, dialect Dialect) {
 		applySQLiteRules(statement, tokens)
 	case DialectSQLServer:
 		applySQLServerRules(statement, tokens)
+	case DialectOracle:
+		applyOracleRules(statement, tokens)
+	case DialectBigQuery:
+		applyBigQueryRules(statement, tokens)
 	}
 }
 
@@ -523,6 +548,40 @@ func applySQLServerRules(statement *Statement, tokens []string) {
 	}
 	if statement.Kind == "alter" && containsToken(tokens, "with") && containsToken(tokens, "check") {
 		statement.Reasons = append(statement.Reasons, "sqlserver with check validates existing rows during constraint changes")
+	}
+}
+
+func applyOracleRules(statement *Statement, tokens []string) {
+	if statement.Kind == "merge" {
+		statement.Table = tokenAfter(tokens, "into")
+		statement.Risk = RiskHigh
+		statement.Effect = string(effects.EffectUnknown)
+		statement.Reasons = append(statement.Reasons, "oracle merge can update and insert many rows in one statement")
+	}
+	if statement.Kind == "alter" && containsToken(tokens, "modify") && containsToken(tokens, "not") && containsToken(tokens, "null") {
+		statement.Risk = RiskHigh
+		statement.Reasons = append(statement.Reasons, "oracle modify not null validates existing rows and can block writes")
+	}
+	if statement.Kind == "update" && containsToken(tokens, "rownum") {
+		statement.Risk = RiskHigh
+		statement.Reasons = append(statement.Reasons, "oracle rownum-limited update can affect arbitrary rows without deterministic order")
+	}
+}
+
+func applyBigQueryRules(statement *Statement, tokens []string) {
+	if statement.Kind == "merge" {
+		statement.Table = tokenAfter(tokens, "into")
+		statement.Risk = RiskHigh
+		statement.Effect = string(effects.EffectUnknown)
+		statement.Reasons = append(statement.Reasons, "bigquery merge can update, insert, or delete large partitions")
+	}
+	if statement.Kind == "create" && containsToken(tokens, "table") && containsToken(tokens, "as") && containsToken(tokens, "select") {
+		statement.Risk = RiskMedium
+		statement.Effect = string(effects.EffectUnknown)
+		statement.Reasons = append(statement.Reasons, "bigquery create table as select materializes query output")
+	}
+	if statement.Kind == "delete" && !statement.HasWhere {
+		statement.Reasons = append(statement.Reasons, "bigquery unbounded delete can scan and remove large tables")
 	}
 }
 
@@ -660,7 +719,7 @@ func sqlServerUpdateTable(tokens []string) string {
 		j := i + 1
 		if j < len(tokens) && tokens[j] == "top" {
 			j++
-			if j < len(tokens) {
+			if j+1 < len(tokens) && tokens[j+1] != "set" {
 				j++
 			}
 		}
@@ -691,7 +750,7 @@ func sqlServerDeleteTable(tokens []string) string {
 }
 
 func cleanIdentifier(identifier string) string {
-	return strings.Trim(identifier, `"`)
+	return strings.Trim(identifier, "\"`[]")
 }
 
 func whereMarker(hasWhere bool) []string {

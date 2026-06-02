@@ -108,8 +108,71 @@ func TestAnalyzeSQLServerDialectRules(t *testing.T) {
 	}
 }
 
+func TestAnalyzeOracleDialectRulesAndNormalization(t *testing.T) {
+	report, err := AnalyzeBytesWithDialect("oracle.sql", []byte("merge into Customer_Accounts using staged_accounts on (Customer_Accounts.id = staged_accounts.id) when matched then update set balance = 0; alter table Customer_Accounts modify balance number(12,2) not null;"), DialectOracle)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if report.Dialect != DialectOracle {
+		t.Fatalf("expected oracle dialect, got %q", report.Dialect)
+	}
+	if report.Statements[0].Kind != "merge" || report.Statements[0].Table != "customer_accounts" || report.Statements[0].Risk != RiskHigh {
+		t.Fatalf("expected oracle merge table and high risk: %#v", report.Statements[0])
+	}
+	if report.Statements[1].Risk != RiskHigh {
+		t.Fatalf("expected oracle modify not null to be high risk: %#v", report.Statements[1])
+	}
+	if report.Statements[1].Normalized != "alter table customer_accounts modify balance numeric not null" {
+		t.Fatalf("expected oracle type normalization, got %q", report.Statements[1].Normalized)
+	}
+}
+
+func TestAnalyzeBigQueryDialectRulesAndNormalization(t *testing.T) {
+	report, err := AnalyzeBytesWithDialect("bigquery.sql", []byte("create or replace table `proj.analytics.customer_daily` as select * from `proj.raw.events`; merge into `proj.analytics.customer_daily` t using `proj.stage.customer_daily` s on t.id = s.id when matched then update set total = s.total;"), DialectBigQuery)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if report.Dialect != DialectBigQuery {
+		t.Fatalf("expected bigquery dialect, got %q", report.Dialect)
+	}
+	if report.Statements[0].Kind != "create" || report.Statements[0].Table != "proj.analytics.customer_daily" || report.Statements[0].Risk != RiskMedium {
+		t.Fatalf("expected bigquery create table as select materialization risk: %#v", report.Statements[0])
+	}
+	if report.Statements[0].Normalized != "create table proj.analytics.customer_daily as select * from proj.raw.events" {
+		t.Fatalf("expected bigquery create-or-replace/backtick normalization, got %q", report.Statements[0].Normalized)
+	}
+	if report.Statements[1].Kind != "merge" || report.Statements[1].Table != "proj.analytics.customer_daily" || report.Statements[1].Risk != RiskHigh {
+		t.Fatalf("expected bigquery merge table and high risk: %#v", report.Statements[1])
+	}
+}
+
+func TestNormalizeSQLWithDialectCoversSupportedDialects(t *testing.T) {
+	cases := map[Dialect]string{
+		DialectPostgres:  NormalizeSQLWithDialect("alter table invoices add column repaired_at timestamptz default now()", DialectPostgres),
+		DialectMySQL:     NormalizeSQLWithDialect("update `invoices` set total_cents = 123 where id = 9", DialectMySQL),
+		DialectSQLite:    NormalizeSQLWithDialect("pragma foreign_keys = off", DialectSQLite),
+		DialectSQLServer: NormalizeSQLWithDialect("update [dbo].[Invoices] set total_cents = 123 where id = 9", DialectSQLServer),
+		DialectOracle:    NormalizeSQLWithDialect("alter table invoices modify amount number(12,2)", DialectOracle),
+		DialectBigQuery:  NormalizeSQLWithDialect("create or replace table `p.d.t` as select 1", DialectBigQuery),
+	}
+	for dialect, normalized := range cases {
+		if normalized == "" {
+			t.Fatalf("expected normalized SQL for %s", dialect)
+		}
+	}
+	if cases[DialectMySQL] != "update \"invoices\" set total_cents = ? where id = ?" {
+		t.Fatalf("unexpected mysql normalization: %q", cases[DialectMySQL])
+	}
+	if cases[DialectSQLServer] != "update dbo.invoices set total_cents = ? where id = ?" {
+		t.Fatalf("unexpected sqlserver normalization: %q", cases[DialectSQLServer])
+	}
+	if cases[DialectBigQuery] != "create table p.d.t as select ?" {
+		t.Fatalf("unexpected bigquery normalization: %q", cases[DialectBigQuery])
+	}
+}
+
 func TestAnalyzeRejectsUnknownDialect(t *testing.T) {
-	if _, err := AnalyzeBytesWithDialect("bad.sql", []byte("select 1"), Dialect("oracle")); err == nil {
+	if _, err := AnalyzeBytesWithDialect("bad.sql", []byte("select 1"), Dialect("db2")); err == nil {
 		t.Fatal("expected unknown dialect error")
 	}
 }

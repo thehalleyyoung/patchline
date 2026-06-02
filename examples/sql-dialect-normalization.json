@@ -1,0 +1,56 @@
+{
+  "version": "patchline.sql-dialect-normalization/v1",
+  "claim": "Dialect-aware SQL normalization is validated on public PostgreSQL, MySQL, SQLite, SQL Server, Oracle, and BigQuery repository slices.",
+  "minimum_public_slices": 4,
+  "required_dialects": ["postgres", "mysql", "sqlite", "sqlserver", "oracle", "bigquery"],
+  "slices": [
+    {
+      "id": "postgres-bytebase-db-sync",
+      "dialect": "postgres",
+      "repo": "bytebase/bytebase",
+      "ref": "0fd7efd92ab30e05de2c994dd8060c248b00160d",
+      "url": "https://raw.githubusercontent.com/bytebase/bytebase/0fd7efd92ab30e05de2c994dd8060c248b00160d/backend/migrator/migration/3.5/0003%23%23db_sync.sql",
+      "expect_fragment": "update db set deleted = true where sync_status = ?"
+    },
+    {
+      "id": "mysql-percona-online-ddl",
+      "dialect": "mysql",
+      "repo": "Percona-QA/percona-qa",
+      "ref": "c38fb51db8a7c87760e6a80a3c400647804f0dad",
+      "url": "https://raw.githubusercontent.com/Percona-QA/percona-qa/c38fb51db8a7c87760e6a80a3c400647804f0dad/pxc-tests/pxc_qa.sql",
+      "expect_fragment": "algorithm=copy"
+    },
+    {
+      "id": "sqlite-core-imposter",
+      "dialect": "sqlite",
+      "repo": "sqlite/sqlite",
+      "ref": "b48ca02d640e55cbdb9e451278fb44b0017524f3",
+      "url": "https://raw.githubusercontent.com/sqlite/sqlite/b48ca02d640e55cbdb9e451278fb44b0017524f3/test/imposter1.sql",
+      "expect_fragment": "create table t1"
+    },
+    {
+      "id": "sqlserver-dialect-update",
+      "dialect": "sqlserver",
+      "repo": "wenshao/sql-dialects",
+      "ref": "acc6698bf87709c16156862d295b2a4bb290cec1",
+      "url": "https://raw.githubusercontent.com/wenshao/sql-dialects/acc6698bf87709c16156862d295b2a4bb290cec1/dml/update/sqlserver.sql",
+      "expect_fragment": "update top (?) users set status = ? where status = ?"
+    },
+    {
+      "id": "oracle-sample-customers",
+      "dialect": "oracle",
+      "repo": "oracle-samples/db-sample-schemas",
+      "ref": "6660bad68c07bd143430ace58565b3f727e17263",
+      "url": "https://raw.githubusercontent.com/oracle-samples/db-sample-schemas/6660bad68c07bd143430ace58565b3f727e17263/customer_orders/co_create.sql",
+      "expect_fragment": "varchar not null"
+    },
+    {
+      "id": "bigquery-utils-optimization",
+      "dialect": "bigquery",
+      "repo": "GoogleCloudPlatform/bigquery-utils",
+      "ref": "56aa999d9a4815dd47dafca53a5b93f1db8ade49",
+      "url": "https://raw.githubusercontent.com/GoogleCloudPlatform/bigquery-utils/56aa999d9a4815dd47dafca53a5b93f1db8ade49/scripts/optimization/bi_engine_disabled_reasons.sql",
+      "expect_fragment": "create table optimization_workshop.bi_engine_disabled_reasons as"
+    }
+  ]
+}

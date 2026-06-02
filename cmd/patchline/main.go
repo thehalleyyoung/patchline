@@ -226,7 +226,7 @@ func run(args []string) error {
 		return transactionPlan(args[1], hasFlag(args[2:], "--json"))
 	case "analyze-migration":
 		if len(args) < 2 {
-			return errors.New("usage: patchline analyze-migration <migration.sql> [--dialect postgres|mysql|sqlite|sqlserver] [--json]")
+			return fmt.Errorf("usage: patchline analyze-migration <migration.sql> [--dialect %s] [--json]", sqlDialectUsage())
 		}
 		dialect, err := parseSQLDialect(args[2:])
 		if err != nil {
@@ -235,7 +235,7 @@ func run(args []string) error {
 		return analyzeMigration(args[1], dialect, hasFlag(args[2:], "--json"))
 	case "schema-diff":
 		if len(args) < 4 {
-			return errors.New("usage: patchline schema-diff <migration.sql> <before-schema.json> <expected-schema.json> [--dialect postgres|mysql|sqlite|sqlserver] [--json]")
+			return fmt.Errorf("usage: patchline schema-diff <migration.sql> <before-schema.json> <expected-schema.json> [--dialect %s] [--json]", sqlDialectUsage())
 		}
 		dialect, err := parseSQLDialect(args[4:])
 		if err != nil {
@@ -244,7 +244,7 @@ func run(args []string) error {
 		return schemaDiff(args[1], args[2], args[3], dialect, hasFlag(args[4:], "--json"))
 	case "migration-semantics":
 		if len(args) < 3 {
-			return errors.New("usage: patchline migration-semantics <migration.sql> <before-schema.json> [--dialect postgres|mysql|sqlite|sqlserver] [--json]")
+			return fmt.Errorf("usage: patchline migration-semantics <migration.sql> <before-schema.json> [--dialect %s] [--json]", sqlDialectUsage())
 		}
 		dialect, err := parseSQLDialect(args[3:])
 		if err != nil {
@@ -448,9 +448,9 @@ Usage:
   patchline generate-sql <manifest.json> [--json]
   patchline rollback-plan <manifest.json> [--json]
   patchline transaction-plan <manifest.json> [--json]
-  patchline analyze-migration <migration.sql> [--dialect postgres|mysql|sqlite|sqlserver] [--json]
-  patchline schema-diff <migration.sql> <before-schema.json> <expected-schema.json> [--dialect postgres|mysql|sqlite|sqlserver] [--json]
-  patchline migration-semantics <migration.sql> <before-schema.json> [--dialect postgres|mysql|sqlite|sqlserver] [--json]
+  patchline analyze-migration <migration.sql> [--dialect generic|postgres|mysql|sqlite|sqlserver|oracle|bigquery] [--json]
+  patchline schema-diff <migration.sql> <before-schema.json> <expected-schema.json> [--dialect generic|postgres|mysql|sqlite|sqlserver|oracle|bigquery] [--json]
+  patchline migration-semantics <migration.sql> <before-schema.json> [--dialect generic|postgres|mysql|sqlite|sqlserver|oracle|bigquery] [--json]
   patchline extract-sql <path> [--json]
   patchline migration-outcomes <evidence.jsonl> <migration.sql> [--repair manifest.json] [--policy policy.json] [--benchmark suite.json] [--source-sql path] [--json]
   patchline dry-run <manifest.json> [--store store.json] [--json]
@@ -8333,11 +8333,16 @@ func parseSQLDialect(args []string) (migration.Dialect, error) {
 	if !ok || value == "" || value == "generic" {
 		return migration.DialectGeneric, nil
 	}
+
 	dialect := migration.Dialect(value)
 	if err := migration.ValidateDialect(dialect); err != nil {
 		return "", err
 	}
 	return dialect, nil
+}
+
+func sqlDialectUsage() string {
+	return "generic|postgres|mysql|sqlite|sqlserver|oracle|bigquery"
 }
 
 func readGraph(path string) (*provenance.Graph, error) {
