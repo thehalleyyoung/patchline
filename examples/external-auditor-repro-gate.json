@@ -1,0 +1,27 @@
+{
+  "version": "patchline.external-auditor-repro-gate/v1",
+  "claim": "Patchline carries an external-auditor reproduction of the headline result with a signed attestation, so the central claim is confirmed by an independent party who signs off. The worker checks every reproduced result has a non-empty auditor signature. The gate proves every headline result is independently reproduced and signed and that an unsigned reproduction is rejected.",
+  "real_repo": "patchline (self): external-auditor-repro",
+  "items": [
+    {
+      "result": "precision-0.95",
+      "reproduced": true,
+      "signature": "sig:auditorA:9f1c"
+    },
+    {
+      "result": "recall-0.95",
+      "reproduced": true,
+      "signature": "sig:auditorA:2b7d"
+    },
+    {
+      "result": "incident-delta",
+      "reproduced": true,
+      "signature": "sig:auditorB:c4e2"
+    }
+  ],
+  "bad": {
+    "result": "unverified",
+    "reproduced": true,
+    "signature": ""
+  }
+}

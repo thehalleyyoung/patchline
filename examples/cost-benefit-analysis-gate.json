@@ -1,0 +1,27 @@
+{
+  "version": "patchline.cost-benefit-analysis-gate/v1",
+  "claim": "Patchline carries a cost-benefit analysis monetizing prevented incidents against reviewer time spent, so adopting the gate is justified in dollars rather than vibes. The worker checks every scenario's monetized benefit exceeds its reviewer-time cost. The gate proves benefit exceeds cost in every scenario and that a net-negative scenario is rejected.",
+  "real_repo": "patchline (self): cost-benefit-analysis",
+  "items": [
+    {
+      "scenario": "startup",
+      "benefit_usd": 40000,
+      "cost_usd": 6000
+    },
+    {
+      "scenario": "midmarket",
+      "benefit_usd": 180000,
+      "cost_usd": 24000
+    },
+    {
+      "scenario": "enterprise",
+      "benefit_usd": 900000,
+      "cost_usd": 120000
+    }
+  ],
+  "bad": {
+    "scenario": "trivial-repo",
+    "benefit_usd": 500,
+    "cost_usd": 9000
+  }
+}

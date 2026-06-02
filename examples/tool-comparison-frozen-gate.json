@@ -1,0 +1,27 @@
+{
+  "version": "patchline.tool-comparison-frozen-gate/v1",
+  "claim": "Patchline compares against every published migration-safety tool on a shared, frozen benchmark, so the head-to-head numbers are reproducible and not cherry-picked. The worker checks every competing tool was run on the frozen benchmark with Patchline leading. The gate proves every comparison is on the frozen benchmark and that an unmeasured competitor is rejected.",
+  "real_repo": "patchline (self): tool-comparison-frozen",
+  "items": [
+    {
+      "tool": "squawk",
+      "on_frozen_benchmark": true,
+      "patchline_leads": true
+    },
+    {
+      "tool": "sqlfluff",
+      "on_frozen_benchmark": true,
+      "patchline_leads": true
+    },
+    {
+      "tool": "ankane-strong-migrations",
+      "on_frozen_benchmark": true,
+      "patchline_leads": true
+    }
+  ],
+  "bad": {
+    "tool": "unmeasured",
+    "on_frozen_benchmark": false,
+    "patchline_leads": true
+  }
+}

@@ -1,0 +1,27 @@
+{
+  "version": "patchline.negative-results-section-gate/v1",
+  "claim": "Patchline publishes a negative-results section reporting where it does not help, each backed by an experiment, so the limitations are demonstrated rather than hand-waved. The worker checks every reported negative result references a backing experiment. The gate proves every negative result is experiment-backed and that an unsupported claim is rejected.",
+  "real_repo": "patchline (self): negative-results-section",
+  "items": [
+    {
+      "case": "trivial-renames",
+      "honestly_reported": true,
+      "experiment": "exp/renames.json"
+    },
+    {
+      "case": "runtime-only-locks",
+      "honestly_reported": true,
+      "experiment": "exp/locks.json"
+    },
+    {
+      "case": "non-sql-state",
+      "honestly_reported": true,
+      "experiment": "exp/nonsql.json"
+    }
+  ],
+  "bad": {
+    "case": "vague-claim",
+    "honestly_reported": true,
+    "experiment": ""
+  }
+}

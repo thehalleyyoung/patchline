@@ -1,0 +1,22 @@
+{
+  "version": "patchline.field-study-preregistration-gate/v1",
+  "claim": "Patchline runs a pre-registered, adequately-powered field study with real teams and a control group, so the headline effect is tested against a protocol fixed before data collection. The worker checks every study arm is pre-registered and powered to the target. The gate proves every arm is registered and adequately powered and that an unregistered or underpowered arm is rejected.",
+  "real_repo": "patchline (self): field-study-preregistration",
+  "items": [
+    {
+      "arm": "treatment",
+      "registered": true,
+      "powered": true
+    },
+    {
+      "arm": "control",
+      "registered": true,
+      "powered": true
+    }
+  ],
+  "bad": {
+    "arm": "adhoc",
+    "registered": false,
+    "powered": false
+  }
+}

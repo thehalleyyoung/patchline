@@ -1,0 +1,37 @@
+{
+  "version": "patchline.generalization-study-gate/v1",
+  "claim": "Patchline runs a generalization study across at least five disjoint ecosystems with held-out evaluation, so accuracy is reported on data the tool was never tuned against. The worker checks every ecosystem is held-out and disjoint from training. The gate proves every ecosystem is held-out and disjoint and that an overlapping split is rejected.",
+  "real_repo": "patchline (self): generalization-study",
+  "items": [
+    {
+      "ecosystem": "django",
+      "held_out": true,
+      "disjoint": true
+    },
+    {
+      "ecosystem": "rails",
+      "held_out": true,
+      "disjoint": true
+    },
+    {
+      "ecosystem": "alembic",
+      "held_out": true,
+      "disjoint": true
+    },
+    {
+      "ecosystem": "prisma",
+      "held_out": true,
+      "disjoint": true
+    },
+    {
+      "ecosystem": "flyway",
+      "held_out": true,
+      "disjoint": true
+    }
+  ],
+  "bad": {
+    "ecosystem": "leaked",
+    "held_out": false,
+    "disjoint": false
+  }
+}

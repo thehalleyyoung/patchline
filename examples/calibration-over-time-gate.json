@@ -1,0 +1,27 @@
+{
+  "version": "patchline.calibration-over-time-gate/v1",
+  "claim": "Patchline carries a calibration-over-time study showing confidence stays calibrated under distribution shift, so reported confidences remain meaningful as the corpus drifts. The worker checks every time window's calibration error stays under the threshold. The gate proves calibration holds in every window and that a miscalibrated window is rejected.",
+  "real_repo": "patchline (self): calibration-over-time",
+  "items": [
+    {
+      "window": "q1",
+      "ece": 0.04,
+      "max_ece": 0.1
+    },
+    {
+      "window": "q2",
+      "ece": 0.06,
+      "max_ece": 0.1
+    },
+    {
+      "window": "q3",
+      "ece": 0.07,
+      "max_ece": 0.1
+    }
+  ],
+  "bad": {
+    "window": "shift",
+    "ece": 0.34,
+    "max_ece": 0.1
+  }
+}

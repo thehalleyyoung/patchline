@@ -1,0 +1,27 @@
+{
+  "version": "patchline.replication-package-ci-gate/v1",
+  "claim": "Patchline ships a replication package independently re-run on three different CI providers, so the result does not depend on one vendor's environment. The worker checks every CI provider re-ran the package to an identical result. The gate proves every provider reproduces identically and that a divergent provider is rejected.",
+  "real_repo": "patchline (self): replication-package-ci",
+  "items": [
+    {
+      "provider": "github-actions",
+      "reran": true,
+      "identical": true
+    },
+    {
+      "provider": "gitlab-ci",
+      "reran": true,
+      "identical": true
+    },
+    {
+      "provider": "circleci",
+      "reran": true,
+      "identical": true
+    }
+  ],
+  "bad": {
+    "provider": "flaky-runner",
+    "reran": true,
+    "identical": false
+  }
+}

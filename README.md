@@ -541,6 +541,21 @@ Run `make polyglot-orm-frontend-gate` for a polyglot ORM front-end covering eigh
 Run `make prevalence-estimator-gate` for a sampling-theory estimator of hazard prevalence with **confidence** bounds, rejecting an out-of-interval estimate; see [docs/prevalence-estimator.md](docs/prevalence-estimator.md).
 Run `make corpus-refresh-pipeline-gate` for a weekly corpus-refresh pipeline with **drift** alerts, rejecting a cycle that skips drift detection; see [docs/corpus-refresh-pipeline.md](docs/corpus-refresh-pipeline.md).
 Run `make hardware-cost-model-gate` for a hardware-cost model reporting analysis throughput **per dollar** across machine classes, rejecting a zero-throughput class; see [docs/hardware-cost-model.md](docs/hardware-cost-model.md).
+Run `make field-study-preregistration-gate` for a **pre-registered**, powered field study with a control group, rejecting an unregistered arm; see [docs/field-study-preregistration.md](docs/field-study-preregistration.md).
+Run `make multi-rater-ground-truth-gate` for a multi-rater labeling protocol reporting **Krippendorff**'s alpha, rejecting a low-agreement batch; see [docs/multi-rater-ground-truth.md](docs/multi-rater-ground-truth.md).
+Run `make tool-comparison-frozen-gate` for a comparison against published tools on a shared, **frozen** benchmark, rejecting an unmeasured competitor; see [docs/tool-comparison-frozen.md](docs/tool-comparison-frozen.md).
+Run `make longitudinal-ab-deployment-gate` for a longitudinal A/B measuring **incident-rate** deltas with sequential analysis, rejecting an underperforming period; see [docs/longitudinal-ab-deployment.md](docs/longitudinal-ab-deployment.md).
+Run `make cost-benefit-analysis-gate` for a **cost-benefit** analysis monetizing prevented incidents against reviewer time, rejecting a net-negative scenario; see [docs/cost-benefit-analysis.md](docs/cost-benefit-analysis.md).
+Run `make survival-analysis-gate` for a **survival** analysis of time-to-incident with and without gating, rejecting a cohort where gating shortens it; see [docs/survival-analysis.md](docs/survival-analysis.md).
+Run `make external-auditor-repro-gate` for an external-auditor reproduction with a signed **attestation**, rejecting an unsigned reproduction; see [docs/external-auditor-repro.md](docs/external-auditor-repro.md).
+Run `make negative-results-section-gate` for a **negative-results** section where each non-benefit is backed by an experiment, rejecting an unsupported claim; see [docs/negative-results-section.md](docs/negative-results-section.md).
+Run `make generalization-study-gate` for a generalization study across five disjoint ecosystems with **held-out** evaluation, rejecting an overlapping split; see [docs/generalization-study.md](docs/generalization-study.md).
+Run `make adversarial-robustness-gate` for a robustness evaluation against an automated **adversary** searching for evasions, rejecting a successful evasion; see [docs/adversarial-robustness.md](docs/adversarial-robustness.md).
+Run `make calibration-over-time-gate` for a **calibration**-over-time study under distribution shift, rejecting a miscalibrated window; see [docs/calibration-over-time.md](docs/calibration-over-time.md).
+Run `make human-factors-study-gate` for a human-factors study of reviewer trust and **over-reliance** with mitigations, rejecting an unmitigated risk; see [docs/human-factors-study.md](docs/human-factors-study.md).
+Run `make replication-package-ci-gate` for a replication package re-run on three different **CI provider**s, rejecting a divergent provider; see [docs/replication-package-ci.md](docs/replication-package-ci.md).
+Run `make meta-analysis-pooled-gate` for a meta-analysis combining studies into one **pooled** effect with heterogeneity reporting, rejecting a null-effect study; see [docs/meta-analysis-pooled.md](docs/meta-analysis-pooled.md).
+Run `make data-availability-statement-gate` for a data-availability statement with **DOI**-pinned raw data per figure, rejecting a figure with no DOI; see [docs/data-availability-statement.md](docs/data-availability-statement.md).
 
 </details>
 

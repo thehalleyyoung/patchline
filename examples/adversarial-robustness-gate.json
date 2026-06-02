@@ -1,0 +1,27 @@
+{
+  "version": "patchline.adversarial-robustness-gate/v1",
+  "claim": "Patchline includes a robustness evaluation against an automated adversary that searches for evasions, so the gate is stress-tested by an attacker rather than only friendly inputs. The worker checks every adversarial mutation is still caught. The gate proves every adversarial evasion attempt is caught and that a successful evasion is rejected.",
+  "real_repo": "patchline (self): adversarial-robustness",
+  "items": [
+    {
+      "attack": "whitespace-obfuscation",
+      "caught": true
+    },
+    {
+      "attack": "comment-injection",
+      "caught": true
+    },
+    {
+      "attack": "split-statement",
+      "caught": true
+    },
+    {
+      "attack": "alias-rename",
+      "caught": true
+    }
+  ],
+  "bad": {
+    "attack": "undetected-evasion",
+    "caught": false
+  }
+}

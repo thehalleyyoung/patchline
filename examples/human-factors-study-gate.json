@@ -1,0 +1,23 @@
+{
+  "version": "patchline.human-factors-study-gate/v1",
+  "claim": "Patchline includes a human-factors study measuring reviewer trust and over-reliance with mitigations, so automation bias is measured and countered rather than ignored. The worker checks every measured over-reliance risk has an applied mitigation. The gate proves every over-reliance risk is mitigated and that an unmitigated risk is rejected.",
+  "real_repo": "patchline (self): human-factors-study",
+  "items": [
+    {
+      "measure": "blind-acceptance",
+      "mitigated": true
+    },
+    {
+      "measure": "alert-fatigue",
+      "mitigated": true
+    },
+    {
+      "measure": "false-confidence",
+      "mitigated": true
+    }
+  ],
+  "bad": {
+    "measure": "unaddressed-bias",
+    "mitigated": false
+  }
+}

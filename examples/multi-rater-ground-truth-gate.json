@@ -1,0 +1,27 @@
+{
+  "version": "patchline.multi-rater-ground-truth-gate/v1",
+  "claim": "Patchline labels ground truth with a multi-rater protocol reporting Krippendorff's alpha, so each label batch has documented inter-rater reliability instead of a single annotator's opinion. The worker checks every batch had at least three raters and cleared the reliability threshold. The gate proves every batch is multi-rated above threshold and that a low-agreement batch is rejected.",
+  "real_repo": "patchline (self): multi-rater-ground-truth",
+  "items": [
+    {
+      "batch": "hazards-a",
+      "raters": 4,
+      "alpha": 0.84
+    },
+    {
+      "batch": "hazards-b",
+      "raters": 3,
+      "alpha": 0.79
+    },
+    {
+      "batch": "repairs",
+      "raters": 3,
+      "alpha": 0.81
+    }
+  ],
+  "bad": {
+    "batch": "noisy",
+    "raters": 2,
+    "alpha": 0.31
+  }
+}

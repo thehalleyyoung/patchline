@@ -1,0 +1,27 @@
+{
+  "version": "patchline.data-availability-statement-gate/v1",
+  "claim": "Patchline carries a data-availability statement with archived, DOI-pinned raw data for every figure, so each plotted number traces to citable, permanent data. The worker checks every figure references archived data with a DOI. The gate proves every figure has DOI-pinned archived data and that a figure with no DOI is rejected.",
+  "real_repo": "patchline (self): data-availability-statement",
+  "items": [
+    {
+      "figure": "fig1-precision",
+      "doi": "10.5281/zenodo.111",
+      "archived": true
+    },
+    {
+      "figure": "fig2-recall",
+      "doi": "10.5281/zenodo.112",
+      "archived": true
+    },
+    {
+      "figure": "fig3-incidents",
+      "doi": "10.5281/zenodo.113",
+      "archived": true
+    }
+  ],
+  "bad": {
+    "figure": "fig-orphan",
+    "doi": "",
+    "archived": false
+  }
+}

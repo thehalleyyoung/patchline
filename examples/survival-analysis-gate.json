@@ -1,0 +1,27 @@
+{
+  "version": "patchline.survival-analysis-gate/v1",
+  "claim": "Patchline includes a survival analysis of time-to-incident with and without gating, so the benefit is expressed as a longer expected time before failure. The worker checks every cohort's gated median time-to-incident exceeds its ungated median. The gate proves gating lengthens time-to-incident in every cohort and that a cohort where gating shortens it is rejected.",
+  "real_repo": "patchline (self): survival-analysis",
+  "items": [
+    {
+      "cohort": "small",
+      "gated_median_days": 210,
+      "ungated_median_days": 45
+    },
+    {
+      "cohort": "medium",
+      "gated_median_days": 160,
+      "ungated_median_days": 38
+    },
+    {
+      "cohort": "large",
+      "gated_median_days": 120,
+      "ungated_median_days": 30
+    }
+  ],
+  "bad": {
+    "cohort": "regressed",
+    "gated_median_days": 10,
+    "ungated_median_days": 40
+  }
+}

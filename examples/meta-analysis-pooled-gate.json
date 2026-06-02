@@ -1,0 +1,27 @@
+{
+  "version": "patchline.meta-analysis-pooled-gate/v1",
+  "claim": "Patchline carries a meta-analysis combining all studies into a single pooled effect with heterogeneity reporting, so the overall evidence is summarized rigorously rather than study by study. The worker checks every contributing study has a positive effect and a positive weight. The gate proves every pooled study contributes a positive weighted effect and that a null-effect study is rejected.",
+  "real_repo": "patchline (self): meta-analysis-pooled",
+  "items": [
+    {
+      "study": "field-2026",
+      "effect": 0.41,
+      "weight": 0.3
+    },
+    {
+      "study": "ab-2026",
+      "effect": 0.33,
+      "weight": 0.45
+    },
+    {
+      "study": "survival-2026",
+      "effect": 0.28,
+      "weight": 0.25
+    }
+  ],
+  "bad": {
+    "study": "null",
+    "effect": 0.0,
+    "weight": 0.1
+  }
+}
