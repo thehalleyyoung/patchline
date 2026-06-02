@@ -309,6 +309,8 @@ Run `make conference-demos-gate` to generate audience-tailored **conference demo
 
 Run `make adoption-case-studies-gate` to render **case studies** of teams using Patchline alongside CI, **observability**, and migration tooling — every cited capability maps to a real gate, so adoption stories are anchored to proof, not marketing; see [docs/adoption-case-studies.md](docs/adoption-case-studies.md).
 
+Run `make incremental-cache-gate` to verify **incremental analysis caching** keyed by archive hash, subpath, **parser version**, and config — the gate proves a cold miss warms to a hit, the key is stable, and all four key components are load-bearing; see [docs/incremental-cache.md](docs/incremental-cache.md).
+
 Add `--redact` to write `analysis-bundle/` copies with stable redaction tokens for identifiers, literals, customer-like strings, and secret-like values while preserving joins and existing artifact hashes.
 
 Add `--ci` to write `ci/summary.md` plus upload snippets and code-quality artifacts for GitHub Actions, GitLab CI, and Bitbucket Pipelines: SARIF under `analysis-bundle/summary.sarif`, GitLab `ci/gl-code-quality-report.json`, and Bitbucket `ci/bitbucket-code-insights.json`.

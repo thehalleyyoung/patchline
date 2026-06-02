@@ -1,0 +1,9 @@
+{
+  "version": "patchline.incremental-cache-gate/v1",
+  "claim": "Patchline supports incremental analysis caching keyed by the four inputs that actually determine an analysis result: the source archive content hash, the subpath, the parser version, and the analysis configuration. The cache worker computes a deterministic key from those inputs, records a miss on the first run and a hit on an identical second run, and proves that changing any one of the four key components produces a different key and a fresh miss. The gate proves the key is stable across identical runs, that a warm run is a hit whose cached result equals the fresh result, and that each of the four key components is load-bearing.",
+  "real_repo": "patchline (self): cache keyed over a real repository file",
+  "archive_path": "internal/project/project.go",
+  "subpath": "db/migrate",
+  "parser_version": "fact/v1",
+  "config": {"stages": "inventory", "no_llm": true}
+}
