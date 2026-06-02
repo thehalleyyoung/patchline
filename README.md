@@ -157,6 +157,7 @@ make issue-template-gate
 make minimizer-gate
 make recurrence-gate
 make corpus-release-gate
+make research-question-gate
 ```
 
 The demo downloads real GitHub project subpaths and writes:
@@ -230,6 +231,8 @@ The real-repo slice matrix is backed by `examples/real-repo-slices.json` and `ex
 `make recurrence-gate` runs cross-repo recurrence analysis on four unrelated public slices and verifies repeated failure-mode signatures are reported without source paths, SQL text, or table identifiers.
 
 `make corpus-release-gate` builds public corpus release artifacts with generated reports, SHA-256 checksums, a signed checksum attestation, and one-command reproduction instructions.
+
+`make research-question-gate` validates the primary research questions and operationalizes fact extraction, risk ranking, evidence linking, generated-intervention safety, and before/after re-analysis on the four pinned public slices.
 
 Current default projects:
 

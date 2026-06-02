@@ -1,0 +1,40 @@
+{
+  "version": "patchline.research-questions/v1",
+  "questions": [
+    {
+      "id": "rq1-fact-extraction",
+      "area": "repo-native fact extraction",
+      "question": "How many project-native facts can Patchline extract from existing migration, source, test, operational, and generated-evidence surfaces in repositories not designed for Patchline?",
+      "primary_metrics": ["facts", "files_scanned", "inventory_coverage"],
+      "real_repo_requirement": "Run on the four pinned public slices and report non-zero facts for each slice."
+    },
+    {
+      "id": "rq2-risk-ranking",
+      "area": "risk ranking",
+      "question": "Does Patchline rank data-change risks with stable, evidence-backed identifiers rather than path-only or grep-only matches?",
+      "primary_metrics": ["ranked_risks", "stable_risk_ids", "ranking_explanations"],
+      "real_repo_requirement": "Run on the four pinned public slices and report ranked risks with stable IDs for each slice."
+    },
+    {
+      "id": "rq3-evidence-linking",
+      "area": "evidence linking",
+      "question": "How often are ranked risks linked to concrete repository facts, provenance slices, and owner-relevant evidence?",
+      "primary_metrics": ["evidence_links", "provenance_slices", "linked_risk_fraction"],
+      "real_repo_requirement": "Run on the four pinned public slices and report non-zero evidence links for each slice."
+    },
+    {
+      "id": "rq4-generated-safety",
+      "area": "generated-intervention safety",
+      "question": "Can generated interventions remain deterministic, bounded, fact-grounded, and checkable before maintainers review them?",
+      "primary_metrics": ["generated_files", "patchline_checks_failed", "scope_budget", "deterministic_only"],
+      "real_repo_requirement": "Run deterministic no-LLM proposals on the four pinned public slices and report generated files plus check outcomes."
+    },
+    {
+      "id": "rq5-before-after",
+      "area": "before/after re-analysis",
+      "question": "Can Patchline re-analyze generated interventions and report before/after deltas instead of stopping at one-shot findings?",
+      "primary_metrics": ["compare_hash", "intervention_loops", "risk_deltas", "deterministic_check_outcomes"],
+      "real_repo_requirement": "Run compare on the four pinned public slices and report compare hashes and intervention-loop evidence."
+    }
+  ]
+}
