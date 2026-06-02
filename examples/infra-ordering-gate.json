@@ -1,0 +1,10 @@
+{
+  "version": "patchline.infra-ordering-gate/v1",
+  "claim": "Patchline performs infrastructure/data ordering analysis: it correlates deploy-ordering markers (Helm hooks, Argo sync-waves, initContainers, Terraform depends_on and waits) with the migration and database jobs detected on the same manifest, and classifies each data-change job as sequenced (ordered by an explicit marker) or unordered (able to race the rollout). This is proven against the real helm/charts repository, where well-known charts such as Kong and Anchore sequence their migration jobs with Helm pre/post hooks while other database jobs run unordered, and is reinforced by a deterministic unit test covering both an unordered Kubernetes migration Job and a Helm-hooked sequenced migration Job.",
+  "real_repo": {
+    "repo": "https://github.com/helm/charts",
+    "ref": "master",
+    "minimum_sequenced": 5,
+    "minimum_unordered": 1
+  }
+}

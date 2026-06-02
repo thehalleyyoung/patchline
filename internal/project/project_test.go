@@ -238,6 +238,68 @@ func TestInventoryDoesNotFlagNoSQLWithoutSignal(t *testing.T) {
 	}
 }
 
+func TestInventoryAnalyzesInfraDataOrdering(t *testing.T) {
+	root := t.TempDir()
+	// An unordered migration job: a Kubernetes Job that runs migrations with no ordering marker.
+	writeFile(t, root, "k8s/migrate-job.yaml", `apiVersion: batch/v1
+kind: Job
+metadata:
+  name: db-migrate
+spec:
+  template:
+    spec:
+      containers:
+        - name: migrate
+          command: ["sh", "-c", "alembic upgrade head"]
+`)
+	// An ordered migration job: a Helm-hooked Job that runs migrations.
+	writeFile(t, root, "helm/templates/migrate-hook.yaml", `apiVersion: batch/v1
+kind: Job
+metadata:
+  name: db-migrate-hook
+  annotations:
+    "helm.sh/hook": pre-upgrade
+spec:
+  template:
+    spec:
+      initContainers:
+        - name: wait
+          image: busybox
+      containers:
+        - name: migrate
+          command: ["sh", "-c", "flyway migrate"]
+`)
+	inv, err := InventoryPath(InventoryOptions{Path: root})
+	if err != nil {
+		t.Fatal(err)
+	}
+	var sawUnordered, sawSequenced bool
+	for _, f := range inv.InfraDataOrdering {
+		if f.Kind == "infra_data_ordering_unordered" && strings.Contains(f.Path, "migrate-job") {
+			sawUnordered = true
+		}
+		if f.Kind == "infra_data_ordering_sequenced" && strings.Contains(f.Path, "migrate-hook") {
+			sawSequenced = true
+		}
+	}
+	if !sawUnordered {
+		t.Fatalf("expected an unordered infra/data ordering finding, got %#v", inv.InfraDataOrdering)
+	}
+	if !sawSequenced {
+		t.Fatalf("expected a sequenced infra/data ordering finding, got %#v", inv.InfraDataOrdering)
+	}
+	// The unordered job must be recorded as an ordered=false fact.
+	var unorderedFact bool
+	for _, fact := range inv.Facts {
+		if fact.Kind == "infra_data_ordering" && fact.Properties["ordered"] == "false" && fact.Properties["job"] == "migration" {
+			unorderedFact = true
+		}
+	}
+	if !unorderedFact {
+		t.Fatalf("expected an ordered=false infra_data_ordering migration fact")
+	}
+}
+
 func TestInventoryDetectsDataPipelineChanges(t *testing.T) {
 	cases := []struct {
 		rel       string

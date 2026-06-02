@@ -91,6 +91,7 @@ type Inventory struct {
 	Infrastructure    []Finding      `json:"infrastructure_scans,omitempty"`
 	NoSQLChanges      []Finding      `json:"nosql_changes,omitempty"`
 	DataPipelines     []Finding      `json:"data_pipelines,omitempty"`
+	InfraDataOrdering []Finding      `json:"infra_data_ordering,omitempty"`
 	PackageBoundaries []PackageBoundary `json:"package_boundaries,omitempty"`
 	NextCommands      []Command      `json:"next_commands,omitempty"`
 	SkippedDirs       []string       `json:"skipped_dirs,omitempty"`
@@ -352,6 +353,7 @@ func InventoryPath(opts InventoryOptions) (Inventory, error) {
 	}
 	inv.Languages = countsFromMap(languages)
 	inv.detectPackageBoundaries(files)
+	inv.analyzeInfraDataOrdering()
 	inv.finalize()
 	return inv, nil
 }
@@ -474,6 +476,95 @@ func (inv *Inventory) detectPackageBoundaries(files []scanFile) {
 			return inv.PackageBoundaries[i].System < inv.PackageBoundaries[j].System
 		}
 		return inv.PackageBoundaries[i].Path < inv.PackageBoundaries[j].Path
+	})
+}
+
+// analyzeInfraDataOrdering is a derived cross-fact pass that correlates infrastructure ordering
+// markers (Helm hooks, Argo sync-waves, initContainers, Terraform depends_on/waits) with the
+// migration and database jobs detected on the same manifest. A migration or database job that runs
+// without any explicit ordering marker is flagged as an unordered data-change risk (the deploy can
+// race the schema change); a job alongside an ordering marker is recorded as ordered. The result is
+// searchable `infra_data_ordering` evidence so reviewers can see whether data changes are sequenced.
+func (inv *Inventory) analyzeInfraDataOrdering() {
+	if len(inv.Infrastructure) == 0 {
+		return
+	}
+	type pathState struct {
+		hasOrdering   bool
+		hasMigration  bool
+		hasDatabase   bool
+		orderingKinds []string
+		jobKinds      []string
+	}
+	order := []string{}
+	states := map[string]*pathState{}
+	get := func(p string) *pathState {
+		s, ok := states[p]
+		if !ok {
+			s = &pathState{}
+			states[p] = s
+			order = append(order, p)
+		}
+		return s
+	}
+	for _, f := range inv.Infrastructure {
+		s := get(f.Path)
+		switch {
+		case strings.HasSuffix(f.Kind, "_deploy_ordering"):
+			s.hasOrdering = true
+			s.orderingKinds = append(s.orderingKinds, f.Kind)
+		case strings.HasSuffix(f.Kind, "_migration_job"):
+			s.hasMigration = true
+			s.jobKinds = append(s.jobKinds, f.Kind)
+		case strings.HasSuffix(f.Kind, "_database_job"):
+			s.hasDatabase = true
+			s.jobKinds = append(s.jobKinds, f.Kind)
+		}
+	}
+	for _, p := range order {
+		s := states[p]
+		if !s.hasMigration && !s.hasDatabase {
+			continue
+		}
+		jobLabel := "database"
+		if s.hasMigration {
+			jobLabel = "migration"
+		}
+		ordered := "false"
+		kind := "infra_data_ordering_unordered"
+		confidence := "derived"
+		rationale := "infrastructure " + jobLabel + " job has no explicit deploy-ordering marker; the data change can race the rollout"
+		if s.hasOrdering {
+			ordered = "true"
+			kind = "infra_data_ordering_sequenced"
+			rationale = "infrastructure " + jobLabel + " job is sequenced by explicit deploy-ordering markers (" + strings.Join(uniqueSortedStrings(s.orderingKinds), ",") + ")"
+		}
+		inv.InfraDataOrdering = append(inv.InfraDataOrdering, Finding{
+			Kind:       kind,
+			Path:       p,
+			Confidence: confidence,
+			Rationale:  rationale,
+		})
+		inv.addFact(Fact{
+			Version:     Version,
+			Kind:        "infra_data_ordering",
+			Path:        p,
+			Confidence:  confidence,
+			Rationale:   rationale,
+			Identifiers: identifiersFromText(p + "\n" + strings.Join(s.jobKinds, " ")),
+			Properties: map[string]string{
+				"job":      jobLabel,
+				"ordered":  ordered,
+				"markers":  strings.Join(uniqueSortedStrings(s.orderingKinds), ","),
+				"jobkinds": strings.Join(uniqueSortedStrings(s.jobKinds), ","),
+			},
+		})
+	}
+	sort.Slice(inv.InfraDataOrdering, func(i, j int) bool {
+		if inv.InfraDataOrdering[i].Path != inv.InfraDataOrdering[j].Path {
+			return inv.InfraDataOrdering[i].Path < inv.InfraDataOrdering[j].Path
+		}
+		return inv.InfraDataOrdering[i].Kind < inv.InfraDataOrdering[j].Kind
 	})
 }
 
