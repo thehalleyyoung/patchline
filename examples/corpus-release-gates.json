@@ -1,0 +1,11 @@
+{
+  "version": "patchline.corpus-release-gates/v1",
+  "release": {
+    "id": "public-corpus-v1",
+    "claims": [
+      "release artifacts include generated dataset-card, fairness, and stratified benchmark reports",
+      "release artifacts include signed SHA-256 checksums",
+      "release artifacts include one-command reproduction instructions"
+    ]
+  }
+}

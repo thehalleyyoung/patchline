@@ -156,6 +156,7 @@ make stale-ref-gate
 make issue-template-gate
 make minimizer-gate
 make recurrence-gate
+make corpus-release-gate
 ```
 
 The demo downloads real GitHub project subpaths and writes:
@@ -227,6 +228,8 @@ The real-repo slice matrix is backed by `examples/real-repo-slices.json` and `ex
 `make minimizer-gate` runs `repo minimize` on four public slices and proves minimized source copies preserve findings, evidence links, and generated intervention metadata.
 
 `make recurrence-gate` runs cross-repo recurrence analysis on four unrelated public slices and verifies repeated failure-mode signatures are reported without source paths, SQL text, or table identifiers.
+
+`make corpus-release-gate` builds public corpus release artifacts with generated reports, SHA-256 checksums, a signed checksum attestation, and one-command reproduction instructions.
 
 Current default projects:
 
