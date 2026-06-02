@@ -177,6 +177,49 @@ func TestProposalPromptContextMinimizesUnselectedEvidence(t *testing.T) {
 	}
 }
 
+func TestInventoryDetectsMultiEcosystemMigrationFrameworks(t *testing.T) {
+	cases := []struct {
+		rel    string
+		system string
+		native string
+	}{
+		{"database/migrations/2024_01_01_000000_create_users_table.php", "laravel", "php artisan migrate"},
+		{"priv/repo/migrations/20240101000000_create_accounts.exs", "ecto", "mix ecto.migrate"},
+		{"migrations/2024-01-01-000000_create_users/up.sql", "diesel", "diesel migration run"},
+		{"diesel.toml", "diesel", "diesel migration run"},
+		{"knexfile.js", "knex", "npx knex migrate:latest"},
+		{".sequelizerc", "sequelize", "npx sequelize-cli db:migrate"},
+		{"src/Migrations/Version20240101000000.php", "doctrine", "php bin/console doctrine:migrations:migrate"},
+		{"db/animals_migrate/20240101000000_create_pets.rb", "rails-multi-db", "bundle exec rails db:migrate:animals"},
+	}
+	for _, c := range cases {
+		root := t.TempDir()
+		writeFile(t, root, c.rel, "-- migration body\nDROP TABLE legacy;\n")
+		inv, err := InventoryPath(InventoryOptions{Path: root})
+		if err != nil {
+			t.Fatalf("%s: %v", c.rel, err)
+		}
+		found := false
+		for _, s := range inv.MigrationSystems {
+			if s.Kind == c.system {
+				found = true
+			}
+		}
+		if !found {
+			t.Fatalf("%s: expected migration system %q, got %#v", c.rel, c.system, inv.MigrationSystems)
+		}
+		nativeFound := false
+		for _, cmd := range inv.NativeCommands {
+			if cmd.Command == c.native {
+				nativeFound = true
+			}
+		}
+		if !nativeFound {
+			t.Fatalf("%s: expected native command %q, got %#v", c.rel, c.native, inv.NativeCommands)
+		}
+	}
+}
+
 func TestInventoryDetectsMonorepoPackageBoundaries(t *testing.T) {
 	root := t.TempDir()
 	// Bazel workspace with two packages.

@@ -1220,6 +1220,31 @@ func (inv *Inventory) inspectFile(file scanFile) {
 		inv.TestCommands = append(inv.TestCommands, Command{Command: "pytest", Reason: "Python project metadata suggests pytest may be available"})
 	}
 	switch {
+	case base == "diesel.toml":
+		add("migration_system", &inv.MigrationSystems, "diesel", "Diesel config")
+		inv.NativeCommands = append(inv.NativeCommands, Command{Command: "diesel migration run", Reason: "Diesel config exposes native migration execution"})
+	case base == "knexfile.js" || base == "knexfile.ts":
+		add("migration_system", &inv.MigrationSystems, "knex", "Knex configuration file")
+		inv.NativeCommands = append(inv.NativeCommands, Command{Command: "npx knex migrate:latest", Reason: "knexfile exposes native Knex migration execution"})
+	case base == ".sequelizerc" || strings.Contains(lower, "/sequelize/migrations/"):
+		add("migration_system", &inv.MigrationSystems, "sequelize", "Sequelize migrations configuration")
+		inv.NativeCommands = append(inv.NativeCommands, Command{Command: "npx sequelize-cli db:migrate", Reason: "Sequelize configuration exposes native migration execution"})
+	case strings.Contains(lower, "database/migrations/"):
+		add("migration_system", &inv.MigrationSystems, "laravel", "Laravel database/migrations path")
+		inv.NativeCommands = append(inv.NativeCommands, Command{Command: "php artisan migrate", Reason: "Laravel database/migrations path exposes native migration execution"})
+	case strings.Contains(lower, "priv/repo/migrations/") || (strings.Contains(lower, "/migrations/") && strings.HasSuffix(lower, ".exs")):
+		add("migration_system", &inv.MigrationSystems, "ecto", "Ecto migrations path")
+		inv.NativeCommands = append(inv.NativeCommands, Command{Command: "mix ecto.migrate", Reason: "Ecto migrations path exposes native migration execution"})
+	case dieselSQLPairPattern.MatchString(lower):
+		add("migration_system", &inv.MigrationSystems, "diesel", "Diesel up/down migration pair")
+		inv.NativeCommands = append(inv.NativeCommands, Command{Command: "diesel migration run", Reason: "Diesel up/down migration pair exposes native migration execution"})
+	case doctrineVersionPattern.MatchString(base) || strings.Contains(lower, "doctrinemigrations/"):
+		add("migration_system", &inv.MigrationSystems, "doctrine", "Doctrine Migrations version class")
+		inv.NativeCommands = append(inv.NativeCommands, Command{Command: "php bin/console doctrine:migrations:migrate", Reason: "Doctrine Migrations version class exposes native migration execution"})
+	case railsMultiDBPattern.MatchString(lower):
+		dbName := railsMultiDBName(lower)
+		add("migration_system", &inv.MigrationSystems, "rails-multi-db", "Rails multi-database migration path for database "+dbName)
+		inv.NativeCommands = append(inv.NativeCommands, Command{Command: "bundle exec rails db:migrate:" + dbName, Reason: "Rails multi-database path exposes a per-database native migration command"})
 	case strings.Contains(lower, "db/migrate/"):
 		add("migration_root", &inv.MigrationRoots, "rails-or-generic-db-migrate", "db/migrate migration path")
 		inv.NativeCommands = append(inv.NativeCommands, Command{Command: "bundle exec rails db:migrate", Reason: "db/migrate path suggests Rails-style migration execution from the project root"})
@@ -1288,7 +1313,17 @@ var (
 	railsCreateTablePattern  = regexp.MustCompile(`(?i)\bcreate_table\s+[:'"]([A-Za-z_][A-Za-z0-9_]*)`)
 	railsAddColumnPattern    = regexp.MustCompile(`(?i)\badd_column\s+[:'"]([A-Za-z_][A-Za-z0-9_]*)['"]?\s*,\s*[:'"]([A-Za-z_][A-Za-z0-9_]*)`)
 	prismaModelPattern       = regexp.MustCompile(`(?s)\bmodel\s+([A-Za-z_][A-Za-z0-9_]*)\s*\{([^}]*)\}`)
+	dieselSQLPairPattern     = regexp.MustCompile(`migrations/[^/]+/(up|down)\.sql$`)
+	doctrineVersionPattern   = regexp.MustCompile(`^version[0-9]{6,}\.php$`)
+	railsMultiDBPattern      = regexp.MustCompile(`(?:^|/)db/([a-z0-9_]+)_migrate/`)
 )
+
+func railsMultiDBName(lower string) string {
+	if m := railsMultiDBPattern.FindStringSubmatch(lower); len(m) == 2 {
+		return m[1]
+	}
+	return "primary"
+}
 
 func (inv *Inventory) addFileFact(file scanFile, language string) {
 	props := map[string]string{"size_bytes": fmt.Sprintf("%d", file.Size)}

@@ -1,0 +1,12 @@
+{
+  "version": "patchline.multi-ecosystem-migration-gate/v1",
+  "claim": "Patchline recognizes migration frameworks far beyond Rails, Django, Alembic, Flyway, and Prisma. The inventory now detects Laravel, Ecto, Diesel, Sequelize, Knex, Doctrine, and Rails multi-database migrations from their on-disk conventions and emits the correct project-native migration command for each. The gate proves Laravel detection against the real laravel/laravel repository fetched from GitHub, and proves the full seven-framework matrix plus the correct native commands through deterministic unit tests, so Patchline can locate the data-change surface of polyglot real-world projects.",
+  "real_repo": {
+    "repo": "laravel/laravel",
+    "ref": "11.x",
+    "expected_system": "laravel",
+    "expected_native": "php artisan migrate",
+    "minimum_migrations": 2
+  },
+  "frameworks": ["laravel", "ecto", "diesel", "sequelize", "knex", "doctrine", "rails-multi-db"]
+}
