@@ -42,14 +42,14 @@
 \contentsline {paragraph}{Minimal reproductions.}{12}{section.9}%
 \contentsline {paragraph}{Drift protection.}{12}{table.caption.4}%
 \contentsline {section}{\numberline {10}Evaluation Methodology}{12}{section.10}%
-\contentsline {paragraph}{Blinded false-positive adjudication.}{12}{section.10}%
+\contentsline {paragraph}{Blinded false-positive adjudication.}{13}{section.10}%
 \contentsline {paragraph}{Seeded false-negative recall.}{13}{section.10}%
 \contentsline {paragraph}{Ablations and effect sizes.}{13}{section.10}%
 \contentsline {paragraph}{Severity calibration.}{13}{section.10}%
 \contentsline {paragraph}{Stratification.}{13}{section.10}%
 \contentsline {paragraph}{Baselines.}{13}{section.10}%
 \contentsline {paragraph}{Headline measured results.}{13}{table.caption.5}%
-\contentsline {section}{\numberline {11}From Analyzer to Trustworthy Artifact}{13}{section.11}%
+\contentsline {section}{\numberline {11}From Analyzer to Trustworthy Artifact}{14}{section.11}%
 \contentsline {subsection}{\numberline {11.1}Empirical generalization and external replication}{14}{subsection.11.1}%
 \contentsline {subsection}{\numberline {11.2}Supply-chain trust and provenance}{14}{subsection.11.2}%
 \contentsline {subsection}{\numberline {11.3}Reviewer, developer, and community experience}{14}{subsection.11.3}%
@@ -96,6 +96,6 @@
 \contentsline {section}{\numberline {B}Fact Schema Reference}{24}{appendix.B}%
 \contentsline {section}{\numberline {C}Detector Rule Catalog}{24}{appendix.C}%
 \contentsline {section}{\numberline {D}Infrastructure/Data Ordering Markers}{24}{appendix.D}%
-\contentsline {section}{\numberline {E}Selected Gate Catalog}{24}{appendix.E}%
+\contentsline {section}{\numberline {E}Selected Gate Catalog}{25}{appendix.E}%
 \contentsline {section}{\numberline {F}Security and Privacy Model}{27}{appendix.F}%
 \contentsline {section}{\numberline {G}Reproduction Guide}{27}{appendix.G}%

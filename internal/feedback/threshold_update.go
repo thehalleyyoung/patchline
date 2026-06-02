@@ -325,22 +325,30 @@ func aggregateDetectorStats(report Report) (map[string]detectorFeedbackStats, er
 }
 
 func confidenceDecileMidpoint(decile string) (float64, error) {
+	low, high, err := confidenceDecileBounds(decile)
+	if err != nil {
+		return 0, err
+	}
+	return (low + high) / 2, nil
+}
+
+func confidenceDecileBounds(decile string) (float64, float64, error) {
 	parts := strings.Split(decile, "-")
 	if len(parts) != 2 {
-		return 0, fmt.Errorf("invalid confidence decile %q", decile)
+		return 0, 0, fmt.Errorf("invalid confidence decile %q", decile)
 	}
 	low, err := strconv.ParseFloat(parts[0], 64)
 	if err != nil {
-		return 0, fmt.Errorf("invalid confidence decile %q", decile)
+		return 0, 0, fmt.Errorf("invalid confidence decile %q", decile)
 	}
 	high, err := strconv.ParseFloat(parts[1], 64)
 	if err != nil {
-		return 0, fmt.Errorf("invalid confidence decile %q", decile)
+		return 0, 0, fmt.Errorf("invalid confidence decile %q", decile)
 	}
 	if low < 0 || high > 1 || low >= high {
-		return 0, fmt.Errorf("invalid confidence decile %q", decile)
+		return 0, 0, fmt.Errorf("invalid confidence decile %q", decile)
 	}
-	return (low + high) / 2, nil
+	return low, high, nil
 }
 
 func (stats detectorFeedbackStats) thresholdEvidence(previous detectorFeedbackStats, hasPrevious bool) ThresholdDriftEvidence {

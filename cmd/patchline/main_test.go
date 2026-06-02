@@ -229,6 +229,82 @@ func TestFeedbackThresholdUpdateRequiresBoundGateForCandidatePolicy(t *testing.T
 	}
 }
 
+func TestFeedbackCounterfactualLogWritesPreviousReleaseRecommendations(t *testing.T) {
+	root := t.TempDir()
+	inputPath := filepath.Join(root, "feedback-input.json")
+	writeMainTestFile(t, root, "feedback-input.json", `{
+  "version": "patchline.live-feedback-ingestion/v1",
+  "adopter_id": "team-delta",
+  "salt": "counterfactual-secret-salt",
+  "min_group_size": 3,
+  "outcomes": [
+    {"finding_id":"finding-001","detector":"orm.write-breadth","release":"v1.0.0","confidence":0.73,"verdict":"false_positive","action":"dismissed","burden_minutes":4,"evidence_hash":"ev-001","reviewer_role":"maintainer"},
+    {"finding_id":"finding-002","detector":"orm.write-breadth","release":"v1.0.0","confidence":0.76,"verdict":"false_positive","action":"dismissed","burden_minutes":4,"evidence_hash":"ev-002","reviewer_role":"dba"},
+    {"finding_id":"finding-003","detector":"orm.write-breadth","release":"v1.0.0","confidence":0.78,"verdict":"false_positive","action":"dismissed","burden_minutes":4,"evidence_hash":"ev-003","reviewer_role":"sre"},
+    {"finding_id":"finding-004","detector":"sql.destructive-ddl","release":"v1.0.0","confidence":0.93,"verdict":"confirmed","action":"blocked","burden_minutes":9,"evidence_hash":"ev-004","reviewer_role":"maintainer"},
+    {"finding_id":"finding-005","detector":"sql.destructive-ddl","release":"v1.0.0","confidence":0.91,"verdict":"confirmed","action":"blocked","burden_minutes":9,"evidence_hash":"ev-005","reviewer_role":"dba"},
+    {"finding_id":"finding-006","detector":"sql.destructive-ddl","release":"v1.0.0","confidence":0.95,"verdict":"confirmed","action":"blocked","burden_minutes":9,"evidence_hash":"ev-006","reviewer_role":"sre"}
+  ]
+}`)
+	ingestOut := filepath.Join(t.TempDir(), "feedback")
+	if err := run([]string{"feedback", "ingest", inputPath, "--out", ingestOut, "--json"}); err != nil {
+		t.Fatalf("feedback ingest failed: %v", err)
+	}
+
+	historyPath := filepath.Join(root, "counterfactual-history.json")
+	writeMainTestFile(t, root, "counterfactual-history.json", `{
+  "version": "patchline.counterfactual-policy-history/v1",
+  "name": "stage63-counterfactual-history",
+  "policies": [
+    {
+      "release": "v0.8.0",
+      "thresholds": [
+        {"detector":"orm.write-breadth","blocking_threshold":0.80},
+        {"detector":"sql.destructive-ddl","blocking_threshold":0.99}
+      ]
+    },
+    {
+      "release": "v0.9.0",
+      "thresholds": [
+        {"detector":"orm.write-breadth","blocking_threshold":0.70},
+        {"detector":"sql.destructive-ddl","blocking_threshold":0.90}
+      ]
+    },
+    {
+      "release": "v1.0.0",
+      "thresholds": [
+        {"detector":"orm.write-breadth","blocking_threshold":0.70},
+        {"detector":"sql.destructive-ddl","blocking_threshold":0.90}
+      ]
+    }
+  ]
+}`)
+	out := filepath.Join(t.TempDir(), "counterfactual")
+	if err := run([]string{"feedback", "counterfactual-log", "--feedback", filepath.Join(ingestOut, "live-feedback.json"), "--history", historyPath, "--out", out, "--json"}); err != nil {
+		t.Fatalf("counterfactual log failed: %v", err)
+	}
+	var log feedback.CounterfactualLog
+	readMainTestJSON(t, filepath.Join(out, "counterfactual-log.json"), &log)
+	if log.Version != feedback.CounterfactualLogVersion || !log.OK || log.Summary.CounterfactualGroupsCompared != 4 || log.Summary.ComparedRecords != 12 {
+		t.Fatalf("unexpected counterfactual log: %#v", log.Summary)
+	}
+	if log.Summary.ConfirmedWouldBlock != 3 || log.Summary.FalsePositiveWouldBlock != 3 || log.Summary.FalsePositiveWouldSpare != 3 || log.Summary.ConfirmedBoundaryAmbiguous != 3 {
+		t.Fatalf("unexpected counterfactual recommendation counts: %#v", log.Summary.CounterfactualCounters)
+	}
+	if _, err := os.Stat(filepath.Join(out, "counterfactual-log.md")); err != nil {
+		t.Fatalf("expected counterfactual markdown: %v", err)
+	}
+	data, err := os.ReadFile(filepath.Join(out, "counterfactual-log.json"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, forbidden := range []string{"finding-001", "ev-001", "counterfactual-secret-salt", "source_code", "evidence_hash"} {
+		if strings.Contains(string(data), forbidden) {
+			t.Fatalf("counterfactual CLI output leaked %q:\n%s", forbidden, data)
+		}
+	}
+}
+
 func TestSecurityReviewBlocksProtectedSurfaceWithoutRequiredGates(t *testing.T) {
 	report := buildSecurityReviewReport(
 		[]string{"internal/evidence/adapter.go", "internal/project/propose.go", "internal/archive/archive.go", "internal/dbdryrun/dryrun.go"},

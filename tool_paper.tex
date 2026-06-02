@@ -515,7 +515,12 @@ in-memory deduplication, enforces a k-anonymity floor, and emits only aggregate 
 On top of those aggregates, the drift-aware threshold updater computes source-free confirmation,
 false-positive, missed-outcome, and previous-release drift statistics. It can recommend a threshold
 change, but it cannot silently change blocking policy: without a gate receipt bound to both the feedback
-hash and the policy hash, every recommendation remains advisory and no candidate policy is written.
+hash and the policy hash, every recommendation remains advisory and no candidate policy is written. A
+companion reviewer-outcome counterfactual log replays those same aggregate groups against ordered
+historical policies, showing what prior releases would have blocked, allowed, or left ambiguous. It is
+conservative by design: if a threshold falls inside a published confidence decile, the group is marked
+\code{boundary\_ambiguous}; if the reviewer outcome is \code{missed}, the log records a detector
+non-emission rather than pretending a blocking threshold would have surfaced it.
 
 \paragraph{Multi-agent review and interoperability.} A simulated panel of reviewer agents with
 distinct risk tolerances votes per migration, and the same panel is shown to yield different outcomes
@@ -1117,13 +1122,14 @@ implicit.
 %======================================================================
 
 The completed roadmap now extends beyond the original 700-step artifact into standard-scale certificate
-interoperability, source-free live feedback ingestion, and gate-bound drift-aware threshold updates.
+interoperability, source-free live feedback ingestion, gate-bound drift-aware threshold updates, and
+reviewer-outcome counterfactual logging for previous releases.
 \tool{} therefore already combines
 deterministic analysis, bounded generation, real-repo gates, formal and causal scaffolding, autonomy
 safety cases, standards hooks, privacy-preserving reviewer-outcome aggregation, and long-horizon impact
 evidence. The remaining frontier is not another isolated detector; it is the transition from a
 generational artifact to shared infrastructure. The open roadmap items around this transition include:
-counterfactual logging for previous releases; shadow-mode online evaluation; adopter-local active-learning queues;
+shadow-mode online evaluation; adopter-local active-learning queues;
 production-grade remediation loops for expand/contract, backfill, rollback, and patch-series safety; a
 public evidence marketplace with licenses, bounties, minimization, and governance; engine-version
 semantics for production databases, locks, replication, partitioning, and online schema change;
@@ -1322,7 +1328,7 @@ Formal methods & \code{invariant-extract-gate}, \code{symexec-gate}, \code{model
 \code{causal-graph-gate}, \code{counterfactual-gate} \\
 Decision science & \code{risk-economics-gate}, \code{uncertainty-calibration-gate},
 \code{active-learning-gate}, \code{reviewer-sim-gate}, \code{live-feedback-ingestion-gate},
-\code{explainable-ranking-gate} \\
+\code{drift-threshold-update-gate}, \code{reviewer-counterfactual-log-gate} \\
 Release \& interop & \code{rc-rehearsal-gate}, \code{leaderboard-gate}, \code{dossier-gate},
 \code{interop-gate}, \code{standards-body-conformance-corpus-gate},
 \code{certificate-interop-dashboard-gate}, \code{conformance-failure-minimizer-gate},
@@ -1364,8 +1370,10 @@ privacy-metrics mode emits source-free risk trends with salted cohort identifier
 shared without raw evidence. The source-free live-feedback ingester applies the same discipline to
 adopter reviewer outcomes: it stores no source, diffs, paths, raw evidence, finding IDs, evidence
 hashes, adopter IDs, or salts, and low-count detector groups are folded into a dimension-free residual
-bucket. Binaries, release archives, and public-corpus downloads carry deterministic provenance and
-sorted checksums.
+bucket. Counterfactual replay over previous releases consumes only those published groups, excludes
+raw confidence values, and reports decile-boundary ambiguity rather than reconstructing private
+individual outcomes. Binaries, release archives, and public-corpus downloads carry deterministic
+provenance and sorted checksums.
 
 \section{Reproduction Guide}
 \label{app:repro}
@@ -1385,7 +1393,8 @@ make certificate-interop-dashboard-gate \quad\# PLCI checker drift dashboard\\
 make certificate-migration-gate \hspace{0.1em}\# PLCI/0 verdicts recheck as PLCI/1\\
 make certificate-plugfest-gate \hspace{0.25em}\# offline PLCI lifecycle submission replay\\
 make live-feedback-ingestion-gate \hspace{0.15em}\# source-free reviewer outcome aggregates\\
-make drift-threshold-update-gate \hspace{0.02em}\# gate-bound advisory calibration updates
+make drift-threshold-update-gate \hspace{0.02em}\# gate-bound advisory calibration updates\\
+make reviewer-counterfactual-log-gate \quad\# previous-release replay without raw outcomes
 \end{quote}
 
 \noindent

@@ -542,6 +542,7 @@ Usage:
   patchline artifact-benchmark compare <actual.json> <expected.json> [--json]
   patchline ingest-evidence <events.jsonl> [--json] [--out graph.json]
   patchline adapt-evidence <otlp|datadog|postgres|github|migration-runner|jira|linear> <input.json> [--json] [--out events.jsonl]
+  patchline feedback counterfactual-log --feedback live-feedback.json --history policy-history.json --out dir [--json]
   patchline ci-gate <suite.json> [--min-precision 0.95] [--min-recall 0.95] [--json]
   patchline ledger-verify [--json]
 
@@ -14495,7 +14496,7 @@ func adaptEvidence(adapter, path string, jsonOut bool, outPath string) error {
 
 func feedbackCommand(args []string) error {
 	if len(args) == 0 {
-		return errors.New("usage: patchline feedback ingest <input.json> --out <dir> [--json] | patchline feedback threshold-update --feedback live-feedback.json --policy thresholds.json --out <dir> [--previous live-feedback.json] [--gate gate.json] [--json]")
+		return errors.New("usage: patchline feedback ingest <input.json> --out <dir> [--json] | patchline feedback threshold-update --feedback live-feedback.json --policy thresholds.json --out <dir> [--previous live-feedback.json] [--gate gate.json] [--json] | patchline feedback counterfactual-log --feedback live-feedback.json --history policy-history.json --out <dir> [--json]")
 	}
 	switch args[0] {
 	case "ingest":
@@ -14509,6 +14510,8 @@ func feedbackCommand(args []string) error {
 		return feedbackIngest(args[1], outPath, hasFlag(args[2:], "--json"))
 	case "threshold-update":
 		return feedbackThresholdUpdate(args[1:], hasFlag(args[1:], "--json"))
+	case "counterfactual-log":
+		return feedbackCounterfactualLog(args[1:], hasFlag(args[1:], "--json"))
 	default:
 		return fmt.Errorf("unknown feedback command %q", args[0])
 	}
@@ -14627,6 +14630,55 @@ func feedbackThresholdUpdate(args []string, jsonOut bool) error {
 	return nil
 }
 
+func feedbackCounterfactualLog(args []string, jsonOut bool) error {
+	feedbackPath, ok := flagValue(args, "--feedback")
+	if !ok || feedbackPath == "" {
+		return errors.New("usage: patchline feedback counterfactual-log --feedback live-feedback.json --history policy-history.json --out <dir> [--json]")
+	}
+	historyPath, ok := flagValue(args, "--history")
+	if !ok || historyPath == "" {
+		return errors.New("usage: patchline feedback counterfactual-log --feedback live-feedback.json --history policy-history.json --out <dir> [--json]")
+	}
+	outPath, ok := flagValue(args, "--out")
+	if !ok || outPath == "" {
+		return errors.New("usage: patchline feedback counterfactual-log --feedback live-feedback.json --history policy-history.json --out <dir> [--json]")
+	}
+	report, err := readLiveFeedbackReport(feedbackPath)
+	if err != nil {
+		return err
+	}
+	history, err := readCounterfactualPolicyHistory(historyPath)
+	if err != nil {
+		return err
+	}
+	log, err := feedback.ComputeCounterfactualLog(report, history)
+	if err != nil {
+		return err
+	}
+	if err := os.MkdirAll(outPath, 0o755); err != nil {
+		return err
+	}
+	jsonFile, err := os.Create(filepath.Join(outPath, "counterfactual-log.json"))
+	if err != nil {
+		return err
+	}
+	if err := writeJSON(jsonFile, log); err != nil {
+		jsonFile.Close()
+		return err
+	}
+	if err := jsonFile.Close(); err != nil {
+		return err
+	}
+	if err := os.WriteFile(filepath.Join(outPath, "counterfactual-log.md"), []byte(renderCounterfactualLogMarkdown(log)), 0o644); err != nil {
+		return err
+	}
+	if jsonOut {
+		return writeJSON(os.Stdout, log)
+	}
+	fmt.Printf("wrote reviewer-outcome counterfactual log with %d group/release comparison(s) to %s\n", log.Summary.CounterfactualGroupsCompared, outPath)
+	return nil
+}
+
 func renderLiveFeedbackMarkdown(report feedback.Report) string {
 	var b strings.Builder
 	fmt.Fprintf(&b, "# Source-free live feedback\n\n")
@@ -14695,6 +14747,7 @@ func renderThresholdUpdateMarkdown(report feedback.ThresholdUpdateReport) string
 		fmt.Fprintf(&b, "No threshold changes were recommended from the published aggregate feedback.\n")
 		return b.String()
 	}
+
 	fmt.Fprintf(&b, "## Recommendations\n\n")
 	fmt.Fprintf(&b, "| Detector | Direction | Current | Suggested | Apply status | Published count | Confirmed | False positive | Drift |\n")
 	fmt.Fprintf(&b, "| --- | --- | ---: | ---: | --- | ---: | ---: | ---: | ---: |\n")
@@ -14717,6 +14770,54 @@ func renderThresholdUpdateMarkdown(report feedback.ThresholdUpdateReport) string
 		fmt.Fprintf(&b, "\nA separate `candidate-threshold-policy.json` was written because the gate receipt was bound to this feedback hash and policy hash. Review and commit that file explicitly if the blocking policy should change.\n")
 	} else {
 		fmt.Fprintf(&b, "\nNo candidate policy was written because a valid policy gate was not provided.\n")
+	}
+	return b.String()
+}
+
+func renderCounterfactualLogMarkdown(report feedback.CounterfactualLog) string {
+	var b strings.Builder
+	fmt.Fprintf(&b, "# Reviewer-outcome counterfactual log\n\n")
+	fmt.Fprintf(&b, "Patchline reconstructed what **previous releases** would have recommended for published k-anonymous reviewer-outcome groups. The log uses only aggregate detector/release/confidence/verdict/action groups; it does not re-identify findings or retain source evidence.\n\n")
+	fmt.Fprintf(&b, "## Safety model\n\n")
+	fmt.Fprintf(&b, "| Field | Value |\n| --- | --- |\n")
+	fmt.Fprintf(&b, "| Evidence basis | `%s` |\n", report.EvidenceBasis)
+	fmt.Fprintf(&b, "| Release ordering | `%s` |\n", report.ReleaseOrdering)
+	fmt.Fprintf(&b, "| Recommendation model | `%s` |\n", report.Recommendation.Kind)
+	fmt.Fprintf(&b, "| Boundary treatment | `%s` |\n", report.Recommendation.BoundaryTreatment)
+	fmt.Fprintf(&b, "| Missed treatment | `%s` |\n", report.Recommendation.MissedTreatment)
+	fmt.Fprintf(&b, "| Hash | `%s` |\n\n", report.Hash)
+	fmt.Fprintf(&b, "## Summary\n\n")
+	fmt.Fprintf(&b, "| Metric | Count |\n| --- | ---: |\n")
+	fmt.Fprintf(&b, "| Published groups | %d |\n", report.Summary.PublishedGroups)
+	fmt.Fprintf(&b, "| Published feedback records | %d |\n", report.Summary.PublishedFeedbackRecords)
+	fmt.Fprintf(&b, "| Counterfactual group/release comparisons | %d |\n", report.Summary.CounterfactualGroupsCompared)
+	fmt.Fprintf(&b, "| Compared records | %d |\n", report.Summary.ComparedRecords)
+	fmt.Fprintf(&b, "| Would block | %d |\n", report.Summary.WouldBlock)
+	fmt.Fprintf(&b, "| Would allow | %d |\n", report.Summary.WouldAllow)
+	fmt.Fprintf(&b, "| Boundary ambiguous | %d |\n", report.Summary.BoundaryAmbiguous)
+	fmt.Fprintf(&b, "| Missed detector non-emissions | %d |\n\n", report.Summary.MissedNotEmitted)
+	if len(report.Releases) > 0 {
+		fmt.Fprintf(&b, "## Previous release summaries\n\n")
+		fmt.Fprintf(&b, "| Policy release | Compared | Block confirmed | Miss confirmed | Block false positives | Spare false positives | Ambiguous |\n")
+		fmt.Fprintf(&b, "| --- | ---: | ---: | ---: | ---: | ---: | ---: |\n")
+		for _, release := range report.Releases {
+			fmt.Fprintf(&b, "| `%s` | %d | %d | %d | %d | %d | %d |\n",
+				release.PolicyRelease,
+				release.ComparedRecords,
+				release.ConfirmedWouldBlock,
+				release.ConfirmedWouldMiss,
+				release.FalsePositiveWouldBlock,
+				release.FalsePositiveWouldSpare,
+				release.BoundaryAmbiguous,
+			)
+		}
+		fmt.Fprintf(&b, "\n")
+	}
+	if len(report.Warnings) > 0 {
+		fmt.Fprintf(&b, "## Warnings\n\n")
+		for _, warning := range report.Warnings {
+			fmt.Fprintf(&b, "- `%s`\n", warning)
+		}
 	}
 	return b.String()
 }
@@ -14962,6 +15063,15 @@ func readThresholdGate(path string) (feedback.ThresholdGateReceipt, error) {
 	}
 	defer file.Close()
 	return feedback.ReadThresholdGate(file)
+}
+
+func readCounterfactualPolicyHistory(path string) (feedback.CounterfactualPolicyHistory, error) {
+	file, err := os.Open(path)
+	if err != nil {
+		return feedback.CounterfactualPolicyHistory{}, err
+	}
+	defer file.Close()
+	return feedback.ReadCounterfactualPolicyHistory(file)
 }
 
 func readBenchmarkSpec(path string) (bench.Spec, error) {

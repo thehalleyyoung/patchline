@@ -1,0 +1,46 @@
+{
+  "version": "patchline.counterfactual-policy-history/v1",
+  "name": "stage63-counterfactual-history",
+  "claim": "Patchline can reconstruct what previous releases would have recommended for published k-anonymous reviewer-outcome groups without retaining source code, finding identifiers, evidence hashes, salts, or raw confidence values.",
+  "policies": [
+    {
+      "release": "v0.8.0",
+      "thresholds": [
+        {
+          "detector": "orm.write-breadth",
+          "blocking_threshold": 0.8
+        },
+        {
+          "detector": "sql.destructive-ddl",
+          "blocking_threshold": 0.99
+        }
+      ]
+    },
+    {
+      "release": "v0.9.0",
+      "thresholds": [
+        {
+          "detector": "orm.write-breadth",
+          "blocking_threshold": 0.7
+        },
+        {
+          "detector": "sql.destructive-ddl",
+          "blocking_threshold": 0.9
+        }
+      ]
+    },
+    {
+      "release": "v1.0.0",
+      "thresholds": [
+        {
+          "detector": "orm.write-breadth",
+          "blocking_threshold": 0.7
+        },
+        {
+          "detector": "sql.destructive-ddl",
+          "blocking_threshold": 0.9
+        }
+      ]
+    }
+  ]
+}
