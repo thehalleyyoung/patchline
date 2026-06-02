@@ -162,6 +162,7 @@ make research-experiment-driver-gate
 make bootstrap-confidence-gate
 make paired-statistical-tests-gate
 make effect-size-gate
+make sensitivity-analysis-gate
 ```
 
 The demo downloads real GitHub project subpaths and writes:
@@ -245,6 +246,8 @@ The real-repo slice matrix is backed by `examples/real-repo-slices.json` and `ex
 `make paired-statistical-tests-gate` regenerates the four-slice matrix and runs exact paired sign tests for Patchline versus grep-only, SQL-only, identifier-only, temporal-only, and no-facts-generation baselines.
 
 `make effect-size-gate` adds magnitude reporting to the paired tests: mean/median deltas, relative lift, win/tie rates, and standardized paired deltas.
+
+`make sensitivity-analysis-gate` runs budget variants and deterministic post-hoc sweeps for finding caps, link-confidence thresholds, temporal windows, and risk-weight settings on the four pinned public slices.
 
 Current default projects:
 

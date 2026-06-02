@@ -1,0 +1,17 @@
+{
+  "version": "patchline.sensitivity-analysis/v1",
+  "minimum_public_slices": 4,
+  "budget_settings": [
+    {"id": "tiny", "budget": "files=1,lines=80,tokens=4000,changes=1", "budget_risks": 1},
+    {"id": "default", "budget": "files=3,lines=120,tokens=12000,changes=3", "budget_risks": 3},
+    {"id": "wide", "budget": "files=6,lines=160,tokens=24000,changes=6", "budget_risks": 6}
+  ],
+  "finding_caps": [5, 25, 100],
+  "link_thresholds": ["identifier", "identifier+stage", "any"],
+  "temporal_window_days": [30, 365, 3650],
+  "risk_weight_settings": [
+    {"id": "base", "description": "Use emitted risk scores."},
+    {"id": "without-linked-evidence", "description": "Remove linked-project-evidence contribution from ranked explanations."},
+    {"id": "safety-heavy", "description": "Double missing transaction, idempotency, retry, and rollback feature weights in ranked explanations."}
+  ]
+}
