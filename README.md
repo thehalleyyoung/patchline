@@ -301,6 +301,8 @@ Run `make governance-gate` to render role-specific **governance** charters for m
 
 Run `make release-notes-gate` to generate release notes that embed a **public proof** delta computed against the live gate set, contributor recognition, and a **known-limitations** ledger — so notes never advertise a capability whose gate is absent; see [docs/release-notes.md](docs/release-notes.md).
 
+Run `make office-hours-gate` to assemble a public **office hours** agenda from recent **reproducibility** failures and roadmap cards — every failure item reproduces with `make <gate>`, so the room always works on real, reproducible issues; see [docs/office-hours.md](docs/office-hours.md).
+
 Add `--redact` to write `analysis-bundle/` copies with stable redaction tokens for identifiers, literals, customer-like strings, and secret-like values while preserving joins and existing artifact hashes.
 
 Add `--ci` to write `ci/summary.md` plus upload snippets and code-quality artifacts for GitHub Actions, GitLab CI, and Bitbucket Pipelines: SARIF under `analysis-bundle/summary.sarif`, GitLab `ci/gl-code-quality-report.json`, and Bitbucket `ci/bitbucket-code-insights.json`.

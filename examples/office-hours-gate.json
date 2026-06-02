@@ -1,0 +1,14 @@
+{
+  "version": "patchline.office-hours-gate/v1",
+  "claim": "Patchline generates public office-hours agendas that are driven by real signals rather than guesswork: each agenda is assembled from recent reproducibility failures and active roadmap cards, time-boxed into review, triage, and planning blocks. Every failure item references a gate that actually exists, so the agenda always points contributors at reproducible work. The gate proves that each agenda failure item maps to a real gate script, that roadmap discussion items are present, and that the rendered agenda contains the mandated review, triage, and planning sections.",
+  "real_repo": "patchline (self): agenda failure items validated against scripts/*-gate.sh",
+  "session": "2025-W23 public office hours",
+  "recent_failures": [
+    {"gate": "schema-compat-gate", "summary": "False positive on a plain JSON file with a reserved word."},
+    {"gate": "nosql-change-gate", "summary": "Missed a Redis FLUSHALL in a shell-wrapped migration."}
+  ],
+  "roadmap_cards": [
+    {"title": "Cross-version protobuf field-number reuse check"},
+    {"title": "Link Helm/Argo ordering into one repository graph"}
+  ]
+}
