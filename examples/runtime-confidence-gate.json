@@ -1,0 +1,16 @@
+{
+  "version": "patchline.runtime-confidence-gate/v1",
+  "claim": "Runtime-evidence confidence scoring separates observed production impact from static risk by scoring every real finding on two independent axes: a static-risk axis from Patchline severity and a runtime axis from per-table observed telemetry (independent of severity). Findings are placed into confirmed, static-only (unconfirmed), runtime-only (static-missed), and quiet quadrants, and a divergence metric proves the two axes are not the same signal.",
+  "real_repo": {
+    "repo": "lobsters/lobsters",
+    "ref": "3b80b47aa5aaba37ec44413e7d1dc96fcf1585b6",
+    "subpath": "db/migrate"
+  },
+  "static_weights": { "high": 1.0, "medium": 0.6, "low": 0.3 },
+  "static_high_threshold": 0.7,
+  "runtime_threshold": 0.5,
+  "telemetry_coverage_pct": 80,
+  "minimum_findings": 50,
+  "minimum_quadrants_populated": 3,
+  "minimum_divergence": 0.1
+}

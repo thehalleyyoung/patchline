@@ -235,6 +235,8 @@ Run `make datadog-timeline-gate` to reconstruct a Datadog-style incident timelin
 
 Run `make prom-grafana-gate` to generate and re-ingest a Prometheus range export and Grafana dashboard (SLO burn, error-rate, latency panels), correlating observed SLO breaches back to real high-severity findings; see [docs/prom-grafana.md](docs/prom-grafana.md).
 
+Run `make runtime-confidence-gate` to score every real finding on independent static-risk and observed-runtime axes, separating confirmed incidents from unconfirmed static risk via confidence quadrants and a divergence metric; see [docs/runtime-confidence.md](docs/runtime-confidence.md).
+
 Add `--redact` to write `analysis-bundle/` copies with stable redaction tokens for identifiers, literals, customer-like strings, and secret-like values while preserving joins and existing artifact hashes.
 
 Add `--ci` to write `ci/summary.md` plus upload snippets and code-quality artifacts for GitHub Actions, GitLab CI, and Bitbucket Pipelines: SARIF under `analysis-bundle/summary.sarif`, GitLab `ci/gl-code-quality-report.json`, and Bitbucket `ci/bitbucket-code-insights.json`.
