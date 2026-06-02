@@ -1,0 +1,13 @@
+{
+  "schema": "prisma.migrate.diagnostics/v1",
+  "tool": "prisma-migrate",
+  "case_id": "drop-legacy-name",
+  "migration_path": "specs/verdict-exchange/v1/real-code/prisma/202406020001_drop_legacy_name/migration.sql",
+  "diagnostic": {
+    "level": "warning",
+    "code": "P3006",
+    "operation": "DropColumn",
+    "risk_bps": 2700,
+    "message": "dropping legacyName may lose customer data unless downstream readers are retired"
+  }
+}

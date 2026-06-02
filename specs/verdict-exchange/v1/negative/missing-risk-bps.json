@@ -1,0 +1,9 @@
+{
+  "schema": "strong_migrations.audit/v1",
+  "tool": "strong_migrations",
+  "case_id": "missing-risk",
+  "file": "specs/verdict-exchange/v1/real-code/rails/remove_email_from_users.rb",
+  "check": "remove_column",
+  "safety": "danger",
+  "message": "risk-bps is intentionally omitted"
+}

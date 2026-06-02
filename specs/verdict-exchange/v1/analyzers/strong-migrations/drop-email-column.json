@@ -1,0 +1,17 @@
+{
+  "schema": "strong_migrations.audit/v1",
+  "tool": "strong_migrations",
+  "case_id": "drop-email-column",
+  "file": "specs/verdict-exchange/v1/real-code/rails/remove_email_from_users.rb",
+  "check": "remove_column",
+  "safety": "danger",
+  "risk_bps": 9400,
+  "message": "remove_column can break old application code and discard data before compatibility is proven",
+  "evidence": [
+    {
+      "path": "specs/verdict-exchange/v1/real-code/rails/remove_email_from_users.rb",
+      "line": 3,
+      "signal": "remove_column :users, :email"
+    }
+  ]
+}

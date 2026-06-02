@@ -1,0 +1,6 @@
+{
+  "schema": "fictional.migration.audit/v1",
+  "tool": "fictional",
+  "case_id": "unsupported",
+  "risk_bps": 1
+}

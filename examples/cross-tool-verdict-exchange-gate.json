@@ -1,0 +1,12 @@
+{
+  "version": "patchline.cross-tool-verdict-exchange-gate/v1",
+  "claim": "Patchline proves cross-tool proof-carrying verdict exchange by projecting three independent migration-safety analyzer formats, Rails strong_migrations, Django migration checks, and Prisma Migrate diagnostics, into PLCI/1 certificates. The gate renders certificates with real repository file digests, parses them through the certificate checker with verification enabled, reconstructs analyzer-specific preserved projections from the parsed certificate only, and requires byte-stable projection equality. Negative controls mutate a preserved risk score, corrupt a digest, omit a preserved field, and submit an unsupported analyzer schema.",
+  "spec_dir": "specs/verdict-exchange/v1",
+  "analyzers": [
+    "strong-migrations",
+    "django-migrations",
+    "prisma-migrate"
+  ],
+  "positive_cases": 3,
+  "negative_controls": 4
+}

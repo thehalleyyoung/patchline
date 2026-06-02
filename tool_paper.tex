@@ -900,7 +900,13 @@ canonical SHA-256 rule, real-code evidence digests, and independent Go, Rust, Py
 checkers. Its gate accepts valid proof-carrying migration-safety certificates, rejects malformed
 verdicts, dangling evidence, hash mismatches, and bad file digests, and fails if any implementation
 disagrees with the others. This is deliberately small enough to audit yet strong enough to serve as the
-seed of a multi-tool certificate ecosystem.
+seed of a multi-tool certificate ecosystem. The next gate turns parser interoperability into semantic
+exchange: Rails \code{strong\_migrations}, Django migration checks, and Prisma Migrate diagnostics are
+projected into PLCI/1 certificates, parsed with real repository digest verification, and reconstructed
+back into analyzer-specific verdict projections. The proof is intentionally non-vacuous: only declared
+fields are preserved, the reconstruction uses the parsed certificate rather than the original fixture,
+and negative controls mutate risk, corrupt evidence, omit a preserved field, and submit an unsupported
+analyzer schema.
 
 %======================================================================
 \section{Developer and Contributor Experience}

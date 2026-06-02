@@ -1,0 +1,13 @@
+{
+  "schema": "django.migration.check/v1",
+  "tool": "django-migrations",
+  "case_id": "slug-not-null",
+  "migration": {
+    "path": "specs/verdict-exchange/v1/real-code/django/0007_make_slug_not_null.py",
+    "operation": "AddField",
+    "app": "blog"
+  },
+  "result": "requires-review",
+  "risk_bps": 4200,
+  "message": "non-null field depends on the prior slug backfill and must carry review evidence"
+}
