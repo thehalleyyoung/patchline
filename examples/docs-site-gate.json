@@ -1,0 +1,30 @@
+{
+  "version": "patchline.docs-site-gate/v1",
+  "claim": "Patchline publishes a hosted documentation site with tutorials for maintainers, researchers, security reviewers, and contributors, and the site embeds real public-repository output regenerated from pinned code.",
+  "site_url": "https://thehalleyyoung.github.io/patchline/",
+  "required_roles": [
+    "maintainers",
+    "researchers",
+    "security-reviewers",
+    "contributors"
+  ],
+  "required_pages": [
+    "index.html",
+    "tutorials/maintainers.html",
+    "tutorials/researchers.html",
+    "tutorials/security-reviewers.html",
+    "tutorials/contributors.html",
+    "artifacts/public-demo.json",
+    "site-manifest.json",
+    "sitemap.xml",
+    ".nojekyll"
+  ],
+  "real_code": {
+    "repo": "lobsters/lobsters",
+    "ref": "3b80b47aa5aaba37ec44413e7d1dc96fcf1585b6",
+    "subpath": "db/migrate",
+    "minimum_files_scanned": 100,
+    "minimum_ranked_risks": 100,
+    "minimum_generated_files": 1
+  }
+}

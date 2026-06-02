@@ -169,6 +169,8 @@ Run `make landing-readme-gate` to prove the top-level README badges, 60-second d
 
 Run `make release-distribution-gate` to build release archives, signed checksums, Homebrew and Docker packaging paths, GitHub Release metadata, and a packaged-binary public-code proof; see [docs/release-distribution.md](docs/release-distribution.md).
 
+Run `make docs-site-gate` to build the GitHub Pages documentation site with maintainer, researcher, security reviewer, and contributor tutorials backed by real public-repo output; see [docs/hosted-docs-site.md](docs/hosted-docs-site.md).
+
 Add `--redact` to write `analysis-bundle/` copies with stable redaction tokens for identifiers, literals, customer-like strings, and secret-like values while preserving joins and existing artifact hashes.
 
 Add `--ci` to write `ci/summary.md` plus upload snippets and code-quality artifacts for GitHub Actions, GitLab CI, and Bitbucket Pipelines: SARIF under `analysis-bundle/summary.sarif`, GitLab `ci/gl-code-quality-report.json`, and Bitbucket `ci/bitbucket-code-insights.json`.
