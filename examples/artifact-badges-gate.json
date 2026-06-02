@@ -1,0 +1,56 @@
+{
+  "version": "patchline.artifact-badges-gate/v1",
+  "claim": "Patchline awards artifact badges only from gate-backed evidence: reusable, available, functional, and reproducible badges must each link to regenerated public-code outputs and concrete acceptance criteria.",
+  "required_badges": ["available", "functional", "reusable", "reproducible"],
+  "minimum_public_repos": 4,
+  "minimum_ranked_risks": 100,
+  "minimum_generated_files": 8,
+  "minimum_justifications_per_badge": 3,
+  "evidence_profile_spec": "examples/artifact-container-profile-gate.json",
+  "badges": [
+    {
+      "id": "available",
+      "label": "artifact",
+      "message": "available",
+      "color": "2563eb",
+      "criteria": [
+        "Public repository contains reviewer documentation, specs, scripts, and gates.",
+        "Pinned public repository refs are encoded in machine-readable specs.",
+        "No production credentials or private datasets are required."
+      ]
+    },
+    {
+      "id": "functional",
+      "label": "artifact",
+      "message": "functional",
+      "color": "16a34a",
+      "criteria": [
+        "Focused gate rebuilds a public-code capstone session.",
+        "The session reports ranked risks, generated artifacts, and rejected bad output.",
+        "Generated evidence includes metrics, taxonomy, claims, limitations, figures, and case studies."
+      ]
+    },
+    {
+      "id": "reusable",
+      "label": "artifact",
+      "message": "reusable",
+      "color": "7c3aed",
+      "criteria": [
+        "Reviewer roles and expected outputs are generated as JSON and Markdown.",
+        "Container profile documents required packages, commands, and environment variables.",
+        "Outputs are organized under stable paths that downstream reviewers can cite."
+      ]
+    },
+    {
+      "id": "reproducible",
+      "label": "artifact",
+      "message": "reproducible",
+      "color": "f97316",
+      "criteria": [
+        "The rebuild profile uses pinned public repository refs.",
+        "The capstone session emits checksums for regenerated artifacts.",
+        "The gate validates host-independence and deterministic-only evidence thresholds."
+      ]
+    }
+  ]
+}

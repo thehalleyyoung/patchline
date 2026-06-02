@@ -8,6 +8,10 @@ It is not an AI tool, and it does not require you to label data or adopt a Patch
 [![not-ai](https://img.shields.io/badge/not--ai-static--analysis-16a34a)](#why-this-is-useful)
 [![public-repos](https://img.shields.io/badge/proven_on-public_repos-7c3aed)](#real-public-repo-output)
 [![artifact-review](https://img.shields.io/badge/artifact-reviewer_walkthrough-f97316)](docs/reviewer-walkthrough.md)
+[![available](https://img.shields.io/badge/artifact-available-2563eb)](docs/artifact-badges.md)
+[![functional](https://img.shields.io/badge/artifact-functional-16a34a)](docs/artifact-badges.md)
+[![reusable](https://img.shields.io/badge/artifact-reusable-7c3aed)](docs/artifact-badges.md)
+[![reproducible](https://img.shields.io/badge/artifact-reproducible-f97316)](docs/artifact-badges.md)
 
 ## 60-second demo
 
@@ -188,6 +192,8 @@ Run `make capstone-demo-gate` to regenerate the release-quality capstone demo wh
 Run `make artifact-evaluation-kit-gate` to regenerate the artifact-evaluation landing kit with reviewer roles, time budgets, expected outputs, and pass/fail criteria; see [docs/artifact-evaluation-kit.md](docs/artifact-evaluation-kit.md).
 
 Run `make artifact-container-profile-gate` to verify the one-command artifact VM/container profile that rebuilds public results without host-specific assumptions; see [docs/artifact-container-profile.md](docs/artifact-container-profile.md).
+
+Run `make artifact-badges-gate` to regenerate artifact badges for reusable, available, functional, and reproducible evidence with gate-backed justifications; see [docs/artifact-badges.md](docs/artifact-badges.md).
 
 Add `--redact` to write `analysis-bundle/` copies with stable redaction tokens for identifiers, literals, customer-like strings, and secret-like values while preserving joins and existing artifact hashes.
 
