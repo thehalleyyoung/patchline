@@ -1,0 +1,13 @@
+{
+  "version": "patchline.negative-controls-gate/v1",
+  "claim": "Runtime evidence is not a rubber stamp. For each real finding the workflow runs a paired test: a positive condition where telemetry shows impact (the static warning is runtime-confirmed) and a negative control where telemetry is silent (no errors, healthy latency). High-severity findings under a silent negative control must stay UNCONFIRMED, proving confirmation is driven by observed telemetry rather than static severity. Specificity (negative controls correctly left unconfirmed) must be 1.0 and the positive arm must retain power (most positives confirmed).",
+  "real_repo": {
+    "repo": "lobsters/lobsters",
+    "ref": "3b80b47aa5aaba37ec44413e7d1dc96fcf1585b6",
+    "subpath": "db/migrate"
+  },
+  "max_findings": 20,
+  "minimum_findings": 8,
+  "min_specificity": 1.0,
+  "min_power": 0.8
+}

@@ -247,6 +247,8 @@ Run `make offline-bundle-gate` to package real findings and runtime evidence int
 
 Run `make incident-export-gate` to export real findings to PagerDuty, Opsgenie, Slack, and Statuspage in each provider's native schema, with severity mapped to provider vocabularies and stable cross-adapter finding linkage; see [docs/incident-export.md](docs/incident-export.md).
 
+Run `make negative-controls-gate` to run paired positive/negative-control telemetry tests proving the runtime layer is no rubber stamp — silent telemetry never confirms a warning (even high-severity), giving specificity 1.0 while the positive arm retains power; see [docs/negative-controls.md](docs/negative-controls.md).
+
 Add `--redact` to write `analysis-bundle/` copies with stable redaction tokens for identifiers, literals, customer-like strings, and secret-like values while preserving joins and existing artifact hashes.
 
 Add `--ci` to write `ci/summary.md` plus upload snippets and code-quality artifacts for GitHub Actions, GitLab CI, and Bitbucket Pipelines: SARIF under `analysis-bundle/summary.sarif`, GitLab `ci/gl-code-quality-report.json`, and Bitbucket `ci/bitbucket-code-insights.json`.
