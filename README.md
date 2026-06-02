@@ -97,6 +97,8 @@ Run `make release-checksum-gate` to prove release archives get sorted SHA-256 ch
 
 Run `make threat-model-gate` to verify the documented threat model for untrusted repos, archives, generated code, native tests, and adapter inputs against real artifacts; see [docs/threat-model.md](docs/threat-model.md).
 
+Run `make archive-security-gate` to prove archive traversal, symlink escape, malformed archive, and archive-bomb regressions fail while pinned public GitHub archives still extract through the content-addressed cache; see [docs/archive-security.md](docs/archive-security.md).
+
 Add `--redact` to write `analysis-bundle/` copies with stable redaction tokens for identifiers, literals, customer-like strings, and secret-like values while preserving joins and existing artifact hashes.
 
 Add `--ci` to write `ci/summary.md` plus upload snippets and code-quality artifacts for GitHub Actions, GitLab CI, and Bitbucket Pipelines: SARIF under `analysis-bundle/summary.sarif`, GitLab `ci/gl-code-quality-report.json`, and Bitbucket `ci/bitbucket-code-insights.json`.

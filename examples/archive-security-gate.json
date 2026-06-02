@@ -1,0 +1,24 @@
+{
+  "version": "patchline.archive-security-gate/v1",
+  "claim": "Patchline rejects unsafe archive traversal, symlink escape, malformed archive, and archive-bomb inputs while still extracting pinned public GitHub repository archives through the content-addressed cache.",
+  "focused_tests": [
+    "TestExtractZipRejectsUnsafePaths",
+    "TestExtractTarGzRejectsUnsafePaths",
+    "TestExtractArchivesIgnoreSymlinkEscapes",
+    "TestExtractArchivesRejectMalformedInputs",
+    "TestExtractArchivesRejectBombs",
+    "TestExtractArchivesAcceptValidRepoFiles"
+  ],
+  "real_code": {
+    "repo": "lobsters/lobsters",
+    "ref": "3b80b47aa5aaba37ec44413e7d1dc96fcf1585b6",
+    "subpath": "db/migrate"
+  },
+  "required_controls": [
+    "path traversal",
+    "symlink",
+    "malformed",
+    "archive bombs",
+    "content-addressed reuse"
+  ]
+}

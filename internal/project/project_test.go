@@ -657,6 +657,175 @@ func TestExtractZipRejectsUnsafePaths(t *testing.T) {
 	}
 }
 
+func TestExtractTarGzRejectsUnsafePaths(t *testing.T) {
+	var buf bytes.Buffer
+	gz := gzip.NewWriter(&buf)
+	tw := tar.NewWriter(gz)
+	header := &tar.Header{Name: "../escape.txt", Mode: 0o644, Size: int64(len("bad"))}
+	if err := tw.WriteHeader(header); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := io.WriteString(tw, "bad"); err != nil {
+		t.Fatal(err)
+	}
+	if err := tw.Close(); err != nil {
+		t.Fatal(err)
+	}
+	if err := gz.Close(); err != nil {
+		t.Fatal(err)
+	}
+	if _, _, err := extractTarGz(bytes.NewReader(buf.Bytes()), t.TempDir()); err == nil {
+		t.Fatalf("expected unsafe tar path to fail")
+	}
+}
+
+func TestExtractArchivesIgnoreSymlinkEscapes(t *testing.T) {
+	t.Run("tar.gz", func(t *testing.T) {
+		base := t.TempDir()
+		var buf bytes.Buffer
+		gz := gzip.NewWriter(&buf)
+		tw := tar.NewWriter(gz)
+		if err := tw.WriteHeader(&tar.Header{Name: "repo/link", Typeflag: tar.TypeSymlink, Linkname: "../../escape.txt", Mode: 0o777}); err != nil {
+			t.Fatal(err)
+		}
+		if err := tw.WriteHeader(&tar.Header{Name: "repo/good.sql", Typeflag: tar.TypeReg, Mode: 0o644, Size: int64(len("select 1;"))}); err != nil {
+			t.Fatal(err)
+		}
+		if _, err := io.WriteString(tw, "select 1;"); err != nil {
+			t.Fatal(err)
+		}
+		if err := tw.Close(); err != nil {
+			t.Fatal(err)
+		}
+		if err := gz.Close(); err != nil {
+			t.Fatal(err)
+		}
+		root, _, err := extractTarGz(bytes.NewReader(buf.Bytes()), filepath.Join(base, "extract"))
+		if err != nil {
+			t.Fatal(err)
+		}
+		if _, err := os.Lstat(filepath.Join(root, "link")); !os.IsNotExist(err) {
+			t.Fatalf("expected tar symlink entry to be skipped, got err=%v", err)
+		}
+		if _, err := os.Stat(filepath.Join(base, "escape.txt")); !os.IsNotExist(err) {
+			t.Fatalf("symlink escape created outside file, err=%v", err)
+		}
+	})
+	t.Run("zip", func(t *testing.T) {
+		base := t.TempDir()
+		archive := filepath.Join(base, "symlink.zip")
+		file, err := os.Create(archive)
+		if err != nil {
+			t.Fatal(err)
+		}
+		zw := zip.NewWriter(file)
+		linkHeader := &zip.FileHeader{Name: "repo/link"}
+		linkHeader.SetMode(os.ModeSymlink | 0o777)
+		w, err := zw.CreateHeader(linkHeader)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if _, err := w.Write([]byte("../../escape.txt")); err != nil {
+			t.Fatal(err)
+		}
+		good, err := zw.Create("repo/good.sql")
+		if err != nil {
+			t.Fatal(err)
+		}
+		if _, err := good.Write([]byte("select 1;")); err != nil {
+			t.Fatal(err)
+		}
+		if err := zw.Close(); err != nil {
+			t.Fatal(err)
+		}
+		if err := file.Close(); err != nil {
+			t.Fatal(err)
+		}
+		root, err := extractZip(archive, filepath.Join(base, "extract"))
+		if err != nil {
+			t.Fatal(err)
+		}
+		if _, err := os.Lstat(filepath.Join(root, "link")); !os.IsNotExist(err) {
+			t.Fatalf("expected zip symlink entry to be skipped, got err=%v", err)
+		}
+		if _, err := os.Stat(filepath.Join(base, "escape.txt")); !os.IsNotExist(err) {
+			t.Fatalf("symlink escape created outside file, err=%v", err)
+		}
+	})
+}
+
+func TestExtractArchivesRejectMalformedInputs(t *testing.T) {
+	if _, _, err := extractTarGz(bytes.NewReader([]byte("not a gzip tar")), t.TempDir()); err == nil {
+		t.Fatalf("expected malformed tar.gz to fail")
+	}
+	archive := filepath.Join(t.TempDir(), "bad.zip")
+	if err := os.WriteFile(archive, []byte("not a zip"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := extractZip(archive, t.TempDir()); err == nil {
+		t.Fatalf("expected malformed zip to fail")
+	}
+}
+
+func TestExtractArchivesRejectBombs(t *testing.T) {
+	t.Run("tar oversized content", func(t *testing.T) {
+		withArchiveLimits(t, archiveExtractionLimits{MaxEntries: 10, MaxUncompressed: 3})
+		data := tarGzForTest(t, map[string]string{"repo/big.sql": "select 1;"})
+		_, _, err := extractTarGz(bytes.NewReader(data), t.TempDir())
+		if err == nil || !strings.Contains(err.Error(), "uncompressed size exceeds") {
+			t.Fatalf("expected tar size bomb rejection, got %v", err)
+		}
+	})
+	t.Run("tar too many entries", func(t *testing.T) {
+		withArchiveLimits(t, archiveExtractionLimits{MaxEntries: 1, MaxUncompressed: 1024})
+		data := tarGzForTest(t, map[string]string{"repo/a.sql": "select 1;", "repo/b.sql": "select 2;"})
+		_, _, err := extractTarGz(bytes.NewReader(data), t.TempDir())
+		if err == nil || !strings.Contains(err.Error(), "too many entries") {
+			t.Fatalf("expected tar entry bomb rejection, got %v", err)
+		}
+	})
+	t.Run("zip oversized content", func(t *testing.T) {
+		withArchiveLimits(t, archiveExtractionLimits{MaxEntries: 10, MaxUncompressed: 3})
+		archive := zipForTest(t, map[string]string{"repo/big.sql": "select 1;"})
+		_, err := extractZip(archive, t.TempDir())
+		if err == nil || !strings.Contains(err.Error(), "uncompressed size exceeds") {
+			t.Fatalf("expected zip size bomb rejection, got %v", err)
+		}
+	})
+	t.Run("zip too many entries", func(t *testing.T) {
+		withArchiveLimits(t, archiveExtractionLimits{MaxEntries: 1, MaxUncompressed: 1024})
+		archive := zipForTest(t, map[string]string{"repo/a.sql": "select 1;", "repo/b.sql": "select 2;"})
+		_, err := extractZip(archive, t.TempDir())
+		if err == nil || !strings.Contains(err.Error(), "too many entries") {
+			t.Fatalf("expected zip entry bomb rejection, got %v", err)
+		}
+	})
+}
+
+func TestExtractArchivesAcceptValidRepoFiles(t *testing.T) {
+	tarRoot, top, err := extractTarGz(bytes.NewReader(tarGzForTest(t, map[string]string{
+		"repo/db/migrate/001.sql": "select 1;",
+	})), t.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if top != "repo" {
+		t.Fatalf("expected tar top repo, got %q", top)
+	}
+	if content, err := os.ReadFile(filepath.Join(tarRoot, "db", "migrate", "001.sql")); err != nil || string(content) != "select 1;" {
+		t.Fatalf("expected tar file content, got %q err=%v", string(content), err)
+	}
+	zipRoot, err := extractZip(zipForTest(t, map[string]string{
+		"repo/db/migrate/001.sql": "select 1;",
+	}), t.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if content, err := os.ReadFile(filepath.Join(zipRoot, "db", "migrate", "001.sql")); err != nil || string(content) != "select 1;" {
+		t.Fatalf("expected zip file content, got %q err=%v", string(content), err)
+	}
+}
+
 func TestBaselineRanksRisksAndLinksFactsWithUnderscores(t *testing.T) {
 	inv := Inventory{
 		Root:         filepath.ToSlash(t.TempDir()),
@@ -1825,6 +1994,41 @@ func tarGzForTest(t *testing.T, files map[string]string) []byte {
 		t.Fatal(err)
 	}
 	return buf.Bytes()
+}
+
+func zipForTest(t *testing.T, files map[string]string) string {
+	t.Helper()
+	archive := filepath.Join(t.TempDir(), "fixture.zip")
+	file, err := os.Create(archive)
+	if err != nil {
+		t.Fatal(err)
+	}
+	zw := zip.NewWriter(file)
+	for name, content := range files {
+		writer, err := zw.Create(filepath.ToSlash(name))
+		if err != nil {
+			t.Fatal(err)
+		}
+		if _, err := io.WriteString(writer, content); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if err := zw.Close(); err != nil {
+		t.Fatal(err)
+	}
+	if err := file.Close(); err != nil {
+		t.Fatal(err)
+	}
+	return archive
+}
+
+func withArchiveLimits(t *testing.T, limits archiveExtractionLimits) {
+	t.Helper()
+	previous := archiveLimits
+	archiveLimits = limits
+	t.Cleanup(func() {
+		archiveLimits = previous
+	})
 }
 
 func hasIdentifier(ids []Identifier, kind, value string) bool {

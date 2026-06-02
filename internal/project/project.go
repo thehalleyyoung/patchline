@@ -698,6 +698,16 @@ func extractCachedArchive(path, kind, outDir string) (string, string, error) {
 	return extractTarGz(file, outDir)
 }
 
+type archiveExtractionLimits struct {
+	MaxEntries      int
+	MaxUncompressed int64
+}
+
+var archiveLimits = archiveExtractionLimits{
+	MaxEntries:      250000,
+	MaxUncompressed: int64(2 << 30),
+}
+
 func readDownloadCache(downloadDir, key string) (downloadCacheEntry, bool) {
 	path := downloadCacheEntryPath(downloadDir, key)
 	data, err := os.ReadFile(path)
@@ -780,6 +790,8 @@ func extractTarGz(reader io.Reader, target string) (string, string, error) {
 	defer gz.Close()
 	tr := tar.NewReader(gz)
 	var top string
+	var entries int
+	var totalBytes int64
 	for {
 		header, err := tr.Next()
 		if err == io.EOF {
@@ -790,6 +802,10 @@ func extractTarGz(reader io.Reader, target string) (string, string, error) {
 		}
 		if header.Typeflag == tar.TypeXGlobalHeader || header.Typeflag == tar.TypeXHeader || header.Typeflag == tar.TypeGNULongName || header.Typeflag == tar.TypeGNULongLink {
 			continue
+		}
+		entries++
+		if entries > archiveLimits.MaxEntries {
+			return "", "", fmt.Errorf("archive has too many entries: %d > %d", entries, archiveLimits.MaxEntries)
 		}
 		name := filepath.Clean(header.Name)
 		if strings.HasPrefix(name, "..") || filepath.IsAbs(name) {
@@ -812,6 +828,10 @@ func extractTarGz(reader io.Reader, target string) (string, string, error) {
 				return "", "", err
 			}
 		case tar.TypeReg:
+			if header.Size < 0 || totalBytes > archiveLimits.MaxUncompressed-header.Size {
+				return "", "", fmt.Errorf("archive uncompressed size exceeds limit %d bytes", archiveLimits.MaxUncompressed)
+			}
+			totalBytes += header.Size
 			if top == "" {
 				top = parts[0]
 			}
@@ -844,7 +864,11 @@ func extractZip(path, target string) (string, error) {
 	}
 	defer zr.Close()
 	var top string
-	for _, file := range zr.File {
+	var totalBytes int64
+	for index, file := range zr.File {
+		if index+1 > archiveLimits.MaxEntries {
+			return "", fmt.Errorf("archive has too many entries: %d > %d", index+1, archiveLimits.MaxEntries)
+		}
 		name := filepath.Clean(file.Name)
 		if strings.HasPrefix(name, "..") || filepath.IsAbs(name) {
 			return "", fmt.Errorf("unsafe archive path %q", file.Name)
@@ -856,6 +880,16 @@ func extractZip(path, target string) (string, error) {
 		mode := file.FileInfo().Mode()
 		if mode&os.ModeSymlink != 0 {
 			continue
+		}
+		if !file.FileInfo().IsDir() {
+			if file.UncompressedSize64 > uint64(archiveLimits.MaxUncompressed) {
+				return "", fmt.Errorf("archive uncompressed size exceeds limit %d bytes", archiveLimits.MaxUncompressed)
+			}
+			size := int64(file.UncompressedSize64)
+			if totalBytes > archiveLimits.MaxUncompressed-size {
+				return "", fmt.Errorf("archive uncompressed size exceeds limit %d bytes", archiveLimits.MaxUncompressed)
+			}
+			totalBytes += size
 		}
 		out := filepath.Join(target, name)
 		if !contained(target, out) {
