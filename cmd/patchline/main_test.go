@@ -391,6 +391,42 @@ func TestRepoReviewabilityExamplesDoNotClaimFullRepair(t *testing.T) {
 	}
 }
 
+func TestRepoLimitationsLedgerDistinguishesLimitationCategories(t *testing.T) {
+	root := t.TempDir()
+	writeMainTestFile(t, root, "db/migrate/001_update_accounts.sql", "UPDATE accounts SET status = 'active';\n")
+	writeMainTestFile(t, root, "scripts/repair_accounts.sql", "UPDATE accounts SET status = 'active' WHERE status IS NULL;\n")
+	outAnalysis := filepath.Join(t.TempDir(), "analysis")
+	if err := run([]string{"repo", "analyze", root, "--stages", "inventory,baseline,propose,compare", "--proposal-kind", "all", "--budget", "files=6,lines=100,tokens=8000,changes=2", "--no-llm", "--out", outAnalysis, "--json"}); err != nil {
+		t.Fatalf("analysis failed: %v", err)
+	}
+	out := filepath.Join(t.TempDir(), "limitations")
+	if err := run([]string{"repo", "limitations-ledger", "--analyses", outAnalysis, "--out", out, "--json"}); err != nil {
+		t.Fatalf("limitations ledger failed: %v", err)
+	}
+	var report repoLimitationsLedgerReport
+	readMainTestJSON(t, filepath.Join(out, "limitations-ledger.json"), &report)
+	if report.Version != "patchline.repo-limitations-ledger/v1" || report.Summary.Analyses != 1 || report.Summary.Limitations < 4 || report.Hash == "" {
+		t.Fatalf("unexpected limitations ledger: %#v", report)
+	}
+	for _, category := range []string{"unsupported_ecosystem", "uncertain_causality", "missing_runtime_evidence", "intentionally_conservative_check"} {
+		if report.Summary.ByCategory[category] == 0 {
+			t.Fatalf("expected limitation category %s in %#v", category, report.Summary.ByCategory)
+		}
+	}
+	for _, limitation := range report.Limitations {
+		if limitation.ID == "" || limitation.Observation == "" || limitation.WhyItMatters == "" || limitation.NotAClaim == "" || len(limitation.Evidence) == 0 || len(limitation.NextEvidence) == 0 || len(limitation.AffectedArtifacts) == 0 {
+			t.Fatalf("limitation missing required review fields: %#v", limitation)
+		}
+	}
+	markdown, err := os.ReadFile(filepath.Join(out, "limitations-ledger.md"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(string(markdown), "limitations ledger") || !strings.Contains(string(markdown), "not a claim") || !strings.Contains(string(markdown), "missing_runtime_evidence") {
+		t.Fatalf("expected limitations markdown, got:\n%s", string(markdown))
+	}
+}
+
 func TestGoldenFixtureGenerateCommand(t *testing.T) {
 	root := t.TempDir()
 	writeMainTestFile(t, root, "db/migrate/001_delete_events.sql", "DELETE FROM account_events;\n")

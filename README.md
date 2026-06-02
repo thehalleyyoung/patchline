@@ -117,6 +117,8 @@ Run `make rejected-generated-gate` to show plausible generated-code diffs being 
 
 Run `make reviewability-examples-gate` to show generated tests and guards improving reviewability while preserving proof holes and avoiding full-repair claims; see [docs/reviewability-examples.md](docs/reviewability-examples.md).
 
+Run `make limitations-ledger-gate` to publish a public-corpus limitations ledger for unsupported ecosystems, uncertain causality, missing runtime evidence, and intentionally conservative checks; see [docs/limitations-ledger.md](docs/limitations-ledger.md).
+
 Add `--redact` to write `analysis-bundle/` copies with stable redaction tokens for identifiers, literals, customer-like strings, and secret-like values while preserving joins and existing artifact hashes.
 
 Add `--ci` to write `ci/summary.md` plus upload snippets and code-quality artifacts for GitHub Actions, GitLab CI, and Bitbucket Pipelines: SARIF under `analysis-bundle/summary.sarif`, GitLab `ci/gl-code-quality-report.json`, and Bitbucket `ci/bitbucket-code-insights.json`.

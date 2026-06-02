@@ -459,6 +459,7 @@ Usage:
   patchline repo cross-file-examples --analyses analysis-dir[,analysis-dir...] [--out dir] [--json]
   patchline repo rejected-generated --analyses analysis-dir[,analysis-dir...] [--out dir] [--json]
   patchline repo reviewability-examples --analyses analysis-dir[,analysis-dir...] [--out dir] [--json]
+  patchline repo limitations-ledger --analyses analysis-dir[,analysis-dir...] [--out dir] [--json]
   patchline intake <path> [--out results/generated/intake] [--json]
   patchline intake --github owner/repo [--ref ref] [--subpath path] [--out results/generated/intake] [--json]
   patchline semantics-contract [--json]
@@ -603,6 +604,8 @@ func repoCommand(args []string) error {
 		return repoRejectedGenerated(args[1:])
 	case "reviewability-examples":
 		return repoReviewabilityExamples(args[1:])
+	case "limitations-ledger":
+		return repoLimitationsLedger(args[1:])
 	default:
 		return fmt.Errorf("unknown repo subcommand %q", args[0])
 	}
@@ -968,6 +971,48 @@ type repoReviewabilityExample struct {
 	ContentExcerpt       []string `json:"content_excerpt"`
 	MaintainerAction     string   `json:"maintainer_action"`
 	RequiredReanalysis   []string `json:"required_reanalysis"`
+}
+
+type repoLimitationsLedgerReport struct {
+	Version     string                   `json:"version"`
+	Summary     repoLimitationsSummary   `json:"summary"`
+	Limitations []repoLimitation         `json:"limitations"`
+	Corpus      []repoTaxonomyRepo       `json:"corpus"`
+	Categories  []repoLimitationCategory `json:"categories"`
+	Hash        string                   `json:"hash"`
+	Markdown    string                   `json:"markdown,omitempty"`
+}
+
+type repoLimitationsSummary struct {
+	Analyses                  int            `json:"analyses"`
+	PublicRepos               int            `json:"public_repos"`
+	Limitations               int            `json:"limitations"`
+	UnsupportedEcosystems     int            `json:"unsupported_ecosystems"`
+	UncertainCausality        int            `json:"uncertain_causality"`
+	MissingRuntimeEvidence    int            `json:"missing_runtime_evidence"`
+	IntentionallyConservative int            `json:"intentionally_conservative_checks"`
+	ByCategory                map[string]int `json:"by_category"`
+}
+
+type repoLimitationCategory struct {
+	ID         string `json:"id"`
+	Definition string `json:"definition"`
+	ReviewRule string `json:"review_rule"`
+}
+
+type repoLimitation struct {
+	ID                string   `json:"id"`
+	Category          string   `json:"category"`
+	Severity          string   `json:"severity"`
+	Repo              string   `json:"repo"`
+	Ref               string   `json:"ref,omitempty"`
+	Subpath           string   `json:"subpath,omitempty"`
+	Observation       string   `json:"observation"`
+	Evidence          []string `json:"evidence"`
+	WhyItMatters      string   `json:"why_it_matters"`
+	NotAClaim         string   `json:"not_a_claim"`
+	NextEvidence      []string `json:"next_evidence"`
+	AffectedArtifacts []string `json:"affected_artifacts"`
 }
 
 type repoAnalyzeCIArtifacts struct {
@@ -8345,6 +8390,299 @@ func renderRepoReviewabilityExamplesMarkdown(report repoReviewabilityExamplesRep
 }
 
 func repoReviewabilityExamplesHash(report repoReviewabilityExamplesReport) string {
+	copy := report
+	copy.Hash = ""
+	copy.Markdown = ""
+	return canonical.Hash(copy)
+}
+
+func repoLimitationsLedger(args []string) error {
+	fs := flag.NewFlagSet("repo limitations-ledger", flag.ContinueOnError)
+	fs.SetOutput(ioDiscard{})
+	analysesValue := fs.String("analyses", "", "comma-separated repo analyze output directories")
+	outPath := fs.String("out", filepath.Join("results", "generated", "repo-limitations-ledger"), "output directory")
+	jsonOut := fs.Bool("json", false, "emit JSON")
+	if err := fs.Parse(args); err != nil {
+		return err
+	}
+	if *analysesValue == "" || fs.NArg() != 0 {
+		return errors.New("usage: patchline repo limitations-ledger --analyses analysis-dir[,analysis-dir...] [--out dir] [--json]")
+	}
+	report, err := buildRepoLimitationsLedgerReport(splitNonEmpty(*analysesValue, ","))
+	if err != nil {
+		return err
+	}
+	if err := writeRepoLimitationsLedgerReport(*outPath, report); err != nil {
+		return err
+	}
+	if *jsonOut {
+		return writeJSON(os.Stdout, report)
+	}
+	fmt.Printf("repo limitations-ledger limitations=%d repos=%d hash=%s\n", report.Summary.Limitations, report.Summary.PublicRepos, report.Hash)
+	fmt.Printf("  out=%s\n", *outPath)
+	return nil
+}
+
+func buildRepoLimitationsLedgerReport(analyses []string) (repoLimitationsLedgerReport, error) {
+	if len(analyses) == 0 {
+		return repoLimitationsLedgerReport{}, errors.New("at least one analysis directory is required")
+	}
+	report := repoLimitationsLedgerReport{
+		Version:    "patchline.repo-limitations-ledger/v1",
+		Categories: limitationCategories(),
+		Summary:    repoLimitationsSummary{ByCategory: map[string]int{}},
+	}
+	repos := map[string]bool{}
+	for _, analysis := range analyses {
+		analyze, err := loadRepoAnalyzeReport(filepath.Join(analysis, "analyze.json"))
+		if err != nil {
+			return repoLimitationsLedgerReport{}, err
+		}
+		inv, _, err := project.LoadInventory(filepath.Join(analysis, "inventory"))
+		if err != nil {
+			return repoLimitationsLedgerReport{}, err
+		}
+		baseline, err := project.LoadBaseline(filepath.Join(analysis, "baseline"))
+		if err != nil {
+			return repoLimitationsLedgerReport{}, err
+		}
+		compare, err := loadCompareReport(filepath.Join(analysis, "compare", "compare.json"))
+		if err != nil {
+			return repoLimitationsLedgerReport{}, err
+		}
+		repo := firstNonEmpty(analyze.Input, analyze.Source.Input)
+		repos[repo] = true
+		report.Corpus = append(report.Corpus, repoTaxonomyRepo{Repo: repo, Ref: analyze.Source.ResolvedCommit, Subpath: analyze.Subpath})
+		report.Limitations = append(report.Limitations, limitationsForAnalysis(repo, analyze, inv, baseline, compare)...)
+	}
+	sort.Slice(report.Limitations, func(i, j int) bool {
+		if report.Limitations[i].Category != report.Limitations[j].Category {
+			return limitationCategoryRank(report.Limitations[i].Category) < limitationCategoryRank(report.Limitations[j].Category)
+		}
+		if report.Limitations[i].Repo != report.Limitations[j].Repo {
+			return report.Limitations[i].Repo < report.Limitations[j].Repo
+		}
+		return report.Limitations[i].ID < report.Limitations[j].ID
+	})
+	report.Summary.Analyses = len(analyses)
+	report.Summary.PublicRepos = len(repos)
+	report.Summary.Limitations = len(report.Limitations)
+	for _, limitation := range report.Limitations {
+		report.Summary.ByCategory[limitation.Category]++
+		switch limitation.Category {
+		case "unsupported_ecosystem":
+			report.Summary.UnsupportedEcosystems++
+		case "uncertain_causality":
+			report.Summary.UncertainCausality++
+		case "missing_runtime_evidence":
+			report.Summary.MissingRuntimeEvidence++
+		case "intentionally_conservative_check":
+			report.Summary.IntentionallyConservative++
+		}
+	}
+	report.Hash = repoLimitationsLedgerHash(report)
+	report.Markdown = renderRepoLimitationsLedgerMarkdown(report)
+	return report, nil
+}
+
+func limitationCategories() []repoLimitationCategory {
+	return []repoLimitationCategory{
+		{ID: "unsupported_ecosystem", Definition: "Patchline detected only partial project/framework/migration support for this slice.", ReviewRule: "Treat findings as static evidence until project-specific commands or parsers are added."},
+		{ID: "uncertain_causality", Definition: "Patchline linked evidence by identifiers or temporal hints, but does not prove causality.", ReviewRule: "Use links as navigation, not as proof that one file caused another."},
+		{ID: "missing_runtime_evidence", Definition: "Runtime row counts, native tests, dry-runs, traces, or rollback execution evidence are unavailable.", ReviewRule: "Do not upgrade static warnings to checked claims without runtime artifacts."},
+		{ID: "intentionally_conservative_check", Definition: "Patchline keeps a warning, rejection, proof hole, or review blocker because the safer default is not to trust weak evidence.", ReviewRule: "Resolve or explicitly suppress the blocker with evidence rather than weakening the check."},
+	}
+}
+
+func limitationsForAnalysis(repo string, analyze repoAnalyzeReport, inv project.Inventory, baseline project.BaselineReport, compare project.CompareReport) []repoLimitation {
+	var limitations []repoLimitation
+	if len(inv.Frameworks) == 0 || len(inv.NativeCommands) == 0 || len(inv.TestCommands) == 0 {
+		evidence := []string{
+			fmt.Sprintf("frameworks=%d migration_roots=%d native_commands=%d test_commands=%d", len(inv.Frameworks), len(inv.MigrationRoots), len(inv.NativeCommands), len(inv.TestCommands)),
+			"languages: " + limitationCounts(inv.Languages),
+			"migration roots: " + limitationFindings(inv.MigrationRoots),
+		}
+		limitations = append(limitations, newLimitation(repo, analyze, "unsupported_ecosystem", "medium",
+			"Project ecosystem support is partial for this analyzed slice.",
+			evidence,
+			"Patchline can still scan files and rank static data-change risks, but project-native execution and framework-specific semantics may be incomplete.",
+			"This is not a claim that the repository is unsupported overall; it is a slice-level limitation of the available analyzed evidence.",
+			[]string{"framework manifest or project root", "native test command", "migration runner command"},
+			[]string{"inventory/inventory.json", "baseline/baseline.json"}))
+	}
+	if baseline.Summary.IdentifierOnlyLinks > 0 || baseline.Summary.DateOnlyLinks > 0 || hasIdentifierSharedProvenance(baseline.Provenance) {
+		limitations = append(limitations, newLimitation(repo, analyze, "uncertain_causality", "high",
+			fmt.Sprintf("Evidence links are navigational, with identifier-only=%d and date-only=%d links.", baseline.Summary.IdentifierOnlyLinks, baseline.Summary.DateOnlyLinks),
+			[]string{
+				fmt.Sprintf("evidence_links=%d provenance_slices=%d", baseline.Summary.EvidenceLinks, baseline.Summary.ProvenanceSlices),
+				"identifier-shared provenance is a navigation aid, not proof of causality",
+			},
+			"Maintainers should inspect linked migrations, repairs, traces, and docs before treating a link as a cause.",
+			"This is not a causal proof that a linked file introduced, fixed, or observed the risk.",
+			[]string{"incident timeline", "deploy marker", "trace span", "maintainer note tying cause to repair"},
+			[]string{"baseline/baseline.json", "baseline/baseline.md"}))
+	}
+	if baseline.Summary.AbstractProofHoles > 0 || baseline.Summary.RepairProofOpen > 0 || baseline.Summary.RepairProofRefuted > 0 || compare.Summary.NativeChecksSkipped > 0 || compare.Summary.NativeChecksRun == 0 {
+		limitations = append(limitations, newLimitation(repo, analyze, "missing_runtime_evidence", "high",
+			fmt.Sprintf("Static proof holes or missing native execution remain: abstract=%d open_repair=%d refuted_repair=%d native_run=%d native_skipped=%d.", baseline.Summary.AbstractProofHoles, baseline.Summary.RepairProofOpen, baseline.Summary.RepairProofRefuted, compare.Summary.NativeChecksRun, compare.Summary.NativeChecksSkipped),
+			[]string{
+				fmt.Sprintf("transaction_missing=%d idempotency_unknown=%d", baseline.Summary.TransactionMissing, baseline.Summary.IdempotencyUnknown),
+				fmt.Sprintf("native_checks_run=%d native_checks_failed=%d native_checks_skipped=%d", compare.Summary.NativeChecksRun, compare.Summary.NativeChecksFailed, compare.Summary.NativeChecksSkipped),
+			},
+			"Without runtime evidence, Patchline should keep claims conditional and preserve proof holes.",
+			"This is not a checked runtime guarantee about row counts, rollback safety, or production behavior.",
+			[]string{"dry-run row counts", "native test results", "database explain output", "rollback rehearsal", "trace or log evidence"},
+			[]string{"baseline/baseline.json", "compare/compare.json"}))
+	}
+	if baseline.Summary.PolicyFailed > 0 || baseline.Summary.SymbolicFailed > 0 || compare.Summary.InterventionRejected > 0 || compare.Summary.PatchlineChecksFailed > 0 || len(compare.ReviewBadge.ProofHoles) > 0 {
+		limitations = append(limitations, newLimitation(repo, analyze, "intentionally_conservative_check", "medium",
+			fmt.Sprintf("Conservative blockers remain: policy_failed=%d symbolic_failed=%d rejected_interventions=%d failed_checks=%d proof_holes=%d.", baseline.Summary.PolicyFailed, baseline.Summary.SymbolicFailed, compare.Summary.InterventionRejected, compare.Summary.PatchlineChecksFailed, len(compare.ReviewBadge.ProofHoles)),
+			[]string{
+				"review badge: " + compare.ReviewBadge.Status,
+				"reasons: " + strings.Join(compare.ReviewBadge.Reasons, "; "),
+			},
+			"Patchline intentionally leaves the blocker visible so generated or static findings are not over-trusted.",
+			"This is not a statement that the underlying change is definitely unsafe; it is a conservative review requirement.",
+			[]string{"owner approval", "guard proof", "rollback evidence", "passing deterministic compare", "documented suppression rationale"},
+			[]string{"compare/compare.json", "baseline/baseline.json"}))
+	}
+	return limitations
+}
+
+func newLimitation(repo string, analyze repoAnalyzeReport, category, severity, observation string, evidence []string, why, notClaim string, nextEvidence, artifacts []string) repoLimitation {
+	limitation := repoLimitation{
+		Category:          category,
+		Severity:          severity,
+		Repo:              repo,
+		Ref:               analyze.Source.ResolvedCommit,
+		Subpath:           analyze.Subpath,
+		Observation:       observation,
+		Evidence:          compactEvidence(evidence, 5),
+		WhyItMatters:      why,
+		NotAClaim:         notClaim,
+		NextEvidence:      compactEvidence(nextEvidence, 8),
+		AffectedArtifacts: compactEvidence(artifacts, 8),
+	}
+	limitation.ID = "limitation:" + canonical.Hash(strings.Join([]string{repo, limitation.Ref, limitation.Subpath, category, observation}, "\x00"))[:16]
+	return limitation
+}
+
+func limitationCounts(counts []project.Count) string {
+	if len(counts) == 0 {
+		return "none"
+	}
+	var values []string
+	for _, count := range counts {
+		values = append(values, fmt.Sprintf("%s=%d", count.Name, count.Count))
+	}
+	sort.Strings(values)
+	if len(values) > 6 {
+		values = values[:6]
+	}
+	return strings.Join(values, ", ")
+}
+
+func limitationFindings(findings []project.Finding) string {
+	if len(findings) == 0 {
+		return "none"
+	}
+	var values []string
+	for _, finding := range findings {
+		values = append(values, finding.Kind+"@"+finding.Path)
+	}
+	sort.Strings(values)
+	if len(values) > 6 {
+		values = values[:6]
+	}
+	return strings.Join(values, ", ")
+}
+
+func hasIdentifierSharedProvenance(slices []project.ProvenanceSlice) bool {
+	for _, slice := range slices {
+		if strings.Contains(slice.Confidence, "identifier") {
+			return true
+		}
+	}
+	return false
+}
+
+func limitationCategoryRank(category string) int {
+	switch category {
+	case "unsupported_ecosystem":
+		return 0
+	case "uncertain_causality":
+		return 1
+	case "missing_runtime_evidence":
+		return 2
+	case "intentionally_conservative_check":
+		return 3
+	default:
+		return 4
+	}
+}
+
+func writeRepoLimitationsLedgerReport(outDir string, report repoLimitationsLedgerReport) error {
+	if err := os.MkdirAll(outDir, 0o755); err != nil {
+		return err
+	}
+	copy := report
+	copy.Markdown = ""
+	data, err := json.MarshalIndent(copy, "", "  ")
+	if err != nil {
+		return err
+	}
+	if err := os.WriteFile(filepath.Join(outDir, "limitations-ledger.json"), append(data, '\n'), 0o644); err != nil {
+		return err
+	}
+	return os.WriteFile(filepath.Join(outDir, "limitations-ledger.md"), []byte(report.Markdown), 0o644)
+}
+
+func renderRepoLimitationsLedgerMarkdown(report repoLimitationsLedgerReport) string {
+	var b strings.Builder
+	fmt.Fprintf(&b, "# Patchline limitations ledger\n\n")
+	fmt.Fprintf(&b, "- analyses: `%d`\n", report.Summary.Analyses)
+	fmt.Fprintf(&b, "- public repos: `%d`\n", report.Summary.PublicRepos)
+	fmt.Fprintf(&b, "- limitations: `%d`\n", report.Summary.Limitations)
+	fmt.Fprintf(&b, "- unsupported ecosystems: `%d`\n", report.Summary.UnsupportedEcosystems)
+	fmt.Fprintf(&b, "- uncertain causality: `%d`\n", report.Summary.UncertainCausality)
+	fmt.Fprintf(&b, "- missing runtime evidence: `%d`\n", report.Summary.MissingRuntimeEvidence)
+	fmt.Fprintf(&b, "- intentionally conservative checks: `%d`\n", report.Summary.IntentionallyConservative)
+	fmt.Fprintf(&b, "- hash: `%s`\n\n", report.Hash)
+	fmt.Fprintf(&b, "## Categories\n\n")
+	for _, category := range report.Categories {
+		fmt.Fprintf(&b, "### %s\n\n- definition: %s\n- review rule: %s\n\n", category.ID, category.Definition, category.ReviewRule)
+	}
+	fmt.Fprintf(&b, "## Corpus coverage\n\n")
+	for _, repo := range report.Corpus {
+		fmt.Fprintf(&b, "- `%s` `%s` `%s`\n", repo.Repo, repo.Subpath, repo.Ref)
+	}
+	fmt.Fprintf(&b, "\n## Limitations\n\n")
+	for _, limitation := range report.Limitations {
+		fmt.Fprintf(&b, "### %s `%s`\n\n", limitation.Category, limitation.ID)
+		fmt.Fprintf(&b, "- repo: `%s`\n", limitation.Repo)
+		fmt.Fprintf(&b, "- severity: `%s`\n", limitation.Severity)
+		fmt.Fprintf(&b, "- observation: %s\n", limitation.Observation)
+		fmt.Fprintf(&b, "- why it matters: %s\n", limitation.WhyItMatters)
+		fmt.Fprintf(&b, "- not a claim: %s\n", limitation.NotAClaim)
+		fmt.Fprintf(&b, "- affected artifacts: `%s`\n", strings.Join(limitation.AffectedArtifacts, "`, `"))
+		if len(limitation.Evidence) > 0 {
+			fmt.Fprintf(&b, "- evidence:\n")
+			for _, evidence := range limitation.Evidence {
+				fmt.Fprintf(&b, "  - %s\n", evidence)
+			}
+		}
+		if len(limitation.NextEvidence) > 0 {
+			fmt.Fprintf(&b, "- next evidence:\n")
+			for _, evidence := range limitation.NextEvidence {
+				fmt.Fprintf(&b, "  - %s\n", evidence)
+			}
+		}
+		fmt.Fprintf(&b, "\n")
+	}
+	return b.String()
+}
+
+func repoLimitationsLedgerHash(report repoLimitationsLedgerReport) string {
 	copy := report
 	copy.Hash = ""
 	copy.Markdown = ""

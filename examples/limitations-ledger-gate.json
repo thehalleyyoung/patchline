@@ -1,0 +1,46 @@
+{
+  "version": "patchline.limitations-ledger-gate/v1",
+  "claim": "Patchline publishes a limitations ledger that distinguishes unsupported or partial ecosystem evidence, uncertain causality, missing runtime evidence, and intentionally conservative checks across pinned public repository analyses.",
+  "required_categories": [
+    "unsupported_ecosystem",
+    "uncertain_causality",
+    "missing_runtime_evidence",
+    "intentionally_conservative_check"
+  ],
+  "required_fields": [
+    "category",
+    "observation",
+    "evidence",
+    "why_it_matters",
+    "not_a_claim",
+    "next_evidence",
+    "affected_artifacts"
+  ],
+  "minimum_public_repos": 4,
+  "real_code": [
+    {
+      "id": "lobsters-rails-migrations",
+      "repo": "lobsters/lobsters",
+      "ref": "3b80b47aa5aaba37ec44413e7d1dc96fcf1585b6",
+      "subpath": "db/migrate"
+    },
+    {
+      "id": "forem-rails-migrations",
+      "repo": "forem/forem",
+      "ref": "9c5509c3aeecd4a86a8950206fa937ebcbc2f8d1",
+      "subpath": "db/migrate"
+    },
+    {
+      "id": "mastodon-rails-migrations",
+      "repo": "mastodon/mastodon",
+      "ref": "facb552c9cdbe8a2ebff0b94ebf2c9e9ec385347",
+      "subpath": "db/migrate"
+    },
+    {
+      "id": "grafana-go-migrations",
+      "repo": "grafana/grafana",
+      "ref": "a54b2e1e9aaf979938813f6ed9e44de569fe1105",
+      "subpath": "pkg/services/sqlstore/migrations"
+    }
+  ]
+}
