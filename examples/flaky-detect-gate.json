@@ -1,0 +1,6 @@
+{
+  "version": "patchline.flaky-detect-gate/v1",
+  "claim": "Patchline detects flaky gates by running each candidate gate multiple times and comparing the canonical hash of its output across runs, so that a gate whose result depends on timing, ordering, or randomness is caught before it is trusted as proof. The worker executes a deterministic gate and a deliberately nondeterministic gate several times each, hashes their outputs, and flags any gate whose output hash is not identical across all runs. The gate proves the deterministic candidate is never flagged and the nondeterministic negative control is always flagged, with the run-to-run hash divergence recorded.",
+  "real_repo": "patchline (self): flaky-gate detection over repeated runs",
+  "runs": 5
+}

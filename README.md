@@ -319,6 +319,8 @@ Run `make error-taxonomy-gate` to verify the structured **error taxonomy** — e
 
 Run `make resource-budgets-gate` to enforce per-stage **resource budget**s — an analysis is admitted only when every stage is within its time, memory, and file budget, and an **over-budget** run is rejected at the offending stage and resource; see [docs/resource-budgets.md](docs/resource-budgets.md).
 
+Run `make flaky-detect-gate` to catch **flaky** gates — each candidate is run repeatedly and any **nondeterministic** output hash is flagged, so only byte-reproducible gates are trusted as proof; see [docs/flaky-detect.md](docs/flaky-detect.md).
+
 Add `--redact` to write `analysis-bundle/` copies with stable redaction tokens for identifiers, literals, customer-like strings, and secret-like values while preserving joins and existing artifact hashes.
 
 Add `--ci` to write `ci/summary.md` plus upload snippets and code-quality artifacts for GitHub Actions, GitLab CI, and Bitbucket Pipelines: SARIF under `analysis-bundle/summary.sarif`, GitLab `ci/gl-code-quality-report.json`, and Bitbucket `ci/bitbucket-code-insights.json`.
