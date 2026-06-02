@@ -1,0 +1,111 @@
+{
+  "version": "patchline.awesome-examples-gate/v1",
+  "claim": "Patchline maintains an awesome examples catalog of community-submitted public-code slices spanning ecosystems and source hosts. Each entry records contributor metadata, pinned source provenance, reviewer value, and regenerated evidence instead of relying on screenshots or unverified claims.",
+  "minimum_analysis_examples": 5,
+  "minimum_source_host_examples": 4,
+  "minimum_ecosystems": 5,
+  "minimum_source_hosts": 5,
+  "analysis_examples": [
+    {
+      "id": "rails-lobsters-migrations",
+      "contributor": "community-rails-maintainer",
+      "source_host": "github",
+      "ecosystem": "Ruby",
+      "framework": "Rails Active Record",
+      "repo": "lobsters/lobsters",
+      "ref": "3b80b47aa5aaba37ec44413e7d1dc96fcf1585b6",
+      "subpath": "db/migrate",
+      "why_awesome": "Small Rails migration corpus with enough ranked data-change risks for a fast first-run demo."
+    },
+    {
+      "id": "django-auth-migrations",
+      "contributor": "community-python-maintainer",
+      "source_host": "github",
+      "ecosystem": "Python",
+      "framework": "Django migrations",
+      "repo": "django/django",
+      "ref": "9383fae0d55a553be3bda620db87fa9ee8a81478",
+      "subpath": "django/contrib/auth/migrations",
+      "why_awesome": "Framework-native auth migrations show how schema evidence travels through a monorepo subpath."
+    },
+    {
+      "id": "alembic-airflow-migrations",
+      "contributor": "community-data-platform-operator",
+      "source_host": "github",
+      "ecosystem": "Python",
+      "framework": "Alembic",
+      "repo": "apache/airflow",
+      "ref": "707e3168816bedc52f30a2e675af2dfc5b8cd4d8",
+      "subpath": "airflow-core/src/airflow/migrations/versions",
+      "why_awesome": "Large data-platform migrations stress monorepo path handling and Alembic SQL extraction."
+    },
+    {
+      "id": "go-grafana-sqlstore",
+      "contributor": "community-observability-engineer",
+      "source_host": "github",
+      "ecosystem": "Go",
+      "framework": "Go SQL migrations",
+      "repo": "grafana/grafana",
+      "ref": "a54b2e1e9aaf979938813f6ed9e44de569fe1105",
+      "subpath": "pkg/services/sqlstore/migrations",
+      "why_awesome": "Observability-adjacent SQL migrations appeal to Datadog-style review workflows."
+    },
+    {
+      "id": "node-calcom-prisma",
+      "contributor": "community-node-maintainer",
+      "source_host": "github",
+      "ecosystem": "Node",
+      "framework": "Prisma",
+      "repo": "calcom/cal.com",
+      "ref": "180ede28f0bddf2738933a6e60a8e80f6116d7da",
+      "subpath": "packages/prisma/migrations",
+      "why_awesome": "Prisma migrations from a production Node monorepo broaden the catalog beyond Rails and Python examples."
+    }
+  ],
+  "source_host_examples": [
+    {
+      "id": "gitlab-cli-commands",
+      "contributor": "community-gitlab-user",
+      "source_host": "gitlab",
+      "ecosystem": "Go",
+      "framework": "CLI source slice",
+      "input": "gitlab:gitlab-org/cli",
+      "ref": "b37860458a2c5f0ef8caf606ae5b8be30b0c62b5",
+      "subpath": "cmd",
+      "why_awesome": "GitLab archive provenance and cache reuse prove non-GitHub source intake works."
+    },
+    {
+      "id": "bitbucket-helloworld",
+      "contributor": "community-bitbucket-user",
+      "source_host": "bitbucket",
+      "ecosystem": "Python",
+      "framework": "Tutorial source slice",
+      "input": "bitbucket:atlassian_tutorial/helloworld",
+      "ref": "65d938f39f364da3f90767e008022ffe45c562af",
+      "subpath": ".",
+      "why_awesome": "Bitbucket provenance entry keeps source-host coverage visible even when the slice is tiny."
+    },
+    {
+      "id": "sourcehut-scdoc",
+      "contributor": "community-sourcehut-user",
+      "source_host": "sourcehut",
+      "ecosystem": "C",
+      "framework": "Build-tool source slice",
+      "input": "sourcehut:sircmpwn/scdoc",
+      "ref": "1d4143da79f22b71dd51da69a9f587f52d19dc84",
+      "subpath": "src",
+      "why_awesome": "SourceHut source fetching extends the catalog beyond the usual forge defaults."
+    },
+    {
+      "id": "archive-tinyhacknews-flyway",
+      "contributor": "community-release-archivist",
+      "source_host": "archive-url",
+      "ecosystem": "Java",
+      "framework": "Flyway",
+      "input": "https://github.com/adlternative/tinyhacknews/archive/b02895a0a927f010269661557a1951ac4e314a76.tar.gz",
+      "ref": "-",
+      "subpath": "src/main/resources/db/migration",
+      "why_awesome": "Release tarball intake proves examples can point at immutable archives, not only forge APIs."
+    }
+  ]
+}

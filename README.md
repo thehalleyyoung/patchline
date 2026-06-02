@@ -173,6 +173,8 @@ Run `make docs-site-gate` to build the GitHub Pages documentation site with main
 
 Run `make screencast-gate` to regenerate short terminal screencasts for first-run analysis, generated intervention review, CI integration, and artifact reproduction from pinned public-repo output; see [docs/screencasts.md](docs/screencasts.md).
 
+Run `make awesome-patchline-gate` to regenerate the Awesome Patchline catalog of community-submitted examples across ecosystems and source hosts from pinned public code; see [docs/awesome-patchline.md](docs/awesome-patchline.md).
+
 Add `--redact` to write `analysis-bundle/` copies with stable redaction tokens for identifiers, literals, customer-like strings, and secret-like values while preserving joins and existing artifact hashes.
 
 Add `--ci` to write `ci/summary.md` plus upload snippets and code-quality artifacts for GitHub Actions, GitLab CI, and Bitbucket Pipelines: SARIF under `analysis-bundle/summary.sarif`, GitLab `ci/gl-code-quality-report.json`, and Bitbucket `ci/bitbucket-code-insights.json`.
