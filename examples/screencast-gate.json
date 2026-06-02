@@ -1,0 +1,32 @@
+{
+  "version": "patchline.screencast-gate/v1",
+  "claim": "Patchline publishes short, reproducible terminal screencasts for first-run analysis, generated intervention review, CI integration, and artifact reproduction, and every screencast is regenerated from pinned public repository output rather than hand-written demo numbers.",
+  "repo": "lobsters/lobsters",
+  "ref": "3b80b47aa5aaba37ec44413e7d1dc96fcf1585b6",
+  "subpath": "db/migrate",
+  "required_screencasts": [
+    "first-run-analysis",
+    "generated-intervention-review",
+    "ci-integration",
+    "artifact-reproduction"
+  ],
+  "minimum_files_scanned": 100,
+  "minimum_ranked_risks": 100,
+  "minimum_generated_files": 1,
+  "required_artifacts": [
+    "casts/first-run-analysis.cast",
+    "casts/generated-intervention-review.cast",
+    "casts/ci-integration.cast",
+    "casts/artifact-reproduction.cast",
+    "transcripts/first-run-analysis.md",
+    "transcripts/generated-intervention-review.md",
+    "transcripts/ci-integration.md",
+    "transcripts/artifact-reproduction.md",
+    "storyboards/first-run-analysis.md",
+    "storyboards/generated-intervention-review.md",
+    "storyboards/ci-integration.md",
+    "storyboards/artifact-reproduction.md",
+    "summary.json",
+    "index.md"
+  ]
+}

@@ -171,6 +171,8 @@ Run `make release-distribution-gate` to build release archives, signed checksums
 
 Run `make docs-site-gate` to build the GitHub Pages documentation site with maintainer, researcher, security reviewer, and contributor tutorials backed by real public-repo output; see [docs/hosted-docs-site.md](docs/hosted-docs-site.md).
 
+Run `make screencast-gate` to regenerate short terminal screencasts for first-run analysis, generated intervention review, CI integration, and artifact reproduction from pinned public-repo output; see [docs/screencasts.md](docs/screencasts.md).
+
 Add `--redact` to write `analysis-bundle/` copies with stable redaction tokens for identifiers, literals, customer-like strings, and secret-like values while preserving joins and existing artifact hashes.
 
 Add `--ci` to write `ci/summary.md` plus upload snippets and code-quality artifacts for GitHub Actions, GitLab CI, and Bitbucket Pipelines: SARIF under `analysis-bundle/summary.sarif`, GitLab `ci/gl-code-quality-report.json`, and Bitbucket `ci/bitbucket-code-insights.json`.
