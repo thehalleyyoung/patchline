@@ -1,0 +1,13 @@
+{
+  "version": "patchline.proof-hole-graph-gate/v1",
+  "claim": "Patchline models the proof holes behind an uncertain risk as a dependency graph and computes the smallest, dependency-respecting set of evidence whose acquisition would lower the risk's uncertainty below a target, so that a reviewer is told the cheapest concrete way to make a finding trustworthy rather than a vague request for more information. The worker enumerates evidence subsets, keeps only those whose dependencies are satisfied and whose combined uncertainty reduction meets the target, and selects the minimum-cost feasible set. The gate proves the selected set reaches the target at minimum cost, respects evidence dependencies, and never includes an irrelevant zero-reduction item.",
+  "real_repo": "patchline (self): minimal evidence selection over a proof-hole graph",
+  "current_uncertainty": 0.6,
+  "target_uncertainty": 0.2,
+  "evidence": [
+    {"id": "A", "reduction": 0.3, "cost": 1, "depends_on": []},
+    {"id": "B", "reduction": 0.3, "cost": 1, "depends_on": ["A"]},
+    {"id": "C", "reduction": 0.4, "cost": 5, "depends_on": []},
+    {"id": "D", "reduction": 0.0, "cost": 1, "depends_on": []}
+  ]
+}
