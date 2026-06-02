@@ -311,6 +311,8 @@ Run `make adoption-case-studies-gate` to render **case studies** of teams using 
 
 Run `make incremental-cache-gate` to verify **incremental analysis caching** keyed by archive hash, subpath, **parser version**, and config — the gate proves a cold miss warms to a hit, the key is stable, and all four key components are load-bearing; see [docs/incremental-cache.md](docs/incremental-cache.md).
 
+Run `make parallel-corpus-gate` to run a public corpus concurrently with **deterministic output ordering** and per-repo **failure isolation** — results collate by repo identity despite out-of-order completion, and one failing repo never aborts the rest; see [docs/parallel-corpus.md](docs/parallel-corpus.md).
+
 Add `--redact` to write `analysis-bundle/` copies with stable redaction tokens for identifiers, literals, customer-like strings, and secret-like values while preserving joins and existing artifact hashes.
 
 Add `--ci` to write `ci/summary.md` plus upload snippets and code-quality artifacts for GitHub Actions, GitLab CI, and Bitbucket Pipelines: SARIF under `analysis-bundle/summary.sarif`, GitLab `ci/gl-code-quality-report.json`, and Bitbucket `ci/bitbucket-code-insights.json`.

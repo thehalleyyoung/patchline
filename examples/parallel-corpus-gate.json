@@ -1,0 +1,11 @@
+{
+  "version": "patchline.parallel-corpus-gate/v1",
+  "claim": "Patchline executes a public-repository corpus in parallel while guaranteeing deterministic output ordering and per-repository failure isolation, so a large corpus runs fast without sacrificing reproducibility. Each repository task runs concurrently with a distinct completion time, yet the collated results are always ordered by repository identity rather than by completion order, and a single failing repository is recorded as failed without aborting or corrupting the others. The gate proves the collated order is byte-identical across runs, that the deliberately failing repository is isolated as failed, and that every other repository still succeeds.",
+  "real_repo": "patchline (self): corpus tasks scheduled concurrently and collated deterministically",
+  "repos": [
+    {"name": "alpha-service", "delay": 0.5, "should_fail": false},
+    {"name": "bravo-service", "delay": 0.1, "should_fail": false},
+    {"name": "charlie-service", "delay": 0.4, "should_fail": true},
+    {"name": "delta-service", "delay": 0.2, "should_fail": false}
+  ]
+}
