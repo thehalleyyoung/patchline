@@ -1306,6 +1306,99 @@ func TestBuildRecurrenceReportRedactsPathsAcrossProjects(t *testing.T) {
 	}
 }
 
+func TestRepoClaimsEvidenceMapsPaperClaimsToArtifacts(t *testing.T) {
+	root := t.TempDir()
+	left := filepath.Join(root, "left")
+	right := filepath.Join(root, "right")
+	writeClaimsEvidenceAnalysisForTest(t, left, "example/rails", "Ruby", "aaaabbbbccccddddeeeeffff0000111122223333")
+	writeClaimsEvidenceAnalysisForTest(t, right, "example/go", "Go", "bbbbccccddddeeeeffff00001111222233334444")
+
+	report, err := buildRepoClaimsEvidenceReport([]string{left, right})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if report.Summary.PublicRepos != 2 || report.Summary.Claims != 6 || report.Summary.AbstractClaims != 2 || report.Summary.IntroductionClaims != 2 || report.Summary.EvaluationClaims != 2 {
+		t.Fatalf("unexpected claims summary: %#v", report.Summary)
+	}
+	if report.Summary.SupportedClaims == 0 || report.Summary.ClaimsWithLimitations != report.Summary.Claims || report.Hash == "" {
+		t.Fatalf("expected supported limited claims with hash: %#v", report.Summary)
+	}
+	for _, claim := range report.Claims {
+		if claim.Status == "unsupported" || len(claim.Evidence) == 0 || len(claim.Artifacts) == 0 || len(claim.Limitations) == 0 || len(claim.MissingEvidence) == 0 || claim.PaperWording == "" || claim.ReviewerCheck == "" {
+			t.Fatalf("claim is not evidence-backed and qualified: %#v", claim)
+		}
+		if claim.Section != "abstract" && claim.Section != "introduction" && claim.Section != "evaluation" {
+			t.Fatalf("unexpected section: %#v", claim)
+		}
+	}
+	if !strings.Contains(report.Markdown, "claims-to-evidence map") || !strings.Contains(report.Markdown, "abstract") || !strings.Contains(report.Markdown, "evaluation") {
+		t.Fatalf("expected rendered paper claim map, got: %s", report.Markdown)
+	}
+}
+
+func writeClaimsEvidenceAnalysisForTest(t *testing.T, root, repo, language, ref string) {
+	t.Helper()
+	writeMainTestFile(t, root, "analyze.json", `{
+  "version": "patchline.repo-analyze/v1",
+  "input": "`+repo+`",
+  "subpath": "db/migrate",
+  "source": {"input":"`+repo+`","resolved_commit":"`+ref+`"}
+}
+`)
+	writeMainTestFile(t, root, "inventory/inventory.json", `{
+  "version": "patchline.project-inventory/v1",
+  "root": "`+filepath.ToSlash(root)+`",
+  "files_scanned": 2,
+  "languages": [{"name":"`+language+`","count":2}],
+  "frameworks": [{"kind":"framework","path":"Gemfile","summary":"rails"}],
+  "migration_roots": [{"kind":"migration-root","path":"db/migrate","summary":"migrations"}],
+  "native_commands": [{"name":"test","command":"make test"}],
+  "test_commands": [{"name":"test","command":"make test"}]
+}
+`)
+	writeMainTestFile(t, root, "inventory/facts.jsonl", `{"id":"fact:test","kind":"sql","path":"db/migrate/001.sql"}`+"\n")
+	writeMainTestFile(t, root, "baseline/baseline.json", `{
+  "version": "patchline.baseline/v1",
+  "summary": {
+    "ranked_risks": 2,
+    "evidence_links": 3,
+    "provenance_slices": 2,
+    "policy_checks": 1,
+    "repair_proof_summaries": 1,
+    "abstract_proof_holes": 1,
+    "repair_proof_open": 1,
+    "identifier_only_links": 1
+  },
+  "risks": [{"id":"risk:test","stable_id":"stable-risk:test","path":"db/migrate/001.sql","kind":"high-risk-sql","severity":"high","score":90}],
+  "evidence_links": [{"risk_id":"risk:test","fact_id":"fact:test","path":"db/migrate/001.sql","confidence":"identifier-shared"}],
+  "provenance_slices": [{"risk_id":"risk:test","summary":"linked repair clue","confidence":"identifier-shared"}],
+  "policy_checks": [{"id":"policy:test","risk_id":"risk:test","status":"warn","rule":"scope"}],
+  "repair_proof_summaries": [{"id":"proof:test","risk_id":"risk:test","status":"open","proof_holes":["no runtime witness"]}],
+  "hash": "baseline"
+}
+`)
+	writeMainTestFile(t, root, "proposal/proposal.json", `{
+  "version": "patchline.proposal/v1",
+  "generated_files": [
+    {"path":"patchline-proposals/tests/risk_test.md","kind":"tests","content_hash":"sha256:test","risk_ids":["risk:test"]},
+    {"path":"patchline-proposals/guards/risk_guard.sql","kind":"guards","content_hash":"sha256:guard","risk_ids":["risk:test"]}
+  ],
+  "hash": "proposal"
+}
+`)
+	writeMainTestFile(t, root, "proposal/patchline-proposals/tests/risk_test.md", "assert scoped update row counts before repair\n")
+	writeMainTestFile(t, root, "proposal/patchline-proposals/guards/risk_guard.sql", "select count(*) from accounts where needs_repair = true;\n")
+	writeMainTestFile(t, root, "compare/compare.json", `{
+  "version": "patchline.repo-compare/v1",
+  "summary": {"generated_files": 2, "patchline_checks_passed": 2, "native_checks_skipped": 1},
+  "intervention_loop": {"status":"accepted-for-review", "required_next_actions":["run native tests"]},
+  "review_badge": {"status":"needs-runtime-evidence", "proof_holes":["no native run"], "reasons":["runtime evidence missing"]},
+  "generated_checks": [{"path":"patchline-proposals/tests/risk_test.md","status":"pass"}, {"path":"patchline-proposals/guards/risk_guard.sql","status":"pass"}],
+  "hash": "compare"
+}
+`)
+}
+
 func writeRecurrenceAnalysisForTest(t *testing.T, root, project, riskID, stableID, path string) {
 	t.Helper()
 	writeMainTestFile(t, root, "analyze.json", `{"input":"`+project+`"}`)

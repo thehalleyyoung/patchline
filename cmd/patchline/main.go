@@ -551,7 +551,7 @@ Examples:
 
 func repoCommand(args []string) error {
 	if len(args) == 0 {
-		return errors.New("usage: patchline repo <doctor|fetch|analyze|inventory|baseline|propose|compare|proposal-minimize|replay|suppressions|why-now|changes|hook|offline|notify-summary|minimize|recurrence> ...")
+		return errors.New("usage: patchline repo <doctor|fetch|analyze|inventory|baseline|propose|compare|proposal-minimize|replay|suppressions|why-now|changes|hook|offline|notify-summary|minimize|recurrence|claims-evidence> ...")
 	}
 	switch args[0] {
 	case "doctor":
@@ -606,6 +606,8 @@ func repoCommand(args []string) error {
 		return repoReviewabilityExamples(args[1:])
 	case "limitations-ledger":
 		return repoLimitationsLedger(args[1:])
+	case "claims-evidence":
+		return repoClaimsEvidence(args[1:])
 	default:
 		return fmt.Errorf("unknown repo subcommand %q", args[0])
 	}
@@ -981,6 +983,53 @@ type repoLimitationsLedgerReport struct {
 	Categories  []repoLimitationCategory `json:"categories"`
 	Hash        string                   `json:"hash"`
 	Markdown    string                   `json:"markdown,omitempty"`
+}
+
+type repoClaimsEvidenceReport struct {
+	Version  string                    `json:"version"`
+	Summary  repoClaimsEvidenceSummary `json:"summary"`
+	Claims   []repoPaperClaim          `json:"claims"`
+	Sections []repoPaperSection        `json:"sections"`
+	Corpus   []repoTaxonomyRepo        `json:"corpus"`
+	Hash     string                    `json:"hash"`
+	Markdown string                    `json:"markdown,omitempty"`
+}
+
+type repoClaimsEvidenceSummary struct {
+	Analyses              int            `json:"analyses"`
+	PublicRepos           int            `json:"public_repos"`
+	Claims                int            `json:"claims"`
+	AbstractClaims        int            `json:"abstract_claims"`
+	IntroductionClaims    int            `json:"introduction_claims"`
+	EvaluationClaims      int            `json:"evaluation_claims"`
+	SupportedClaims       int            `json:"supported_claims"`
+	QualifiedClaims       int            `json:"qualified_claims"`
+	UnsupportedClaims     int            `json:"unsupported_claims"`
+	ClaimsWithLimitations int            `json:"claims_with_limitations"`
+	BySection             map[string]int `json:"by_section"`
+}
+
+type repoPaperSection struct {
+	ID          string `json:"id"`
+	Purpose     string `json:"purpose"`
+	ReviewRule  string `json:"review_rule"`
+	ClaimPolicy string `json:"claim_policy"`
+}
+
+type repoPaperClaim struct {
+	ID                string   `json:"id"`
+	Section           string   `json:"section"`
+	Claim             string   `json:"claim"`
+	Status            string   `json:"status"`
+	Evidence          []string `json:"evidence"`
+	Artifacts         []string `json:"artifacts"`
+	Limitations       []string `json:"limitations"`
+	MissingEvidence   []string `json:"missing_evidence"`
+	PaperWording      string   `json:"paper_wording"`
+	ReviewerCheck     string   `json:"reviewer_check"`
+	AffectedRepos     []string `json:"affected_repos"`
+	RequiredForPaper  bool     `json:"required_for_paper"`
+	ExpectedPaperSlot string   `json:"expected_paper_slot"`
 }
 
 type repoLimitationsSummary struct {
@@ -8683,6 +8732,345 @@ func renderRepoLimitationsLedgerMarkdown(report repoLimitationsLedgerReport) str
 }
 
 func repoLimitationsLedgerHash(report repoLimitationsLedgerReport) string {
+	copy := report
+	copy.Hash = ""
+	copy.Markdown = ""
+	return canonical.Hash(copy)
+}
+
+func repoClaimsEvidence(args []string) error {
+	fs := flag.NewFlagSet("repo claims-evidence", flag.ContinueOnError)
+	fs.SetOutput(ioDiscard{})
+	analysesValue := fs.String("analyses", "", "comma-separated repo analyze output directories")
+	outPath := fs.String("out", filepath.Join("results", "generated", "repo-claims-evidence"), "output directory")
+	jsonOut := fs.Bool("json", false, "emit JSON")
+	if err := fs.Parse(args); err != nil {
+		return err
+	}
+	if *analysesValue == "" || fs.NArg() != 0 {
+		return errors.New("usage: patchline repo claims-evidence --analyses analysis-dir[,analysis-dir...] [--out dir] [--json]")
+	}
+	report, err := buildRepoClaimsEvidenceReport(splitNonEmpty(*analysesValue, ","))
+	if err != nil {
+		return err
+	}
+	if err := writeRepoClaimsEvidenceReport(*outPath, report); err != nil {
+		return err
+	}
+	if *jsonOut {
+		return writeJSON(os.Stdout, report)
+	}
+	fmt.Printf("repo claims-evidence claims=%d supported=%d qualified=%d repos=%d hash=%s\n", report.Summary.Claims, report.Summary.SupportedClaims, report.Summary.QualifiedClaims, report.Summary.PublicRepos, report.Hash)
+	fmt.Printf("  out=%s\n", *outPath)
+	return nil
+}
+
+func buildRepoClaimsEvidenceReport(analyses []string) (repoClaimsEvidenceReport, error) {
+	if len(analyses) == 0 {
+		return repoClaimsEvidenceReport{}, errors.New("at least one analysis directory is required")
+	}
+	report := repoClaimsEvidenceReport{
+		Version:  "patchline.repo-claims-evidence/v1",
+		Sections: paperClaimSections(),
+		Summary:  repoClaimsEvidenceSummary{BySection: map[string]int{}},
+	}
+	repos := map[string]bool{}
+	var contexts []paperClaimContext
+	for _, analysis := range analyses {
+		analyze, err := loadRepoAnalyzeReport(filepath.Join(analysis, "analyze.json"))
+		if err != nil {
+			return repoClaimsEvidenceReport{}, err
+		}
+		inv, _, err := project.LoadInventory(filepath.Join(analysis, "inventory"))
+		if err != nil {
+			return repoClaimsEvidenceReport{}, err
+		}
+		baseline, err := project.LoadBaseline(filepath.Join(analysis, "baseline"))
+		if err != nil {
+			return repoClaimsEvidenceReport{}, err
+		}
+		proposal, err := project.LoadProposal(filepath.Join(analysis, "proposal"))
+		if err != nil {
+			return repoClaimsEvidenceReport{}, err
+		}
+		compare, err := loadCompareReport(filepath.Join(analysis, "compare", "compare.json"))
+		if err != nil {
+			return repoClaimsEvidenceReport{}, err
+		}
+		repo := firstNonEmpty(analyze.Input, analyze.Source.Input)
+		repos[repo] = true
+		report.Corpus = append(report.Corpus, repoTaxonomyRepo{Repo: repo, Ref: analyze.Source.ResolvedCommit, Subpath: analyze.Subpath})
+		contexts = append(contexts, paperClaimContext{Analysis: analysis, Repo: repo, Analyze: analyze, Inventory: inv, Baseline: baseline, Proposal: proposal, Compare: compare})
+	}
+	report.Claims = buildPaperClaims(contexts)
+	sort.Slice(report.Claims, func(i, j int) bool {
+		if report.Claims[i].Section != report.Claims[j].Section {
+			return paperSectionRank(report.Claims[i].Section) < paperSectionRank(report.Claims[j].Section)
+		}
+		return report.Claims[i].ID < report.Claims[j].ID
+	})
+	report.Summary.Analyses = len(analyses)
+	report.Summary.PublicRepos = len(repos)
+	report.Summary.Claims = len(report.Claims)
+	for _, claim := range report.Claims {
+		report.Summary.BySection[claim.Section]++
+		switch claim.Section {
+		case "abstract":
+			report.Summary.AbstractClaims++
+		case "introduction":
+			report.Summary.IntroductionClaims++
+		case "evaluation":
+			report.Summary.EvaluationClaims++
+		}
+		switch claim.Status {
+		case "supported":
+			report.Summary.SupportedClaims++
+		case "qualified":
+			report.Summary.QualifiedClaims++
+		default:
+			report.Summary.UnsupportedClaims++
+		}
+		if len(claim.Limitations) > 0 {
+			report.Summary.ClaimsWithLimitations++
+		}
+	}
+	report.Hash = repoClaimsEvidenceHash(report)
+	report.Markdown = renderRepoClaimsEvidenceMarkdown(report)
+	return report, nil
+}
+
+type paperClaimContext struct {
+	Analysis  string
+	Repo      string
+	Analyze   repoAnalyzeReport
+	Inventory project.Inventory
+	Baseline  project.BaselineReport
+	Proposal  project.ProposalReport
+	Compare   project.CompareReport
+}
+
+func paperClaimSections() []repoPaperSection {
+	return []repoPaperSection{
+		{ID: "abstract", Purpose: "Short paper claims that must be true without caveats hidden elsewhere.", ReviewRule: "Every abstract claim needs at least two artifact families or an explicit qualified status.", ClaimPolicy: "No abstract claim may imply applied repair, runtime safety, or causality unless the mapped evidence contains those artifacts."},
+		{ID: "introduction", Purpose: "Motivating claims that explain why Patchline matters on existing data-change material.", ReviewRule: "Introduction claims need public corpus coverage and concrete examples, not aspirations.", ClaimPolicy: "Claims must distinguish deterministic navigation from proof of root cause or production correctness."},
+		{ID: "evaluation", Purpose: "Empirical claims expected in tables, ablations, and artifact appendices.", ReviewRule: "Evaluation claims need reproducible commands, pinned repos, generated artifacts, and limitations.", ClaimPolicy: "Numbers are artifact-backed summaries, not benchmark generalization beyond the analyzed corpus."},
+	}
+}
+
+func buildPaperClaims(contexts []paperClaimContext) []repoPaperClaim {
+	var claims []repoPaperClaim
+	totalRisks, totalLinks, totalProvenance, totalGenerated, totalPassedChecks := 0, 0, 0, 0, 0
+	totalPolicy, totalRepairProofs, totalLimitations := 0, 0, 0
+	langs, repos := map[string]bool{}, map[string]bool{}
+	var artifacts []string
+	for _, ctx := range contexts {
+		repos[ctx.Repo] = true
+		totalRisks += ctx.Baseline.Summary.RankedRisks
+		totalLinks += ctx.Baseline.Summary.EvidenceLinks
+		totalProvenance += ctx.Baseline.Summary.ProvenanceSlices
+		totalGenerated += len(ctx.Proposal.GeneratedFiles)
+		totalPassedChecks += ctx.Compare.Summary.PatchlineChecksPassed
+		totalPolicy += ctx.Baseline.Summary.PolicyChecks
+		totalRepairProofs += ctx.Baseline.Summary.RepairProofs
+		totalLimitations += len(limitationsForAnalysis(ctx.Repo, ctx.Analyze, ctx.Inventory, ctx.Baseline, ctx.Compare))
+		for _, language := range ctx.Inventory.Languages {
+			if language.Count > 0 {
+				langs[language.Name] = true
+			}
+		}
+		artifacts = append(artifacts,
+			filepath.Join(ctx.Analysis, "inventory", "inventory.json"),
+			filepath.Join(ctx.Analysis, "baseline", "baseline.json"),
+			filepath.Join(ctx.Analysis, "proposal", "proposal.json"),
+			filepath.Join(ctx.Analysis, "compare", "compare.json"),
+		)
+	}
+	repoList := sortedKeys(repos)
+	langList := sortedKeys(langs)
+	claims = append(claims,
+		newPaperClaim("abstract", "Patchline is a deterministic system for auditing existing data-change code and evidence rather than a model that applies repairs automatically.",
+			statusFor(totalRisks > 0 && totalGenerated > 0 && totalPassedChecks > 0, "supported", "qualified"),
+			[]string{
+				fmt.Sprintf("analyses=%d public_repos=%d ranked_risks=%d generated_files=%d patchline_checks_passed=%d", len(contexts), len(repos), totalRisks, totalGenerated, totalPassedChecks),
+				"repo analyze produced inventory, baseline, proposal, and compare artifacts without applying generated files",
+			},
+			compactEvidence(artifacts, 12),
+			[]string{"Generated interventions are quarantined review artifacts, not automatically applied repairs.", "Runtime safety still depends on native tests, dry-runs, and maintainer review."},
+			[]string{"native execution logs", "maintainer acceptance evidence"},
+			"Patchline deterministically maps existing data-change material to repair risks and bounded review artifacts while keeping generated code untrusted.",
+			"Re-run the mapped analyses and verify compare summaries show generated artifacts plus passed Patchline checks.",
+			repoList, true, "abstract contribution sentence"),
+		newPaperClaim("abstract", "Patchline can connect risky migrations to cross-file operational and repair evidence in public repositories.",
+			statusFor(totalLinks > 0 && totalProvenance > 0, "supported", "qualified"),
+			[]string{fmt.Sprintf("evidence_links=%d provenance_slices=%d", totalLinks, totalProvenance), "baseline provenance slices preserve source paths and confidence labels"},
+			compactEvidence(artifacts, 10),
+			[]string{"Identifier and date links are navigation evidence, not causal proof."},
+			[]string{"incident timeline", "deploy marker", "review note confirming causal chain"},
+			"Across pinned public repository slices, Patchline links risky data changes to nearby operational and repair clues for reviewer navigation.",
+			"Inspect baseline/baseline.json for evidence_links and provenance_slices on each listed repository.",
+			repoList, true, "abstract evidence sentence"),
+		newPaperClaim("introduction", "Real repair work starts from heterogeneous existing repo material: migrations, source SQL, tests, native commands, traces, and generated review artifacts.",
+			statusFor(len(langList) > 0 && len(repos) > 1, "supported", "qualified"),
+			[]string{fmt.Sprintf("languages=%s", strings.Join(langList, ", ")), fmt.Sprintf("public_repos=%d", len(repos))},
+			compactEvidence(artifacts, 8),
+			[]string{"The corpus is a set of pinned slices, not a claim about every ecosystem."},
+			[]string{"more source hosts", "non-SQL data stores", "project-root native runners"},
+			"Patchline targets the files teams already have, and the paper should motivate this with pinned heterogeneous repository slices.",
+			"Confirm corpus coverage lists each repo, ref, and subpath used by the claim.",
+			repoList, true, "introduction motivation paragraph"),
+		newPaperClaim("introduction", "The system exposes limitations as first-class outputs so paper claims can remain conservative.",
+			statusFor(totalLimitations > 0, "supported", "qualified"),
+			[]string{fmt.Sprintf("limitations=%d categories=%d", totalLimitations, 4), "limitations cover unsupported ecosystems, uncertain causality, missing runtime evidence, and conservative checks"},
+			compactEvidence(artifacts, 8),
+			[]string{"A limitation is evidence for claim qualification, not a failure by itself."},
+			[]string{"limitations-ledger report attached to every evaluation table"},
+			"Patchline should state what its evidence does not prove, and every paper section can link claims to those limitations.",
+			"Run repo limitations-ledger over the same analyses and match limitation categories to this claim map.",
+			repoList, true, "introduction scope paragraph"),
+		newPaperClaim("evaluation", "Evaluation tables can be regenerated from pinned public analyses with explicit artifact paths.",
+			statusFor(len(contexts) >= 2 && totalRisks > 0, "supported", "qualified"),
+			[]string{fmt.Sprintf("analyses=%d public_repos=%d ranked_risks=%d policy_checks=%d repair_proofs=%d", len(contexts), len(repos), totalRisks, totalPolicy, totalRepairProofs)},
+			compactEvidence(artifacts, 16),
+			[]string{"These are corpus-specific counts, not universal performance or precision claims."},
+			[]string{"frozen release artifact bundle", "reviewer walkthrough log"},
+			"The evaluation should report artifact-backed counts for ranked risks, policy checks, repair proofs, generated files, and deterministic outcomes.",
+			"Re-run the gate and compare claims-evidence.json summary counts to baseline/proposal/compare artifacts.",
+			repoList, true, "evaluation table 1 and artifact appendix"),
+		newPaperClaim("evaluation", "Generated tests and guards are measured as reviewability aids, not completed repairs.",
+			statusFor(totalGenerated > 0 && totalPassedChecks > 0, "supported", "qualified"),
+			[]string{fmt.Sprintf("generated_files=%d patchline_checks_passed=%d", totalGenerated, totalPassedChecks), "compare review badges preserve proof holes and required next actions"},
+			compactEvidence(artifacts, 12),
+			[]string{"Passing deterministic checks do not prove production safety or full repair."},
+			[]string{"native test run", "database dry-run", "owner approval"},
+			"The evaluation should separate reviewability outcomes from repair success claims.",
+			"Verify compare/compare.json intervention_loop and review_badge fields for each repo.",
+			repoList, true, "evaluation intervention outcome table"),
+	)
+	return claims
+}
+
+func newPaperClaim(section, claim, status string, evidence, artifacts, limitations, missing []string, wording, check string, repos []string, required bool, slot string) repoPaperClaim {
+	item := repoPaperClaim{
+		Section:           section,
+		Claim:             claim,
+		Status:            status,
+		Evidence:          compactEvidence(evidence, 8),
+		Artifacts:         compactEvidence(artifacts, 20),
+		Limitations:       compactEvidence(limitations, 8),
+		MissingEvidence:   compactEvidence(missing, 8),
+		PaperWording:      wording,
+		ReviewerCheck:     check,
+		AffectedRepos:     compactEvidence(repos, 12),
+		RequiredForPaper:  required,
+		ExpectedPaperSlot: slot,
+	}
+	item.ID = "claim:" + canonical.Hash(strings.Join([]string{section, claim, strings.Join(item.Evidence, "\x00")}, "\x00"))[:16]
+	return item
+}
+
+func statusFor(condition bool, trueStatus, falseStatus string) string {
+	if condition {
+		return trueStatus
+	}
+	return falseStatus
+}
+
+func paperSectionRank(section string) int {
+	switch section {
+	case "abstract":
+		return 0
+	case "introduction":
+		return 1
+	case "evaluation":
+		return 2
+	default:
+		return 3
+	}
+}
+
+func sortedKeys(values map[string]bool) []string {
+	keys := make([]string, 0, len(values))
+	for key := range values {
+		if strings.TrimSpace(key) != "" {
+			keys = append(keys, key)
+		}
+	}
+	sort.Strings(keys)
+	return keys
+}
+
+func writeRepoClaimsEvidenceReport(outDir string, report repoClaimsEvidenceReport) error {
+	if err := os.MkdirAll(outDir, 0o755); err != nil {
+		return err
+	}
+	copy := report
+	copy.Markdown = ""
+	data, err := json.MarshalIndent(copy, "", "  ")
+	if err != nil {
+		return err
+	}
+	if err := os.WriteFile(filepath.Join(outDir, "claims-evidence.json"), append(data, '\n'), 0o644); err != nil {
+		return err
+	}
+	return os.WriteFile(filepath.Join(outDir, "claims-evidence.md"), []byte(report.Markdown), 0o644)
+}
+
+func renderRepoClaimsEvidenceMarkdown(report repoClaimsEvidenceReport) string {
+	var b strings.Builder
+	fmt.Fprintf(&b, "# Patchline claims-to-evidence map\n\n")
+	fmt.Fprintf(&b, "- analyses: `%d`\n", report.Summary.Analyses)
+	fmt.Fprintf(&b, "- public repos: `%d`\n", report.Summary.PublicRepos)
+	fmt.Fprintf(&b, "- claims: `%d`\n", report.Summary.Claims)
+	fmt.Fprintf(&b, "- supported claims: `%d`\n", report.Summary.SupportedClaims)
+	fmt.Fprintf(&b, "- qualified claims: `%d`\n", report.Summary.QualifiedClaims)
+	fmt.Fprintf(&b, "- claims with limitations: `%d`\n", report.Summary.ClaimsWithLimitations)
+	fmt.Fprintf(&b, "- hash: `%s`\n\n", report.Hash)
+	fmt.Fprintf(&b, "## Paper sections\n\n")
+	for _, section := range report.Sections {
+		fmt.Fprintf(&b, "### %s\n\n- purpose: %s\n- review rule: %s\n- claim policy: %s\n\n", section.ID, section.Purpose, section.ReviewRule, section.ClaimPolicy)
+	}
+	fmt.Fprintf(&b, "## Corpus coverage\n\n")
+	for _, repo := range report.Corpus {
+		fmt.Fprintf(&b, "- `%s` `%s` `%s`\n", repo.Repo, repo.Subpath, repo.Ref)
+	}
+	fmt.Fprintf(&b, "\n## Claims\n\n")
+	for _, claim := range report.Claims {
+		fmt.Fprintf(&b, "### %s `%s`\n\n", claim.Section, claim.ID)
+		fmt.Fprintf(&b, "- claim: %s\n", claim.Claim)
+		fmt.Fprintf(&b, "- status: `%s`\n", claim.Status)
+		fmt.Fprintf(&b, "- expected paper slot: `%s`\n", claim.ExpectedPaperSlot)
+		fmt.Fprintf(&b, "- paper wording: %s\n", claim.PaperWording)
+		fmt.Fprintf(&b, "- reviewer check: %s\n", claim.ReviewerCheck)
+		if len(claim.Evidence) > 0 {
+			fmt.Fprintf(&b, "- evidence:\n")
+			for _, evidence := range claim.Evidence {
+				fmt.Fprintf(&b, "  - %s\n", evidence)
+			}
+		}
+		if len(claim.Artifacts) > 0 {
+			fmt.Fprintf(&b, "- artifacts:\n")
+			for _, artifact := range claim.Artifacts {
+				fmt.Fprintf(&b, "  - `%s`\n", artifact)
+			}
+		}
+		if len(claim.Limitations) > 0 {
+			fmt.Fprintf(&b, "- limitations:\n")
+			for _, limitation := range claim.Limitations {
+				fmt.Fprintf(&b, "  - %s\n", limitation)
+			}
+		}
+		if len(claim.MissingEvidence) > 0 {
+			fmt.Fprintf(&b, "- missing evidence:\n")
+			for _, missing := range claim.MissingEvidence {
+				fmt.Fprintf(&b, "  - %s\n", missing)
+			}
+		}
+		fmt.Fprintf(&b, "\n")
+	}
+	return b.String()
+}
+
+func repoClaimsEvidenceHash(report repoClaimsEvidenceReport) string {
 	copy := report
 	copy.Hash = ""
 	copy.Markdown = ""
