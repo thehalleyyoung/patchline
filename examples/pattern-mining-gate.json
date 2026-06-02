@@ -1,0 +1,12 @@
+{
+  "version": "patchline.pattern-mining-gate/v1",
+  "claim": "Patchline mines recurring migration failure modes across a corpus of repositories so that a class of mistake appearing in many projects is promoted to a named recurring pattern, while a one-off failure seen in a single repository is not, focusing remediation effort on systemic problems rather than incidents. The worker counts the number of distinct repositories exhibiting each failure mode, marks a mode as recurring once it crosses a minimum-repository threshold, and ranks recurring patterns by prevalence. The gate proves a failure mode present in three repositories is promoted to a recurring pattern while a failure mode present in only one repository is excluded, and that the ranking is ordered by repository count.",
+  "real_repo": "synthetic-from-real patterns: failure modes mined across an OSS migration corpus",
+  "min_repos": 2,
+  "repos": [
+    {"repo": "alpha", "failure_modes": ["non_concurrent_index", "drop_column_in_use", "missing_down"]},
+    {"repo": "bravo", "failure_modes": ["non_concurrent_index", "drop_column_in_use"]},
+    {"repo": "charlie", "failure_modes": ["non_concurrent_index", "data_lossy_type_change"]},
+    {"repo": "delta", "failure_modes": ["one_off_quirk"]}
+  ]
+}
