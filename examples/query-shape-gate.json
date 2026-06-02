@@ -1,0 +1,12 @@
+{
+  "version": "patchline.query-shape-gate/v1",
+  "claim": "Patchline extracts a normalized query shape from heterogeneous data-access code so that ORM calls, raw SQL, prepared statements, and generated query-builder chains all reduce to the same (operation, table) representation the migration analysis can reason over. The worker applies a per-dialect extractor to each source string, recovering the operation and target table from raw SQL FROM/INTO/UPDATE clauses, from ORM model names, from prepared-statement SQL, and from query-builder table calls. The gate proves all four query styles yield the correct operation and table, that model names are normalized to table names, and that a non-query negative control yields no shape.",
+  "real_repo": "synthetic-from-real patterns: ActiveRecord, raw SQL, db.prepare, Knex",
+  "inputs": [
+    {"kind": "raw_sql", "source": "SELECT id, email FROM users WHERE active = 1"},
+    {"kind": "prepared", "source": "db.prepare('UPDATE orders SET status = ? WHERE id = ?')"},
+    {"kind": "orm", "source": "User.where(active: true).select(:id, :email)"},
+    {"kind": "builder", "source": "knex('payments').insert({ amount: 10 })"},
+    {"kind": "comment", "source": "# TODO: refactor the reporting query later"}
+  ]
+}

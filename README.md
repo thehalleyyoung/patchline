@@ -331,6 +331,8 @@ Run `make release-smoke-gate` to gate releases behind a minimal **smoke** suite 
 
 Run `make dataflow-summary-gate` to build a **dataflow summary** joining application writes to migration-touched columns — a write to a dropped/renamed column becomes a high-severity **impact edge** while added-column and unrelated writes are excluded; see [docs/dataflow-summary.md](docs/dataflow-summary.md).
 
+Run `make query-shape-gate` to extract a normalized **query shape** from ORM, raw SQL, prepared-statement, and **query-builder** code — all four reduce to the same `(operation, table)` while a non-query comment yields no shape; see [docs/query-shape.md](docs/query-shape.md).
+
 Add `--redact` to write `analysis-bundle/` copies with stable redaction tokens for identifiers, literals, customer-like strings, and secret-like values while preserving joins and existing artifact hashes.
 
 Add `--ci` to write `ci/summary.md` plus upload snippets and code-quality artifacts for GitHub Actions, GitLab CI, and Bitbucket Pipelines: SARIF under `analysis-bundle/summary.sarif`, GitLab `ci/gl-code-quality-report.json`, and Bitbucket `ci/bitbucket-code-insights.json`.
