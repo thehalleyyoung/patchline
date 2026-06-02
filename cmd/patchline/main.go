@@ -2,10 +2,13 @@ package main
 
 import (
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"flag"
 	"fmt"
+	"io"
 	"io/fs"
 	"os"
 	"os/exec"
@@ -418,6 +421,7 @@ Usage:
   patchline repo why-now --previous baseline-dir --current baseline-dir [--out dir] [--json]
   patchline repo changes --previous analysis-dir --current analysis-dir [--out dir] [--json]
   patchline repo hook <pre-commit|pre-push> [--root repo] [--base ref] [--out dir] [--json]
+  patchline repo offline --analysis analysis-dir [--adapter adapter-result.json]... [--out dir] [--json]
   patchline repo pr-comment --base baseline-dir --head baseline-dir [--max-findings n] [--out dir] [--json]
   patchline repo notify-summary --analysis analysis-dir [--bundle-link url] [--out dir] [--json]
   patchline repo minimize --analysis analysis-dir [--out dir] [--json]
@@ -512,7 +516,7 @@ Examples:
 
 func repoCommand(args []string) error {
 	if len(args) == 0 {
-		return errors.New("usage: patchline repo <doctor|fetch|analyze|inventory|baseline|propose|compare|proposal-minimize|replay|suppressions|why-now|changes|hook|notify-summary|minimize|recurrence> ...")
+		return errors.New("usage: patchline repo <doctor|fetch|analyze|inventory|baseline|propose|compare|proposal-minimize|replay|suppressions|why-now|changes|hook|offline|notify-summary|minimize|recurrence> ...")
 	}
 	switch args[0] {
 	case "doctor":
@@ -541,6 +545,8 @@ func repoCommand(args []string) error {
 		return repoChanges(args[1:])
 	case "hook":
 		return repoHook(args[1:])
+	case "offline":
+		return repoOffline(args[1:])
 	case "pr-comment":
 		return repoPRComment(args[1:])
 	case "notify-summary":
@@ -650,6 +656,65 @@ type repoHookFindingDelta struct {
 	Table       string `json:"table,omitempty"`
 	Rationale   string `json:"rationale"`
 	NextCommand string `json:"next_command,omitempty"`
+}
+
+type repoOfflineReport struct {
+	Version     string                `json:"version"`
+	Analysis    string                `json:"analysis,omitempty"`
+	Network     bool                  `json:"network"`
+	OK          bool                  `json:"ok"`
+	Summary     repoOfflineSummary    `json:"summary"`
+	CacheInputs []repoOfflineCache    `json:"cache_inputs,omitempty"`
+	Adapters    []repoOfflineAdapter  `json:"adapters,omitempty"`
+	Reports     []repoOfflineArtifact `json:"reports,omitempty"`
+	Errors      []string              `json:"errors,omitempty"`
+	Warnings    []string              `json:"warnings,omitempty"`
+	Hash        string                `json:"hash"`
+	Markdown    string                `json:"markdown,omitempty"`
+}
+
+type repoOfflineSummary struct {
+	CacheInputs        int `json:"cache_inputs"`
+	CacheInputsValid   int `json:"cache_inputs_valid"`
+	Adapters           int `json:"adapters"`
+	AdaptersValid      int `json:"adapters_valid"`
+	Reports            int `json:"reports"`
+	ReportsValid       int `json:"reports_valid"`
+	GeneratedArtifacts int `json:"generated_artifacts"`
+	NetworkOperations  int `json:"network_operations"`
+	Errors             int `json:"errors"`
+	Warnings           int `json:"warnings"`
+}
+
+type repoOfflineCache struct {
+	SourcePath     string `json:"source_path"`
+	Input          string `json:"input,omitempty"`
+	Mode           string `json:"mode,omitempty"`
+	CacheKey       string `json:"cache_key,omitempty"`
+	CachePath      string `json:"cache_path,omitempty"`
+	ArchiveHash    string `json:"archive_hash,omitempty"`
+	ActualHash     string `json:"actual_hash,omitempty"`
+	ScannedRoot    string `json:"scanned_root,omitempty"`
+	ResolvedCommit string `json:"resolved_commit,omitempty"`
+	Valid          bool   `json:"valid"`
+	Rationale      string `json:"rationale"`
+}
+
+type repoOfflineAdapter struct {
+	Path       string `json:"path"`
+	Adapter    string `json:"adapter,omitempty"`
+	EventCount int    `json:"event_count"`
+	InputHash  string `json:"input_hash,omitempty"`
+	Valid      bool   `json:"valid"`
+	Rationale  string `json:"rationale"`
+}
+
+type repoOfflineArtifact struct {
+	Kind      string `json:"kind"`
+	Path      string `json:"path"`
+	Hash      string `json:"hash,omitempty"`
+	Valid     bool   `json:"valid"`
+	Rationale string `json:"rationale"`
 }
 
 type gitlabCodeQualityIssue struct {
@@ -4101,6 +4166,438 @@ func renderRepoHookMarkdown(report repoHookReport) string {
 	fmt.Fprintf(&b, "| severity | score | path | kind | table | rationale |\n| --- | ---: | --- | --- | --- | --- |\n")
 	for _, finding := range report.FindingDeltas {
 		fmt.Fprintf(&b, "| %s | %d | `%s` | %s | %s | %s |\n", finding.Severity, finding.Score, finding.Path, finding.Kind, finding.Table, finding.Rationale)
+	}
+	return b.String()
+}
+
+func repoOffline(args []string) error {
+	fs := flag.NewFlagSet("repo offline", flag.ContinueOnError)
+	fs.SetOutput(ioDiscard{})
+	analysisPath := fs.String("analysis", "", "repo analyze output directory to validate offline")
+	outPath := fs.String("out", "", "output directory")
+	jsonOut := fs.Bool("json", false, "emit JSON")
+	var adapterPaths multiFlag
+	fs.Var(&adapterPaths, "adapter", "adapter result JSON to validate; repeatable")
+	if err := fs.Parse(args); err != nil {
+		return err
+	}
+	if *analysisPath == "" || fs.NArg() != 0 {
+		return errors.New("usage: patchline repo offline --analysis analysis-dir [--adapter adapter-result.json]... [--out dir] [--json]")
+	}
+	report := buildRepoOfflineReport(*analysisPath, adapterPaths)
+	if *outPath != "" {
+		if err := writeRepoOfflineReport(*outPath, report); err != nil {
+			return err
+		}
+	}
+	if *jsonOut {
+		if err := writeJSON(os.Stdout, report); err != nil {
+			return err
+		}
+		if !report.OK {
+			return codedError{code: 2, err: errors.New("offline validation failed")}
+		}
+		return nil
+	}
+	status := "failed"
+	if report.OK {
+		status = "passed"
+	}
+	fmt.Printf("offline validation %s analysis=%s caches=%d/%d reports=%d/%d adapters=%d/%d network=%t hash=%s\n",
+		status,
+		report.Analysis,
+		report.Summary.CacheInputsValid,
+		report.Summary.CacheInputs,
+		report.Summary.ReportsValid,
+		report.Summary.Reports,
+		report.Summary.AdaptersValid,
+		report.Summary.Adapters,
+		report.Network,
+		report.Hash,
+	)
+	if *outPath != "" {
+		fmt.Printf("  out=%s\n", *outPath)
+	}
+	if !report.OK {
+		return codedError{code: 2, err: errors.New("offline validation failed")}
+	}
+	return nil
+}
+
+type multiFlag []string
+
+func (m *multiFlag) String() string {
+	return strings.Join(*m, ",")
+}
+
+func (m *multiFlag) Set(value string) error {
+	if strings.TrimSpace(value) != "" {
+		*m = append(*m, value)
+	}
+	return nil
+}
+
+func buildRepoOfflineReport(analysisPath string, adapterPaths []string) repoOfflineReport {
+	report := repoOfflineReport{
+		Version:  "patchline.repo-offline/v1",
+		Analysis: filepath.ToSlash(analysisPath),
+		Network:  false,
+		OK:       true,
+	}
+	addErr := func(format string, args ...any) {
+		report.Errors = append(report.Errors, fmt.Sprintf(format, args...))
+		report.OK = false
+	}
+	addWarn := func(format string, args ...any) {
+		report.Warnings = append(report.Warnings, fmt.Sprintf(format, args...))
+	}
+
+	if info, err := os.Stat(analysisPath); err != nil || !info.IsDir() {
+		addErr("analysis directory %s is not readable", analysisPath)
+	} else {
+		sourcePaths := offlineSourcePaths(analysisPath)
+		if len(sourcePaths) == 0 {
+			addWarn("no source.json found under %s", analysisPath)
+		}
+		for _, sourcePath := range sourcePaths {
+			cache := validateOfflineSource(sourcePath)
+			report.CacheInputs = append(report.CacheInputs, cache)
+			if !cache.Valid {
+				addErr("invalid cache input %s: %s", sourcePath, cache.Rationale)
+			}
+		}
+		for _, artifact := range validateOfflineReports(analysisPath) {
+			report.Reports = append(report.Reports, artifact)
+			if !artifact.Valid {
+				addErr("invalid %s report %s: %s", artifact.Kind, artifact.Path, artifact.Rationale)
+			}
+		}
+	}
+	for _, adapterPath := range adapterPaths {
+		adapter := validateOfflineAdapter(adapterPath)
+		report.Adapters = append(report.Adapters, adapter)
+		if !adapter.Valid {
+			addErr("invalid adapter result %s: %s", adapterPath, adapter.Rationale)
+		}
+	}
+	if len(adapterPaths) == 0 {
+		addWarn("no adapter result files supplied; cached adapter output validation skipped")
+	}
+	report.Summary = repoOfflineSummary{
+		CacheInputs:        len(report.CacheInputs),
+		CacheInputsValid:   countValidOfflineCaches(report.CacheInputs),
+		Adapters:           len(report.Adapters),
+		AdaptersValid:      countValidOfflineAdapters(report.Adapters),
+		Reports:            len(report.Reports),
+		ReportsValid:       countValidOfflineArtifacts(report.Reports),
+		GeneratedArtifacts: countOfflineGeneratedArtifacts(report.Reports),
+		NetworkOperations:  0,
+		Errors:             len(report.Errors),
+		Warnings:           len(report.Warnings),
+	}
+	report.Hash = repoOfflineHash(report)
+	report.Markdown = renderRepoOfflineMarkdown(report)
+	return report
+}
+
+func offlineSourcePaths(analysisPath string) []string {
+	candidates := []string{
+		filepath.Join(analysisPath, "fetch", "source.json"),
+		filepath.Join(analysisPath, "analysis-bundle", "source.json"),
+	}
+	var paths []string
+	seen := map[string]bool{}
+	for _, candidate := range candidates {
+		if fileExists(candidate) && !seen[candidate] {
+			paths = append(paths, candidate)
+			seen[candidate] = true
+		}
+	}
+	return paths
+}
+
+func validateOfflineSource(sourcePath string) repoOfflineCache {
+	cache := repoOfflineCache{SourcePath: filepath.ToSlash(sourcePath)}
+	source, err := loadSource(sourcePath)
+	if err != nil {
+		cache.Rationale = err.Error()
+		return cache
+	}
+	cache.Input = source.Input
+	cache.Mode = source.Mode
+	cache.CacheKey = source.CacheKey
+	cache.CachePath = source.CachePath
+	cache.ArchiveHash = source.ArchiveHash
+	cache.ScannedRoot = source.ScannedRoot
+	cache.ResolvedCommit = source.ResolvedCommit
+	if strings.TrimSpace(source.CachePath) != "" {
+		actual, err := hashFileSHA256(source.CachePath)
+		cache.ActualHash = actual
+		if err != nil {
+			cache.Rationale = "cached archive is not readable: " + err.Error()
+			return cache
+		}
+		if source.ArchiveHash != "" && actual != source.ArchiveHash {
+			cache.Rationale = "cached archive hash does not match source metadata"
+			return cache
+		}
+	}
+	if strings.TrimSpace(source.ScannedRoot) != "" {
+		if info, err := os.Stat(source.ScannedRoot); err != nil || !info.IsDir() {
+			cache.Rationale = "scanned_root is not available locally"
+			return cache
+		}
+	}
+	switch {
+	case source.Mode == "local":
+		cache.Valid = true
+		cache.Rationale = "local source is readable without network access"
+	case source.CachePath != "" && source.ArchiveHash != "":
+		cache.Valid = true
+		cache.Rationale = "cached archive hash matches source metadata"
+	default:
+		cache.Rationale = "non-local source lacks cache path and archive hash"
+	}
+	return cache
+}
+
+func validateOfflineReports(analysisPath string) []repoOfflineArtifact {
+	checks := []struct {
+		kind string
+		path string
+		load func(string) error
+	}{
+		{"analyze", filepath.Join(analysisPath, "analyze.json"), validateGenericJSON},
+		{"inventory", filepath.Join(analysisPath, "inventory"), func(path string) error {
+			_, _, err := project.LoadInventory(path)
+			return err
+		}},
+		{"intake", filepath.Join(analysisPath, "intake"), func(path string) error {
+			_, err := project.LoadIntakeReport(path)
+			return err
+		}},
+		{"baseline", filepath.Join(analysisPath, "baseline"), func(path string) error {
+			_, err := project.LoadBaseline(path)
+			return err
+		}},
+		{"proposal", filepath.Join(analysisPath, "proposal"), func(path string) error {
+			_, err := project.LoadProposal(path)
+			return err
+		}},
+		{"compare", filepath.Join(analysisPath, "compare", "compare.json"), func(path string) error {
+			_, err := loadCompareReport(path)
+			return err
+		}},
+		{"triage", filepath.Join(analysisPath, "triage", "triage.json"), validateGenericJSON},
+	}
+	var artifacts []repoOfflineArtifact
+	for _, check := range checks {
+		if _, err := os.Stat(check.path); err != nil {
+			if check.kind == "compare" || check.kind == "triage" {
+				continue
+			}
+			artifacts = append(artifacts, repoOfflineArtifact{Kind: check.kind, Path: filepath.ToSlash(check.path), Valid: false, Rationale: "required report artifact is missing"})
+			continue
+		}
+		artifact := repoOfflineArtifact{Kind: check.kind, Path: filepath.ToSlash(check.path)}
+		hash, err := hashPathSHA256(check.path)
+		if err == nil {
+			artifact.Hash = hash
+		}
+		if err := check.load(check.path); err != nil {
+			artifact.Valid = false
+			artifact.Rationale = err.Error()
+		} else {
+			artifact.Valid = true
+			artifact.Rationale = "report loaded from local artifacts"
+		}
+		artifacts = append(artifacts, artifact)
+	}
+	return artifacts
+}
+
+func validateGenericJSON(path string) error {
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return err
+	}
+	var value any
+	return json.Unmarshal(data, &value)
+}
+
+func validateOfflineAdapter(path string) repoOfflineAdapter {
+	adapter := repoOfflineAdapter{Path: filepath.ToSlash(path)}
+	data, err := os.ReadFile(path)
+	if err != nil {
+		adapter.Rationale = err.Error()
+		return adapter
+	}
+	var result evidence.AdaptResult
+	if err := json.Unmarshal(data, &result); err != nil {
+		adapter.Rationale = err.Error()
+		return adapter
+	}
+	adapter.Adapter = result.Adapter
+	adapter.EventCount = result.EventCount
+	adapter.InputHash = result.InputHash
+	if result.Version != evidence.AdapterVersion || !result.OK || result.EventCount != len(result.Events) || result.InputHash == "" {
+		adapter.Rationale = "adapter result has invalid version, status, event count, or input hash"
+		return adapter
+	}
+	adapter.Valid = true
+	adapter.Rationale = "adapter result is self-contained and internally consistent"
+	return adapter
+}
+
+func hashPathSHA256(path string) (string, error) {
+	info, err := os.Stat(path)
+	if err != nil {
+		return "", err
+	}
+	if !info.IsDir() {
+		return hashFileSHA256(path)
+	}
+	var hashes []string
+	err = filepath.WalkDir(path, func(item string, entry fs.DirEntry, err error) error {
+		if err != nil {
+			return err
+		}
+		if entry.IsDir() {
+			return nil
+		}
+		info, err := entry.Info()
+		if err != nil {
+			return err
+		}
+		if info.Mode()&os.ModeSymlink != 0 {
+			return nil
+		}
+		hash, err := hashFileSHA256(item)
+		if err != nil {
+			return err
+		}
+		rel, _ := filepath.Rel(path, item)
+		hashes = append(hashes, filepath.ToSlash(rel)+"="+hash)
+		return nil
+	})
+	if err != nil {
+		return "", err
+	}
+	sort.Strings(hashes)
+	return "sha256:" + canonical.Hash(strings.Join(hashes, "\n")), nil
+}
+
+func hashFileSHA256(path string) (string, error) {
+	file, err := os.Open(path)
+	if err != nil {
+		return "", err
+	}
+	defer file.Close()
+	hasher := sha256.New()
+	if _, err := io.Copy(hasher, file); err != nil {
+		return "", err
+	}
+	return "sha256:" + hex.EncodeToString(hasher.Sum(nil)), nil
+}
+
+func countValidOfflineCaches(caches []repoOfflineCache) int {
+	count := 0
+	for _, cache := range caches {
+		if cache.Valid {
+			count++
+		}
+	}
+	return count
+}
+
+func countValidOfflineAdapters(adapters []repoOfflineAdapter) int {
+	count := 0
+	for _, adapter := range adapters {
+		if adapter.Valid {
+			count++
+		}
+	}
+	return count
+}
+
+func countValidOfflineArtifacts(artifacts []repoOfflineArtifact) int {
+	count := 0
+	for _, artifact := range artifacts {
+		if artifact.Valid {
+			count++
+		}
+	}
+	return count
+}
+
+func countOfflineGeneratedArtifacts(artifacts []repoOfflineArtifact) int {
+	for _, artifact := range artifacts {
+		if artifact.Kind == "proposal" && artifact.Valid {
+			if proposal, err := project.LoadProposal(artifact.Path); err == nil {
+				return len(proposal.GeneratedFiles)
+			}
+		}
+	}
+	return 0
+}
+
+func writeRepoOfflineReport(outDir string, report repoOfflineReport) error {
+	if err := os.MkdirAll(outDir, 0o755); err != nil {
+		return err
+	}
+	copy := report
+	copy.Markdown = ""
+	data, err := json.MarshalIndent(copy, "", "  ")
+	if err != nil {
+		return err
+	}
+	if err := os.WriteFile(filepath.Join(outDir, "offline.json"), append(data, '\n'), 0o644); err != nil {
+		return err
+	}
+	return os.WriteFile(filepath.Join(outDir, "offline.md"), []byte(report.Markdown), 0o644)
+}
+
+func repoOfflineHash(report repoOfflineReport) string {
+	copy := report
+	copy.Hash = ""
+	copy.Markdown = ""
+	return canonical.Hash(copy)
+}
+
+func renderRepoOfflineMarkdown(report repoOfflineReport) string {
+	var b strings.Builder
+	fmt.Fprintf(&b, "# Patchline offline validation\n\n")
+	fmt.Fprintf(&b, "- analysis: `%s`\n", report.Analysis)
+	fmt.Fprintf(&b, "- ok: `%t`\n", report.OK)
+	fmt.Fprintf(&b, "- network: `%t`\n", report.Network)
+	fmt.Fprintf(&b, "- hash: `%s`\n\n", report.Hash)
+	fmt.Fprintf(&b, "## Summary\n\n| area | count |\n| --- | ---: |\n")
+	fmt.Fprintf(&b, "| cache inputs | %d |\n", report.Summary.CacheInputs)
+	fmt.Fprintf(&b, "| cache inputs valid | %d |\n", report.Summary.CacheInputsValid)
+	fmt.Fprintf(&b, "| reports | %d |\n", report.Summary.Reports)
+	fmt.Fprintf(&b, "| reports valid | %d |\n", report.Summary.ReportsValid)
+	fmt.Fprintf(&b, "| adapters | %d |\n", report.Summary.Adapters)
+	fmt.Fprintf(&b, "| adapters valid | %d |\n", report.Summary.AdaptersValid)
+	fmt.Fprintf(&b, "| network operations | %d |\n", report.Summary.NetworkOperations)
+	fmt.Fprintf(&b, "| errors | %d |\n", report.Summary.Errors)
+	fmt.Fprintf(&b, "| warnings | %d |\n\n", report.Summary.Warnings)
+	if len(report.CacheInputs) > 0 {
+		fmt.Fprintf(&b, "## Cache inputs\n\n| valid | mode | input | cache path | rationale |\n| --- | --- | --- | --- | --- |\n")
+		for _, cache := range report.CacheInputs {
+			fmt.Fprintf(&b, "| %t | %s | %s | `%s` | %s |\n", cache.Valid, cache.Mode, cache.Input, cache.CachePath, cache.Rationale)
+		}
+	}
+	if len(report.Reports) > 0 {
+		fmt.Fprintf(&b, "\n## Reports\n\n| valid | kind | path | rationale |\n| --- | --- | --- | --- |\n")
+		for _, artifact := range report.Reports {
+			fmt.Fprintf(&b, "| %t | %s | `%s` | %s |\n", artifact.Valid, artifact.Kind, artifact.Path, artifact.Rationale)
+		}
+	}
+	if len(report.Adapters) > 0 {
+		fmt.Fprintf(&b, "\n## Adapters\n\n| valid | adapter | events | path | rationale |\n| --- | --- | ---: | --- | --- |\n")
+		for _, adapter := range report.Adapters {
+			fmt.Fprintf(&b, "| %t | %s | %d | `%s` | %s |\n", adapter.Valid, adapter.Adapter, adapter.EventCount, adapter.Path, adapter.Rationale)
+		}
 	}
 	return b.String()
 }

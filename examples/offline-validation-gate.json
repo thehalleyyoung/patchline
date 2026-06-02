@@ -1,0 +1,31 @@
+{
+  "version": "patchline.offline-validation-gate/v1",
+  "claim": "Enterprise-safe offline mode validates cached repo inputs, adapter outputs, and analysis reports without network access.",
+  "minimum_public_repos": 4,
+  "slices": [
+    {
+      "id": "sentry-migrations",
+      "repo": "getsentry/sentry",
+      "ref": "7b0929f1237e205324f3a481e87255253e02ac9f",
+      "subpath": "src/sentry/migrations"
+    },
+    {
+      "id": "home-assistant-recorder",
+      "repo": "home-assistant/core",
+      "ref": "bc66c2610e9b4fcb95cfcad0d56d67543585560d",
+      "subpath": "homeassistant/components/recorder"
+    },
+    {
+      "id": "grafana-sqlstore",
+      "repo": "grafana/grafana",
+      "ref": "9bcff8f6f5e84fafac24e57794973cb034869055",
+      "subpath": "pkg/services/sqlstore"
+    },
+    {
+      "id": "discourse-migrations",
+      "repo": "discourse/discourse",
+      "ref": "1f42822a370fc5d264d86b60e7bc078f31b60839",
+      "subpath": "migrations"
+    }
+  ]
+}

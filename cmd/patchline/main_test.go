@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -11,6 +12,8 @@ import (
 	"testing"
 
 	"github.com/thehalleyyoung/patchline/internal/artifact"
+	"github.com/thehalleyyoung/patchline/internal/evidence"
+	"github.com/thehalleyyoung/patchline/internal/intake"
 	"github.com/thehalleyyoung/patchline/internal/project"
 )
 
@@ -104,6 +107,86 @@ func TestRepoHookPrePushScansBranchDelta(t *testing.T) {
 	}
 	if report.Summary.ChangedFiles != 1 || report.Summary.RankedRisks == 0 || report.FindingDeltas[0].Path != "db/migrate/002_delete_accounts.sql" {
 		t.Fatalf("expected branch delta finding: summary=%#v deltas=%#v", report.Summary, report.FindingDeltas)
+	}
+}
+
+func TestRepoOfflineValidatesLocalReportsAndAdapters(t *testing.T) {
+	root := t.TempDir()
+	writeMainTestFile(t, root, "db/migrate/001_backfill.sql", "UPDATE accounts SET status = 'active';\n")
+	analysis := filepath.Join(t.TempDir(), "analysis")
+	inv, err := project.InventoryPath(project.InventoryOptions{Path: root})
+	if err != nil {
+		t.Fatal(err)
+	}
+	intakeReport, err := intake.Run(context.Background(), intake.Options{Path: root})
+	if err != nil {
+		t.Fatal(err)
+	}
+	baseline := project.Baseline(inv, inv.Facts, intakeReport)
+	if err := project.WriteInventory(filepath.Join(analysis, "inventory"), inv); err != nil {
+		t.Fatal(err)
+	}
+	if err := intake.WriteReport(filepath.Join(analysis, "intake"), intakeReport); err != nil {
+		t.Fatal(err)
+	}
+	if err := project.WriteBaseline(filepath.Join(analysis, "baseline"), baseline); err != nil {
+		t.Fatal(err)
+	}
+	proposal, err := project.Propose(project.ProposalOptions{BaselinePath: filepath.Join(analysis, "baseline"), Kind: "guards", OutDir: filepath.Join(analysis, "proposal"), NoLLM: true, BudgetRisks: 1})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := project.WriteProposal(filepath.Join(analysis, "proposal"), proposal); err != nil {
+		t.Fatal(err)
+	}
+	writeMainTestFile(t, analysis, "analyze.json", `{"version":"patchline.repo-analyze/v1","summary":{"ranked_risks":1}}`)
+	writeMainTestFile(t, analysis, "fetch/source.json", fmt.Sprintf(`{"version":"patchline.project/v1","mode":"local","input":"%s","scanned_root":"%s"}`, root, root))
+	adapterPath := filepath.Join(t.TempDir(), "adapter.json")
+	writeMainTestFile(t, filepath.Dir(adapterPath), filepath.Base(adapterPath), `{"version":"patchline.evidence-adapter/v1","adapter":"github","ok":true,"event_count":1,"input_hash":"sha256:test","events":[{"type":"deploy"}]}`)
+
+	report := buildRepoOfflineReport(analysis, []string{adapterPath})
+	if !report.OK || report.Network || report.Summary.NetworkOperations != 0 {
+		t.Fatalf("expected offline validation to pass without network: %#v", report)
+	}
+	if report.Summary.ReportsValid < 5 || report.Summary.AdaptersValid != 1 || report.Summary.CacheInputsValid != 1 || report.Hash == "" {
+		t.Fatalf("unexpected offline summary: %#v", report.Summary)
+	}
+	if !strings.Contains(report.Markdown, "offline validation") {
+		t.Fatalf("expected markdown report: %s", report.Markdown)
+	}
+}
+
+func TestRepoOfflineRejectsCacheHashMismatch(t *testing.T) {
+	root := t.TempDir()
+	analysis := filepath.Join(root, "analysis")
+	cacheArchive := filepath.Join(root, "cache", "archives", "bad.tar.gz")
+	writeMainTestFile(t, filepath.Dir(cacheArchive), filepath.Base(cacheArchive), "cached archive")
+	writeMainTestFile(t, analysis, "fetch/source.json", fmt.Sprintf(`{
+  "version":"patchline.project/v1",
+  "mode":"github",
+  "input":"owner/repo",
+  "cache_path":%q,
+  "archive_hash":"sha256:0000",
+  "scanned_root":%q
+}`, cacheArchive, root))
+	writeMainTestFile(t, analysis, "analyze.json", `{"version":"patchline.repo-analyze/v1"}`)
+	report := buildRepoOfflineReport(analysis, nil)
+	if report.OK || len(report.Errors) == 0 || !strings.Contains(strings.Join(report.Errors, "\n"), "hash") {
+		t.Fatalf("expected cache hash mismatch failure, got %#v", report)
+	}
+}
+
+func TestRepoOfflineRejectsInvalidAdapterResult(t *testing.T) {
+	root := t.TempDir()
+	analysis := filepath.Join(root, "analysis")
+	writeMainTestFile(t, analysis, "analyze.json", `{"version":"patchline.repo-analyze/v1"}`)
+	writeMainTestFile(t, analysis, "fetch/source.json", fmt.Sprintf(`{"version":"patchline.project/v1","mode":"local","input":"%s","scanned_root":"%s"}`, root, root))
+	adapterPath := filepath.Join(root, "adapter.json")
+	data, _ := json.Marshal(evidence.AdaptResult{Version: evidence.AdapterVersion, Adapter: "github", OK: true, EventCount: 2, InputHash: "sha256:test", Events: []map[string]string{{"type": "deploy"}}})
+	writeMainTestFile(t, root, "adapter.json", string(data))
+	report := buildRepoOfflineReport(analysis, []string{adapterPath})
+	if report.OK || len(report.Adapters) != 1 || report.Adapters[0].Valid {
+		t.Fatalf("expected invalid adapter count failure, got %#v", report)
 	}
 }
 
