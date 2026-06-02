@@ -1,0 +1,5 @@
+{
+  "version": "patchline.generated-risk-budget/v1",
+  "minimum_public_slices": 4,
+  "claim": "Generated interventions are rejected when newly introduced SQL risk budget exceeds the number of baseline risks they cover."
+}

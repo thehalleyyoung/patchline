@@ -966,6 +966,51 @@ func TestCompareChecksRepairManifestSchema(t *testing.T) {
 	}
 }
 
+func TestCompareRejectsGeneratedRiskBudgetOverrun(t *testing.T) {
+	baseline := BaselineReport{
+		Version: BaselineVersion,
+		Hash:    "baseline-hash",
+		Risks: []BaselineRisk{{
+			ID:        "risk:accounts",
+			Path:      "db/migrate/001.sql",
+			Kind:      "update",
+			Table:     "accounts",
+			Severity:  "high",
+			Score:     120,
+			Rationale: "baseline risk",
+		}},
+	}
+	baseline.Hash = baselineHash(baseline)
+	proposal := ProposalReport{
+		BaselineHash:  baseline.Hash,
+		OutputHash:    "proposal-hash",
+		TargetRiskIDs: []string{"risk:accounts"},
+		GeneratedFiles: []GeneratedFile{{
+			Path:    "patchline-proposals/explain/risky.sql",
+			Kind:    "explain",
+			RiskIDs: []string{"risk:accounts"},
+		}},
+		Generated: []GeneratedArtifact{{
+			Path: "patchline-proposals/explain/risky.sql",
+			Kind: "explain",
+			Content: `-- Untrusted generated explain proposal
+EXPLAIN SELECT * FROM accounts LIMIT 1;
+SELECT count(*) AS patchline_candidate_rows FROM accounts;
+UPDATE accounts SET admin = true;
+DELETE FROM accounts;
+`,
+			RiskIDs: []string{"risk:accounts"},
+		}},
+	}
+	compare := Compare(baseline, proposal)
+	if compare.Summary.PatchlineChecksFailed != 0 || !compare.Summary.RiskBudgetRejected || compare.Summary.RiskBudgetAdded <= compare.Summary.RiskBudgetCovered {
+		t.Fatalf("expected generated risk budget overrun without shape-check failure: %#v", compare.Summary)
+	}
+	if compare.Intervention.Status != "rejected-by-deterministic-checks" {
+		t.Fatalf("expected rejected intervention loop, got %#v", compare.Intervention)
+	}
+}
+
 func TestCompareRunsSafeNativeChecks(t *testing.T) {
 	root := t.TempDir()
 	writeFile(t, root, "go.mod", "module example.com/nativecheck\n\ngo 1.22\n")

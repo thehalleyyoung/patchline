@@ -34,25 +34,28 @@ type CompareReport struct {
 }
 
 type CompareSummary struct {
-	BaselineRisks         int `json:"baseline_risks"`
-	TargetedRisks         int `json:"targeted_risks"`
-	GeneratedFiles        int `json:"generated_files"`
-	RisksWithCoverage     int `json:"risks_with_coverage"`
-	NewHighRiskSQL        int `json:"new_high_risk_sql"`
-	NewMediumRiskSQL      int `json:"new_medium_risk_sql"`
-	GuardChecks           int `json:"guard_checks"`
-	RepairChecks          int `json:"repair_checks"`
-	PatchlineChecksPassed int `json:"patchline_checks_passed"`
-	PatchlineChecksFailed int `json:"patchline_checks_failed"`
-	NativeChecksRun       int `json:"native_checks_run"`
-	NativeChecksPassed    int `json:"native_checks_passed"`
-	NativeChecksFailed    int `json:"native_checks_failed"`
-	NativeChecksSkipped   int `json:"native_checks_skipped"`
-	InterventionLoops     int `json:"intervention_loops"`
-	InterventionAccepted  int `json:"intervention_accepted"`
-	InterventionRejected  int `json:"intervention_rejected"`
-	Rejected              int `json:"rejected"`
-	Warnings              int `json:"warnings"`
+	BaselineRisks         int  `json:"baseline_risks"`
+	TargetedRisks         int  `json:"targeted_risks"`
+	GeneratedFiles        int  `json:"generated_files"`
+	RisksWithCoverage     int  `json:"risks_with_coverage"`
+	NewHighRiskSQL        int  `json:"new_high_risk_sql"`
+	NewMediumRiskSQL      int  `json:"new_medium_risk_sql"`
+	RiskBudgetCovered     int  `json:"risk_budget_covered"`
+	RiskBudgetAdded       int  `json:"risk_budget_added"`
+	RiskBudgetRejected    bool `json:"risk_budget_rejected"`
+	GuardChecks           int  `json:"guard_checks"`
+	RepairChecks          int  `json:"repair_checks"`
+	PatchlineChecksPassed int  `json:"patchline_checks_passed"`
+	PatchlineChecksFailed int  `json:"patchline_checks_failed"`
+	NativeChecksRun       int  `json:"native_checks_run"`
+	NativeChecksPassed    int  `json:"native_checks_passed"`
+	NativeChecksFailed    int  `json:"native_checks_failed"`
+	NativeChecksSkipped   int  `json:"native_checks_skipped"`
+	InterventionLoops     int  `json:"intervention_loops"`
+	InterventionAccepted  int  `json:"intervention_accepted"`
+	InterventionRejected  int  `json:"intervention_rejected"`
+	Rejected              int  `json:"rejected"`
+	Warnings              int  `json:"warnings"`
 }
 
 type RiskDelta struct {
@@ -448,6 +451,12 @@ func summarizeCompare(baseline BaselineReport, proposal ProposalReport, checks [
 			summary.NativeChecksSkipped++
 		}
 	}
+	summary.RiskBudgetCovered = summary.RisksWithCoverage
+	summary.RiskBudgetAdded = summary.NewHighRiskSQL*2 + summary.NewMediumRiskSQL
+	if summary.RiskBudgetAdded > summary.RiskBudgetCovered {
+		summary.RiskBudgetRejected = true
+		summary.Rejected++
+	}
 	return summary
 }
 
@@ -458,7 +467,7 @@ func buildInterventionLoop(baseline BaselineReport, proposal ProposalReport, sum
 		"apply only in an isolated worktree or patch review",
 		"rerun baseline and compare after any maintainer edits",
 	}
-	if summary.PatchlineChecksFailed > 0 || summary.NativeChecksFailed > 0 || summary.NewHighRiskSQL > 0 {
+	if summary.PatchlineChecksFailed > 0 || summary.NativeChecksFailed > 0 || summary.NewHighRiskSQL > 0 || summary.RiskBudgetRejected {
 		status = "rejected-by-deterministic-checks"
 		next = []string{
 			"fix or discard generated artifacts that failed deterministic checks",
@@ -678,6 +687,9 @@ func reviewCompare(report CompareReport) []ReviewItem {
 	if report.Summary.NewHighRiskSQL > 0 {
 		review = append(review, ReviewItem{Severity: "error", Message: "generated proposal introduces high-risk SQL"})
 	}
+	if report.Summary.RiskBudgetRejected {
+		review = append(review, ReviewItem{Severity: "error", Message: "generated proposal adds more SQL risk budget than it covers"})
+	}
 	if report.Summary.NativeChecksFailed > 0 {
 		review = append(review, ReviewItem{Severity: "error", Message: "project-native tests failed or timed out"})
 	}
@@ -710,6 +722,8 @@ func renderCompareMarkdown(report CompareReport) string {
 	fmt.Fprintf(&b, "| risks with coverage | %d |\n", report.Summary.RisksWithCoverage)
 	fmt.Fprintf(&b, "| new high-risk SQL | %d |\n", report.Summary.NewHighRiskSQL)
 	fmt.Fprintf(&b, "| new medium-risk SQL | %d |\n", report.Summary.NewMediumRiskSQL)
+	fmt.Fprintf(&b, "| risk budget covered | %d |\n", report.Summary.RiskBudgetCovered)
+	fmt.Fprintf(&b, "| risk budget added | %d |\n", report.Summary.RiskBudgetAdded)
 	fmt.Fprintf(&b, "| checks passed | %d |\n", report.Summary.PatchlineChecksPassed)
 	fmt.Fprintf(&b, "| checks failed | %d |\n", report.Summary.PatchlineChecksFailed)
 	fmt.Fprintf(&b, "| native checks run | %d |\n", report.Summary.NativeChecksRun)
