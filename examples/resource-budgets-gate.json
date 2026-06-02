@@ -1,0 +1,23 @@
+{
+  "version": "patchline.resource-budgets-gate/v1",
+  "claim": "Patchline runs under explicit per-stage resource budgets so that an analysis can never silently consume unbounded time, memory, or file handles on an adversarial public repository. Each stage declares a budget for wall-clock seconds, peak memory in megabytes, and files opened; the worker measures each stage's actual usage against its budget and admits a run only when every stage is within budget. The gate proves a within-budget run is admitted, an over-budget negative control is rejected at the offending stage, and the rejection names the specific stage and resource that overran.",
+  "real_repo": "patchline (self): per-stage time/memory/file budgets",
+  "budgets": [
+    {"stage": "fetch", "seconds": 30, "memory_mb": 256, "files": 5000},
+    {"stage": "parse", "seconds": 60, "memory_mb": 512, "files": 20000},
+    {"stage": "analyze", "seconds": 120, "memory_mb": 1024, "files": 20000},
+    {"stage": "report", "seconds": 20, "memory_mb": 256, "files": 2000}
+  ],
+  "within_budget_run": [
+    {"stage": "fetch", "seconds": 12, "memory_mb": 180, "files": 3200},
+    {"stage": "parse", "seconds": 41, "memory_mb": 430, "files": 15800},
+    {"stage": "analyze", "seconds": 92, "memory_mb": 870, "files": 15800},
+    {"stage": "report", "seconds": 8, "memory_mb": 120, "files": 240}
+  ],
+  "over_budget_run": [
+    {"stage": "fetch", "seconds": 12, "memory_mb": 180, "files": 3200},
+    {"stage": "parse", "seconds": 41, "memory_mb": 430, "files": 15800},
+    {"stage": "analyze", "seconds": 92, "memory_mb": 1390, "files": 15800},
+    {"stage": "report", "seconds": 8, "memory_mb": 120, "files": 240}
+  ]
+}
