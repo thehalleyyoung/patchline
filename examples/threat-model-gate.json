@@ -1,0 +1,17 @@
+{
+  "version": "patchline.threat-model-gate/v1",
+  "claim": "The Patchline threat model covers untrusted repos, archives, generated code, native tests, and adapter inputs with executable real-artifact checks.",
+  "real_code": {
+    "repo": "lobsters/lobsters",
+    "ref": "3b80b47aa5aaba37ec44413e7d1dc96fcf1585b6",
+    "subpath": "db/migrate"
+  },
+  "adapter_fixture": "examples/evidence/datadog-span-export.json",
+  "required_boundaries": [
+    "Repository source",
+    "Archive handling",
+    "Adapter inputs",
+    "Generated code",
+    "Native tests"
+  ]
+}
