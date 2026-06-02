@@ -303,6 +303,8 @@ Run `make release-notes-gate` to generate release notes that embed a **public pr
 
 Run `make office-hours-gate` to assemble a public **office hours** agenda from recent **reproducibility** failures and roadmap cards — every failure item reproduces with `make <gate>`, so the room always works on real, reproducible issues; see [docs/office-hours.md](docs/office-hours.md).
 
+Run `make feedback-forms-gate` to render **analytics-free** docs feedback forms that produce structured **local issue** templates — the gate enforces zero external URLs or trackers, so reader feedback never phones home; see [docs/feedback-forms.md](docs/feedback-forms.md).
+
 Add `--redact` to write `analysis-bundle/` copies with stable redaction tokens for identifiers, literals, customer-like strings, and secret-like values while preserving joins and existing artifact hashes.
 
 Add `--ci` to write `ci/summary.md` plus upload snippets and code-quality artifacts for GitHub Actions, GitLab CI, and Bitbucket Pipelines: SARIF under `analysis-bundle/summary.sarif`, GitLab `ci/gl-code-quality-report.json`, and Bitbucket `ci/bitbucket-code-insights.json`.

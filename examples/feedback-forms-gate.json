@@ -1,0 +1,26 @@
+{
+  "version": "patchline.feedback-forms-gate/v1",
+  "claim": "Patchline ships analytics-free documentation feedback forms that turn reader input into structured local issue templates without any tracking, network calls, or third-party scripts. Each form is defined by a name, a set of labelled fields with required flags, and the issue label it produces; the worker renders a plain-Markdown form plus a structured local issue template that a reader can fill in and paste, with no external assets whatsoever. The gate proves every form renders all its fields, marks required fields, emits a structured template, and contains zero external URLs or analytics references.",
+  "real_repo": "patchline (self): feedback forms rendered as local-only templates",
+  "forms": [
+    {
+      "name": "doc-unclear",
+      "title": "Documentation is unclear",
+      "label": "docs",
+      "fields": [
+        {"label": "Which doc or section?", "required": true},
+        {"label": "What was confusing?", "required": true},
+        {"label": "Suggested wording", "required": false}
+      ]
+    },
+    {
+      "name": "missing-example",
+      "title": "A capability is missing an example",
+      "label": "examples",
+      "fields": [
+        {"label": "Which capability?", "required": true},
+        {"label": "What example would help?", "required": true}
+      ]
+    }
+  ]
+}
