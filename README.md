@@ -209,6 +209,8 @@ Run `make independent-replication-gate` to generate no-credential replication in
 
 Run `make failure-injection-suite-gate` to prove artifact checks fail loudly when refs, caches, or generated evidence drift; see [docs/failure-injection-suite.md](docs/failure-injection-suite.md).
 
+Run `make longitudinal-public-reruns-gate` to rerun public-corpus slices over multiple historical commits per repository and summarize risk/evidence deltas; see [docs/longitudinal-public-reruns.md](docs/longitudinal-public-reruns.md).
+
 Add `--redact` to write `analysis-bundle/` copies with stable redaction tokens for identifiers, literals, customer-like strings, and secret-like values while preserving joins and existing artifact hashes.
 
 Add `--ci` to write `ci/summary.md` plus upload snippets and code-quality artifacts for GitHub Actions, GitLab CI, and Bitbucket Pipelines: SARIF under `analysis-bundle/summary.sarif`, GitLab `ci/gl-code-quality-report.json`, and Bitbucket `ci/bitbucket-code-insights.json`.

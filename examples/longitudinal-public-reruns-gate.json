@@ -1,0 +1,70 @@
+{
+  "version": "patchline.longitudinal-public-reruns-gate/v1",
+  "claim": "Patchline can rerun the same public-corpus slices over multiple historical commits per repository and summarize how files, ranked risks, and evidence counts change across time.",
+  "minimum_repositories": 3,
+  "minimum_commits_per_repository": 2,
+  "minimum_total_runs": 6,
+  "minimum_ranked_risks": 20,
+  "slices": [
+    {
+      "repo": "lobsters/lobsters",
+      "subpath": "db/migrate",
+      "ecosystem": "Ruby",
+      "framework": "Rails Active Record",
+      "commits": [
+        {
+          "ref": "a4cf468a95573f85eac7f99693c8ca6e327599a4",
+          "date": "2026-02-21T19:27:45Z",
+          "label": "revert-sqlite"
+        },
+        {
+          "ref": "e61b565e2644534851d7f2c6a9396c6b1707a74a",
+          "date": "2026-02-19T19:31:23Z",
+          "label": "story-submit-acculturation"
+        }
+      ]
+    },
+    {
+      "repo": "django/django",
+      "subpath": "django/contrib/auth/migrations",
+      "ecosystem": "Python",
+      "framework": "Django migrations",
+      "commits": [
+        {
+          "ref": "097e3a70c1481ee7b042b2edd91b2be86fb7b5b6",
+          "date": "2023-02-01T10:04:38Z",
+          "label": "black-2023-style"
+        },
+        {
+          "ref": "7119f40c9881666b6f9b5cf7df09ee1d21cc8344",
+          "date": "2022-02-07T19:37:05Z",
+          "label": "black-line-length"
+        }
+      ]
+    },
+    {
+      "repo": "apache/airflow",
+      "subpath": "airflow-core/src/airflow/migrations/versions",
+      "ecosystem": "Python",
+      "framework": "Alembic",
+      "commits": [
+        {
+          "ref": "ac6894b358a162443c77b92d45858c21bb67b898",
+          "date": "2026-06-02T11:44:25Z",
+          "label": "task-store-rename"
+        },
+        {
+          "ref": "f72e4c417187335b3124a5cfe0766df32b5d6aba",
+          "date": "2026-05-25T15:59:45Z",
+          "label": "team-trigger-column"
+        }
+      ]
+    }
+  ],
+  "required_outputs": [
+    "longitudinal-reruns.json",
+    "longitudinal-reruns.md",
+    "repository-trends.json",
+    "runs.jsonl"
+  ]
+}
