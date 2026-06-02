@@ -1,0 +1,13 @@
+{
+  "version": "patchline.onboarding-quest-gate/v1",
+  "claim": "Patchline turns adding a new ecosystem into a guided quest a contributor can finish in under one hour. A scaffolder generates the example spec, worker script, gate script, and doc stub following the established gate pattern, and a step-by-step quest walks the contributor from scaffold to a passing real-repo gate. The gate proves the scaffolder emits valid, runnable artifacts and that the quest narrative stays in sync with the required steps.",
+  "demo_ecosystem": "Example Queue",
+  "quest_steps": [
+    "Scaffold the gate files with scripts/new-ecosystem.sh",
+    "Implement the detector in internal/project and emit a fact kind",
+    "Add a unit test with a positive case and a no-false-positive case",
+    "Prove the detector on a real public repository",
+    "Wire a Makefile target and a README mention",
+    "Run the gate and confirm it passes"
+  ]
+}

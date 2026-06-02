@@ -287,6 +287,8 @@ Run `make fixture-minimizer-gate` to **delta-debug** any failing input down to a
 
 Run `make parser-dashboard-gate` to publish an **ecosystem parser quality dashboard** unifying coverage, fuzz robustness, known gaps, and real-repo proofs — every ecosystem carries a real-repository proof and the analyzer survives a malformed-input fuzz corpus with zero crashes; see [docs/parser-dashboard.md](docs/parser-dashboard.md).
 
+Run `make onboarding-quest-gate` to scaffold a new ecosystem gate in minutes — a generator emits valid, runnable starter files and a six-step **onboarding quest** takes a contributor from zero to a passing real-repo gate in under one hour; see [docs/onboarding-quest.md](docs/onboarding-quest.md).
+
 Add `--redact` to write `analysis-bundle/` copies with stable redaction tokens for identifiers, literals, customer-like strings, and secret-like values while preserving joins and existing artifact hashes.
 
 Add `--ci` to write `ci/summary.md` plus upload snippets and code-quality artifacts for GitHub Actions, GitLab CI, and Bitbucket Pipelines: SARIF under `analysis-bundle/summary.sarif`, GitLab `ci/gl-code-quality-report.json`, and Bitbucket `ci/bitbucket-code-insights.json`.
