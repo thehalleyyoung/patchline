@@ -294,6 +294,28 @@ func eventSemantics(eventType string, event map[string]json.RawMessage) (string,
 			return "", "", "", "", nil, fmt.Errorf("%s missing to", eventType)
 		}
 		return eventType + ":" + from + "->" + to, "derived_into", from, to, nil, nil
+	case "incident", "log", "monitor", "slo", "notebook":
+		id, ok := stringField(event, "id")
+		if !ok {
+			return "", "", "", "", nil, fmt.Errorf("%s missing id", eventType)
+		}
+		subject := id
+		for _, field := range []string{"trace", "migration", "deploy", "commit", "service"} {
+			if value, ok := stringField(event, field); ok {
+				subject = value
+				if field == "service" && !strings.HasPrefix(subject, "service:") {
+					subject = "service:" + subject
+				}
+				break
+			}
+		}
+		attrs := map[string]string{"kind": eventType}
+		for _, field := range []string{"name", "title", "status", "message", "query", "service"} {
+			if value, ok := stringField(event, field); ok {
+				attrs[field] = value
+			}
+		}
+		return id, "observed_" + eventType, subject, id, attrs, nil
 	default:
 		return "", "", "", "", nil, fmt.Errorf("unsupported event type %q", eventType)
 	}
@@ -309,7 +331,7 @@ func sourceConfidence(event map[string]json.RawMessage, eventType string) Source
 	switch eventType {
 	case "deploy", "migration", "row_mutation":
 		return SourceExact
-	case "trace", "sql_mutation", "derived_record", "derived_report":
+	case "trace", "sql_mutation", "derived_record", "derived_report", "incident", "log", "monitor", "slo", "notebook":
 		return SourceCausal
 	default:
 		return SourceInferred

@@ -90,6 +90,85 @@ func TestAdaptDatadogSpanAndDeployEvent(t *testing.T) {
 	}
 }
 
+func TestAdaptDatadogOperationalExports(t *testing.T) {
+	input := `{
+	  "events": [{
+	    "id": "dep-1",
+	    "title": "Deployment completed",
+	    "tags": ["service:billing-api", "git.commit.sha:8f3c2ab", "patchline.deploy_id:2026-05-29T12:00Z"]
+	  }],
+	  "incidents": [{
+	    "public_id": "INC-42",
+	    "title": "Billing rows corrupted",
+	    "state": "resolved",
+	    "root_cause": "bad migration",
+	    "tags": ["service:billing-api", "deployment.id:2026-05-29T12:00Z"]
+	  }],
+	  "logs": [{
+	    "id": "log-1",
+	    "message": "rollback started for table invoices",
+	    "status": "error",
+	    "ddsource": "postgres",
+	    "service": "billing-api",
+	    "trace_id": "abc"
+	  }],
+	  "monitors": [{
+	    "id": "mon-1",
+	    "name": "Billing DB error rate",
+	    "type": "query alert",
+	    "query": "sum(last_5m):sum:postgres.errors{service:billing-api} > 0",
+	    "message": "billing database errors",
+	    "tags": ["service:billing-api"]
+	  }],
+	  "slos": [{
+	    "id": "slo-1",
+	    "name": "Billing availability",
+	    "target_threshold": 99.9,
+	    "timeframe": "30d",
+	    "tags": ["service:billing-api"]
+	  }],
+	  "notebooks": [{
+	    "id": "nb-1",
+	    "name": "Billing incident investigation",
+	    "cells": [{"type": "markdown", "content": "incident INC-42 deploy 2026-05-29T12:00Z"}],
+	    "tags": ["service:billing-api"]
+	  }],
+	  "spans": [{
+	    "trace_id": "abc",
+	    "span_id": "def",
+	    "resource": "UPDATE invoices SET total_cents = ?",
+	    "meta": {
+	      "patchline.migration_id": "bad_backfill",
+	      "patchline.deploy_id": "2026-05-29T12:00Z",
+	      "git.commit.sha": "8f3c2ab",
+	      "service": "billing-api",
+	      "db.statement": "UPDATE invoices SET total_cents = ? WHERE status = ?"
+	    }
+	  }]
+	}`
+
+	result, err := AdaptJSON(strings.NewReader(input), "datadog")
+	if err != nil {
+		t.Fatal(err)
+	}
+	counts := map[string]int{}
+	for _, event := range result.Events {
+		counts[event["type"]]++
+	}
+	for _, eventType := range []string{"deploy", "incident", "log", "monitor", "slo", "notebook", "trace", "sql_mutation"} {
+		if counts[eventType] == 0 {
+			t.Fatalf("expected %s event in %#v", eventType, result.Events)
+		}
+	}
+	ingested, err := IngestJSONL(strings.NewReader(eventsJSONL(result.Events)))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !ingested.OK {
+		t.Fatalf("adapted datadog operational evidence should ingest cleanly: %#v events=%#v", ingested.Errors, result.Events)
+	}
+}
+
 func TestAdaptWarnsWhenSQLSpanLacksMigration(t *testing.T) {
 	input := `{"resourceSpans":[{"scopeSpans":[{"spans":[{"traceId":"abc","spanId":"def","attributes":[{"key":"db.statement","value":{"stringValue":"select 1"}}]}]}]}]}`
 	result, err := AdaptJSON(strings.NewReader(input), "otlp")
@@ -185,7 +264,7 @@ func eventsJSONL(events []map[string]string) string {
 	var lines []string
 	for _, event := range events {
 		parts := []string{}
-		for _, key := range []string{"type", "id", "commit", "service", "deploy", "name", "migration", "trace", "fingerprint", "record", "sql"} {
+		for _, key := range []string{"type", "id", "commit", "service", "deploy", "name", "migration", "trace", "fingerprint", "record", "sql", "title", "status", "message", "query"} {
 			if value := event[key]; value != "" {
 				parts = append(parts, `"`+key+`":"`+value+`"`)
 			}

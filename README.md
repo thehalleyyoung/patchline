@@ -379,6 +379,8 @@ go run ./cmd/patchline lint-repair repair.json --json
 go run ./cmd/patchline dry-run repair.json --store store.json --json
 ```
 
+The Datadog-style adapter recognizes deploy events, incidents, traces, logs, monitors, SLOs, and notebooks from exported JSON or exported IaC-shaped JSON without requiring Datadog API access.
+
 ## What deeper checks add
 
 The intake command is the front door. If your tree also contains richer inputs, Patchline can go further:

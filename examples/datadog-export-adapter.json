@@ -1,0 +1,50 @@
+{
+  "version": "patchline.datadog-export-adapter/v1",
+  "claim": "Datadog-style deploy, incident, trace, log, monitor, SLO, and notebook export adapters work without proprietary APIs and are validated against files from public repositories not designed for Patchline.",
+  "minimum_public_repos": 4,
+  "required_event_types": [
+    "deploy",
+    "incident",
+    "trace",
+    "log",
+    "monitor",
+    "slo",
+    "notebook"
+  ],
+  "slices": [
+    {
+      "id": "datadog-provider-monitor-slo",
+      "repo": "DataDog/terraform-provider-datadog",
+      "ref": "850d5b3395b4bc3e4d9ad1508ccdfa8aebd4d038",
+      "paths": [
+        "examples/resources/datadog_monitor/resource.tf",
+        "examples/resources/datadog_service_level_objective/resource.tf"
+      ]
+    },
+    {
+      "id": "awslimitchecker-monitor",
+      "repo": "jantman/awslimitchecker",
+      "ref": "411ad9e734ddb16d87720ff5b994f19f47b8b098",
+      "paths": [
+        "docs/examples/terraform-fargate/datadog_monitor.tf"
+      ]
+    },
+    {
+      "id": "hashicorp-observability-monitor",
+      "repo": "hashicorp/observability-as-code",
+      "ref": "7e0a4cac17d5d020d3341d3f18345b9ac7a90b25",
+      "paths": [
+        "datadog/monitors.tf",
+        "datadog/dashboard-docker.tf.json"
+      ]
+    },
+    {
+      "id": "microsoft-what-the-hack-monitor",
+      "repo": "microsoft/WhatTheHack",
+      "ref": "3565457e064c154886dbcbc39f52d133991603d0",
+      "paths": [
+        "059-DatadogOnAzure/Coach/Solutions/Challenge-01/GenerateMonitors-Solution.tf"
+      ]
+    }
+  ]
+}

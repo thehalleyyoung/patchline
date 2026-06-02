@@ -192,10 +192,65 @@ func (b *builder) applyEvent(lineNo int, eventType string, event map[string]json
 		}
 		b.addEntity(provenance.Entity{ID: to, Kind: kind})
 		b.addEdge(provenance.Edge{From: from, To: to, Kind: provenance.EdgeDerivedInto, Evidence: provenance.EvidenceStrong, Description: "evidence derivation event"})
+	case "incident", "log", "monitor", "slo", "notebook":
+		return b.applyOperationalSignal(eventType, event, line)
 	default:
 		return line("unsupported event type %q", eventType)
 	}
 	return nil
+}
+
+func (b *builder) applyOperationalSignal(eventType string, event map[string]json.RawMessage, line func(string, ...any) error) error {
+	id, ok := stringField(event, "id")
+	if !ok {
+		return line("%s missing id", eventType)
+	}
+	attrs := map[string]string{}
+	for _, field := range []string{"name", "title", "status", "message", "query", "service"} {
+		if value, ok := stringField(event, field); ok {
+			attrs[field] = value
+		}
+	}
+	b.addEntity(provenance.Entity{ID: id, Kind: operationalEntityKind(eventType), Attributes: attrs})
+	if service, ok := stringField(event, "service"); ok {
+		serviceID := "service:" + service
+		b.addEntity(provenance.Entity{ID: serviceID, Kind: provenance.KindService, Name: service})
+		b.addEdge(provenance.Edge{From: serviceID, To: id, Kind: provenance.EdgeObserved, Evidence: provenance.EvidenceMedium, Description: "evidence operational signal"})
+	}
+	for _, link := range []struct {
+		field string
+		kind  provenance.EntityKind
+	}{
+		{"commit", provenance.KindCommit},
+		{"deploy", provenance.KindDeploy},
+		{"migration", provenance.KindMigration},
+		{"trace", provenance.KindTrace},
+	} {
+		value, ok := stringField(event, link.field)
+		if !ok {
+			continue
+		}
+		b.addEntity(provenance.Entity{ID: value, Kind: link.kind})
+		b.addEdge(provenance.Edge{From: value, To: id, Kind: provenance.EdgeObserved, Evidence: provenance.EvidenceMedium, Description: "evidence operational signal"})
+	}
+	return nil
+}
+
+func operationalEntityKind(eventType string) provenance.EntityKind {
+	switch eventType {
+	case "incident":
+		return provenance.KindIncident
+	case "log":
+		return provenance.KindLog
+	case "monitor":
+		return provenance.KindMonitor
+	case "slo":
+		return provenance.KindSLO
+	case "notebook":
+		return provenance.KindNotebook
+	default:
+		return provenance.KindReport
+	}
 }
 
 func (b *builder) addEntity(entity provenance.Entity) {
@@ -253,6 +308,11 @@ func allowedFields(eventType string) map[string]bool {
 		"row_mutation":   {"type", "record", "sql", "before", "after"},
 		"derived_record": {"type", "from", "to"},
 		"derived_report": {"type", "from", "to"},
+		"incident":       {"type", "id", "service", "deploy", "migration", "trace", "commit", "name", "title", "status", "message"},
+		"log":            {"type", "id", "service", "deploy", "migration", "trace", "commit", "name", "title", "status", "message"},
+		"monitor":        {"type", "id", "service", "deploy", "migration", "trace", "commit", "name", "title", "status", "message", "query"},
+		"slo":            {"type", "id", "service", "deploy", "migration", "trace", "commit", "name", "title", "status", "message", "query"},
+		"notebook":       {"type", "id", "service", "deploy", "migration", "trace", "commit", "name", "title", "status", "message", "query"},
 	}
 	allowed := map[string]bool{}
 	for _, field := range append(fields[eventType], commonTraceFields...) {

@@ -52,6 +52,7 @@ func AdaptJSON(reader io.Reader, adapter string) (AdaptResult, error) {
 	if err != nil {
 		return AdaptResult{}, err
 	}
+	result.Events = dedupeEvents(result.Events)
 	sortEvents(result.Events)
 	result.EventCount = len(result.Events)
 	return result, nil
@@ -426,57 +427,39 @@ func adaptDatadog(content []byte) ([]map[string]string, []string, error) {
 	if err := decoder.Decode(&payload); err != nil {
 		return nil, nil, err
 	}
-	var spans []map[string]any
-	var events []map[string]any
-	collectDatadogObjects(payload, &spans, &events)
+	var objects []map[string]any
+	collectObjects(payload, &objects)
 
 	var adapted []map[string]string
 	var warnings []string
-	for _, event := range events {
-		attrs := attrsFromDatadog(event)
-		deployID := firstNonEmpty(attrs["patchline.deploy_id"], attrs["deployment.id"], stringValue(event["id"]))
-		commit := firstNonEmpty(attrs["git.commit.sha"], attrs["git.sha"], attrs["commit"])
-		service := firstNonEmpty(attrs["service"], attrs["service.name"])
-		if deployID == "" || commit == "" || service == "" {
-			continue
+	for _, object := range objects {
+		if event := datadogDeployEvent(object); event != nil {
+			adapted = append(adapted, event)
 		}
-		adapted = append(adapted, map[string]string{
-			"type":    "deploy",
-			"id":      ensurePrefix(deployID, "deploy:"),
-			"commit":  ensurePrefix(commit, "commit:"),
-			"service": service,
-			"source":  "datadog",
-		})
+		if isDatadogSpan(object) {
+			attrs := attrsFromDatadog(object)
+			traceID := firstNonEmpty(stringValue(object["trace_id"]), stringValue(object["traceId"]), attrs["trace_id"])
+			spanID := firstNonEmpty(stringValue(object["span_id"]), stringValue(object["spanId"]), attrs["span_id"])
+			name := firstNonEmpty(stringValue(object["name"]), stringValue(object["resource"]))
+			spanEvents, spanWarnings := adaptTraceSpan("datadog", traceID, spanID, name, attrs)
+			adapted = append(adapted, spanEvents...)
+			warnings = append(warnings, spanWarnings...)
+		}
+		if event := datadogOperationalEvent(object); event != nil {
+			adapted = append(adapted, event)
+		}
+		if rawDashboard, ok := object["dashboard"]; ok {
+			if nested := parseEmbeddedJSONObject(stringValue(rawDashboard)); nested != nil {
+				if event := datadogOperationalEvent(nested); event != nil {
+					adapted = append(adapted, event)
+				}
+			}
+		}
 	}
-	for _, span := range spans {
-		attrs := attrsFromDatadog(span)
-		traceID := firstNonEmpty(stringValue(span["trace_id"]), stringValue(span["traceId"]), attrs["trace_id"])
-		spanID := firstNonEmpty(stringValue(span["span_id"]), stringValue(span["spanId"]), attrs["span_id"])
-		name := firstNonEmpty(stringValue(span["name"]), stringValue(span["resource"]))
-		spanEvents, spanWarnings := adaptTraceSpan("datadog", traceID, spanID, name, attrs)
-		adapted = append(adapted, spanEvents...)
-		warnings = append(warnings, spanWarnings...)
+	if len(adapted) == 0 {
+		warnings = append(warnings, "datadog export contained no deploy, incident, trace, log, monitor, SLO, or notebook objects")
 	}
 	return adapted, warnings, nil
-}
-
-func collectDatadogObjects(value any, spans, events *[]map[string]any) {
-	switch typed := value.(type) {
-	case []any:
-		for _, item := range typed {
-			collectDatadogObjects(item, spans, events)
-		}
-	case map[string]any:
-		if isDatadogSpan(typed) {
-			*spans = append(*spans, typed)
-		}
-		if isDatadogEvent(typed) {
-			*events = append(*events, typed)
-		}
-		for _, item := range typed {
-			collectDatadogObjects(item, spans, events)
-		}
-	}
 }
 
 func isDatadogSpan(value map[string]any) bool {
@@ -494,10 +477,139 @@ func isDatadogEvent(value map[string]any) bool {
 	return hasTags && (hasTitle || hasText)
 }
 
+func datadogDeployEvent(value map[string]any) map[string]string {
+	if !isDatadogEvent(value) {
+		return nil
+	}
+	attrs := attrsFromDatadog(value)
+	deployID := firstNonEmpty(attrs["patchline.deploy_id"], attrs["deployment.id"], stringValue(value["id"]))
+	commit := firstNonEmpty(attrs["git.commit.sha"], attrs["git.sha"], attrs["commit"], attrs["revision"])
+	service := firstNonEmpty(attrs["service"], attrs["service.name"])
+	title := strings.ToLower(firstNonEmpty(stringValue(value["title"]), stringValue(value["text"]), attrs["event_type"], attrs["source"]))
+	if !strings.Contains(title, "deploy") && !strings.Contains(title, "release") && attrs["deployment.id"] == "" && attrs["patchline.deploy_id"] == "" {
+		return nil
+	}
+	if deployID == "" || commit == "" || service == "" {
+		return nil
+	}
+	return map[string]string{
+		"type":    "deploy",
+		"id":      ensurePrefix(deployID, "deploy:"),
+		"commit":  ensurePrefix(commit, "commit:"),
+		"service": service,
+		"source":  "datadog",
+	}
+}
+
+func datadogOperationalEvent(value map[string]any) map[string]string {
+	attrs := attrsFromDatadog(value)
+	eventType := classifyDatadogOperationalKind(value, attrs)
+	if eventType == "" {
+		return nil
+	}
+	id := firstNonEmpty(stringValue(value["id"]), stringValue(value["public_id"]), attrs["id"], attrs[eventType+".id"], attrs["resource_name"], stringValue(value["name"]), stringValue(value["title"]))
+	if id == "" {
+		id = canonical.Hash(value)[:16]
+	}
+	event := map[string]string{
+		"type":   eventType,
+		"id":     ensurePrefix(cleanID(id), eventType+":datadog/"),
+		"source": "datadog",
+	}
+	for _, pair := range []struct {
+		field  string
+		values []string
+	}{
+		{"service", []string{attrs["service"], attrs["service.name"], attrs["service_name"]}},
+		{"deploy", []string{attrs["patchline.deploy_id"], attrs["deployment.id"], attrs["deploy_id"]}},
+		{"migration", []string{attrs["patchline.migration_id"], attrs["db.migration.id"], attrs["migration.id"]}},
+		{"trace", []string{attrs["trace_id"], attrs["traceId"], attrs["dd.trace_id"]}},
+		{"commit", []string{attrs["git.commit.sha"], attrs["git.sha"], attrs["commit"], attrs["revision"]}},
+		{"name", []string{stringValue(value["name"]), attrs["name"], stringValue(value["resource_name"])}},
+		{"title", []string{stringValue(value["title"])}},
+		{"status", []string{stringValue(value["status"]), stringValue(value["state"])}},
+		{"message", []string{stringValue(value["message"]), stringValue(value["text"])}},
+		{"query", []string{stringValue(value["query"]), attrs["query"]}},
+	} {
+		if found := firstNonEmpty(pair.values...); found != "" {
+			event[pair.field] = normalizeDatadogEventField(pair.field, found)
+		}
+	}
+	return event
+}
+
+func classifyDatadogOperationalKind(value map[string]any, attrs map[string]string) string {
+	lower := strings.ToLower(strings.Join([]string{
+		stringValue(value["type"]),
+		stringValue(value["source"]),
+		stringValue(value["kind"]),
+		stringValue(value["resource_type"]),
+		stringValue(value["urn"]),
+		stringValue(value["title"]),
+		stringValue(value["name"]),
+		stringValue(value["message"]),
+		attrs["resource_type"],
+		attrs["event_type"],
+		attrs["status"],
+	}, " "))
+	switch {
+	case strings.Contains(lower, "notebook") || value["cells"] != nil:
+		return "notebook"
+	case strings.Contains(lower, "incident") || value["customer_impact"] != nil || value["root_cause"] != nil:
+		return "incident"
+	case strings.Contains(lower, "service_level_objective") || strings.Contains(lower, "slo") || value["target_threshold"] != nil || value["timeframe"] != nil:
+		return "slo"
+	case strings.Contains(lower, "monitor") || (value["query"] != nil && (value["message"] != nil || value["options"] != nil)):
+		return "monitor"
+	case strings.Contains(lower, "log") || value["ddsource"] != nil || value["hostname"] != nil || (value["message"] != nil && (value["status"] != nil || value["trace_id"] != nil)):
+		return "log"
+	default:
+		return ""
+	}
+}
+
+func normalizeDatadogEventField(field, value string) string {
+	switch field {
+	case "deploy":
+		return ensurePrefix(value, "deploy:")
+	case "migration":
+		return ensurePrefix(value, "migration:")
+	case "trace":
+		return ensurePrefix(value, "trace:")
+	case "commit":
+		return ensurePrefix(value, "commit:")
+	default:
+		return value
+	}
+}
+
+func parseEmbeddedJSONObject(value string) map[string]any {
+	value = strings.TrimSpace(value)
+	if !strings.HasPrefix(value, "{") {
+		return nil
+	}
+	var object map[string]any
+	decoder := json.NewDecoder(strings.NewReader(value))
+	decoder.UseNumber()
+	if err := decoder.Decode(&object); err != nil {
+		return nil
+	}
+	return object
+}
+
 func attrsFromDatadog(value map[string]any) map[string]string {
 	attrs := map[string]string{}
-	for _, field := range []string{"meta", "metrics"} {
+	for _, field := range []string{"meta", "metrics", "attributes", "properties", "context"} {
 		if nested, ok := value[field].(map[string]any); ok {
+			for key, raw := range nested {
+				if text := stringValue(raw); text != "" {
+					attrs[key] = text
+				}
+			}
+		}
+	}
+	if data, ok := value["data"].(map[string]any); ok {
+		if nested, ok := data["attributes"].(map[string]any); ok {
 			for key, raw := range nested {
 				if text := stringValue(raw); text != "" {
 					attrs[key] = text
@@ -659,4 +771,18 @@ func sortEvents(events []map[string]string) {
 		right := events[j]["type"] + "\x00" + events[j]["id"] + "\x00" + events[j]["record"] + "\x00" + events[j]["sql"]
 		return left < right
 	})
+}
+
+func dedupeEvents(events []map[string]string) []map[string]string {
+	seen := map[string]bool{}
+	out := make([]map[string]string, 0, len(events))
+	for _, event := range events {
+		key := canonical.Hash(event)
+		if seen[key] {
+			continue
+		}
+		seen[key] = true
+		out = append(out, event)
+	}
+	return out
 }

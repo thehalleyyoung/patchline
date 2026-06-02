@@ -857,6 +857,21 @@ func classifyKeyValueSignal(key string, value any, signals map[string]int) {
 	if strings.Contains(lower, "trace") || strings.Contains(lower, "span") {
 		signals["trace_fields"]++
 	}
+	if strings.Contains(lower, "incident") {
+		signals["incident_fields"]++
+	}
+	if strings.Contains(lower, "log") || strings.Contains(lower, "message") {
+		signals["log_fields"]++
+	}
+	if strings.Contains(lower, "monitor") || strings.Contains(text, "datadog_monitor") {
+		signals["monitor_fields"]++
+	}
+	if strings.Contains(lower, "slo") || strings.Contains(lower, "service_level_objective") || strings.Contains(lower, "target_threshold") {
+		signals["slo_fields"]++
+	}
+	if strings.Contains(lower, "notebook") {
+		signals["notebook_fields"]++
+	}
 	if strings.Contains(lower, "deploy") || strings.Contains(lower, "release") {
 		signals["deploy_fields"]++
 	}
