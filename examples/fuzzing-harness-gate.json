@@ -1,0 +1,32 @@
+{
+  "version": "patchline.fuzzing-harness-gate/v1",
+  "claim": "Patchline includes a fuzzing harness that mutates migrations at random and asserts two invariants on every mutant: the analyzer never crashes, and it never unsoundly passes a migration that drops or nulls a still-referenced column. The worker tallies crashes and unsound passes across the mutant corpus and computes the survival rate. The gate proves zero crashes and zero unsound passes across all mutants, and that a deliberately planted unsound pass is detected by the same invariant check.",
+  "real_repo": "patchline (self): fuzzing-harness",
+  "mutants": [
+    {
+      "id": "m1",
+      "crashed": false,
+      "unsound_pass": false
+    },
+    {
+      "id": "m2",
+      "crashed": false,
+      "unsound_pass": false
+    },
+    {
+      "id": "m3",
+      "crashed": false,
+      "unsound_pass": false
+    },
+    {
+      "id": "m4",
+      "crashed": false,
+      "unsound_pass": false
+    }
+  ],
+  "planted_unsound": {
+    "id": "planted",
+    "crashed": false,
+    "unsound_pass": true
+  }
+}

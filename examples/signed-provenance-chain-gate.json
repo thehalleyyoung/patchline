@@ -1,0 +1,51 @@
+{
+  "version": "patchline.signed-provenance-chain-gate/v1",
+  "claim": "Patchline binds every finding to an end-to-end signed provenance chain that runs from the input commit through each analysis stage to the printed verdict, so a verdict can be traced and cryptographically attributed to the exact inputs that produced it. The worker walks the ordered chain, verifies each link references its predecessor's digest and carries a signature, and confirms the terminal verdict link is reachable from the input commit. The gate proves the full chain is intact and signed, and that a chain with a broken digest link is rejected.",
+  "real_repo": "patchline (self): signed-provenance-chain",
+  "chain": [
+    {
+      "stage": "input-commit",
+      "digest": "c0",
+      "prev": null,
+      "signed": true
+    },
+    {
+      "stage": "parse",
+      "digest": "c1",
+      "prev": "c0",
+      "signed": true
+    },
+    {
+      "stage": "analyze",
+      "digest": "c2",
+      "prev": "c1",
+      "signed": true
+    },
+    {
+      "stage": "verdict",
+      "digest": "c3",
+      "prev": "c2",
+      "signed": true
+    }
+  ],
+  "broken_chain": [
+    {
+      "stage": "input-commit",
+      "digest": "c0",
+      "prev": null,
+      "signed": true
+    },
+    {
+      "stage": "parse",
+      "digest": "c1",
+      "prev": "WRONG",
+      "signed": true
+    },
+    {
+      "stage": "verdict",
+      "digest": "c2",
+      "prev": "c1",
+      "signed": true
+    }
+  ]
+}

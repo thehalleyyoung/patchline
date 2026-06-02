@@ -1,0 +1,20 @@
+{
+  "version": "patchline.reproducible-build-attestation-gate/v1",
+  "claim": "Patchline emits a deterministic build attestation for the whole toolchain: building the analyzer container twice from the same pinned sources yields byte-identical output digests, and the attestation records those digests so any consumer can confirm reproducibility. The worker compares the two recorded build digests, verifies the source and toolchain are pinned, and reports whether the build is bit-reproducible. The gate proves the two builds match and that a nondeterministic build whose digests differ is flagged.",
+  "real_repo": "patchline (self): reproducible-build-attestation",
+  "build_a": {
+    "source_pin": "sha:src1",
+    "toolchain_pin": "go1.22.0",
+    "digest": "img:abc"
+  },
+  "build_b": {
+    "source_pin": "sha:src1",
+    "toolchain_pin": "go1.22.0",
+    "digest": "img:abc"
+  },
+  "nondeterministic_b": {
+    "source_pin": "sha:src1",
+    "toolchain_pin": "go1.22.0",
+    "digest": "img:xyz"
+  }
+}

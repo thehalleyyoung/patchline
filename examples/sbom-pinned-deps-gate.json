@@ -1,0 +1,31 @@
+{
+  "version": "patchline.sbom-pinned-deps-gate/v1",
+  "claim": "Patchline publishes a supply-chain SBOM in which every dependency is pinned to an exact version and a content hash, so an installed tree can be verified against the bill of materials before any analysis runs. The worker checks that each SBOM component has both a pinned version and a hash, and recomputes whether the installed digests match the SBOM. The gate proves every component is pinned and verified, and that a component whose installed hash diverges from the SBOM is flagged.",
+  "real_repo": "patchline (self): sbom-pinned-deps",
+  "components": [
+    {
+      "name": "jq",
+      "version": "1.7.1",
+      "hash": "h-jq",
+      "installed_hash": "h-jq"
+    },
+    {
+      "name": "go",
+      "version": "1.22.0",
+      "hash": "h-go",
+      "installed_hash": "h-go"
+    },
+    {
+      "name": "bash",
+      "version": "5.2.21",
+      "hash": "h-bash",
+      "installed_hash": "h-bash"
+    }
+  ],
+  "compromised": {
+    "name": "jq",
+    "version": "1.7.1",
+    "hash": "h-jq",
+    "installed_hash": "h-EVIL"
+  }
+}

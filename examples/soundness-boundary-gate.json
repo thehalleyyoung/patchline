@@ -1,0 +1,43 @@
+{
+  "version": "patchline.soundness-boundary-gate/v1",
+  "claim": "Patchline ships an explicit soundness-boundary specification enumerating exactly which hazard classes it guarantees to catch, which it best-effort detects, and which are out of scope, so no user mistakes a silent gap for a guarantee. The worker checks that every hazard class carries an explicit guarantee level and that each guaranteed class is backed by at least one gate. The gate proves the boundary is total over the declared hazard classes and that a guaranteed class with no backing gate is rejected.",
+  "real_repo": "patchline (self): soundness-boundary",
+  "classes": [
+    {
+      "hazard": "drop-referenced-column",
+      "level": "guaranteed",
+      "backing_gates": [
+        "dead-column-gate"
+      ]
+    },
+    {
+      "hazard": "notnull-without-backfill",
+      "level": "guaranteed",
+      "backing_gates": [
+        "backfill-completeness-gate"
+      ]
+    },
+    {
+      "hazard": "rename-without-shim",
+      "level": "guaranteed",
+      "backing_gates": [
+        "column-lineage-gate"
+      ]
+    },
+    {
+      "hazard": "semantic-data-corruption",
+      "level": "best-effort",
+      "backing_gates": []
+    },
+    {
+      "hazard": "app-level-race",
+      "level": "out-of-scope",
+      "backing_gates": []
+    }
+  ],
+  "ungated_guarantee": {
+    "hazard": "phantom",
+    "level": "guaranteed",
+    "backing_gates": []
+  }
+}

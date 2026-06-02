@@ -1,0 +1,31 @@
+{
+  "version": "patchline.red-team-adversarial-gate/v1",
+  "claim": "Patchline maintains a red-team suite of adversarial migrations hand-crafted to evade each analysis \u2014 obfuscated drops, indirected backfills, and split hazards \u2014 and asserts the analyzer still flags every one. The worker scores each adversarial case against its intended-detection label, computes the evasion rate, and confirms a clearly benign control is not falsely flagged. The gate proves zero successful evasions across the suite and that the benign control stays clean.",
+  "real_repo": "patchline (self): red-team-adversarial",
+  "adversarial": [
+    {
+      "id": "obfuscated-drop",
+      "evaded": false
+    },
+    {
+      "id": "indirect-backfill-missing",
+      "evaded": false
+    },
+    {
+      "id": "split-hazard-across-files",
+      "evaded": false
+    },
+    {
+      "id": "aliased-notnull",
+      "evaded": false
+    },
+    {
+      "id": "comment-hidden-rename",
+      "evaded": false
+    }
+  ],
+  "benign_control": {
+    "id": "add-nullable-column",
+    "flagged": false
+  }
+}

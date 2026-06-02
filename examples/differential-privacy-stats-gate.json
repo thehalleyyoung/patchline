@@ -1,0 +1,10 @@
+{
+  "version": "patchline.differential-privacy-stats-gate/v1",
+  "claim": "Patchline can share aggregate corpus statistics under differential privacy by adding calibrated noise sized to the query sensitivity and a chosen epsilon, so published aggregates cannot be reverse-engineered to a single repository. The worker computes the Laplace noise scale as sensitivity over epsilon, verifies the released value stays within a sane bound of the true aggregate, and confirms the per-record privacy budget is positive and bounded. The gate proves the noise scale matches the sensitivity/epsilon relation and that a zero-epsilon (no-privacy) request is rejected.",
+  "real_repo": "patchline (self): differential-privacy-stats",
+  "true_count": 1000,
+  "sensitivity": 1,
+  "epsilon": 0.5,
+  "released_count": 1002,
+  "bad_epsilon": 0
+}

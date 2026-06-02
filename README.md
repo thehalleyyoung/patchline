@@ -448,6 +448,16 @@ Run `make perturbation-robustness-gate` for a **robustness** suite — semantic-
 Run `make historical-replay-study-gate` for a **longitudinal** replay of historical migrations against known post-merge incidents — Patchline flags every incident-causing migration and clears the ones that shipped safely; see [docs/historical-replay-study.md](docs/historical-replay-study.md).
 
 Run `make external-replication-kit-gate` for an **external-replication** kit — every paper number maps to a one-command recomputation whose value matches the manifest, and a tampered expected value is caught; see [docs/external-replication-kit.md](docs/external-replication-kit.md).
+Run `make signed-provenance-chain-gate` for an end-to-end signed **provenance** chain from input commit to printed verdict, where a broken digest link is rejected; see [docs/signed-provenance-chain.md](docs/signed-provenance-chain.md).
+Run `make reproducible-build-attestation-gate` for a deterministic build **attestation** proving two pinned builds are byte-identical while a nondeterministic build is flagged; see [docs/reproducible-build-attestation.md](docs/reproducible-build-attestation.md).
+Run `make merkle-audit-log-gate` for a **tamper-evident** Merkle-chained audit log over every gate run, where an edited past entry is detected; see [docs/merkle-audit-log.md](docs/merkle-audit-log.md).
+Run `make secret-leak-scanner-gate` for a **zero-tolerance** secret-leak scan over all generated artifacts, where a seeded API key is caught; see [docs/secret-leak-scanner.md](docs/secret-leak-scanner.md).
+Run `make sbom-pinned-deps-gate` for a **supply-chain** SBOM with pinned, hash-verified dependencies where a compromised installed hash is flagged; see [docs/sbom-pinned-deps.md](docs/sbom-pinned-deps.md).
+Run `make differential-privacy-stats-gate` to share aggregate corpus stats under **differential privacy**, where the Laplace noise scale matches sensitivity/epsilon and a zero-epsilon request is rejected; see [docs/differential-privacy-stats.md](docs/differential-privacy-stats.md).
+Run `make red-team-adversarial-gate` for a red-team suite of **adversarial** migrations crafted to evade analysis, asserting zero successful evasions and a clean benign control; see [docs/red-team-adversarial.md](docs/red-team-adversarial.md).
+Run `make fuzzing-harness-gate` for a **fuzzing** harness that mutates migrations and asserts no crash and no unsound pass, with a planted unsound pass detected; see [docs/fuzzing-harness.md](docs/fuzzing-harness.md).
+Run `make soundness-boundary-gate` for an explicit **soundness boundary** where every guaranteed hazard class is backed by a gate and an unbacked guarantee is rejected; see [docs/soundness-boundary.md](docs/soundness-boundary.md).
+Run `make security-threat-model-gate` for a security **threat model** where every threat has a present mitigation and an unmitigated threat is flagged; see [docs/security-threat-model.md](docs/security-threat-model.md).
 
 Add `--redact` to write `analysis-bundle/` copies with stable redaction tokens for identifiers, literals, customer-like strings, and secret-like values while preserving joins and existing artifact hashes.
 

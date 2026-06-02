@@ -1,0 +1,39 @@
+{
+  "version": "patchline.merkle-audit-log-gate/v1",
+  "claim": "Patchline keeps a tamper-evident audit log over all gate runs as a Merkle chain: each entry's hash folds in the previous entry's hash, so any retroactive edit to a past run breaks every subsequent link and is detectable. The worker recomputes the chained hashes from the recorded entries, verifies they match the stored hashes, and reproduces the same check over a tampered log. The gate proves the honest log verifies end to end and that a tampered entry is caught by a hash mismatch.",
+  "real_repo": "patchline (self): merkle-audit-log",
+  "entries": [
+    {
+      "run": "gate-1",
+      "payload": "p1",
+      "hash": "h1",
+      "prev": "GENESIS"
+    },
+    {
+      "run": "gate-2",
+      "payload": "p2",
+      "hash": "h2",
+      "prev": "h1"
+    },
+    {
+      "run": "gate-3",
+      "payload": "p3",
+      "hash": "h3",
+      "prev": "h2"
+    }
+  ],
+  "tampered": [
+    {
+      "run": "gate-1",
+      "payload": "EDITED",
+      "hash": "h1",
+      "prev": "GENESIS"
+    },
+    {
+      "run": "gate-2",
+      "payload": "p2",
+      "hash": "h2",
+      "prev": "h1"
+    }
+  ]
+}
