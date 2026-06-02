@@ -93,6 +93,8 @@ Run `make redaction-stability-gate` to prove redacted bundles, SARIF, prompts, a
 
 Run `make supply-chain-provenance-gate` to prove binaries, release archives, generated experiment artifacts, and public corpus downloads carry deterministic provenance; see [docs/supply-chain-provenance.md](docs/supply-chain-provenance.md).
 
+Run `make release-checksum-gate` to prove release archives get sorted SHA-256 checksums, signed attestations, and reproducible build instructions; see [docs/release-checksums.md](docs/release-checksums.md).
+
 Add `--redact` to write `analysis-bundle/` copies with stable redaction tokens for identifiers, literals, customer-like strings, and secret-like values while preserving joins and existing artifact hashes.
 
 Add `--ci` to write `ci/summary.md` plus upload snippets and code-quality artifacts for GitHub Actions, GitLab CI, and Bitbucket Pipelines: SARIF under `analysis-bundle/summary.sarif`, GitLab `ci/gl-code-quality-report.json`, and Bitbucket `ci/bitbucket-code-insights.json`.
@@ -196,6 +198,7 @@ make secret-scan-gate
 make prompt-context-gate
 make redaction-stability-gate
 make supply-chain-provenance-gate
+make release-checksum-gate
 make minimizer-gate
 make recurrence-gate
 make corpus-release-gate

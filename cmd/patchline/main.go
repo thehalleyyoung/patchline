@@ -228,6 +228,11 @@ func run(args []string) error {
 			return errors.New("usage: patchline supply-chain provenance --artifact kind=path [--subject subject] [--source ref] [--command command] [--out provenance.json] [--json]")
 		}
 		return supplyChainProvenance(args[2:], hasFlag(args[2:], "--json"))
+	case "release":
+		if len(args) < 2 || args[1] != "checksums" {
+			return errors.New("usage: patchline release checksums --artifact path [--subject subject] --seed-hex seed --out dir [--json]")
+		}
+		return releaseChecksums(args[2:], hasFlag(args[2:], "--json"))
 	case "generate-sql":
 		if len(args) < 2 {
 			return errors.New("usage: patchline generate-sql <manifest.json> [--json]")
@@ -9520,6 +9525,160 @@ func currentGitCommit() string {
 		return ""
 	}
 	return strings.TrimSpace(string(output))
+}
+
+type releaseChecksumReport struct {
+	Version           string                  `json:"version"`
+	Subject           string                  `json:"subject"`
+	Artifacts         []releaseChecksumEntry  `json:"artifacts"`
+	ChecksumsPath     string                  `json:"checksums_path"`
+	AttestationPath   string                  `json:"attestation_path"`
+	SignatureVerified bool                    `json:"signature_verified"`
+	Attestation       attest.Signed           `json:"attestation"`
+	ReproducibleBuild releaseReproducibleInfo `json:"reproducible_build"`
+	ReportHash        string                  `json:"report_hash"`
+}
+
+type releaseChecksumEntry struct {
+	Path   string `json:"path"`
+	SHA256 string `json:"sha256"`
+	Bytes  int64  `json:"bytes"`
+}
+
+type releaseReproducibleInfo struct {
+	GOFLAGS     string   `json:"goflags"`
+	CGOEnabled  string   `json:"cgo_enabled"`
+	Ldflags     string   `json:"ldflags"`
+	Environment []string `json:"environment"`
+	Command     string   `json:"command"`
+}
+
+func releaseChecksums(args []string, jsonOut bool) error {
+	fs := flag.NewFlagSet("release checksums", flag.ContinueOnError)
+	fs.SetOutput(io.Discard)
+	subject := fs.String("subject", "patchline-release", "release subject")
+	seedValue := fs.String("seed-hex", "", "ed25519 seed hex for signing")
+	outDir := fs.String("out", "", "output directory")
+	fs.Bool("json", false, "emit JSON")
+	var artifacts repeatFlag
+	fs.Var(&artifacts, "artifact", "release artifact path; repeatable")
+	if err := fs.Parse(args); err != nil {
+		return err
+	}
+	if len(artifacts) == 0 {
+		return errors.New("release checksums requires at least one --artifact")
+	}
+	if *seedValue == "" {
+		return errors.New("release checksums requires --seed-hex")
+	}
+	if *outDir == "" {
+		return errors.New("release checksums requires --out")
+	}
+	seed, err := attest.SeedFromHex(*seedValue)
+	if err != nil {
+		return err
+	}
+	if err := os.MkdirAll(*outDir, 0o755); err != nil {
+		return err
+	}
+	var entries []releaseChecksumEntry
+	for _, path := range sortedNonEmptyStrings(artifacts) {
+		info, err := os.Stat(path)
+		if err != nil {
+			return err
+		}
+		if info.IsDir() {
+			return fmt.Errorf("release artifact must be a file, got directory: %s", path)
+		}
+		hash, err := fileSHA256(path)
+		if err != nil {
+			return err
+		}
+		entries = append(entries, releaseChecksumEntry{Path: filepath.ToSlash(path), SHA256: "sha256:" + hash, Bytes: info.Size()})
+	}
+	sort.Slice(entries, func(i, j int) bool { return entries[i].Path < entries[j].Path })
+	var b strings.Builder
+	for _, entry := range entries {
+		fmt.Fprintf(&b, "%s  %s\n", strings.TrimPrefix(entry.SHA256, "sha256:"), entry.Path)
+	}
+	checksumsPath := filepath.Join(*outDir, "checksums.sha256")
+	if err := os.WriteFile(checksumsPath, []byte(b.String()), 0o644); err != nil {
+		return err
+	}
+	statement, err := attest.Sign(*subject, []byte(b.String()), seed)
+	if err != nil {
+		return err
+	}
+	attestationPath := filepath.Join(*outDir, "checksums.attestation.json")
+	attestationFile, err := os.Create(attestationPath)
+	if err != nil {
+		return err
+	}
+	if err := writeJSON(attestationFile, statement); err != nil {
+		attestationFile.Close()
+		return err
+	}
+	if err := attestationFile.Close(); err != nil {
+		return err
+	}
+	verifyErr := attest.VerifySignature(statement, []byte(b.String()))
+	report := releaseChecksumReport{
+		Version:           "patchline.release-checksums/v1",
+		Subject:           *subject,
+		Artifacts:         entries,
+		ChecksumsPath:     filepath.ToSlash(checksumsPath),
+		AttestationPath:   filepath.ToSlash(attestationPath),
+		SignatureVerified: verifyErr == nil,
+		Attestation:       statement,
+		ReproducibleBuild: releaseReproducibleInfo{
+			GOFLAGS:    "-trimpath -buildvcs=false",
+			CGOEnabled: "0",
+			Ldflags:    "-buildid=",
+			Environment: []string{
+				"CGO_ENABLED=0",
+				"GOFLAGS=-trimpath -buildvcs=false",
+				"SOURCE_DATE_EPOCH=<release commit timestamp>",
+			},
+			Command: "CGO_ENABLED=0 GOFLAGS='-trimpath -buildvcs=false' go build -ldflags '-buildid=' -o bin/patchline ./cmd/patchline",
+		},
+	}
+	report.ReportHash = canonical.Hash(struct {
+		Version           string                  `json:"version"`
+		Subject           string                  `json:"subject"`
+		Artifacts         []releaseChecksumEntry  `json:"artifacts"`
+		ChecksumsHash     string                  `json:"checksums_hash"`
+		AttestationHash   string                  `json:"attestation_hash"`
+		SignatureVerified bool                    `json:"signature_verified"`
+		ReproducibleBuild releaseReproducibleInfo `json:"reproducible_build"`
+	}{
+		Version:           report.Version,
+		Subject:           report.Subject,
+		Artifacts:         report.Artifacts,
+		ChecksumsHash:     statement.ArtifactHash,
+		AttestationHash:   canonical.Hash(statement),
+		SignatureVerified: report.SignatureVerified,
+		ReproducibleBuild: report.ReproducibleBuild,
+	})
+	reportPath := filepath.Join(*outDir, "release-checksums.json")
+	reportFile, err := os.Create(reportPath)
+	if err != nil {
+		return err
+	}
+	if err := writeJSON(reportFile, report); err != nil {
+		reportFile.Close()
+		return err
+	}
+	if err := reportFile.Close(); err != nil {
+		return err
+	}
+	if verifyErr != nil {
+		return verifyErr
+	}
+	if jsonOut {
+		return writeJSON(os.Stdout, report)
+	}
+	fmt.Printf("release checksums wrote %s artifacts=%d verified=%t\n", reportPath, len(entries), report.SignatureVerified)
+	return nil
 }
 
 func generateSQL(path string, jsonOut bool) error {

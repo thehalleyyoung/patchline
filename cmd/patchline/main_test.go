@@ -12,6 +12,7 @@ import (
 	"testing"
 
 	"github.com/thehalleyyoung/patchline/internal/artifact"
+	"github.com/thehalleyyoung/patchline/internal/attest"
 	"github.com/thehalleyyoung/patchline/internal/evidence"
 	"github.com/thehalleyyoung/patchline/internal/intake"
 	"github.com/thehalleyyoung/patchline/internal/project"
@@ -302,6 +303,47 @@ func TestSupplyChainProvenanceCommandCoversRequiredArtifactKinds(t *testing.T) {
 		if !strings.HasPrefix(artifact.SHA256, "sha256:") || artifact.Bytes <= 0 || artifact.Files <= 0 {
 			t.Fatalf("artifact missing digest metadata: %#v", artifact)
 		}
+	}
+}
+
+func TestReleaseChecksumsSignsSortedArtifacts(t *testing.T) {
+	root := t.TempDir()
+	writeMainTestFile(t, root, "dist/patchline-darwin-arm64.tar.gz", "darwin archive\n")
+	writeMainTestFile(t, root, "dist/patchline-linux-amd64.tar.gz", "linux archive\n")
+	seed, err := attest.GenerateSeed()
+	if err != nil {
+		t.Fatal(err)
+	}
+	out := filepath.Join(root, "release")
+	if err := run([]string{
+		"release", "checksums",
+		"--subject", "patchline-test-release",
+		"--seed-hex", attest.SeedHex(seed),
+		"--artifact", filepath.Join(root, "dist/patchline-linux-amd64.tar.gz"),
+		"--artifact", filepath.Join(root, "dist/patchline-darwin-arm64.tar.gz"),
+		"--out", out,
+		"--json",
+	}); err != nil {
+		t.Fatalf("release checksums failed: %v", err)
+	}
+	var report releaseChecksumReport
+	readMainTestJSON(t, filepath.Join(out, "release-checksums.json"), &report)
+	if report.Version != "patchline.release-checksums/v1" || !report.SignatureVerified || len(report.Artifacts) != 2 || report.ReportHash == "" {
+		t.Fatalf("unexpected release checksum report: %#v", report)
+	}
+	if !strings.Contains(report.ReproducibleBuild.Command, "-trimpath") || !strings.Contains(report.ReproducibleBuild.Ldflags, "-buildid=") {
+		t.Fatalf("expected reproducible build instructions in report: %#v", report.ReproducibleBuild)
+	}
+	checksums, err := os.ReadFile(filepath.Join(out, "checksums.sha256"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	lines := strings.Split(strings.TrimSpace(string(checksums)), "\n")
+	if len(lines) != 2 || !strings.Contains(lines[0], "darwin-arm64") || !strings.Contains(lines[1], "linux-amd64") {
+		t.Fatalf("expected sorted checksum lines, got %q", string(checksums))
+	}
+	if err := run([]string{"verify-artifact", filepath.Join(out, "checksums.attestation.json"), "--artifact", filepath.Join(out, "checksums.sha256"), "--json"}); err != nil {
+		t.Fatalf("release checksum attestation did not verify: %v", err)
 	}
 }
 

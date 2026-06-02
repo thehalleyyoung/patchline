@@ -1,0 +1,10 @@
+{
+  "version": "patchline.release-checksum-gate/v1",
+  "claim": "Patchline produces signed release checksums and documents reproducible build flags for release binaries and archives.",
+  "real_code": {
+    "repo": "lobsters/lobsters",
+    "ref": "3b80b47aa5aaba37ec44413e7d1dc96fcf1585b6",
+    "subpath": "db/migrate"
+  },
+  "minimum_release_artifacts": 3
+}
