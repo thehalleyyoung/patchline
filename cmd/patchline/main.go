@@ -22,6 +22,7 @@ import (
 	"github.com/thehalleyyoung/patchline/internal/bench"
 	"github.com/thehalleyyoung/patchline/internal/bundle"
 	"github.com/thehalleyyoung/patchline/internal/canonical"
+	"github.com/thehalleyyoung/patchline/internal/dbdryrun"
 	"github.com/thehalleyyoung/patchline/internal/demo"
 	"github.com/thehalleyyoung/patchline/internal/effects"
 	"github.com/thehalleyyoung/patchline/internal/evidence"
@@ -266,6 +267,11 @@ func run(args []string) error {
 			return errors.New("usage: patchline dry-run <manifest.json> [--store store.json] [--json]")
 		}
 		return dryRun(args[1], args[2:], hasFlag(args[2:], "--json"))
+	case "db-dry-run":
+		if len(args) < 2 {
+			return errors.New("usage: patchline db-dry-run <manifest.json> --dialect <postgres|mysql> [--dsn local-dsn] [--execute] [--json]")
+		}
+		return dbDryRun(args[1], args[2:], hasFlag(args[2:], "--json"))
 	case "repair-semantics", "step-trace":
 		if len(args) < 2 {
 			return errors.New("usage: patchline repair-semantics <manifest.json> [--store store.json] [--json]")
@@ -455,6 +461,7 @@ Usage:
   patchline extract-sql <path> [--json]
   patchline migration-outcomes <evidence.jsonl> <migration.sql> [--repair manifest.json] [--policy policy.json] [--benchmark suite.json] [--source-sql path] [--json]
   patchline dry-run <manifest.json> [--store store.json] [--json]
+  patchline db-dry-run <manifest.json> --dialect <postgres|mysql> [--dsn local-dsn] [--execute] [--json]
   patchline repair-semantics <manifest.json> [--store store.json] [--json]
   patchline snapshot-drift <manifest.json> <before-store.json> <after-store.json> [--json]
   patchline effect-summary <manifest.json> [--json]
@@ -6842,6 +6849,58 @@ func dryRun(path string, args []string, jsonOut bool) error {
 		}
 	}
 	fmt.Printf("canonical report hash: %s\n", report.Hash())
+	return nil
+}
+
+func dbDryRun(path string, args []string, jsonOut bool) error {
+	fs := flag.NewFlagSet("db-dry-run", flag.ContinueOnError)
+	fs.SetOutput(ioDiscard{})
+	dialect := fs.String("dialect", "", "database dialect: postgres or mysql")
+	dsn := fs.String("dsn", "", "optional localhost/container DSN")
+	execute := fs.Bool("execute", false, "execute the generated schema-only script against the local DSN")
+	_ = fs.Bool("json", false, "emit JSON")
+	if err := fs.Parse(args); err != nil {
+		return err
+	}
+	if fs.NArg() != 0 || *dialect == "" {
+		return errors.New("usage: patchline db-dry-run <manifest.json> --dialect <postgres|mysql> [--dsn local-dsn] [--execute] [--json]")
+	}
+	manifest, err := readManifest(path)
+	if err != nil {
+		return err
+	}
+	report, err := dbdryrun.Build(manifest, dbdryrun.Options{Dialect: *dialect, DSN: *dsn, Execute: *execute})
+	if err != nil {
+		return err
+	}
+	if *execute {
+		report, err = dbdryrun.Execute(report, *dsn)
+		if err != nil && !jsonOut {
+			return err
+		}
+	}
+	if jsonOut {
+		if err := writeJSON(os.Stdout, report); err != nil {
+			return err
+		}
+		if !report.OK {
+			return codedError{code: 2, err: errors.New("database dry-run failed")}
+		}
+		return nil
+	}
+	fmt.Printf("db dry-run manifest=%s dialect=%s mode=%s schema_tables=%d statements=%d hash=%s\n",
+		report.Manifest, report.Dialect, report.Mode, len(report.Schema), len(report.Statements), report.Hash)
+	fmt.Printf("  container: %s\n", report.Container.RunCommand)
+	fmt.Printf("  client: %s\n", report.Container.ClientHint)
+	for _, warning := range report.Warnings {
+		fmt.Printf("  warning: %s\n", warning)
+	}
+	if report.Execution != nil {
+		fmt.Printf("  execution client=%s exit=%d\n", report.Execution.Client, report.Execution.ExitCode)
+	}
+	if !report.OK {
+		return codedError{code: 2, err: errors.New("database dry-run failed")}
+	}
 	return nil
 }
 

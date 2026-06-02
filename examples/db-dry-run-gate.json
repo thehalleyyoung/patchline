@@ -1,0 +1,35 @@
+{
+  "version": "patchline.db-dry-run-gate/v1",
+  "claim": "Database dry-run hooks derive schema-only local Postgres/MySQL scripts from real public migration tables without requiring production credentials.",
+  "minimum_public_repos": 4,
+  "required_dialects": [
+    "postgres",
+    "mysql"
+  ],
+  "slices": [
+    {
+      "id": "digital-asset-custody-customer-update",
+      "repo": "ismailAhmed0000/digital-asset-custody",
+      "ref": "eb1cd86f54b6f9a8abb4fdef0b7d122ac3131eb7",
+      "path": "backend/db/migrate_customer_type_to_retail_institutional.sql"
+    },
+    {
+      "id": "heimdall-parser-results-update",
+      "repo": "RaiseiX/Heimdall-DFIR",
+      "ref": "54ad7ea96fb2b893a9253d773ba8e1e435d624ad",
+      "path": "db/migrate_v2.7.sql"
+    },
+    {
+      "id": "rlg-data-user-roles-delete",
+      "repo": "RLG-Media/RLG-DATA",
+      "ref": "b5573726793ec87ac081bce25d4b6424b0da3cbf",
+      "path": "Database/data_migrations.sql"
+    },
+    {
+      "id": "adsbdb-temp-request-delete",
+      "repo": "mrjackwills/adsbdb",
+      "ref": "7d6f351f1c5c6ba6405b993d699923afa2cebac4",
+      "path": "docker/init/migrations.sql"
+    }
+  ]
+}

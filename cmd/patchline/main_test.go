@@ -46,6 +46,25 @@ func TestOnePositionalWithFlagsAllowsFlagsAfterPath(t *testing.T) {
 	}
 }
 
+func TestDBDryRunRejectsNonLocalDSN(t *testing.T) {
+	root := t.TempDir()
+	manifest := filepath.Join(root, "repair.json")
+	writeMainTestFile(t, root, "repair.json", `{
+  "version": "patchline.repair/v1",
+  "name": "cli-db-dry-run",
+  "incident": "inc_1",
+  "scope": {"table": "accounts", "where": {"id": "acct_1"}},
+  "preconditions": [{"kind": "sql", "expr": "select 1", "expect": "1"}],
+  "operations": [{"id": "fix", "kind": "update", "table": "accounts", "where": {"id": "acct_1"}, "set": {"status": "ok"}}],
+  "postconditions": [{"kind": "sql", "expr": "select 1", "expect": "1"}],
+  "rollback": {"strategy": "snapshot", "snapshot_required": true}
+}`)
+	err := dbDryRun(manifest, []string{"--dialect", "postgres", "--dsn", "postgres://user:secret@prod-db.example.com/app", "--json"}, true)
+	if err == nil || !strings.Contains(err.Error(), "refusing non-local database target") {
+		t.Fatalf("expected non-local DSN rejection, got %v", err)
+	}
+}
+
 func TestRepoDoctorReportsLocalPreflight(t *testing.T) {
 	root := t.TempDir()
 	writeMainTestFile(t, root, "go.mod", "module example.com/doctor\n\ngo 1.22\n")
