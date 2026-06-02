@@ -493,6 +493,21 @@ Run `make rl-reviewer-gate` for a learned triage order that lowers **reviewer co
 Run `make multimodal-finding-gate` for **multimodal** findings (diagram + text + code) checked for cross-modal consistency, flagging disagreement; see [docs/multimodal-finding.md](docs/multimodal-finding.md).
 Run `make abstention-policy-gate` for an uncertainty-aware **abstention** policy with a guaranteed selective-accuracy floor, shown to fail under forced full coverage; see [docs/abstention-policy.md](docs/abstention-policy.md).
 Run `make self-improving-loop-gate` for a loop that mines candidate gates from **unexplained** corpus failures, rejecting a proposal with no backing failure; see [docs/self-improving-loop.md](docs/self-improving-loop.md).
+Run `make repro-appendix-gate` for a reproducibility appendix mapping every paper claim to a **one-command** gate, rejecting a claim with no command; see [docs/repro-appendix.md](docs/repro-appendix.md).
+Run `make hermetic-artifact-container-gate` for a hermetic container passing the ACM **Artifacts-Available**/Reusable checklist, rejecting one needing network access; see [docs/hermetic-artifact-container.md](docs/hermetic-artifact-container.md).
+Run `make results-regeneration-gate` to regenerate every figure and table **deterministically** from raw data, flagging a nondeterministic artifact; see [docs/results-regeneration.md](docs/results-regeneration.md).
+Run `make anonymized-build-gate` for an **anonymized**-for-review build that strips identifying metadata, with the un-anonymized control detected as leaking; see [docs/anonymized-build.md](docs/anonymized-build.md).
+Run `make threats-to-validity-gate` for a **threats to validity** section where every threat is backed by a robustness or ablation experiment; see [docs/threats-to-validity.md](docs/threats-to-validity.md).
+Run `make related-work-table-gate` for a related-work table generated from the **baseline harness** numbers where Patchline leads, rejecting an unmeasured row; see [docs/related-work-table.md](docs/related-work-table.md).
+Run `make limitations-gate-gate` to ensure every claimed **limitation** has a backing experiment or example, rejecting a speculative one; see [docs/limitations-gate.md](docs/limitations-gate.md).
+Run `make reviewer-reproduction-guide-gate` for a one-page reviewer guide regenerating the headline result **in minutes**, rejecting an over-length guide; see [docs/reviewer-reproduction-guide.md](docs/reviewer-reproduction-guide.md).
+Run `make dataset-datasheet-gate` for a dataset **datasheet** documenting collection, consent, licensing, and biases, rejecting an incomplete one; see [docs/dataset-datasheet.md](docs/dataset-datasheet.md).
+Run `make model-card-gate` for a model card documenting intended use and **failure mode**s for the learned component, rejecting an incomplete card; see [docs/model-card.md](docs/model-card.md).
+Run `make camera-ready-build-gate` for a camera-ready PDF pipeline with **pinned tooling**, rejecting a build on a floating tool version; see [docs/camera-ready-build.md](docs/camera-ready-build.md).
+Run `make demo-video-script-gate` for a video script of the **end-to-end workflow** where every beat maps to a runnable command, rejecting an uncovered beat; see [docs/demo-video-script.md](docs/demo-video-script.md).
+Run `make artifact-badge-audit-gate` to self-audit each artifact **badge** criterion against evidence, rejecting an unearned badge; see [docs/artifact-badge-audit.md](docs/artifact-badge-audit.md).
+Run `make evaluation-preregistration-gate` for a public **pre-registration** of the evaluation protocol, detecting a post-hoc altered protocol; see [docs/evaluation-preregistration.md](docs/evaluation-preregistration.md).
+Run `make rebuttal-evidence-pack-gate` for a rebuttal pack pairing each anticipated reviewer question with a **reproducible answer** command, rejecting an unanswered one; see [docs/rebuttal-evidence-pack.md](docs/rebuttal-evidence-pack.md).
 
 Add `--redact` to write `analysis-bundle/` copies with stable redaction tokens for identifiers, literals, customer-like strings, and secret-like values while preserving joins and existing artifact hashes.
 

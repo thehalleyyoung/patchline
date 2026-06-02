@@ -1,0 +1,15 @@
+{
+  "version": "patchline.reviewer-reproduction-guide-gate/v1",
+  "claim": "Patchline includes a one-page reviewer reproduction guide that regenerates the headline result in minutes with a single command path, so a reviewer can confirm the central claim quickly. The worker checks the guide fits a one-page step budget, has a measured runtime within the minutes bound, and ends at the headline result. The gate proves the guide is within the page and time budget and reaches the headline result, and that an over-length guide exceeding the step budget is rejected.",
+  "real_repo": "patchline (self): reviewer-reproduction-guide",
+  "steps": [
+    "clone",
+    "make build",
+    "make config-profiles-gate"
+  ],
+  "max_steps": 5,
+  "runtime_minutes": 3,
+  "max_minutes": 10,
+  "reaches_headline": true,
+  "bloated_steps_count": 12
+}

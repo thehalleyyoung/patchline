@@ -1,0 +1,12 @@
+{
+  "version": "patchline.anonymized-build-gate/v1",
+  "claim": "Patchline produces an anonymized-for-review build that reproducibly strips identifying metadata \u2014 author names, remotes, and emails \u2014 so a double-blind submission leaks no identity. The worker scans the anonymized artifact for any identifying token and confirms none remain, while the un-anonymized control still contains them. The gate proves the anonymized build is identity-free and that the un-anonymized control is correctly detected as leaking identity.",
+  "real_repo": "patchline (self): anonymized-build",
+  "identifying_tokens": [
+    "halleyyoung",
+    "@example.com",
+    "github.com/thehalleyyoung"
+  ],
+  "anonymized_content": "author: ANON; remote: ANON; analysis verdict hazard",
+  "raw_content": "author: halleyyoung; remote: github.com/thehalleyyoung"
+}

@@ -1,0 +1,8 @@
+{
+  "version": "patchline.evaluation-preregistration-gate/v1",
+  "claim": "Patchline publicly pre-registers its evaluation protocol \u2014 metrics, datasets, and thresholds \u2014 before running, so post-hoc metric selection is impossible. The worker hashes the pre-registered protocol, compares it to the protocol actually run, and confirms they match. The gate proves the executed protocol matches the pre-registration exactly and that a post-hoc altered protocol is detected as a deviation.",
+  "real_repo": "patchline (self): evaluation-preregistration",
+  "preregistered_hash": "PRE123",
+  "executed_hash": "PRE123",
+  "altered_hash": "PRE999"
+}

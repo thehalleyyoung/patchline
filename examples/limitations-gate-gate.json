@@ -1,0 +1,28 @@
+{
+  "version": "patchline.limitations-gate-gate/v1",
+  "claim": "Patchline ensures every claimed limitation has a backing experiment or example, so the limitations section is grounded in demonstrable behavior rather than speculation. The worker checks each limitation references a real backing artifact and that the reference resolves. The gate proves every limitation is demonstrably backed and that a speculative limitation with no example is rejected.",
+  "real_repo": "patchline (self): limitations-gate",
+  "artifacts": [
+    "fuzzing-harness-gate",
+    "red-team-adversarial-gate",
+    "soundness-boundary-gate"
+  ],
+  "limitations": [
+    {
+      "id": "no-app-race-detection",
+      "backing": "soundness-boundary-gate"
+    },
+    {
+      "id": "evasion-residual-risk",
+      "backing": "red-team-adversarial-gate"
+    },
+    {
+      "id": "rare-crash-classes",
+      "backing": "fuzzing-harness-gate"
+    }
+  ],
+  "speculative": {
+    "id": "maybe-slow",
+    "backing": "none"
+  }
+}

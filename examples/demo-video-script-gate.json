@@ -1,0 +1,23 @@
+{
+  "version": "patchline.demo-video-script-gate/v1",
+  "claim": "Patchline ships a supplementary video script demonstrating the end-to-end workflow on a real repository, where every spoken step maps to a runnable command so the demo is reproducible rather than staged. The worker checks each script beat carries a runnable command and that the beats cover clone-to-verdict. The gate proves every script beat is backed by a runnable command covering the end-to-end workflow and that a beat with no command is rejected.",
+  "real_repo": "patchline (self): demo-video-script",
+  "beats": [
+    {
+      "say": "clone the repo",
+      "run": "git clone ..."
+    },
+    {
+      "say": "build patchline",
+      "run": "make build"
+    },
+    {
+      "say": "analyze and see the verdict",
+      "run": "make quickstart-sixty-seconds-gate"
+    }
+  ],
+  "uncovered_beat": {
+    "say": "magic happens",
+    "run": ""
+  }
+}

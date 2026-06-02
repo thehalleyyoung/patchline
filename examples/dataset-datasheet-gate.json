@@ -1,0 +1,27 @@
+{
+  "version": "patchline.dataset-datasheet-gate/v1",
+  "claim": "Patchline ships a dataset datasheet documenting collection, consent, licensing, and known biases for the corpus, so downstream users understand provenance and limitations. The worker checks the datasheet answers every required section and that the license is an approved open license. The gate proves every required datasheet section is present with an approved license and that a datasheet missing the licensing section is rejected.",
+  "real_repo": "patchline (self): dataset-datasheet",
+  "required_sections": [
+    "collection",
+    "consent",
+    "licensing",
+    "known_biases"
+  ],
+  "datasheet": {
+    "collection": "public repos",
+    "consent": "public license",
+    "licensing": "Apache-2.0",
+    "known_biases": "python-heavy"
+  },
+  "approved_licenses": [
+    "Apache-2.0",
+    "MIT",
+    "BSD-3-Clause"
+  ],
+  "incomplete_datasheet": {
+    "collection": "x",
+    "consent": "y",
+    "known_biases": "z"
+  }
+}

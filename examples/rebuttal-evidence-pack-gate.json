@@ -1,0 +1,27 @@
+{
+  "version": "patchline.rebuttal-evidence-pack-gate/v1",
+  "claim": "Patchline assembles a rebuttal evidence pack anticipating likely reviewer questions, each paired with a reproducible answer command, so a rebuttal cites runnable evidence rather than promises. The worker checks every anticipated question has a backing command and an expected outcome that resolves. The gate proves every question has a reproducible answer and that a question with no backing command is rejected.",
+  "real_repo": "patchline (self): rebuttal-evidence-pack",
+  "questions": [
+    {
+      "q": "does it generalize?",
+      "command": "make transfer-learning-study-gate",
+      "expected": "pass"
+    },
+    {
+      "q": "is it robust?",
+      "command": "make perturbation-robustness-gate",
+      "expected": "pass"
+    },
+    {
+      "q": "is it reproducible?",
+      "command": "make external-replication-kit-gate",
+      "expected": "pass"
+    }
+  ],
+  "unanswered_question": {
+    "q": "why so good?",
+    "command": "",
+    "expected": "pass"
+  }
+}

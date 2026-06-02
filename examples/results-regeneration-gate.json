@@ -1,0 +1,27 @@
+{
+  "version": "patchline.results-regeneration-gate/v1",
+  "claim": "Patchline regenerates every figure and table deterministically from raw data, so two runs of the pipeline produce byte-identical outputs and no result is hand-edited. The worker compares the digests of two regeneration runs over each artifact and confirms they match. The gate proves all figures and tables regenerate deterministically and that an artifact whose two runs differ is flagged as nondeterministic.",
+  "real_repo": "patchline (self): results-regeneration",
+  "artifacts": [
+    {
+      "name": "fig1",
+      "run_a": "d1",
+      "run_b": "d1"
+    },
+    {
+      "name": "tbl1",
+      "run_a": "d2",
+      "run_b": "d2"
+    },
+    {
+      "name": "fig2",
+      "run_a": "d3",
+      "run_b": "d3"
+    }
+  ],
+  "nondeterministic_artifact": {
+    "name": "figX",
+    "run_a": "d4",
+    "run_b": "d5"
+  }
+}

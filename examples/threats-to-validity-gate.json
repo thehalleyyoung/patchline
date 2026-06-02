@@ -1,0 +1,28 @@
+{
+  "version": "patchline.threats-to-validity-gate/v1",
+  "claim": "Patchline's threats-to-validity section ties every stated threat to a backing experiment from the robustness or ablation suites, so each limitation is evidenced rather than hand-waved. The worker checks every threat references an existing backing suite and that the references resolve. The gate proves every threat is backed by a real experiment and that a threat with no backing experiment is rejected.",
+  "real_repo": "patchline (self): threats-to-validity",
+  "suites": [
+    "perturbation-robustness-gate",
+    "stage-ablation-gate",
+    "sensitivity-analysis-gate"
+  ],
+  "threats": [
+    {
+      "id": "construct",
+      "backing": "perturbation-robustness-gate"
+    },
+    {
+      "id": "internal",
+      "backing": "stage-ablation-gate"
+    },
+    {
+      "id": "external",
+      "backing": "sensitivity-analysis-gate"
+    }
+  ],
+  "unbacked_threat": {
+    "id": "x",
+    "backing": "none"
+  }
+}

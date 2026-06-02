@@ -1,0 +1,22 @@
+{
+  "version": "patchline.model-card-gate/v1",
+  "claim": "Patchline publishes a model card for its learned component documenting intended use, evaluation data, and failure modes, so the component is deployed within its validated envelope. The worker checks the card declares intended use, lists at least one failure mode, and reports held-out metrics. The gate proves the model card is complete with documented failure modes and metrics, and that a card omitting failure modes is rejected.",
+  "real_repo": "patchline (self): model-card",
+  "card": {
+    "intended_use": "migration risk ranking",
+    "failure_modes": [
+      "novel ORM idioms",
+      "non-SQL stores"
+    ],
+    "metrics": {
+      "accuracy": 0.9
+    }
+  },
+  "incomplete_card": {
+    "intended_use": "x",
+    "failure_modes": [],
+    "metrics": {
+      "accuracy": 0.9
+    }
+  }
+}

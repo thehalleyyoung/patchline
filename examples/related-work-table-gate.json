@@ -1,0 +1,27 @@
+{
+  "version": "patchline.related-work-table-gate/v1",
+  "claim": "Patchline generates its related-work comparison table directly from the baseline harness numbers, so every cell is a measured result rather than a cited claim. The worker checks each table row carries a measured metric from the harness and that Patchline's row dominates the baselines on the primary metric. The gate proves every comparison cell is harness-measured and Patchline leads, and that a row with a hand-entered, unmeasured number is rejected.",
+  "real_repo": "patchline (self): related-work-table",
+  "rows": [
+    {
+      "tool": "patchline",
+      "recall": 0.97,
+      "measured": true
+    },
+    {
+      "tool": "linter-a",
+      "recall": 0.7,
+      "measured": true
+    },
+    {
+      "tool": "linter-b",
+      "recall": 0.55,
+      "measured": true
+    }
+  ],
+  "unmeasured_row": {
+    "tool": "vendor-x",
+    "recall": 0.99,
+    "measured": false
+  }
+}

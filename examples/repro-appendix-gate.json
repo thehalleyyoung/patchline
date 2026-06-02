@@ -1,0 +1,27 @@
+{
+  "version": "patchline.repro-appendix-gate/v1",
+  "claim": "Patchline ships a reproducibility appendix mapping every paper claim to a single one-command gate, so a reviewer can regenerate each number without bespoke setup. The worker checks every claim row has a one-command invocation and an expected value, and that the command set covers all claims. The gate proves every claim maps to exactly one command with an expected value and that a claim with no command is rejected.",
+  "real_repo": "patchline (self): repro-appendix",
+  "claims": [
+    {
+      "id": "precision",
+      "command": "make config-profiles-gate",
+      "expected": "1.0"
+    },
+    {
+      "id": "recall",
+      "command": "make historical-replay-study-gate",
+      "expected": "1.0"
+    },
+    {
+      "id": "robustness",
+      "command": "make perturbation-robustness-gate",
+      "expected": "1.0"
+    }
+  ],
+  "uncovered_claim": {
+    "id": "x",
+    "command": "",
+    "expected": "1.0"
+  }
+}

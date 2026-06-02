@@ -1,0 +1,31 @@
+{
+  "version": "patchline.artifact-badge-audit-gate/v1",
+  "claim": "Patchline self-audits each artifact badge criterion against concrete evidence, so a claimed badge is only asserted when its criteria are actually met. The worker matches every badge criterion to a backing evidence artifact and confirms each resolves. The gate proves every badge criterion is satisfied by evidence and that a badge claimed without satisfying evidence is rejected.",
+  "real_repo": "patchline (self): artifact-badge-audit",
+  "badges": [
+    {
+      "badge": "available",
+      "criterion": "public-archive",
+      "evidence": "hermetic-artifact-container-gate",
+      "met": true
+    },
+    {
+      "badge": "reusable",
+      "criterion": "documented-rebuild",
+      "evidence": "results-regeneration-gate",
+      "met": true
+    },
+    {
+      "badge": "reproduced",
+      "criterion": "independent-rerun",
+      "evidence": "external-replication-kit-gate",
+      "met": true
+    }
+  ],
+  "unearned_badge": {
+    "badge": "distinguished",
+    "criterion": "x",
+    "evidence": "",
+    "met": false
+  }
+}

@@ -1,0 +1,25 @@
+{
+  "version": "patchline.hermetic-artifact-container-gate/v1",
+  "claim": "Patchline provides a hermetic artifact-evaluation container that satisfies the ACM Artifacts-Available and Reusable checklist, building offline from pinned inputs with no network access at evaluation time. The worker checks the container declares offline operation, pins all inputs, and satisfies each required checklist item. The gate proves every checklist item is satisfied under hermetic conditions and that a container requiring network access at run time is rejected.",
+  "real_repo": "patchline (self): hermetic-artifact-container",
+  "checklist": [
+    {
+      "item": "available",
+      "satisfied": true
+    },
+    {
+      "item": "reusable",
+      "satisfied": true
+    },
+    {
+      "item": "documented",
+      "satisfied": true
+    }
+  ],
+  "offline": true,
+  "inputs_pinned": true,
+  "network_required": false,
+  "leaky_container": {
+    "network_required": true
+  }
+}

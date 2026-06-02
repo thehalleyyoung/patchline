@@ -1,0 +1,13 @@
+{
+  "version": "patchline.camera-ready-build-gate/v1",
+  "claim": "Patchline builds the final PDF from source with pinned tooling, so the camera-ready artifact is reproducible and not dependent on a particular machine's TeX installation. The worker checks the build pins the TeX toolchain version, declares its source inputs, and produces a fixed output name. The gate proves the camera-ready build is fully pinned and source-driven and that a build relying on an unpinned floating tool version is rejected.",
+  "real_repo": "patchline (self): camera-ready-build",
+  "tex_version": "TeXLive-2023",
+  "source": "tool_paper.tex",
+  "output": "tool_paper.pdf",
+  "pinned": true,
+  "floating_build": {
+    "tex_version": "latest",
+    "pinned": false
+  }
+}
