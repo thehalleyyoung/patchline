@@ -1,0 +1,35 @@
+{
+  "version": "patchline.governance-gate/v1",
+  "claim": "Patchline ships role-specific governance documentation so that maintainers, security reviewers, research reviewers, and ecosystem owners each have an explicit, reproducible charter rather than tribal knowledge. The governance worker renders one charter per role from structured data, each with a scope, named responsibilities, an escalation path, and the gates that role is accountable for, and assembles a governance index. The gate proves that all four mandated roles are present and that every charter declares a scope, at least three responsibilities, an escalation path, and at least one accountable gate.",
+  "real_repo": "patchline (self): governance charters generated from role data",
+  "roles": [
+    {
+      "role": "maintainer",
+      "scope": "Overall project direction, releases, and merge decisions.",
+      "responsibilities": ["Triage and review pull requests", "Cut releases and sign release dossiers", "Keep the gate suite green on main", "Mentor new contributors"],
+      "escalation": "Disputes escalate to a maintainer vote; ties defer to the lead maintainer.",
+      "accountable_gates": ["gate", "release-blocking-smoke-gate"]
+    },
+    {
+      "role": "security-reviewer",
+      "scope": "Archive handling, secret redaction, and supply-chain provenance.",
+      "responsibilities": ["Review archive-extraction and redaction changes", "Audit secret-scan results", "Validate supply-chain provenance"],
+      "escalation": "Suspected vulnerabilities go to a private security advisory before disclosure.",
+      "accountable_gates": ["secret-scan-gate", "archive-security-gate", "redaction-stability-gate"]
+    },
+    {
+      "role": "research-reviewer",
+      "scope": "Evaluation rigor, claims-to-evidence mapping, and paper artifacts.",
+      "responsibilities": ["Review evaluation methodology", "Verify claims map to reproducible evidence", "Check the limitations ledger stays honest"],
+      "escalation": "Disputed claims are frozen until an independent rerun resolves them.",
+      "accountable_gates": ["fp-adjudication-gate", "ablation-study-gate"]
+    },
+    {
+      "role": "ecosystem-owner",
+      "scope": "A single ecosystem's detector, fixtures, and real-repo proofs.",
+      "responsibilities": ["Maintain the ecosystem detector and fixtures", "Keep the real-repo proof gate green", "Document known gaps in the parser dashboard"],
+      "escalation": "Breaking upstream changes are reported to maintainers with a reproducing gate.",
+      "accountable_gates": ["parser-dashboard-gate"]
+    }
+  ]
+}

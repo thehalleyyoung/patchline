@@ -297,6 +297,8 @@ Run `make contributor-badges-gate` to render contributor **recognition** badges 
 
 Run `make starter-issues-gate` to generate **good first issue** templates from structured **roadmap card** data — each issue names its failure mode, expected gate, artifact path, and acceptance criteria, so contributors never get a vague task; see [docs/starter-issues.md](docs/starter-issues.md).
 
+Run `make governance-gate` to render role-specific **governance** charters for maintainers, security reviewers, research reviewers, and ecosystem owners — each with scope, responsibilities, an **escalation** path, and accountable gates; see [docs/governance.md](docs/governance.md).
+
 Add `--redact` to write `analysis-bundle/` copies with stable redaction tokens for identifiers, literals, customer-like strings, and secret-like values while preserving joins and existing artifact hashes.
 
 Add `--ci` to write `ci/summary.md` plus upload snippets and code-quality artifacts for GitHub Actions, GitLab CI, and Bitbucket Pipelines: SARIF under `analysis-bundle/summary.sarif`, GitLab `ci/gl-code-quality-report.json`, and Bitbucket `ci/bitbucket-code-insights.json`.
