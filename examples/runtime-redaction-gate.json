@@ -1,0 +1,13 @@
+{
+  "version": "patchline.runtime-redaction-gate/v1",
+  "claim": "Runtime evidence (trace attributes, log lines, metric labels, and incident text) is redacted with the same deterministic [redacted:<kind>:<hash>] token policy used for static artifacts, and the redaction is stable across reruns: identical sensitive values map to identical tokens, distinct values map to distinct tokens, no raw sensitive value survives, and re-running produces byte-identical redacted output.",
+  "real_repo": {
+    "repo": "lobsters/lobsters",
+    "ref": "3b80b47aa5aaba37ec44413e7d1dc96fcf1585b6",
+    "subpath": "db/migrate"
+  },
+  "max_findings": 10,
+  "minimum_findings": 4,
+  "sensitive_kinds": ["email", "ipv4", "bearer", "customer-id", "path"],
+  "token_format": "[redacted:<kind>:<hash>]"
+}

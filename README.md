@@ -241,6 +241,8 @@ Run `make incident-notebook-gate` to reconstruct a data-change failure hypothesi
 
 Run `make causality-limits-gate` to enforce the causality limitations of trace-to-migration links — constructing clean, confounded, temporally-inconsistent, and cross-table scenarios so correlation is never overclaimed as proven causation (ceiling verdict: consistent-with); see [docs/causality-limits.md](docs/causality-limits.md).
 
+Run `make runtime-redaction-gate` to prove the deterministic `[redacted:<kind>:<hash>]` token policy is stable on runtime evidence — trace attributes, log lines, metric labels, and incident text — with byte-identical reruns, deterministic tokens, and zero raw-value leaks; see [docs/runtime-redaction.md](docs/runtime-redaction.md).
+
 Add `--redact` to write `analysis-bundle/` copies with stable redaction tokens for identifiers, literals, customer-like strings, and secret-like values while preserving joins and existing artifact hashes.
 
 Add `--ci` to write `ci/summary.md` plus upload snippets and code-quality artifacts for GitHub Actions, GitLab CI, and Bitbucket Pipelines: SARIF under `analysis-bundle/summary.sarif`, GitLab `ci/gl-code-quality-report.json`, and Bitbucket `ci/bitbucket-code-insights.json`.
