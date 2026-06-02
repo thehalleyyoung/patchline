@@ -164,6 +164,7 @@ make paired-statistical-tests-gate
 make effect-size-gate
 make sensitivity-analysis-gate
 make ablation-dashboard-gate
+make negative-control-gate
 ```
 
 The demo downloads real GitHub project subpaths and writes:
@@ -251,6 +252,8 @@ The real-repo slice matrix is backed by `examples/real-repo-slices.json` and `ex
 `make sensitivity-analysis-gate` runs budget variants and deterministic post-hoc sweeps for finding caps, link-confidence thresholds, temporal windows, and risk-weight settings on the four pinned public slices.
 
 `make ablation-dashboard-gate` builds JSON and Markdown ablation dashboards showing which feature families matter by ecosystem and observed failure-mode kind across the four pinned public slices.
+
+`make negative-control-gate` runs documentation-only, vendor-only, and test-only public slices and verifies Patchline does not emit high-confidence repair claims for them.
 
 Current default projects:
 
