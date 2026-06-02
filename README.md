@@ -351,6 +351,8 @@ Run `make explainable-ranking-gate` to produce an **explainable ranking** that d
 
 Run `make paper-build-gate` to run the **paper build** pipeline — a LaTeX capabilities table, figure, and appendix are generated from the live gate catalog and compiled with **pdflatex** into a PDF, so the paper can never drift from the implementation; see [docs/paper-build.md](docs/paper-build.md).
 
+Run `make claim-freeze-gate` to freeze paper claims into a checksum manifest — a **claim freeze** re-verifies cited artifacts and flags any post-submission **drift**, so reviewers read exactly the evidence that was submitted; see [docs/claim-freeze.md](docs/claim-freeze.md).
+
 Add `--redact` to write `analysis-bundle/` copies with stable redaction tokens for identifiers, literals, customer-like strings, and secret-like values while preserving joins and existing artifact hashes.
 
 Add `--ci` to write `ci/summary.md` plus upload snippets and code-quality artifacts for GitHub Actions, GitLab CI, and Bitbucket Pipelines: SARIF under `analysis-bundle/summary.sarif`, GitLab `ci/gl-code-quality-report.json`, and Bitbucket `ci/bitbucket-code-insights.json`.

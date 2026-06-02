@@ -1,0 +1,10 @@
+{
+  "version": "patchline.claim-freeze-gate/v1",
+  "claim": "Patchline freezes the evidence behind every paper claim into a checksum manifest at submission time, so that any post-submission drift in a cited artifact is detected by re-verification instead of silently changing what the paper asserts. The worker canonicalizes and checksums each claim's backing artifact into a freeze file, then re-verifies the live artifacts against the freeze, reporting no drift when they are unchanged and detecting drift when an artifact is tampered with. The gate proves the unchanged artifacts re-verify cleanly against the freeze while a tampered copy produces a checksum mismatch that is flagged as drift.",
+  "real_repo": "patchline (self): claim->artifact checksum freeze with drift detection",
+  "claims": [
+    {"id": "c1", "artifact": "docs/rollback-check.md"},
+    {"id": "c2", "artifact": "docs/lock-duration.md"},
+    {"id": "c3", "artifact": "docs/tenant-risk.md"}
+  ]
+}
