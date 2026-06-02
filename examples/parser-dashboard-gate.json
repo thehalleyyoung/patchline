@@ -1,0 +1,6 @@
+{
+  "version": "patchline.parser-dashboard-gate/v1",
+  "claim": "Patchline publishes an ecosystem parser quality dashboard that unifies coverage, fuzz robustness, known gaps, and real-repository proofs. For every supported ecosystem the dashboard lists the detector fact kinds it emits, links the gate that proves it on real public code, and documents its known gaps. The analyzer is additionally hardened by a deterministic fuzz-seed corpus of malformed and high-byte inputs that must be processed without a single crash, so parser quality is measurable and regressions are visible.",
+  "minimum_ecosystems": 6,
+  "minimum_fuzz_seeds": 20
+}

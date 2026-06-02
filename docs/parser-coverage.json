@@ -1,0 +1,60 @@
+{
+  "version": "patchline.parser-coverage/v1",
+  "ecosystems": [
+    {
+      "name": "SQL migrations",
+      "fact_kinds": ["schema_evolution", "migration_root", "source_sql_hint"],
+      "real_repo_proof": "make multi-ecosystem-migration-gate",
+      "fuzz_seeds": 8,
+      "known_gaps": [
+        "dialect-specific stored-procedure bodies are not parsed",
+        "dynamic SQL assembled at runtime is only partially recovered"
+      ]
+    },
+    {
+      "name": "NoSQL changes",
+      "fact_kinds": ["nosql_change"],
+      "real_repo_proof": "make nosql-change-gate",
+      "fuzz_seeds": 6,
+      "known_gaps": [
+        "vendor-specific aggregation pipelines are matched heuristically, not fully parsed"
+      ]
+    },
+    {
+      "name": "Data pipelines",
+      "fact_kinds": ["data_pipeline_change"],
+      "real_repo_proof": "make data-pipeline-gate",
+      "fuzz_seeds": 6,
+      "known_gaps": [
+        "dynamically generated DAGs and templated SQL are detected only when literals are present"
+      ]
+    },
+    {
+      "name": "Infrastructure ordering",
+      "fact_kinds": ["infrastructure", "infra_data_ordering"],
+      "real_repo_proof": "make infra-ordering-gate",
+      "fuzz_seeds": 6,
+      "known_gaps": [
+        "cross-file Helm/Argo dependencies are not yet linked into a single ordering graph"
+      ]
+    },
+    {
+      "name": "Schema compatibility",
+      "fact_kinds": ["schema_compatibility"],
+      "real_repo_proof": "make schema-compat-gate",
+      "fuzz_seeds": 6,
+      "known_gaps": [
+        "per-message protobuf field-number uniqueness is not yet diffed across versions"
+      ]
+    },
+    {
+      "name": "Source adapters",
+      "fact_kinds": ["source"],
+      "real_repo_proof": "make mercurial-fossil-source-gate",
+      "fuzz_seeds": 4,
+      "known_gaps": [
+        "shallow-clone provenance for very large monorepos is approximated by content hashing"
+      ]
+    }
+  ]
+}

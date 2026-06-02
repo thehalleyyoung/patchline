@@ -285,6 +285,8 @@ Run `make schema-compat-gate` to flag **protobuf/Avro schema-compatibility** haz
 
 Run `make fixture-minimizer-gate` to **delta-debug** any failing input down to a 1-minimal reproducing fixture across every ecosystem — using the analyzer as an oracle and proven by reducing a real Cassandra migration to its minimal destructive core; see [docs/fixture-minimizer.md](docs/fixture-minimizer.md).
 
+Run `make parser-dashboard-gate` to publish an **ecosystem parser quality dashboard** unifying coverage, fuzz robustness, known gaps, and real-repo proofs — every ecosystem carries a real-repository proof and the analyzer survives a malformed-input fuzz corpus with zero crashes; see [docs/parser-dashboard.md](docs/parser-dashboard.md).
+
 Add `--redact` to write `analysis-bundle/` copies with stable redaction tokens for identifiers, literals, customer-like strings, and secret-like values while preserving joins and existing artifact hashes.
 
 Add `--ci` to write `ci/summary.md` plus upload snippets and code-quality artifacts for GitHub Actions, GitLab CI, and Bitbucket Pipelines: SARIF under `analysis-bundle/summary.sarif`, GitLab `ci/gl-code-quality-report.json`, and Bitbucket `ci/bitbucket-code-insights.json`.
