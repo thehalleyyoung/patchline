@@ -1,0 +1,31 @@
+{
+  "version": "patchline.security-review-gate/v1",
+  "claim": "Patchline blocks merge-sensitive adapter, generator, archive-handler, and execution-feature changes unless their matching proof gates have passed.",
+  "protected_surfaces": [
+    "adapters",
+    "generators",
+    "archive-handlers",
+    "execution-features"
+  ],
+  "required_gates": [
+    "threat-model-gate",
+    "offline-validation-gate",
+    "secret-scan-gate",
+    "generated-code-quarantine-gate",
+    "prompt-context-gate",
+    "redaction-stability-gate",
+    "archive-security-gate",
+    "db-dry-run-gate"
+  ],
+  "real_code": {
+    "repo": "lobsters/lobsters",
+    "ref": "3b80b47aa5aaba37ec44413e7d1dc96fcf1585b6",
+    "subpath": "db/migrate"
+  },
+  "example_changed_files": [
+    "internal/evidence/adapter.go",
+    "internal/project/propose.go",
+    "internal/archive/archive.go",
+    "internal/dbdryrun/dryrun.go"
+  ]
+}

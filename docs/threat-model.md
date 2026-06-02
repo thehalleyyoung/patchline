@@ -35,4 +35,4 @@ Patchline does not sandbox arbitrary third-party build systems, prove generated 
 5. Validate cached analyses with `repo offline` in restricted environments.
 6. Publish release artifacts with `release checksums` and supply-chain provenance.
 
-Run `make threat-model-gate` to verify this document against real Patchline artifacts from a pinned public repository slice plus an adapter-export validation path.
+Run `make threat-model-gate` to verify this document against real Patchline artifacts from a pinned public repository slice plus an adapter-export validation path. Run `make security-review-gate` before merging changes to adapters, generators, archive handlers, or execution features.

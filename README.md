@@ -103,6 +103,8 @@ Run `make generated-code-quarantine-gate` to prove generated proposal files stay
 
 Run `make privacy-metrics-gate` to emit source-free aggregate risk trend metrics with bucketed counts and salted cohort IDs for sharing without raw evidence; see [docs/privacy-aggregate-metrics.md](docs/privacy-aggregate-metrics.md).
 
+Run `make security-review-gate` to prove adapter, generator, archive-handler, and execution-feature changes are blocked unless their required proof gates have passed; see [docs/security-review-gates.md](docs/security-review-gates.md).
+
 Add `--redact` to write `analysis-bundle/` copies with stable redaction tokens for identifiers, literals, customer-like strings, and secret-like values while preserving joins and existing artifact hashes.
 
 Add `--ci` to write `ci/summary.md` plus upload snippets and code-quality artifacts for GitHub Actions, GitLab CI, and Bitbucket Pipelines: SARIF under `analysis-bundle/summary.sarif`, GitLab `ci/gl-code-quality-report.json`, and Bitbucket `ci/bitbucket-code-insights.json`.

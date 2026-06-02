@@ -401,6 +401,8 @@ func run(args []string) error {
 		}
 		outPath, _ := flagValue(args[3:], "--out")
 		return adaptEvidence(args[1], args[2], hasFlag(args[3:], "--json"), outPath)
+	case "security":
+		return securityCommand(args[1:])
 	case "ci-gate":
 		if len(args) < 2 {
 			return errors.New("usage: patchline ci-gate <suite.json> [--min-precision 0.95] [--min-recall 0.95] [--json]")
@@ -465,6 +467,7 @@ Usage:
   patchline provenance archive <evidence.jsonl>... [--json]
   patchline archive-index <archive-spec.json> [--json]
   patchline archive-query <archive-spec.json> [broad-updates|damaged-reports|missing-rollback|repair-outcomes|semantic-regressions|all] [--json]
+  patchline security review --changed-files file[,file...] --passed-gates gate[,gate...] [--out dir] [--json]
   patchline repair-outcomes <archive-spec.json> [--json]
   patchline semantic-regressions <archive-spec.json> [--json]
   patchline historical-failures <suite.json> [--json]
@@ -2177,6 +2180,272 @@ type contributorCheckSummary struct {
 	FocusedTest bool `json:"focused_test"`
 	FastGates   int  `json:"fast_gates"`
 	Success     bool `json:"success"`
+}
+
+type securityReviewReport struct {
+	Version      string                  `json:"version"`
+	ChangedFiles []string                `json:"changed_files"`
+	PassedGates  []string                `json:"passed_gates"`
+	Surfaces     []securityReviewSurface `json:"surfaces"`
+	Summary      securityReviewSummary   `json:"summary"`
+	RequiredDocs []string                `json:"required_docs"`
+	Hash         string                  `json:"hash"`
+	Markdown     string                  `json:"markdown,omitempty"`
+}
+
+type securityReviewSurface struct {
+	Name          string   `json:"name"`
+	Status        string   `json:"status"`
+	Files         []string `json:"files"`
+	RequiredGates []string `json:"required_gates"`
+	PassedGates   []string `json:"passed_gates"`
+	MissingGates  []string `json:"missing_gates,omitempty"`
+	RequiredDocs  []string `json:"required_docs"`
+	Rationale     string   `json:"rationale"`
+}
+
+type securityReviewSummary struct {
+	ChangedFiles      int  `json:"changed_files"`
+	ProtectedSurfaces int  `json:"protected_surfaces"`
+	PassedSurfaces    int  `json:"passed_surfaces"`
+	BlockedSurfaces   int  `json:"blocked_surfaces"`
+	RequiredGates     int  `json:"required_gates"`
+	MissingGates      int  `json:"missing_gates"`
+	Success           bool `json:"success"`
+}
+
+func securityCommand(args []string) error {
+	if len(args) == 0 {
+		return errors.New("usage: patchline security review --changed-files file[,file...] --passed-gates gate[,gate...] [--out dir] [--json]")
+	}
+	switch args[0] {
+	case "review":
+		return securityReview(args[1:])
+	default:
+		return errors.New("usage: patchline security review --changed-files file[,file...] --passed-gates gate[,gate...] [--out dir] [--json]")
+	}
+}
+
+func securityReview(args []string) error {
+	fs := flag.NewFlagSet("security review", flag.ContinueOnError)
+	fs.SetOutput(ioDiscard{})
+	changedRaw := fs.String("changed-files", "", "comma-separated changed files")
+	passedRaw := fs.String("passed-gates", "", "comma-separated gates that have passed")
+	outDir := fs.String("out", filepath.Join("results", "generated", "security-review"), "output directory")
+	jsonOut := fs.Bool("json", false, "emit JSON")
+	if err := fs.Parse(args); err != nil {
+		return err
+	}
+	if *changedRaw == "" || fs.NArg() != 0 {
+		return errors.New("usage: patchline security review --changed-files file[,file...] --passed-gates gate[,gate...] [--out dir] [--json]")
+	}
+	report := buildSecurityReviewReport(splitNonEmpty(*changedRaw, ","), splitNonEmpty(*passedRaw, ","))
+	if err := writeSecurityReviewReport(*outDir, report); err != nil {
+		return err
+	}
+	if *jsonOut {
+		if err := writeJSON(os.Stdout, report); err != nil {
+			return err
+		}
+	}
+	if !*jsonOut {
+		fmt.Printf("security review %s: protected=%d missing=%d hash=%s\n", reportStatusWord(report.Summary.Success), report.Summary.ProtectedSurfaces, report.Summary.MissingGates, report.Hash)
+		fmt.Printf("  out=%s\n", *outDir)
+	}
+	if !report.Summary.Success {
+		return codedError{code: 3, err: fmt.Errorf("security review blocked: %d missing gates", report.Summary.MissingGates)}
+	}
+	return nil
+}
+
+func buildSecurityReviewReport(changedFiles, passedGates []string) securityReviewReport {
+	changedFiles = normalizedSecurityFiles(changedFiles)
+	passedGates = sortedStrings(passedGates)
+	passedSet := map[string]bool{}
+	for _, gate := range passedGates {
+		passedSet[gate] = true
+	}
+	report := securityReviewReport{
+		Version:      "patchline.security-review/v1",
+		ChangedFiles: changedFiles,
+		PassedGates:  passedGates,
+		RequiredDocs: []string{"docs/threat-model.md", "docs/security-review-gates.md"},
+	}
+	for _, spec := range securitySurfaceSpecs() {
+		var files []string
+		for _, file := range changedFiles {
+			if securitySurfaceMatches(file, spec.Patterns) {
+				files = append(files, file)
+			}
+		}
+		if len(files) == 0 {
+			continue
+		}
+		sort.Strings(files)
+		surface := securityReviewSurface{
+			Name:          spec.Name,
+			Status:        "pass",
+			Files:         files,
+			RequiredGates: append([]string(nil), spec.RequiredGates...),
+			RequiredDocs:  append([]string(nil), spec.RequiredDocs...),
+			Rationale:     spec.Rationale,
+		}
+		for _, gate := range spec.RequiredGates {
+			if passedSet[gate] {
+				surface.PassedGates = append(surface.PassedGates, gate)
+			} else {
+				surface.MissingGates = append(surface.MissingGates, gate)
+			}
+		}
+		if len(surface.MissingGates) > 0 {
+			surface.Status = "blocked"
+		}
+		report.Surfaces = append(report.Surfaces, surface)
+	}
+	sort.Slice(report.Surfaces, func(i, j int) bool { return report.Surfaces[i].Name < report.Surfaces[j].Name })
+	finalizeSecurityReviewReport(&report)
+	return report
+}
+
+type securitySurfaceSpec struct {
+	Name          string
+	Patterns      []string
+	RequiredGates []string
+	RequiredDocs  []string
+	Rationale     string
+}
+
+func securitySurfaceSpecs() []securitySurfaceSpec {
+	return []securitySurfaceSpec{
+		{
+			Name:          "adapters",
+			Patterns:      []string{"internal/evidence/", "docs/*adapter*", "examples/*adapter*", "scripts/*adapter*"},
+			RequiredGates: []string{"threat-model-gate", "offline-validation-gate", "secret-scan-gate"},
+			RequiredDocs:  []string{"docs/threat-model.md"},
+			Rationale:     "adapter inputs are untrusted exports and must preserve input hashes, event counts, offline validation, and redaction safety",
+		},
+		{
+			Name:          "archive-handlers",
+			Patterns:      []string{"internal/archive/", "internal/project/project.go", "docs/*archive*", "examples/*archive*", "scripts/*archive*"},
+			RequiredGates: []string{"archive-security-gate", "threat-model-gate", "offline-validation-gate"},
+			RequiredDocs:  []string{"docs/archive-security.md", "docs/threat-model.md"},
+			Rationale:     "archive handlers process untrusted downloads and must prove traversal, symlink, bomb, cache, and offline-validation controls",
+		},
+		{
+			Name:          "execution-features",
+			Patterns:      []string{"internal/project/compare.go", "internal/dbdryrun/", "cmd/patchline/main.go", "docs/*native*", "docs/*dry-run*", "scripts/*db-dry-run*"},
+			RequiredGates: []string{"generated-code-quarantine-gate", "db-dry-run-gate", "threat-model-gate"},
+			RequiredDocs:  []string{"docs/generated-code-quarantine.md", "docs/threat-model.md"},
+			Rationale:     "execution features can run native commands or database clients and must prove opt-in, allowlist, sandbox, and local-only controls",
+		},
+		{
+			Name:          "generators",
+			Patterns:      []string{"internal/project/propose.go", "internal/project/compare.go", "docs/*generated*", "examples/*generated*", "scripts/*generated*"},
+			RequiredGates: []string{"generated-code-quarantine-gate", "prompt-context-gate", "redaction-stability-gate"},
+			RequiredDocs:  []string{"docs/generated-code-quarantine.md", "docs/prompt-context-minimization.md", "docs/redaction-stability.md"},
+			Rationale:     "generated artifacts are untrusted interventions and require quarantine, minimized prompts, and stable redaction before merge",
+		},
+	}
+}
+
+func securitySurfaceMatches(file string, patterns []string) bool {
+	for _, pattern := range patterns {
+		if strings.HasSuffix(pattern, "/") && strings.HasPrefix(file, pattern) {
+			return true
+		}
+		if strings.Contains(pattern, "*") {
+			matched, _ := filepath.Match(pattern, file)
+			if matched {
+				return true
+			}
+			continue
+		}
+		if file == pattern {
+			return true
+		}
+	}
+	return false
+}
+
+func normalizedSecurityFiles(files []string) []string {
+	var out []string
+	seen := map[string]bool{}
+	for _, file := range files {
+		file = strings.TrimSpace(filepath.ToSlash(file))
+		file = strings.TrimPrefix(file, "./")
+		if file == "" || seen[file] {
+			continue
+		}
+		seen[file] = true
+		out = append(out, file)
+	}
+	sort.Strings(out)
+	return out
+}
+
+func finalizeSecurityReviewReport(report *securityReviewReport) {
+	report.Summary = securityReviewSummary{ChangedFiles: len(report.ChangedFiles), ProtectedSurfaces: len(report.Surfaces), Success: true}
+	required := map[string]bool{}
+	for _, surface := range report.Surfaces {
+		if surface.Status == "blocked" {
+			report.Summary.BlockedSurfaces++
+			report.Summary.Success = false
+		} else {
+			report.Summary.PassedSurfaces++
+		}
+		for _, gate := range surface.RequiredGates {
+			required[gate] = true
+		}
+		report.Summary.MissingGates += len(surface.MissingGates)
+	}
+	report.Summary.RequiredGates = len(required)
+	report.Hash = securityReviewHash(*report)
+	report.Markdown = renderSecurityReviewMarkdown(*report)
+}
+
+func securityReviewHash(report securityReviewReport) string {
+	copy := report
+	copy.Hash = ""
+	copy.Markdown = ""
+	return canonical.Hash(copy)
+}
+
+func renderSecurityReviewMarkdown(report securityReviewReport) string {
+	var b strings.Builder
+	fmt.Fprintf(&b, "# Patchline security review\n\n")
+	fmt.Fprintf(&b, "- status: `%s`\n", reportStatusWord(report.Summary.Success))
+	fmt.Fprintf(&b, "- protected surfaces: `%d`\n", report.Summary.ProtectedSurfaces)
+	fmt.Fprintf(&b, "- missing gates: `%d`\n", report.Summary.MissingGates)
+	fmt.Fprintf(&b, "- hash: `%s`\n\n", report.Hash)
+	fmt.Fprintf(&b, "## Protected surfaces\n\n| surface | status | files | required gates | missing gates |\n| --- | --- | ---: | --- | --- |\n")
+	for _, surface := range report.Surfaces {
+		missing := strings.Join(surface.MissingGates, ", ")
+		if missing == "" {
+			missing = "none"
+		}
+		fmt.Fprintf(&b, "| %s | %s | %d | %s | %s |\n", surface.Name, surface.Status, len(surface.Files), strings.Join(surface.RequiredGates, ", "), missing)
+	}
+	fmt.Fprintf(&b, "\n## Required docs\n\n")
+	for _, doc := range report.RequiredDocs {
+		fmt.Fprintf(&b, "- %s\n", doc)
+	}
+	return b.String()
+}
+
+func writeSecurityReviewReport(outDir string, report securityReviewReport) error {
+	if err := os.MkdirAll(outDir, 0o755); err != nil {
+		return err
+	}
+	copy := report
+	copy.Markdown = ""
+	data, err := json.MarshalIndent(copy, "", "  ")
+	if err != nil {
+		return err
+	}
+	if err := os.WriteFile(filepath.Join(outDir, "security-review.json"), append(data, '\n'), 0o644); err != nil {
+		return err
+	}
+	return os.WriteFile(filepath.Join(outDir, "security-review.md"), []byte(report.Markdown), 0o644)
 }
 
 func contributorCommand(args []string) error {

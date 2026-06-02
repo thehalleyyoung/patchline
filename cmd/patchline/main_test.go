@@ -105,6 +105,66 @@ func TestRepoMetricsWritesPrivacyPreservingAggregates(t *testing.T) {
 	}
 }
 
+func TestSecurityReviewBlocksProtectedSurfaceWithoutRequiredGates(t *testing.T) {
+	report := buildSecurityReviewReport(
+		[]string{"internal/evidence/adapter.go", "internal/project/propose.go", "internal/archive/archive.go", "internal/dbdryrun/dryrun.go"},
+		[]string{"threat-model-gate"},
+	)
+	if report.Summary.Success || report.Summary.ProtectedSurfaces != 4 || report.Summary.BlockedSurfaces != 4 || report.Summary.MissingGates == 0 {
+		t.Fatalf("expected blocked protected surfaces, got %#v", report.Summary)
+	}
+	surfaces := map[string]securityReviewSurface{}
+	for _, surface := range report.Surfaces {
+		surfaces[surface.Name] = surface
+	}
+	for _, name := range []string{"adapters", "archive-handlers", "execution-features", "generators"} {
+		if surfaces[name].Status != "blocked" {
+			t.Fatalf("expected %s blocked, got %#v", name, surfaces[name])
+		}
+	}
+	if !containsString(surfaces["archive-handlers"].MissingGates, "archive-security-gate") {
+		t.Fatalf("expected archive gate requirement, got %#v", surfaces["archive-handlers"])
+	}
+	if !containsString(surfaces["generators"].MissingGates, "generated-code-quarantine-gate") {
+		t.Fatalf("expected generated quarantine requirement, got %#v", surfaces["generators"])
+	}
+}
+
+func TestSecurityReviewPassesWithSurfaceGatesAndWritesReport(t *testing.T) {
+	passed := []string{
+		"archive-security-gate",
+		"db-dry-run-gate",
+		"generated-code-quarantine-gate",
+		"offline-validation-gate",
+		"prompt-context-gate",
+		"redaction-stability-gate",
+		"secret-scan-gate",
+		"threat-model-gate",
+	}
+	report := buildSecurityReviewReport(
+		[]string{"internal/evidence/adapter.go", "internal/project/project.go", "internal/project/propose.go", "internal/project/compare.go", "internal/dbdryrun/dryrun.go"},
+		passed,
+	)
+	if !report.Summary.Success || report.Summary.ProtectedSurfaces != 4 || report.Summary.MissingGates != 0 || report.Hash == "" {
+		t.Fatalf("expected passing security review, got %#v", report)
+	}
+	if !strings.Contains(report.Markdown, "Patchline security review") || !strings.Contains(report.Markdown, "archive-security-gate") {
+		t.Fatalf("expected review markdown with gates, got %s", report.Markdown)
+	}
+	out := filepath.Join(t.TempDir(), "security")
+	if err := run([]string{"security", "review", "--changed-files", "internal/project/propose.go,internal/archive/archive.go", "--passed-gates", strings.Join(passed, ","), "--out", out, "--json"}); err != nil {
+		t.Fatalf("security review command failed: %v", err)
+	}
+	var loaded securityReviewReport
+	readMainTestJSON(t, filepath.Join(out, "security-review.json"), &loaded)
+	if !loaded.Summary.Success || loaded.Summary.ProtectedSurfaces != 2 {
+		t.Fatalf("expected written passing report, got %#v", loaded.Summary)
+	}
+	if stat, err := os.Stat(filepath.Join(out, "security-review.md")); err != nil || stat.Size() == 0 {
+		t.Fatalf("expected security review markdown, stat=%#v err=%v", stat, err)
+	}
+}
+
 func TestGoldenFixtureGenerateCommand(t *testing.T) {
 	root := t.TempDir()
 	writeMainTestFile(t, root, "db/migrate/001_delete_events.sql", "DELETE FROM account_events;\n")
@@ -1098,4 +1158,13 @@ func readMainTestJSON(t *testing.T, path string, target any) {
 	if err := json.Unmarshal(data, target); err != nil {
 		t.Fatalf("failed to decode %s: %v\n%s", path, err, string(data))
 	}
+}
+
+func containsString(values []string, want string) bool {
+	for _, value := range values {
+		if value == want {
+			return true
+		}
+	}
+	return false
 }
