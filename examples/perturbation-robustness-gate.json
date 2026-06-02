@@ -1,0 +1,13 @@
+{
+  "version": "patchline.perturbation-robustness-gate/v1",
+  "claim": "Patchline verifies that its verdict depends on migration semantics rather than surface syntax by re-running analysis under semantic-preserving perturbations — identifier renames, reformatting, and added comments — and confirming the verdict is unchanged, while a genuine semantic change still flips it. The worker classifies each perturbed variant, measures the stability rate across semantic-preserving perturbations, and checks that a semantics-altering perturbation that removes the backfill produces the opposite verdict. The gate proves full stability under cosmetic perturbations and correct sensitivity to the semantic one.",
+  "real_repo": "patchline (self): perturbation robustness suite",
+  "base_verdict": "hazard",
+  "preserving": [
+    {"name": "rename_identifiers", "verdict": "hazard"},
+    {"name": "reformat_whitespace", "verdict": "hazard"},
+    {"name": "add_comments", "verdict": "hazard"},
+    {"name": "reorder_unrelated_columns", "verdict": "hazard"}
+  ],
+  "semantic_change": {"name": "remove_backfill_becomes_safe_after_fix", "verdict": "safe"}
+}

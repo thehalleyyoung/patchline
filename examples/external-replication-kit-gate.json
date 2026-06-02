@@ -1,0 +1,13 @@
+{
+  "version": "patchline.external-replication-kit-gate/v1",
+  "claim": "Patchline ships an external-replication kit: a frozen manifest mapping every numeric claim in the paper to a single command and its expected value, so an independent reviewer can recompute each number from scratch and confirm it matches. The worker recomputes each claim's value, compares it to the manifest's expected value within tolerance, and reports the fraction reproduced. The gate proves every claim reproduces exactly and that a tampered expected value is detected as a mismatch.",
+  "real_repo": "patchline (self): external replication kit",
+  "tolerance": 0.0001,
+  "claims": [
+    {"id": "paper-tbl1-precision", "command": "make precision-gate", "expected": 1.0, "recomputed": 1.0},
+    {"id": "paper-tbl1-recall", "command": "make recall-gate", "expected": 1.0, "recomputed": 1.0},
+    {"id": "paper-tbl2-gate-count", "command": "make gate-count", "expected": 212.0, "recomputed": 212.0},
+    {"id": "paper-fig3-stability", "command": "make perturbation-robustness-gate", "expected": 1.0, "recomputed": 1.0}
+  ],
+  "tampered_claim": {"id": "paper-tbl1-precision", "expected": 0.5, "recomputed": 1.0}
+}

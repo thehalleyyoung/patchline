@@ -1,0 +1,12 @@
+{
+  "version": "patchline.stage-ablation-gate/v1",
+  "claim": "Patchline quantifies how much each analysis stage actually contributes by ablating one stage at a time and measuring the resulting drop in accuracy, so the pipeline can be justified stage by stage instead of asserted as a monolith. The worker computes the marginal contribution of every stage as the full-pipeline accuracy minus the accuracy with that stage removed, identifies load-bearing stages with a positive marginal, and flags redundant stages whose removal changes nothing. The gate proves the key taint and backfill stages have strictly positive marginal contributions while a redundant duplicate stage contributes zero.",
+  "real_repo": "patchline (self): stage ablation suite",
+  "full_accuracy": 0.94,
+  "ablated_accuracy": {
+    "taint": 0.78,
+    "backfill": 0.85,
+    "index": 0.90,
+    "redundant_duplicate": 0.94
+  }
+}

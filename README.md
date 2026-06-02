@@ -429,6 +429,26 @@ Run `make drift-monitor-gate` for a **corpus drift monitor** computing total-var
 
 Run `make benchmark-release-gate` to publish a **versioned benchmark** with a **frozen split** and a leaderboard submission format — the split checksum is stable and train/test are disjoint, a conforming submission is accepted, and a malformed one is rejected; see [docs/benchmark-release.md](docs/benchmark-release.md).
 
+Run `make linter-baseline-compare-gate` to compare Patchline against **existing migration linters** on matched inputs — recall is computed per tool on the same cases, Patchline's recall dominates the baselines, and a baseline run on mismatched inputs is rejected; see [docs/linter-baseline-compare.md](docs/linter-baseline-compare.md).
+
+Run `make mcnemar-significance-gate` for **statistical significance** testing — a **McNemar** statistic plus a percentile **bootstrap CI** declare a real improvement significant while two identical systems are not; see [docs/mcnemar-significance.md](docs/mcnemar-significance.md).
+
+Run `make stage-ablation-gate` for an **ablation** suite measuring each analysis stage's **marginal contribution** — removing a load-bearing stage drops accuracy while a redundant stage contributes nothing; see [docs/stage-ablation.md](docs/stage-ablation.md).
+
+Run `make human-timing-study-gate` for a **human-study protocol** comparing reviewer time with and without Patchline findings — the counterbalanced design is validated and the with-findings condition is faster, while an unbalanced protocol is rejected; see [docs/human-timing-study.md](docs/human-timing-study.md).
+
+Run `make error-cost-model-gate` for a **cost-of-error** model weighting false negatives by historical incident severity — the configuration that misses a critical hazard ranks worse by expected cost even with fewer raw misses; see [docs/error-cost-model.md](docs/error-cost-model.md).
+
+Run `make reliability-calibration-gate` for a **calibration** study with reliability bins — a well-calibrated model's expected calibration error stays under threshold while an overconfident model exceeds it; see [docs/reliability-calibration.md](docs/reliability-calibration.md).
+
+Run `make framework-holdout-gate` for a **generalization** test holding out an entire framework — the threshold is selected only on training frameworks, evaluated on the unseen one, and any leakage of the held-out framework into training is detected; see [docs/framework-holdout.md](docs/framework-holdout.md).
+
+Run `make perturbation-robustness-gate` for a **robustness** suite — semantic-preserving perturbations (renames, reformatting, comments) leave the verdict stable while a semantic change (removing the backfill) correctly flips it; see [docs/perturbation-robustness.md](docs/perturbation-robustness.md).
+
+Run `make historical-replay-study-gate` for a **longitudinal** replay of historical migrations against known post-merge incidents — Patchline flags every incident-causing migration and clears the ones that shipped safely; see [docs/historical-replay-study.md](docs/historical-replay-study.md).
+
+Run `make external-replication-kit-gate` for an **external-replication** kit — every paper number maps to a one-command recomputation whose value matches the manifest, and a tampered expected value is caught; see [docs/external-replication-kit.md](docs/external-replication-kit.md).
+
 Add `--redact` to write `analysis-bundle/` copies with stable redaction tokens for identifiers, literals, customer-like strings, and secret-like values while preserving joins and existing artifact hashes.
 
 Add `--ci` to write `ci/summary.md` plus upload snippets and code-quality artifacts for GitHub Actions, GitLab CI, and Bitbucket Pipelines: SARIF under `analysis-bundle/summary.sarif`, GitLab `ci/gl-code-quality-report.json`, and Bitbucket `ci/bitbucket-code-insights.json`.

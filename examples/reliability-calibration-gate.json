@@ -1,0 +1,16 @@
+{
+  "version": "patchline.reliability-calibration-gate/v1",
+  "claim": "Patchline reports a reliability diagram and expected calibration error so that a stated confidence of eighty percent actually corresponds to being right about eighty percent of the time, letting a reviewer trust the abstain/act threshold. The worker bins predictions by confidence, computes the gap between mean predicted confidence and observed accuracy in each bin, and aggregates them into a sample-weighted expected calibration error. The gate proves a well-calibrated model's ECE stays under the acceptance threshold while a systematically overconfident model's ECE exceeds it.",
+  "real_repo": "patchline (self): reliability calibration study",
+  "ece_threshold": 0.1,
+  "well_calibrated": [
+    {"confidence": 0.55, "accuracy": 0.57, "count": 100},
+    {"confidence": 0.75, "accuracy": 0.73, "count": 100},
+    {"confidence": 0.95, "accuracy": 0.94, "count": 100}
+  ],
+  "overconfident": [
+    {"confidence": 0.60, "accuracy": 0.40, "count": 100},
+    {"confidence": 0.80, "accuracy": 0.55, "count": 100},
+    {"confidence": 0.99, "accuracy": 0.60, "count": 100}
+  ]
+}

@@ -1,0 +1,13 @@
+{
+  "version": "patchline.historical-replay-study-gate/v1",
+  "claim": "Patchline validates against ground truth by replaying historical migrations whose real-world outcomes are known — some caused production incidents, some shipped safely — and confirming the analyzer flags every incident-causing migration while clearing every safe one. The worker scores each replayed migration against its recorded outcome, computing recall on incident-causing migrations and specificity on safe ones. The gate proves perfect recall on known incidents and no false alarms on the migrations that shipped without harm.",
+  "real_repo": "patchline (self): historical incident replay",
+  "migrations": [
+    {"id": "m-2019-add-notnull-no-default", "outcome": "incident", "flagged": true},
+    {"id": "m-2020-drop-column-still-read", "outcome": "incident", "flagged": true},
+    {"id": "m-2021-rename-without-shim", "outcome": "incident", "flagged": true},
+    {"id": "m-2020-add-nullable-column", "outcome": "safe", "flagged": false},
+    {"id": "m-2021-create-index-concurrently", "outcome": "safe", "flagged": false},
+    {"id": "m-2022-backfill-then-notnull", "outcome": "safe", "flagged": false}
+  ]
+}

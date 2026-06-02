@@ -1,0 +1,10 @@
+{
+  "version": "patchline.error-cost-model-gate/v1",
+  "claim": "Patchline scores analyzer configurations by an expected cost that weights each missed hazard by its historical incident severity, so a configuration that misses one catastrophic data-loss hazard is correctly ranked worse than one that misses several cosmetic ones, even though it has fewer raw misses. The worker multiplies each false negative by its severity weight, sums the expected cost per configuration, and compares the cost ranking against the naive raw-miss-count ranking. The gate proves the severity-weighted ranking flips the naive ranking: the config with fewer but more severe misses has the higher expected cost.",
+  "real_repo": "patchline (self): cost-of-error model",
+  "severity_weight": {"critical": 100, "high": 20, "low": 1},
+  "configs": {
+    "config_a": {"missed": ["critical"]},
+    "config_b": {"missed": ["low", "low", "low", "high"]}
+  }
+}

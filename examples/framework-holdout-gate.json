@@ -1,0 +1,8 @@
+{
+  "version": "patchline.framework-holdout-gate/v1",
+  "claim": "Patchline measures cross-framework generalization by holding an entire framework out of threshold selection and evaluating only on that unseen framework, so a reported accuracy cannot be inflated by tuning on the very examples it is tested on. The worker selects the decision threshold using only the training frameworks, evaluates on the held-out framework, and verifies the held-out framework never appears in the training pool. The gate proves the threshold is chosen without the held-out framework, the evaluation runs on the held-out framework, and that a leaked configuration in which the held-out framework also appears in training is rejected.",
+  "real_repo": "patchline (self): framework holdout generalization",
+  "train_frameworks": ["django", "rails", "sqlalchemy"],
+  "holdout_framework": "prisma",
+  "leaked_train_frameworks": ["django", "rails", "prisma"]
+}

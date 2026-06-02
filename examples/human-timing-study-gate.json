@@ -1,0 +1,15 @@
+{
+  "version": "patchline.human-timing-study-gate/v1",
+  "claim": "Patchline specifies a counterbalanced human study that measures reviewer time on migration pull requests with and without Patchline findings, so a claimed productivity benefit rests on a valid within-subjects design rather than an anecdote. The worker validates that every participant completed both the with-findings and without-findings conditions (a balanced within-subjects design), computes the per-participant time delta, and reports the mean reduction. The gate proves the protocol is balanced, the with-findings condition is meaningfully faster on average, and that a protocol in which a participant skipped a condition is rejected as unbalanced.",
+  "real_repo": "patchline (self): reviewer timing study protocol",
+  "participants": [
+    {"id": "p1", "without_sec": 600, "with_sec": 360},
+    {"id": "p2", "without_sec": 540, "with_sec": 300},
+    {"id": "p3", "without_sec": 720, "with_sec": 480},
+    {"id": "p4", "without_sec": 480, "with_sec": 330}
+  ],
+  "unbalanced_participants": [
+    {"id": "p1", "without_sec": 600, "with_sec": 360},
+    {"id": "p2", "without_sec": 540, "with_sec": null}
+  ]
+}

@@ -1,0 +1,13 @@
+{
+  "version": "patchline.linter-baseline-compare-gate/v1",
+  "claim": "Patchline measures its accuracy against existing migration linters on exactly matched inputs, so a recall improvement reflects a better analysis rather than an easier test set, and any input mismatch between tools is caught before numbers are compared. The worker scores each tool's predictions against shared gold labels over the identical case set, computes per-tool recall on the hazardous cases, and verifies all tools were run on the same inputs. The gate proves Patchline's recall dominates both baseline linters on matched inputs and that a baseline evaluated on a different case set is rejected as an unmatched comparison.",
+  "real_repo": "patchline (self): baseline linter comparison",
+  "cases": ["c1","c2","c3","c4","c5","c6"],
+  "gold_hazards": ["c1","c2","c3","c4"],
+  "tools": {
+    "patchline": {"flagged": ["c1","c2","c3","c4"], "cases": ["c1","c2","c3","c4","c5","c6"]},
+    "linter_a": {"flagged": ["c1","c2"], "cases": ["c1","c2","c3","c4","c5","c6"]},
+    "linter_b": {"flagged": ["c1","c3","c5"], "cases": ["c1","c2","c3","c4","c5","c6"]}
+  },
+  "mismatched_tool": {"flagged": ["c1","c2","c3","c4"], "cases": ["c1","c2","c3","x9"]}
+}

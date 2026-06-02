@@ -1,0 +1,8 @@
+{
+  "version": "patchline.mcnemar-significance-gate/v1",
+  "claim": "Patchline backs every headline accuracy claim with a statistical significance test rather than a bare point estimate, using McNemar's test on paired per-case outcomes and a percentile bootstrap confidence interval on the metric difference so that an apparent improvement is only reported as real when the data support it. The worker counts the discordant pairs between two systems, computes the continuity-corrected McNemar statistic, compares it against the chi-square critical value, and derives a bootstrap CI from provided resample differences. The gate proves a genuine improvement is significant with a CI excluding zero, and that two identical systems produce no discordance, a zero statistic, and a CI containing zero.",
+  "real_repo": "patchline (self): McNemar significance and bootstrap CI",
+  "chi2_crit_0_05": 3.841,
+  "improved": {"b_only_patchline_correct": 12, "c_only_baseline_correct": 2, "resample_diffs": [0.08,0.10,0.12,0.09,0.11,0.07,0.13,0.10,0.09,0.11,0.12,0.08,0.10,0.11,0.09,0.10,0.12,0.08,0.11,0.10]},
+  "identical": {"b_only_patchline_correct": 0, "c_only_baseline_correct": 0, "resample_diffs": [-0.02,0.01,-0.01,0.02,0.00,-0.02,0.01,0.00,-0.01,0.02,0.00,-0.02,0.01,0.00,-0.01,0.02,0.00,-0.01,0.01,-0.02]}
+}
