@@ -1,0 +1,14 @@
+{
+  "version": "patchline.citation-doi-gate/v1",
+  "claim": "Patchline provides a citation file and an archival DOI so the artifact is formally referenceable, with the DOI matching a registered pattern and the citation carrying complete bibliographic fields. The worker validates the DOI format, checks the citation has title, authors, version, and year, and confirms the cited version matches the release. The gate proves the citation is complete with a well-formed DOI and that a citation with a malformed DOI is rejected.",
+  "real_repo": "patchline (self): citation-doi",
+  "doi": "10.5281/zenodo.1234567",
+  "title": "Patchline: Migration Safety Analysis",
+  "authors": [
+    "H. Young"
+  ],
+  "cite_version": "1.4.2",
+  "year": 2024,
+  "release_version": "1.4.2",
+  "bad_doi": "not-a-doi"
+}

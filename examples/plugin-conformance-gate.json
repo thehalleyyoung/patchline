@@ -1,0 +1,28 @@
+{
+  "version": "patchline.plugin-conformance-gate/v1",
+  "claim": "Patchline exposes a plugin API with a stable contract and a conformance test suite that every third-party analyzer must pass, so external plugins integrate without breaking the core guarantees. The worker checks each plugin implements every required contract method and passes each conformance case, computing the conformance rate. The gate proves a fully implemented plugin conforms and that a plugin missing a required contract method fails conformance.",
+  "real_repo": "patchline (self): plugin-conformance",
+  "required_methods": [
+    "analyze",
+    "explain",
+    "version"
+  ],
+  "plugin": {
+    "name": "acme-analyzer",
+    "methods": [
+      "analyze",
+      "explain",
+      "version"
+    ],
+    "cases_passed": 5,
+    "cases_total": 5
+  },
+  "bad_plugin": {
+    "name": "broken",
+    "methods": [
+      "analyze"
+    ],
+    "cases_passed": 2,
+    "cases_total": 5
+  }
+}

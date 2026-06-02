@@ -1,0 +1,29 @@
+{
+  "version": "patchline.office-hours-rotation-gate/v1",
+  "claim": "Patchline documents a public office-hours and triage rotation, gate-verified to have full calendar coverage with no unstaffed slot and no maintainer double-booked, so community support is dependable rather than ad hoc. The worker checks every scheduled slot has an assigned maintainer and that no maintainer covers two slots simultaneously. The gate proves coverage is complete with no conflicts and that a schedule with an unstaffed slot is rejected.",
+  "real_repo": "patchline (self): office-hours-rotation",
+  "slots": [
+    {
+      "slot": "mon-am",
+      "maintainer": "alice"
+    },
+    {
+      "slot": "wed-pm",
+      "maintainer": "bob"
+    },
+    {
+      "slot": "fri-am",
+      "maintainer": "carol"
+    }
+  ],
+  "broken_schedule": [
+    {
+      "slot": "mon-am",
+      "maintainer": "alice"
+    },
+    {
+      "slot": "wed-pm",
+      "maintainer": ""
+    }
+  ]
+}

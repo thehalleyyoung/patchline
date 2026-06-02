@@ -1,0 +1,12 @@
+{
+  "version": "patchline.sustainability-plan-gate/v1",
+  "claim": "Patchline gate-verifies a sustainability plan covering CI cost per run, maintainer load, and bus-factor, so the project's continuity is measured rather than assumed. The worker checks CI cost stays under budget, maintainer load under a healthy cap, and bus-factor at or above a minimum threshold of independent maintainers. The gate proves all three sustainability metrics are within bounds and that a single-maintainer bus-factor below threshold is flagged.",
+  "real_repo": "patchline (self): sustainability-plan",
+  "ci_cost_usd": 3.2,
+  "ci_budget_usd": 5.0,
+  "maintainer_load_hours": 6,
+  "load_cap_hours": 10,
+  "bus_factor": 3,
+  "min_bus_factor": 2,
+  "fragile_bus_factor": 1
+}

@@ -468,6 +468,16 @@ Run `make triage-prioritizer-gate` to deduplicate and **prioritize** findings by
 Run `make config-profiles-gate` for **strict/balanced/lenient** profiles with a documented, monotonic recall-precision trade-off, rejecting a misconfigured profile; see [docs/config-profiles.md](docs/config-profiles.md).
 Run `make regression-snapshot-gate` for a snapshot mode that fails CI only on **newly introduced** hazards, never on pre-existing debt; see [docs/regression-snapshot.md](docs/regression-snapshot.md).
 Run `make a11y-i18n-output-gate` for an **accessibility** and i18n pass ensuring every message is text-marked and localizable, rejecting color-only output; see [docs/a11y-i18n-output.md](docs/a11y-i18n-output.md).
+Run `make contributor-onboarding-gate` for a **one script** onboarding that builds, tests, and runs a first analysis, rejecting a plan missing a stage; see [docs/contributor-onboarding.md](docs/contributor-onboarding.md).
+Run `make good-first-issue-gen-gate` to seed **good first issue**s from real gate-catalog gaps, rejecting a fabricated issue with no backing gap; see [docs/good-first-issue-gen.md](docs/good-first-issue-gen.md).
+Run `make office-hours-rotation-gate` for a documented office-hours triage **rotation** with full coverage and no conflicts, rejecting an unstaffed schedule; see [docs/office-hours-rotation.md](docs/office-hours-rotation.md).
+Run `make plugin-conformance-gate` for a plugin API **conformance** suite where a compliant plugin passes and one missing a contract method fails; see [docs/plugin-conformance.md](docs/plugin-conformance.md).
+Run `make showcase-gallery-gate` for a gallery of protected repos, each with **reproducible evidence**, rejecting an entry with no reproduce command; see [docs/showcase-gallery.md](docs/showcase-gallery.md).
+Run `make quarterly-benchmark-report-gate` for a quarterly report auto-generated from the **leaderboard**, proving the series is non-regressing and flagging a regression quarter; see [docs/quarterly-benchmark-report.md](docs/quarterly-benchmark-report.md).
+Run `make governance-policy-gate` for a governance policy with semver and a **deprecation** window, rejecting a breaking change shipped under the minimum window; see [docs/governance-policy.md](docs/governance-policy.md).
+Run `make citation-doi-gate` for a citation file and archival **DOI** with complete bibliographic fields, rejecting a malformed DOI; see [docs/citation-doi.md](docs/citation-doi.md).
+Run `make sustainability-plan-gate` for a sustainability plan checking CI cost, maintainer load, and **bus-factor**, flagging a single-maintainer project; see [docs/sustainability-plan.md](docs/sustainability-plan.md).
+Run `make roadmap-burndown-gate` for a 1.0-to-2.0 **milestone** burndown where every open milestone is gate-backed and an evidence-free completion is rejected; see [docs/roadmap-burndown.md](docs/roadmap-burndown.md).
 
 Add `--redact` to write `analysis-bundle/` copies with stable redaction tokens for identifiers, literals, customer-like strings, and secret-like values while preserving joins and existing artifact hashes.
 

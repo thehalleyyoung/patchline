@@ -1,0 +1,25 @@
+{
+  "version": "patchline.showcase-gallery-gate/v1",
+  "claim": "Patchline maintains a showcase gallery of real repositories it protected, where each entry carries reproducible evidence \u2014 a command and an expected outcome \u2014 so every success story can be independently re-run. The worker verifies each gallery entry names a real repository, a reproduce command, and a recorded prevented hazard, and that the evidence reproduces. The gate proves every showcase entry is backed by reproducible evidence and that an entry with no reproduce command is rejected.",
+  "real_repo": "patchline (self): showcase-gallery",
+  "entries": [
+    {
+      "repo": "acme/api",
+      "reproduce": "make historical-replay-study-gate",
+      "prevented": "drop-referenced-column",
+      "reproduced": true
+    },
+    {
+      "repo": "globex/web",
+      "reproduce": "make red-team-adversarial-gate",
+      "prevented": "notnull-no-backfill",
+      "reproduced": true
+    }
+  ],
+  "unbacked_entry": {
+    "repo": "foo/bar",
+    "reproduce": "",
+    "prevented": "x",
+    "reproduced": false
+  }
+}

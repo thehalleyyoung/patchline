@@ -1,0 +1,32 @@
+{
+  "version": "patchline.good-first-issue-gen-gate/v1",
+  "claim": "Patchline seeds good-first-issue suggestions from real gaps in the gate catalog, proposing each as a scoped task tied to a concrete missing or weak gate so newcomers work on things that matter. The worker filters catalog entries to those with an identified gap, checks each generated issue has a scope and a backing gap reference, and counts the actionable issues. The gate proves every generated issue references a real gap and is scoped, and that a fabricated issue with no backing gap is rejected.",
+  "real_repo": "patchline (self): good-first-issue-gen",
+  "catalog_gaps": [
+    {
+      "area": "mysql-dialect",
+      "gap": "no-mysql-fixture"
+    },
+    {
+      "area": "streaming",
+      "gap": "no-backpressure-test"
+    }
+  ],
+  "issues": [
+    {
+      "title": "Add MySQL fixture",
+      "scope": "small",
+      "backing_gap": "no-mysql-fixture"
+    },
+    {
+      "title": "Add backpressure test",
+      "scope": "small",
+      "backing_gap": "no-backpressure-test"
+    }
+  ],
+  "fabricated_issue": {
+    "title": "Rewrite everything",
+    "scope": "huge",
+    "backing_gap": "none"
+  }
+}

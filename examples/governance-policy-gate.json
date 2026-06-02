@@ -1,0 +1,27 @@
+{
+  "version": "patchline.governance-policy-gate/v1",
+  "claim": "Patchline documents a governance policy with semantic versioning, a minimum deprecation window, and architecture decision records, so breaking changes are predictable and traceable. The worker checks the version follows semver, that the deprecation window meets the documented minimum, and that each breaking change links to a decision record. The gate proves the policy is satisfied with adequate deprecation and recorded decisions, and that a breaking change shipped under the minimum deprecation window is rejected.",
+  "real_repo": "patchline (self): governance-policy",
+  "sem_version": "1.4.2",
+  "min_deprecation_days": 90,
+  "changes": [
+    {
+      "id": "c1",
+      "breaking": true,
+      "deprecation_days": 120,
+      "adr": "adr-007"
+    },
+    {
+      "id": "c2",
+      "breaking": false,
+      "deprecation_days": 0,
+      "adr": "adr-008"
+    }
+  ],
+  "rushed_change": {
+    "id": "c3",
+    "breaking": true,
+    "deprecation_days": 10,
+    "adr": "adr-009"
+  }
+}

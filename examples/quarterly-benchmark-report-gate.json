@@ -1,0 +1,27 @@
+{
+  "version": "patchline.quarterly-benchmark-report-gate/v1",
+  "claim": "Patchline publishes a quarterly benchmark report generated automatically from the leaderboard, so progress over time is a recorded, monotone-checked series rather than a one-off claim. The worker checks the report rows are ordered by quarter, that each carries the headline metrics, and that the latest quarter does not regress below the previous on the primary metric. The gate proves the series is ordered and non-regressing on the primary metric, and that an injected regression quarter is flagged.",
+  "real_repo": "patchline (self): quarterly-benchmark-report",
+  "quarters": [
+    {
+      "q": "2024Q1",
+      "recall": 0.9,
+      "precision": 0.92
+    },
+    {
+      "q": "2024Q2",
+      "recall": 0.94,
+      "precision": 0.93
+    },
+    {
+      "q": "2024Q3",
+      "recall": 0.97,
+      "precision": 0.95
+    }
+  ],
+  "regression_quarter": {
+    "q": "2024Q4",
+    "recall": 0.8,
+    "precision": 0.95
+  }
+}

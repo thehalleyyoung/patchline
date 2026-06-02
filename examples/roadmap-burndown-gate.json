@@ -1,0 +1,27 @@
+{
+  "version": "patchline.roadmap-burndown-gate/v1",
+  "claim": "Patchline tracks a 1.0-to-2.0 roadmap as gate-backed milestones with a burndown, where each milestone is either complete or has a backing gate, and progress is computed from real completion rather than narrative. The worker counts completed milestones, verifies every incomplete milestone has a backing gate, and computes the burndown percentage. The gate proves the burndown is consistent and every open milestone is gate-backed, and that a milestone marked complete with no evidence is rejected.",
+  "real_repo": "patchline (self): roadmap-burndown",
+  "milestones": [
+    {
+      "id": "m1",
+      "complete": true,
+      "backing_gate": "signed-provenance-chain-gate"
+    },
+    {
+      "id": "m2",
+      "complete": true,
+      "backing_gate": "plugin-conformance-gate"
+    },
+    {
+      "id": "m3",
+      "complete": false,
+      "backing_gate": "reproducible-build-attestation-gate"
+    }
+  ],
+  "evidence_free_milestone": {
+    "id": "m4",
+    "complete": true,
+    "backing_gate": ""
+  }
+}

@@ -1,0 +1,34 @@
+{
+  "version": "patchline.contributor-onboarding-gate/v1",
+  "claim": "Patchline ships a contributor-onboarding path that, in one script, builds the tool, runs the test suite, and produces a first analysis verdict, so a new contributor reaches a working setup without manual steps. The worker verifies the onboarding plan contains the build, test, and first-analysis stages in order and that each stage has a runnable command. The gate proves all three onboarding stages are present and runnable and that a plan missing the test stage is rejected.",
+  "real_repo": "patchline (self): contributor-onboarding",
+  "stages": [
+    {
+      "name": "build",
+      "cmd": "make build"
+    },
+    {
+      "name": "test",
+      "cmd": "make test"
+    },
+    {
+      "name": "first-analysis",
+      "cmd": "make quickstart-sixty-seconds-gate"
+    }
+  ],
+  "required": [
+    "build",
+    "test",
+    "first-analysis"
+  ],
+  "incomplete": [
+    {
+      "name": "build",
+      "cmd": "make build"
+    },
+    {
+      "name": "first-analysis",
+      "cmd": "make x"
+    }
+  ]
+}
