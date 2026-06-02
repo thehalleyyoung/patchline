@@ -383,6 +383,8 @@ Run `make active-learning-gate` to build an **active-learning queue** that prior
 
 Run `make risk-economics-gate` to make the ship-or-block call as **repair economics** — it weighs **expected** failure loss against blocking cost, blocking only when expected loss is greater; see [docs/risk-economics.md](docs/risk-economics.md).
 
+Run `make reviewer-sim-gate` to simulate a multi-agent **reviewer panel** — strict/balanced/lenient agents vote and the same panel yields different outcomes under majority versus **veto** aggregation; see [docs/reviewer-sim.md](docs/reviewer-sim.md).
+
 Add `--redact` to write `analysis-bundle/` copies with stable redaction tokens for identifiers, literals, customer-like strings, and secret-like values while preserving joins and existing artifact hashes.
 
 Add `--ci` to write `ci/summary.md` plus upload snippets and code-quality artifacts for GitHub Actions, GitLab CI, and Bitbucket Pipelines: SARIF under `analysis-bundle/summary.sarif`, GitLab `ci/gl-code-quality-report.json`, and Bitbucket `ci/bitbucket-code-insights.json`.

@@ -1,0 +1,14 @@
+{
+  "version": "patchline.reviewer-sim-gate/v1",
+  "claim": "Patchline simulates a panel of reviewer agents with different risk tolerances — strict, balanced, and lenient — each voting to approve or block a migration by comparing its risk score against the reviewer's personal threshold, and it then aggregates those votes under named policies so the same panel can yield different decisions depending on whether the team uses majority rule or any-reviewer veto. The worker runs each reviewer over each migration, records individual votes, and computes both the majority outcome and the veto outcome. The gate proves a borderline migration is approved under majority but blocked under veto because the strict reviewer dissents, while a clearly-safe migration is approved unanimously under both policies.",
+  "real_repo": "patchline (self): multi-agent reviewer panel simulation",
+  "reviewers": [
+    {"name": "strict", "block_threshold": 0.2},
+    {"name": "balanced", "block_threshold": 0.5},
+    {"name": "lenient", "block_threshold": 0.8}
+  ],
+  "migrations": [
+    {"id": "borderline", "risk": 0.35},
+    {"id": "clearly_safe", "risk": 0.05}
+  ]
+}
