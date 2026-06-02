@@ -1,0 +1,74 @@
+{
+  "version": "patchline.rebuttal-response-workspace-gate/v1",
+  "claim": "Patchline can generate a public rebuttal-response workspace where likely reviewer concerns are mapped to current evidence, explicit limitations, reviewer checks, and response drafts.",
+  "minimum_concerns": 7,
+  "minimum_public_repos": 4,
+  "minimum_evidence_links_per_concern": 2,
+  "minimum_limitations_linked": 6,
+  "appendix_spec": "examples/paper-appendix-gate.json",
+  "release_manifest_spec": "examples/artifact-release-manifest-gate.json",
+  "concerns": [
+    {
+      "id": "reproducibility",
+      "question": "Can independent reviewers rebuild the reported public-code results?",
+      "claim_select": "links risky data changes",
+      "limitation_category": "missing_runtime_evidence",
+      "reviewer_check": "Run the artifact container profile gate and compare the generated checksums and public repository counts."
+    },
+    {
+      "id": "availability",
+      "question": "Are the exact sources and archives public and pinned?",
+      "claim_select": "public repository slices",
+      "limitation_category": "unsupported_ecosystem",
+      "reviewer_check": "Inspect the release manifest exact refs, codeload archive URLs, and archive SHA-256 values."
+    },
+    {
+      "id": "functional-correctness",
+      "question": "Does the artifact produce concrete findings rather than only documentation?",
+      "claim_select": "artifact-backed counts",
+      "limitation_category": "intentionally_conservative_check",
+      "reviewer_check": "Inspect capstone summary counts for ranked risks, generated files, rejected bad output, and evidence artifacts."
+    },
+    {
+      "id": "scope-of-claims",
+      "question": "Are claims qualified when runtime or causal evidence is missing?",
+      "claim_select": "limitations",
+      "limitation_category": "uncertain_causality",
+      "reviewer_check": "Read the claims-to-evidence appendix rows and confirm every claim carries limitations or missing evidence."
+    },
+    {
+      "id": "generated-output-safety",
+      "question": "Can generated repair output be trusted by default?",
+      "claim_select": "generated",
+      "limitation_category": "intentionally_conservative_check",
+      "reviewer_check": "Inspect rejected-generated evidence and confirm generated output is treated as untrusted intervention input."
+    },
+    {
+      "id": "ecosystem-generalization",
+      "question": "Does the artifact overstate support across ecosystems?",
+      "claim_select": "public repositories",
+      "limitation_category": "unsupported_ecosystem",
+      "reviewer_check": "Compare corpus composition, language/framework evidence, and unsupported-ecosystem limitations."
+    },
+    {
+      "id": "paper-figure-drift",
+      "question": "Can paper figures drift from the current generated evidence?",
+      "claim_select": "Evaluation tables",
+      "limitation_category": "missing_runtime_evidence",
+      "reviewer_check": "Regenerate the paper appendix and inspect figure source artifacts and table values."
+    }
+  ],
+  "required_outputs": [
+    "rebuttal-workspace.json",
+    "rebuttal-workspace.md",
+    "responses/reproducibility.md",
+    "responses/availability.md",
+    "responses/functional-correctness.md",
+    "responses/scope-of-claims.md",
+    "responses/generated-output-safety.md",
+    "responses/ecosystem-generalization.md",
+    "responses/paper-figure-drift.md",
+    "evidence/paper-appendix/appendix.json",
+    "evidence/release-manifest/artifact-release-manifest.json"
+  ]
+}

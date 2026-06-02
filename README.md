@@ -201,6 +201,8 @@ Run `make reviewer-dry-run-logs-gate` to generate anonymized reviewer dry-run lo
 
 Run `make artifact-release-manifest-gate` to generate the deterministic artifact DOI/release manifest with exact refs, archives, checksums, and command versions; see [docs/artifact-release-manifest.md](docs/artifact-release-manifest.md).
 
+Run `make rebuttal-response-workspace-gate` to generate a public rebuttal-response workspace linking likely reviewer concerns to evidence and limitations; see [docs/rebuttal-response-workspace.md](docs/rebuttal-response-workspace.md).
+
 Add `--redact` to write `analysis-bundle/` copies with stable redaction tokens for identifiers, literals, customer-like strings, and secret-like values while preserving joins and existing artifact hashes.
 
 Add `--ci` to write `ci/summary.md` plus upload snippets and code-quality artifacts for GitHub Actions, GitLab CI, and Bitbucket Pipelines: SARIF under `analysis-bundle/summary.sarif`, GitLab `ci/gl-code-quality-report.json`, and Bitbucket `ci/bitbucket-code-insights.json`.
