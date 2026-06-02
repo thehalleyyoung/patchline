@@ -1,0 +1,9 @@
+{
+  "version": "patchline.fixture-minimizer-gate/v1",
+  "claim": "Patchline ships generated fixture minimizers for every supported ecosystem. Each minimizer uses the real analyzer as an oracle and applies delta-debugging to reduce a seed input to the smallest fixture that still reproduces a destructive data-change finding, then proves the result is 1-minimal (removing any remaining line drops the target finding). This is proven against a real Cassandra migration fetched from the laaksomavrick/twitter-go repository, which is reduced from its full size to a minimal reproducing fixture, alongside minimizers for SQL migrations, Spark pipeline overwrites, and Avro schema-compatibility breaks.",
+  "ecosystems": ["cassandra", "sql", "spark", "avro"],
+  "real_repo": {
+    "repo": "laaksomavrick/twitter-go",
+    "subpath": "migrations"
+  }
+}

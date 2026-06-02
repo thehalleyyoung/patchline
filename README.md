@@ -283,6 +283,8 @@ Run `make infra-ordering-gate` to run **infrastructure/data ordering** analysis 
 
 Run `make schema-compat-gate` to flag **protobuf/Avro schema-compatibility** hazards (proto2 required fields, missing reserved tags, Avro fields without defaults) tied to data-change risk — proven on the real apache/avro repo plus a unit matrix with a no-false-positive rule; see [docs/schema-compat.md](docs/schema-compat.md).
 
+Run `make fixture-minimizer-gate` to **delta-debug** any failing input down to a 1-minimal reproducing fixture across every ecosystem — using the analyzer as an oracle and proven by reducing a real Cassandra migration to its minimal destructive core; see [docs/fixture-minimizer.md](docs/fixture-minimizer.md).
+
 Add `--redact` to write `analysis-bundle/` copies with stable redaction tokens for identifiers, literals, customer-like strings, and secret-like values while preserving joins and existing artifact hashes.
 
 Add `--ci` to write `ci/summary.md` plus upload snippets and code-quality artifacts for GitHub Actions, GitLab CI, and Bitbucket Pipelines: SARIF under `analysis-bundle/summary.sarif`, GitLab `ci/gl-code-quality-report.json`, and Bitbucket `ci/bitbucket-code-insights.json`.
