@@ -1,0 +1,35 @@
+{
+  "version": "patchline.issue-to-artifact-gate/v1",
+  "claim": "Patchline turns accepted user-submitted examples into pinned public proof entries through a deterministic, auditable pipeline that refuses to admit anything that is not reproducible. Each submission must name a capability that maps to an existing gate, a public repository, and a pinned ref (a 40-character commit SHA or an explicit tag ref); submissions that are unpinned, name an unknown capability, or lack a claim are rejected with a structured reason. The gate proves that valid submissions become proof entries and that a deliberately unpinned negative-control submission is always rejected.",
+  "real_repo": "patchline (self): submissions validated against scripts/*-gate.sh",
+  "submissions": [
+    {
+      "title": "Cassandra DROP detected in twitter-go",
+      "repo": "laaksomavrick/twitter-go",
+      "ref": "0000000000000000000000000000000000000000",
+      "capability": "nosql-change",
+      "claim": "Patchline flags destructive Cassandra DROP TABLE/KEYSPACE in real migration files."
+    },
+    {
+      "title": "Avro fields without defaults in apache/avro",
+      "repo": "apache/avro",
+      "ref": "refs/tags/release-1.11.3",
+      "capability": "schema-compat",
+      "claim": "Patchline flags Avro record fields without defaults as schema-evolution hazards."
+    },
+    {
+      "title": "Unpinned submission (negative control)",
+      "repo": "example/unpinned",
+      "ref": "main",
+      "capability": "nosql-change",
+      "claim": "This submission is intentionally unpinned and must be rejected."
+    },
+    {
+      "title": "Unknown capability (negative control)",
+      "repo": "example/repo",
+      "ref": "1111111111111111111111111111111111111111",
+      "capability": "does-not-exist",
+      "claim": "This submission names a capability with no gate and must be rejected."
+    }
+  ]
+}

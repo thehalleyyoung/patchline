@@ -291,6 +291,8 @@ Run `make onboarding-quest-gate` to scaffold a new ecosystem gate in minutes —
 
 Run `make examples-gallery-gate` to render a public **examples gallery** straight from `examples/*.json` and their **reproducibility** backing — every advertised capability is cross-checked against its gate and doc, so the gallery has zero orphan entries; see [docs/examples-gallery.md](docs/examples-gallery.md).
 
+Run `make issue-to-artifact-gate` to turn accepted user submissions into **pinned public proof** entries — only pinned refs that map to a real gate are admitted, and unpinned or unknown-capability submissions are **rejected** by deterministic negative controls; see [docs/issue-to-artifact.md](docs/issue-to-artifact.md).
+
 Add `--redact` to write `analysis-bundle/` copies with stable redaction tokens for identifiers, literals, customer-like strings, and secret-like values while preserving joins and existing artifact hashes.
 
 Add `--ci` to write `ci/summary.md` plus upload snippets and code-quality artifacts for GitHub Actions, GitLab CI, and Bitbucket Pipelines: SARIF under `analysis-bundle/summary.sarif`, GitLab `ci/gl-code-quality-report.json`, and Bitbucket `ci/bitbucket-code-insights.json`.
