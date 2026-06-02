@@ -1,0 +1,12 @@
+{
+  "version": "patchline.intervention-contracts-gate/v1",
+  "claim": "Every generated intervention carries an explicit contract: preconditions (policy evidence that must hold before it is trusted), postconditions (scope and frame obligations the repair must preserve), rollback assumptions, and the proof holes that remain unresolved. Contracts are built from real repair-proof summaries and policy checks, every contract surfaces its proof holes rather than hiding them, and no contract claims a 'proven' status — the strongest status is 'conditional'.",
+  "real_repo": {
+    "repo": "lobsters/lobsters",
+    "ref": "3b80b47aa5aaba37ec44413e7d1dc96fcf1585b6",
+    "subpath": "db/migrate"
+  },
+  "minimum_contracts": 20,
+  "allowed_statuses": ["refuted", "conditional", "open"],
+  "required_sections": ["preconditions", "postconditions", "rollback_assumptions", "proof_holes"]
+}

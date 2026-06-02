@@ -249,6 +249,8 @@ Run `make incident-export-gate` to export real findings to PagerDuty, Opsgenie, 
 
 Run `make negative-controls-gate` to run paired positive/negative-control telemetry tests proving the runtime layer is no rubber stamp — silent telemetry never confirms a warning (even high-severity), giving specificity 1.0 while the positive arm retains power; see [docs/negative-controls.md](docs/negative-controls.md).
 
+Run `make intervention-contracts-gate` to attach an explicit contract to every generated intervention — preconditions, postconditions, rollback assumptions, and remaining proof holes — built from real repair-proof summaries, where no contract claims a proven status; see [docs/intervention-contracts.md](docs/intervention-contracts.md).
+
 Add `--redact` to write `analysis-bundle/` copies with stable redaction tokens for identifiers, literals, customer-like strings, and secret-like values while preserving joins and existing artifact hashes.
 
 Add `--ci` to write `ci/summary.md` plus upload snippets and code-quality artifacts for GitHub Actions, GitLab CI, and Bitbucket Pipelines: SARIF under `analysis-bundle/summary.sarif`, GitLab `ci/gl-code-quality-report.json`, and Bitbucket `ci/bitbucket-code-insights.json`.
