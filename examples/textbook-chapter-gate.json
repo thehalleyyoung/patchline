@@ -1,0 +1,23 @@
+{
+  "version": "patchline.textbook-chapter-gate/v1",
+  "claim": "Patchline distills a textbook-quality chapter on migration safety derived from the repo's evidence, so each pedagogical claim traces to a runnable artifact rather than assertion. The worker checks every chapter section is evidence-backed. The gate proves every section is backed by evidence and that an unbacked section is rejected.",
+  "real_repo": "patchline (self): textbook-chapter",
+  "items": [
+    {
+      "section": "hazard-taxonomy",
+      "claim_backed": true
+    },
+    {
+      "section": "gate-design",
+      "claim_backed": true
+    },
+    {
+      "section": "evaluation",
+      "claim_backed": true
+    }
+  ],
+  "bad": {
+    "section": "speculation",
+    "claim_backed": false
+  }
+}

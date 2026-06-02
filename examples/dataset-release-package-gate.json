@@ -1,0 +1,27 @@
+{
+  "version": "patchline.dataset-release-package-gate/v1",
+  "claim": "Patchline releases a public dataset with a datasheet, license, and DOI passing an ethics review, so the data is documented, licensed, and citable. The worker checks every release requirement is present. The gate proves every requirement is present and that a missing requirement is rejected.",
+  "real_repo": "patchline (self): dataset-release-package",
+  "items": [
+    {
+      "requirement": "datasheet",
+      "present": true
+    },
+    {
+      "requirement": "license",
+      "present": true
+    },
+    {
+      "requirement": "doi",
+      "present": true
+    },
+    {
+      "requirement": "ethics-review",
+      "present": true
+    }
+  ],
+  "bad": {
+    "requirement": "provenance",
+    "present": false
+  }
+}

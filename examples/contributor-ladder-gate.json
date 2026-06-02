@@ -1,0 +1,27 @@
+{
+  "version": "patchline.contributor-ladder-gate/v1",
+  "claim": "Patchline defines a contributor-ladder program with measurable progression and mentorship pairing, so newcomers have a clear path to maintainership. The worker checks every ladder rung has defined criteria and an assigned mentor. The gate proves every rung is defined with a mentor and that an undefined rung is rejected.",
+  "real_repo": "patchline (self): contributor-ladder",
+  "items": [
+    {
+      "rung": "first-pr",
+      "criteria_defined": true,
+      "mentor_assigned": true
+    },
+    {
+      "rung": "reviewer",
+      "criteria_defined": true,
+      "mentor_assigned": true
+    },
+    {
+      "rung": "maintainer",
+      "criteria_defined": true,
+      "mentor_assigned": true
+    }
+  ],
+  "bad": {
+    "rung": "vague",
+    "criteria_defined": false,
+    "mentor_assigned": false
+  }
+}

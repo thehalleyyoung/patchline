@@ -1,0 +1,27 @@
+{
+  "version": "patchline.bug-bounty-program-gate/v1",
+  "claim": "Patchline runs a funded bug-bounty program with a published payout history and triage SLAs, so security reports are rewarded and handled on time. The worker checks every report was paid and triaged within SLA. The gate proves every report is paid within SLA and that an SLA-breaching report is rejected.",
+  "real_repo": "patchline (self): bug-bounty-program",
+  "items": [
+    {
+      "report": "CVE-x",
+      "paid": true,
+      "within_sla": true
+    },
+    {
+      "report": "hardening-y",
+      "paid": true,
+      "within_sla": true
+    },
+    {
+      "report": "info-leak-z",
+      "paid": true,
+      "within_sla": true
+    }
+  ],
+  "bad": {
+    "report": "ignored",
+    "paid": false,
+    "within_sla": false
+  }
+}

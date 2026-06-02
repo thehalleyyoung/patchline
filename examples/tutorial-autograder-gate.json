@@ -1,0 +1,27 @@
+{
+  "version": "patchline.tutorial-autograder-gate/v1",
+  "claim": "Patchline ships a tutorial series with graded exercises and an autograder backed by gates, so learners get instant, objective feedback tied to the real tool. The worker checks every exercise is autograded by a concrete gate. The gate proves every exercise is gate-autograded and that an ungraded exercise is rejected.",
+  "real_repo": "patchline (self): tutorial-autograder",
+  "items": [
+    {
+      "exercise": "detect-nn",
+      "autograded": true,
+      "gate": "soundness-theorem-gate"
+    },
+    {
+      "exercise": "fix-fk-index",
+      "autograded": true,
+      "gate": "index-coverage-gate"
+    },
+    {
+      "exercise": "safe-backfill",
+      "autograded": true,
+      "gate": "backfill-completeness-gate"
+    }
+  ],
+  "bad": {
+    "exercise": "freeform",
+    "autograded": false,
+    "gate": ""
+  }
+}

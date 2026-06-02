@@ -591,6 +591,21 @@ Run `make cross-lingual-comments-gate` for cross-lingual comment analysis on **n
 Run `make incident-simulation-env-gate` for a simulation environment generating **counterfactual** incident timelines, rejecting a malformed timeline; see [docs/incident-simulation-env.md](docs/incident-simulation-env.md).
 Run `make meta-gate-predictor-gate` for a meta-gate that **predict**s which gate fires from cheap features, rejecting a mispredicted case; see [docs/meta-gate-predictor.md](docs/meta-gate-predictor.md).
 Run `make replication-leaderboard-gate` for a research-replication **leaderboard** of external reproductions, rejecting an unreproduced entry; see [docs/replication-leaderboard.md](docs/replication-leaderboard.md).
+Run `make acm-reproduced-badge-gate` for an ACM Results-**Reproduced** badge package with independent sign-off, rejecting an unmet criterion; see [docs/acm-reproduced-badge.md](docs/acm-reproduced-badge.md).
+Run `make tutorial-autograder-gate` for a tutorial series with a gate-backed **autograder**, rejecting an ungraded exercise; see [docs/tutorial-autograder.md](docs/tutorial-autograder.md).
+Run `make textbook-chapter-gate` for a textbook-quality chapter derived from repo **evidence**, rejecting an unbacked section; see [docs/textbook-chapter.md](docs/textbook-chapter.md).
+Run `make certificate-standard-gate` for a standards proposal codifying the certificate format for **interoperability**, rejecting an underspecified field; see [docs/certificate-standard.md](docs/certificate-standard.md).
+Run `make dataset-release-package-gate` for a public dataset release with a **datasheet**, license, and DOI, rejecting a missing requirement; see [docs/dataset-release-package.md](docs/dataset-release-package.md).
+Run `make maintainer-council-gate` for a maintainer-council model with documented **decision record**s and term limits, rejecting an undocumented element; see [docs/maintainer-council.md](docs/maintainer-council.md).
+Run `make bug-bounty-program-gate` for a funded bug-**bounty** program with payout history and triage SLAs, rejecting an SLA-breaching report; see [docs/bug-bounty-program.md](docs/bug-bounty-program.md).
+Run `make contributor-ladder-gate` for a contributor-**ladder** with measurable progression and mentorship, rejecting an undefined rung; see [docs/contributor-ladder.md](docs/contributor-ladder.md).
+Run `make community-survey-gate` for an annual community **survey** whose published results drive the roadmap, rejecting an unpublished cycle; see [docs/community-survey.md](docs/community-survey.md).
+Run `make workshop-proposal-gate` for a conference workshop with **reproducible demo**s per talk, rejecting a non-reproducible demo; see [docs/workshop-proposal.md](docs/workshop-proposal.md).
+Run `make integration-partner-program-gate` for an integration-partner program with **certified**, reproducible deployments, rejecting an uncertified partner; see [docs/integration-partner-program.md](docs/integration-partner-program.md).
+Run `make localization-parity-gate` for a localization program with **parity** gates across ten languages, rejecting a lagging locale; see [docs/localization-parity.md](docs/localization-parity.md).
+Run `make lts-release-line-gate` for an LTS line with security **backport**s and a clear EOL policy, rejecting a release with no EOL; see [docs/lts-release-line.md](docs/lts-release-line.md).
+Run `make accessibility-conformance-gate` for a **WCAG** conformance audit of all human-facing surfaces, rejecting a failing surface; see [docs/accessibility-conformance.md](docs/accessibility-conformance.md).
+Run `make public-roadmap-burndown-gate` for a public roadmap with gate-backed quarterly **burndown**s and retrospectives, rejecting an unbacked quarter; see [docs/public-roadmap-burndown.md](docs/public-roadmap-burndown.md).
 
 </details>
 

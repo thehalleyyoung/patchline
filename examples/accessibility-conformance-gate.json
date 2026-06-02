@@ -1,0 +1,23 @@
+{
+  "version": "patchline.accessibility-conformance-gate/v1",
+  "claim": "Patchline runs an accessibility conformance audit meeting WCAG for all human-facing surfaces, so the tool is usable by everyone. The worker checks every human-facing surface passes WCAG. The gate proves every surface is WCAG-conformant and that a failing surface is rejected.",
+  "real_repo": "patchline (self): accessibility-conformance",
+  "items": [
+    {
+      "surface": "cli-output",
+      "wcag_pass": true
+    },
+    {
+      "surface": "html-report",
+      "wcag_pass": true
+    },
+    {
+      "surface": "pr-comment",
+      "wcag_pass": true
+    }
+  ],
+  "bad": {
+    "surface": "inaccessible-widget",
+    "wcag_pass": false
+  }
+}

@@ -1,0 +1,22 @@
+{
+  "version": "patchline.community-survey-gate/v1",
+  "claim": "Patchline runs an annual community survey with published results driving the roadmap, so the roadmap reflects user needs rather than maintainer guesses. The worker checks every survey cycle was published and fed the roadmap. The gate proves every cycle is published and roadmap-driving and that an unpublished cycle is rejected.",
+  "real_repo": "patchline (self): community-survey",
+  "items": [
+    {
+      "cycle": "2025",
+      "published": true,
+      "drove_roadmap": true
+    },
+    {
+      "cycle": "2026",
+      "published": true,
+      "drove_roadmap": true
+    }
+  ],
+  "bad": {
+    "cycle": "hidden",
+    "published": false,
+    "drove_roadmap": false
+  }
+}

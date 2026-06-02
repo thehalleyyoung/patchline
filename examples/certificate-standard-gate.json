@@ -1,0 +1,27 @@
+{
+  "version": "patchline.certificate-standard-gate/v1",
+  "claim": "Patchline drafts a standards proposal codifying the gate-certificate format for interoperability, so other tools can emit and consume the same certificates. The worker checks every format field is specified and interop-tested. The gate proves every field is specified and tested and that an underspecified field is rejected.",
+  "real_repo": "patchline (self): certificate-standard",
+  "items": [
+    {
+      "field": "version",
+      "specified": true,
+      "interop_tested": true
+    },
+    {
+      "field": "verdict",
+      "specified": true,
+      "interop_tested": true
+    },
+    {
+      "field": "evidence-ref",
+      "specified": true,
+      "interop_tested": true
+    }
+  ],
+  "bad": {
+    "field": "freeform-blob",
+    "specified": false,
+    "interop_tested": false
+  }
+}

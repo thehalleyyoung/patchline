@@ -1,0 +1,23 @@
+{
+  "version": "patchline.maintainer-council-gate/v1",
+  "claim": "Patchline adopts a maintainer-council governance model with documented decision records and term limits, so project direction is accountable and rotates. The worker checks every governance element is documented. The gate proves every element is documented and that an undocumented element is rejected.",
+  "real_repo": "patchline (self): maintainer-council",
+  "items": [
+    {
+      "element": "council-charter",
+      "documented": true
+    },
+    {
+      "element": "decision-records",
+      "documented": true
+    },
+    {
+      "element": "term-limits",
+      "documented": true
+    }
+  ],
+  "bad": {
+    "element": "shadow-process",
+    "documented": false
+  }
+}

@@ -1,0 +1,51 @@
+{
+  "version": "patchline.localization-parity-gate/v1",
+  "claim": "Patchline runs a localization program covering the top ten developer languages with parity gates, so no localization silently lags the canonical content. The worker checks every locale is at parity. The gate proves every locale is at parity and that a lagging locale is rejected.",
+  "real_repo": "patchline (self): localization-parity",
+  "items": [
+    {
+      "locale": "zh",
+      "parity": true
+    },
+    {
+      "locale": "es",
+      "parity": true
+    },
+    {
+      "locale": "hi",
+      "parity": true
+    },
+    {
+      "locale": "ar",
+      "parity": true
+    },
+    {
+      "locale": "pt",
+      "parity": true
+    },
+    {
+      "locale": "ja",
+      "parity": true
+    },
+    {
+      "locale": "ru",
+      "parity": true
+    },
+    {
+      "locale": "de",
+      "parity": true
+    },
+    {
+      "locale": "fr",
+      "parity": true
+    },
+    {
+      "locale": "ko",
+      "parity": true
+    }
+  ],
+  "bad": {
+    "locale": "lagging",
+    "parity": false
+  }
+}

@@ -1,0 +1,22 @@
+{
+  "version": "patchline.lts-release-line-gate/v1",
+  "claim": "Patchline maintains a long-term-support release line with backported security fixes and a clear EOL policy, so stability-focused adopters get security without forced upgrades. The worker checks every LTS release has security backports and a defined EOL. The gate proves every LTS release is backported with an EOL and that a release with no EOL is rejected.",
+  "real_repo": "patchline (self): lts-release-line",
+  "items": [
+    {
+      "release": "1.0-lts",
+      "security_backported": true,
+      "eol_defined": true
+    },
+    {
+      "release": "2.0-lts",
+      "security_backported": true,
+      "eol_defined": true
+    }
+  ],
+  "bad": {
+    "release": "orphan",
+    "security_backported": false,
+    "eol_defined": false
+  }
+}

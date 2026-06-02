@@ -1,0 +1,27 @@
+{
+  "version": "patchline.public-roadmap-burndown-gate/v1",
+  "claim": "Patchline maintains a public roadmap with quarterly, gate-backed milestone burndowns and retrospectives, so progress is transparent and evidenced. The worker checks every quarter is gate-backed with a retrospective. The gate proves every quarter is gate-backed and reviewed and that an unbacked quarter is rejected.",
+  "real_repo": "patchline (self): public-roadmap-burndown",
+  "items": [
+    {
+      "quarter": "2026-Q1",
+      "gate_backed": true,
+      "retrospective": true
+    },
+    {
+      "quarter": "2026-Q2",
+      "gate_backed": true,
+      "retrospective": true
+    },
+    {
+      "quarter": "2026-Q3",
+      "gate_backed": true,
+      "retrospective": true
+    }
+  ],
+  "bad": {
+    "quarter": "2026-Q4",
+    "gate_backed": false,
+    "retrospective": false
+  }
+}

@@ -1,0 +1,27 @@
+{
+  "version": "patchline.workshop-proposal-gate/v1",
+  "claim": "Patchline submits a conference workshop proposal with accepted talks and reproducible demos, so the academic presence is backed by runnable material. The worker checks every accepted talk has a reproducible demo. The gate proves every talk has a reproducible demo and that a non-reproducible demo is rejected.",
+  "real_repo": "patchline (self): workshop-proposal",
+  "items": [
+    {
+      "talk": "intro",
+      "accepted": true,
+      "demo_reproducible": true
+    },
+    {
+      "talk": "internals",
+      "accepted": true,
+      "demo_reproducible": true
+    },
+    {
+      "talk": "case-studies",
+      "accepted": true,
+      "demo_reproducible": true
+    }
+  ],
+  "bad": {
+    "talk": "slideware",
+    "accepted": true,
+    "demo_reproducible": false
+  }
+}

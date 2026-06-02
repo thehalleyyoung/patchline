@@ -1,0 +1,27 @@
+{
+  "version": "patchline.acm-reproduced-badge-gate/v1",
+  "claim": "Patchline assembles an ACM Results-Reproduced badge submission package with an independent reviewer's sign-off, so the artifact meets the highest reproducibility badge with third-party confirmation. The worker checks every badge criterion is met and signed off. The gate proves every criterion is met and signed and that an unmet criterion is rejected.",
+  "real_repo": "patchline (self): acm-reproduced-badge",
+  "items": [
+    {
+      "criterion": "available",
+      "met": true,
+      "signed_off": true
+    },
+    {
+      "criterion": "functional",
+      "met": true,
+      "signed_off": true
+    },
+    {
+      "criterion": "reproduced",
+      "met": true,
+      "signed_off": true
+    }
+  ],
+  "bad": {
+    "criterion": "unverified",
+    "met": false,
+    "signed_off": false
+  }
+}

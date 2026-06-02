@@ -1,0 +1,27 @@
+{
+  "version": "patchline.integration-partner-program-gate/v1",
+  "claim": "Patchline runs an integration-partner program with certified, reproducible joint deployments, so each partnership is verified end to end rather than announced. The worker checks every partner is certified with a reproducible deployment. The gate proves every partner is certified and reproducible and that an uncertified partner is rejected.",
+  "real_repo": "patchline (self): integration-partner-program",
+  "items": [
+    {
+      "partner": "ci-vendor",
+      "certified": true,
+      "reproducible": true
+    },
+    {
+      "partner": "orm-vendor",
+      "certified": true,
+      "reproducible": true
+    },
+    {
+      "partner": "observability-vendor",
+      "certified": true,
+      "reproducible": true
+    }
+  ],
+  "bad": {
+    "partner": "logo-only",
+    "certified": false,
+    "reproducible": false
+  }
+}
