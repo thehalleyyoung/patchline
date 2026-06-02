@@ -908,6 +908,15 @@ fields are preserved, the reconstruction uses the parsed certificate rather than
 and negative controls mutate risk, corrupt evidence, omit a preserved field, and submit an unsupported
 analyzer schema.
 
+The standards-body conformance corpus raises that exchange layer from checker agreement to a citable
+reference suite. Four PLCI/1 examples cover \code{safe}, \code{guarded}, \code{blocked}, and
+\code{unsupported} verdict semantics over real Patchline source, proof, grammar, and documentation
+files. Each example pairs a positive certificate proof with a near-miss negative control whose syntax
+and file digests are valid but whose verdict/obligation semantics must be rejected; the expected
+checker output is Ed25519-signed and verified against a pinned public key. The gate also tampers with a
+signed reference output and proves the tamper is rejected, making the corpus suitable for external
+implementers rather than merely internal regression tests.
+
 %======================================================================
 \section{Developer and Contributor Experience}
 %======================================================================
@@ -1269,7 +1278,7 @@ Formal methods & \code{invariant-extract-gate}, \code{symexec-gate}, \code{model
 Decision science & \code{risk-economics-gate}, \code{uncertainty-calibration-gate},
 \code{active-learning-gate}, \code{reviewer-sim-gate}, \code{explainable-ranking-gate} \\
 Release \& interop & \code{rc-rehearsal-gate}, \code{leaderboard-gate}, \code{dossier-gate},
-\code{interop-gate}, \code{artifact-mirror-gate} \\
+\code{interop-gate}, \code{standards-body-conformance-corpus-gate} \\
 Generalization & \code{framework-holdout-gate}, \code{perturbation-robustness-gate},
 \code{historical-replay-study-gate}, \code{external-replication-kit-gate} \\
 Trust stack & \code{signed-provenance-chain-gate}, \code{reproducible-build-attestation-gate},

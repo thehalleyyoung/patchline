@@ -1896,6 +1896,10 @@ iso-track-certificate-standard-gate:
 certificate-interchange-language-gate:
 	bash scripts/certificate-interchange-language-gate.sh
 
+.PHONY: standards-body-conformance-corpus-gate
+standards-body-conformance-corpus-gate:
+	bash scripts/standards-body-conformance-corpus-gate.sh
+
 .PHONY: cross-tool-verdict-exchange-gate
 cross-tool-verdict-exchange-gate:
 	bash scripts/cross-tool-verdict-exchange-gate.sh

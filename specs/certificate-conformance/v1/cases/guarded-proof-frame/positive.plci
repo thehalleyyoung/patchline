@@ -1,0 +1,14 @@
+PLCI/1
+certificate-id: plci.guarded.proof.frame.v1
+subject-repo: thehalleyyoung/patchline
+subject-ref: 8e6e3fe
+subject-path: internal/repair/proof.go
+subject-sha256: af95a00c193739a2042b983dba1f0930b76f80f08dbe6168d7739d09d7ccc303
+issued-at: 2026-06-02T00:00:00Z
+producer: patchline-standards-body/1
+verdict: guarded
+risk-bps: 180
+evidence: ev.proof type=source uri=file:internal/repair/proof.go sha256=af95a00c193739a2042b983dba1f0930b76f80f08dbe6168d7739d09d7ccc303
+obligation: obl.frame kind=frame status=assumed evidence=ev.proof formula="database replay discharges external row existence obligations"
+canonical-sha256: 96dbe12e7b4eec3bb63b8f9a8c47b4e49f0ec612e1e74022433597ba136e3e2e
+END

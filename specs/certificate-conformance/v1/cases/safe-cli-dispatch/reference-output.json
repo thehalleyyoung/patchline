@@ -1,0 +1,25 @@
+{
+  "version": "patchline.certificate-conformance.reference/v1",
+  "case_id": "safe-cli-dispatch",
+  "payload": {
+    "case_id": "safe-cli-dispatch",
+    "standard": "PLCI/1",
+    "checker": "go-certlang",
+    "positive": "cases/safe-cli-dispatch/positive.plci",
+    "negative_control": "cases/safe-cli-dispatch/negative.plci",
+    "accepted": true,
+    "negative_rejected": true,
+    "certificate_id": "plci.safe.cli.dispatch.v1",
+    "verdict": "safe",
+    "risk_bps": 40,
+    "canonical_sha256": "15fef05291cbd28abb95da9d48ac6cedb07abbdbd55d6093fb1e6b9a04232ebd",
+    "positive_sha256": "cc0b344a407d4c30e563c2af0ffff4430a59840986983e2e0bca39afeb2e0c55",
+    "negative_sha256": "b94064e28434d0e7d730ad63fcd74df0167502b75e4394aeb429d422db33e70b",
+    "negative_error_contains": "safe verdict cannot carry assumed, refuted, or unsupported obligations"
+  },
+  "signature": {
+    "algorithm": "ed25519",
+    "public_key": "6823b6dcdbe7e8929a450ea9e830318781dc752d960ecb630d901ef0b3aab6eb",
+    "value": "7413e8d042b593c08b874a34e63bab207bd19b8b4f288dea3d46cafea3a6d2e0b6c9b15dd72902dfb6d537763bc536200e35b5f19f3813225ac979dc1eb16008"
+  }
+}

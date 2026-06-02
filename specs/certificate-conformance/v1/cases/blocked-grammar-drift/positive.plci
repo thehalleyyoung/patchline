@@ -1,0 +1,14 @@
+PLCI/1
+certificate-id: plci.blocked.grammar.drift.v1
+subject-repo: thehalleyyoung/patchline
+subject-ref: 8e6e3fe
+subject-path: specs/certificate-interchange/v1/grammar.abnf
+subject-sha256: 8dca1b08cdd015fef245cd1354fef614fcd973dcb618355aed9a1f112784800b
+issued-at: 2026-06-02T00:00:00Z
+producer: patchline-standards-body/1
+verdict: blocked
+risk-bps: 9200
+evidence: ev.grammar type=spec uri=file:specs/certificate-interchange/v1/grammar.abnf sha256=8dca1b08cdd015fef245cd1354fef614fcd973dcb618355aed9a1f112784800b
+obligation: obl.grammar kind=invariant status=refuted evidence=ev.grammar formula="grammar drift refutes byte-stable certificate interchange obligations"
+canonical-sha256: d4fbca661f697ec1fa708fddd65229f106ea57ca589f217cdd0a5038eef3d422
+END

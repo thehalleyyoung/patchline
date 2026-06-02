@@ -1,0 +1,8 @@
+{
+  "version": "patchline.standards-body-conformance-corpus-gate/v1",
+  "claim": "Patchline ships a standards-body conformance corpus for PLCI/1 certificates where every certificate example has a positive proof, a near-miss negative control, and an Ed25519-signed reference output. The gate validates the frozen corpus manifest, parses every positive proof against real Patchline source/spec/doc files, rejects every negative control for the expected semantic reason, verifies each signed reference output against a pinned public key, and proves signature tampering fails via `make standards-body-conformance-corpus-gate`.",
+  "real_repo": "patchline (self): cmd/patchline/main.go, internal/repair/proof.go, PLCI grammar, and certificate docs",
+  "corpus": "specs/certificate-conformance/v1/corpus.json",
+  "minimum_cases": 4,
+  "required_verdicts": ["safe", "guarded", "blocked", "unsupported"]
+}

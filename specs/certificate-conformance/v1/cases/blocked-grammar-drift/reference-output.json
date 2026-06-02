@@ -1,0 +1,25 @@
+{
+  "version": "patchline.certificate-conformance.reference/v1",
+  "case_id": "blocked-grammar-drift",
+  "payload": {
+    "case_id": "blocked-grammar-drift",
+    "standard": "PLCI/1",
+    "checker": "go-certlang",
+    "positive": "cases/blocked-grammar-drift/positive.plci",
+    "negative_control": "cases/blocked-grammar-drift/negative.plci",
+    "accepted": true,
+    "negative_rejected": true,
+    "certificate_id": "plci.blocked.grammar.drift.v1",
+    "verdict": "blocked",
+    "risk_bps": 9200,
+    "canonical_sha256": "d4fbca661f697ec1fa708fddd65229f106ea57ca589f217cdd0a5038eef3d422",
+    "positive_sha256": "923ae2be3ac3a9dfd4dfc66a2000632b780943fda72b907bbefef811a7a033fb",
+    "negative_sha256": "a9be597384bc2e8f46b7cf83a4661c383408a16bb0cf7261112cd33d9c607d30",
+    "negative_error_contains": "blocked verdict requires at least one refuted obligation"
+  },
+  "signature": {
+    "algorithm": "ed25519",
+    "public_key": "6823b6dcdbe7e8929a450ea9e830318781dc752d960ecb630d901ef0b3aab6eb",
+    "value": "1085593cc158f4cb77a273ee6f24ca2c2fef76026f187931301d40a38b95fcdb37e4b7fc5d81275fc9e3f9d1e52c13c88927dd897fc564f0527ed596c476220b"
+  }
+}

@@ -1,0 +1,25 @@
+{
+  "version": "patchline.certificate-conformance.reference/v1",
+  "case_id": "guarded-proof-frame",
+  "payload": {
+    "case_id": "guarded-proof-frame",
+    "standard": "PLCI/1",
+    "checker": "go-certlang",
+    "positive": "cases/guarded-proof-frame/positive.plci",
+    "negative_control": "cases/guarded-proof-frame/negative.plci",
+    "accepted": true,
+    "negative_rejected": true,
+    "certificate_id": "plci.guarded.proof.frame.v1",
+    "verdict": "guarded",
+    "risk_bps": 180,
+    "canonical_sha256": "96dbe12e7b4eec3bb63b8f9a8c47b4e49f0ec612e1e74022433597ba136e3e2e",
+    "positive_sha256": "0916a42e826a35d5408d54c261259d072b93ca9feacf856de1eb4ed7c1f291b8",
+    "negative_sha256": "1943de04bc280690c49ee2f8d9a925600396bf9b5eee2c3700086e8219500c9e",
+    "negative_error_contains": "guarded verdict cannot carry refuted or unsupported obligations"
+  },
+  "signature": {
+    "algorithm": "ed25519",
+    "public_key": "6823b6dcdbe7e8929a450ea9e830318781dc752d960ecb630d901ef0b3aab6eb",
+    "value": "5afba7b6fce906dc1aa6102c714c98a647a1f924592021d33076d4f9e4e828fcf51a4230706e07806a62e2c2a08932e2cfef66c631e416f93731c62ef0c70007"
+  }
+}

@@ -1,0 +1,14 @@
+PLCI/1
+certificate-id: plci.unsupported.doc.boundary.v1.negative
+subject-repo: thehalleyyoung/patchline
+subject-ref: 8e6e3fe
+subject-path: docs/certificate-interchange-language.md
+subject-sha256: 30dece8eeb27ec9e94b429e658b37a502f6761f78979abd704590162afd7ccc6
+issued-at: 2026-06-02T00:00:00Z
+producer: patchline-standards-body/1
+verdict: unsupported
+risk-bps: 10000
+evidence: ev.docs type=report uri=file:docs/certificate-interchange-language.md sha256=30dece8eeb27ec9e94b429e658b37a502f6761f78979abd704590162afd7ccc6
+obligation: obl.boundary kind=evidence status=checked evidence=ev.docs formula="cross-standard certificate semantics are outside the PLCI one boundary"
+canonical-sha256: a67e43a6f9d62eecc3f57ac09799a4fc200713d1e38b57262e595e188737e7d6
+END

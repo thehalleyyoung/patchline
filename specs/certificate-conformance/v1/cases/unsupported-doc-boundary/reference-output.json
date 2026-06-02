@@ -1,0 +1,25 @@
+{
+  "version": "patchline.certificate-conformance.reference/v1",
+  "case_id": "unsupported-doc-boundary",
+  "payload": {
+    "case_id": "unsupported-doc-boundary",
+    "standard": "PLCI/1",
+    "checker": "go-certlang",
+    "positive": "cases/unsupported-doc-boundary/positive.plci",
+    "negative_control": "cases/unsupported-doc-boundary/negative.plci",
+    "accepted": true,
+    "negative_rejected": true,
+    "certificate_id": "plci.unsupported.doc.boundary.v1",
+    "verdict": "unsupported",
+    "risk_bps": 10000,
+    "canonical_sha256": "c4b3e9b9c72b73f34b6723771cff72661cca1775b40ebbcae0ac24ca3ace57e0",
+    "positive_sha256": "72141ed37e442539abce7b30ab1e4a59b62ee9129ac7805d9d70418622c1886c",
+    "negative_sha256": "ed798e1104e1067138d8ade0f8956656853f3850147e21be4995cbe5753271b0",
+    "negative_error_contains": "unsupported verdict requires at least one unsupported obligation"
+  },
+  "signature": {
+    "algorithm": "ed25519",
+    "public_key": "6823b6dcdbe7e8929a450ea9e830318781dc752d960ecb630d901ef0b3aab6eb",
+    "value": "021dd0dd133f50813e6f849ab83f0d455c018ebddd4a203ed97e1b3067cdad01f70908b8e6efbde5ccb55a9503b45efbef8903b91ce34abe4c63ca1856cfd50a"
+  }
+}
