@@ -968,6 +968,67 @@ func TestCompareChecksGeneratedProposalCoverage(t *testing.T) {
 	}
 }
 
+func TestBaselineClassifiesLockConcurrencyHazards(t *testing.T) {
+	root := t.TempDir()
+	writeFile(t, root, "db/migrate/001_blocking.sql", "ALTER TABLE accounts ADD COLUMN processed_at timestamptz DEFAULT now();\nCREATE INDEX idx_accounts_email ON accounts(email);\n")
+	writeFile(t, root, "app/jobs/account_backfill.rb", "class AccountBackfill\n  include Sidekiq::Worker\n  def perform\n    Account.where(active: true).update_all(flagged: true)\n  end\nend\n")
+	inv, err := InventoryPath(InventoryOptions{Path: root})
+	if err != nil {
+		t.Fatal(err)
+	}
+	intakeReport, err := intake.Run(context.Background(), intake.Options{Path: root})
+	if err != nil {
+		t.Fatal(err)
+	}
+	baseline := Baseline(inv, inv.Facts, intakeReport)
+	if baseline.Summary.LockHazards == 0 || baseline.Summary.LockHazardHigh == 0 {
+		t.Fatalf("expected high lock/concurrency hazards: summary=%#v hazards=%#v", baseline.Summary, baseline.LockHazards)
+	}
+	if !hasLockHazardMarker(baseline.LockHazards, "table-rewrite") || !hasLockHazardMarker(baseline.LockHazards, "job-contention") {
+		t.Fatalf("expected schema and job contention markers: %#v", baseline.LockHazards)
+	}
+	if !strings.Contains(baseline.Markdown, "Lock and concurrency hazards") {
+		t.Fatalf("expected lock hazards in markdown:\n%s", baseline.Markdown)
+	}
+}
+
+func TestCompareClassifiesGeneratedLockHazards(t *testing.T) {
+	baseline := BaselineReport{
+		Version: BaselineVersion,
+		Hash:    "baseline-hash",
+		Risks: []BaselineRisk{{
+			ID:       "risk:accounts",
+			Path:     "db/migrate/001.sql",
+			Kind:     "alter",
+			Table:    "accounts",
+			Severity: "high",
+			Score:    120,
+		}},
+	}
+	proposal := ProposalReport{
+		OutputHash:    "proposal-hash",
+		TargetRiskIDs: []string{"risk:accounts"},
+		GeneratedFiles: []GeneratedFile{{
+			Path:    "patchline-proposals/repair/blocking.sql",
+			Kind:    "repair",
+			RiskIDs: []string{"risk:accounts"},
+		}},
+		Generated: []GeneratedArtifact{{
+			Path:    "patchline-proposals/repair/blocking.sql",
+			Kind:    "repair",
+			RiskIDs: []string{"risk:accounts"},
+			Content: "ALTER TABLE accounts ADD COLUMN repaired_at timestamptz DEFAULT now();\nLOCK TABLE accounts IN ACCESS EXCLUSIVE MODE;\n",
+		}},
+	}
+	compare := Compare(baseline, proposal)
+	if compare.Summary.LockHazards != 1 || compare.Summary.LockHazardCritical != 1 {
+		t.Fatalf("expected generated critical lock hazard: summary=%#v hazards=%#v", compare.Summary, compare.LockHazards)
+	}
+	if !strings.Contains(compare.Markdown, "Generated lock and concurrency hazards") {
+		t.Fatalf("expected generated lock hazards in markdown:\n%s", compare.Markdown)
+	}
+}
+
 func TestCompareRejectsMutatedGeneratedGuards(t *testing.T) {
 	good := GeneratedArtifact{
 		Path: "patchline-proposals/guards/risk.sql",
@@ -1396,6 +1457,17 @@ func hasCommand(commands []Command, command string) bool {
 	for _, item := range commands {
 		if item.Command == command {
 			return true
+		}
+	}
+	return false
+}
+
+func hasLockHazardMarker(hazards []LockHazard, marker string) bool {
+	for _, hazard := range hazards {
+		for _, item := range hazard.Markers {
+			if item == marker {
+				return true
+			}
 		}
 	}
 	return false

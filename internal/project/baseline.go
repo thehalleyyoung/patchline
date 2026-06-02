@@ -36,6 +36,7 @@ type BaselineReport struct {
 	Recurrences     []RecurrencePattern       `json:"recurrences,omitempty"`
 	Transactions    []TransactionBoundary     `json:"transaction_boundaries,omitempty"`
 	Idempotency     []IdempotencyClass        `json:"idempotency_classifications,omitempty"`
+	LockHazards     []LockHazard              `json:"lock_concurrency_hazards,omitempty"`
 	PolicyChecks    []PolicyCheck             `json:"policy_checks,omitempty"`
 	RepairProofs    []RepairProofSummary      `json:"repair_proof_summaries,omitempty"`
 	NativeChecks    []Command                 `json:"native_checks,omitempty"`
@@ -75,6 +76,11 @@ type BaselineSummary struct {
 	IdempotencyGuarded  int `json:"idempotency_guarded"`
 	IdempotencyUnknown  int `json:"idempotency_unknown"`
 	IdempotencyUnsafe   int `json:"idempotency_non_idempotent"`
+	LockHazards         int `json:"lock_concurrency_hazards"`
+	LockHazardCritical  int `json:"lock_hazard_critical"`
+	LockHazardHigh      int `json:"lock_hazard_high"`
+	LockHazardMedium    int `json:"lock_hazard_medium"`
+	LockHazardLow       int `json:"lock_hazard_low"`
 	PolicyChecks        int `json:"policy_checks"`
 	PolicyPassed        int `json:"policy_passed"`
 	PolicyWarnings      int `json:"policy_warnings"`
@@ -133,6 +139,23 @@ type IdempotencyClass struct {
 	Status      string       `json:"status"`
 	Confidence  string       `json:"confidence"`
 	Markers     []string     `json:"markers,omitempty"`
+	Evidence    []string     `json:"evidence,omitempty"`
+	Identifiers []Identifier `json:"identifiers,omitempty"`
+	Rationale   string       `json:"rationale"`
+}
+
+type LockHazard struct {
+	ID          string       `json:"id"`
+	RiskID      string       `json:"risk_id,omitempty"`
+	Path        string       `json:"path"`
+	Line        int          `json:"line,omitempty"`
+	Table       string       `json:"table,omitempty"`
+	Surface     string       `json:"surface"`
+	Operation   string       `json:"operation,omitempty"`
+	Severity    string       `json:"severity"`
+	Confidence  string       `json:"confidence"`
+	Markers     []string     `json:"markers,omitempty"`
+	Mitigations []string     `json:"mitigations,omitempty"`
 	Evidence    []string     `json:"evidence,omitempty"`
 	Identifiers []Identifier `json:"identifiers,omitempty"`
 	Rationale   string       `json:"rationale"`
@@ -313,6 +336,7 @@ func Baseline(inv Inventory, facts []Fact, intakeReport intake.Report) BaselineR
 	report.Recurrences = buildRecurrences(report.Risks, report.AbstractEffects, report.Provenance)
 	report.Transactions = buildTransactionBoundaries(report.Risks, report.Provenance, intakeReport)
 	report.Idempotency = buildIdempotencyClasses(report.Risks, report.Provenance, report.SymbolicChecks, facts, intakeReport)
+	report.LockHazards = buildLockHazards(report.Risks, report.Provenance, facts, intakeReport)
 	report.PolicyChecks = buildPolicyChecks(report.Risks, report.Provenance, report.SymbolicChecks)
 	report.RepairProofs = buildRepairProofSummaries(report.Risks, report.Provenance, report.AbstractEffects, report.SymbolicChecks)
 	report.Summary = BaselineSummary{
@@ -347,6 +371,11 @@ func Baseline(inv Inventory, facts []Fact, intakeReport intake.Report) BaselineR
 		IdempotencyGuarded:  countIdempotencyStatus(report.Idempotency, "guarded"),
 		IdempotencyUnknown:  countIdempotencyStatus(report.Idempotency, "unknown"),
 		IdempotencyUnsafe:   countIdempotencyStatus(report.Idempotency, "non_idempotent"),
+		LockHazards:         len(report.LockHazards),
+		LockHazardCritical:  countLockHazardSeverity(report.LockHazards, "critical"),
+		LockHazardHigh:      countLockHazardSeverity(report.LockHazards, "high"),
+		LockHazardMedium:    countLockHazardSeverity(report.LockHazards, "medium"),
+		LockHazardLow:       countLockHazardSeverity(report.LockHazards, "low"),
 		PolicyChecks:        len(report.PolicyChecks),
 		PolicyPassed:        countPolicyStatus(report.PolicyChecks, "pass"),
 		PolicyWarnings:      countPolicyStatus(report.PolicyChecks, "warn"),
@@ -2637,6 +2666,321 @@ func countIdempotencyStatus(classes []IdempotencyClass, status string) int {
 	return count
 }
 
+func buildLockHazards(risks []BaselineRisk, slices []ProvenanceSlice, facts []Fact, intakeReport intake.Report) []LockHazard {
+	root := firstNonEmpty(intakeReport.Source.ScannedRoot, intakeReport.Source.Input)
+	sliceByRisk := map[string]ProvenanceSlice{}
+	for _, slice := range slices {
+		sliceByRisk[slice.RiskID] = slice
+	}
+	seen := map[string]bool{}
+	var out []LockHazard
+	for _, risk := range risks {
+		if !riskNeedsLockHazardAnalysis(risk) {
+			continue
+		}
+		text := textForBoundary(root, risk.Path)
+		window := text
+		if risk.Statement > 0 {
+			window = lineWindow(text, risk.Statement, 10)
+		}
+		severity, markers, mitigations := classifyLockHazard(window, risk)
+		if severity == "low" && window != text {
+			fullSeverity, fullMarkers, fullMitigations := classifyLockHazard(text, risk)
+			if lockHazardSeverityRank(fullSeverity) > lockHazardSeverityRank(severity) {
+				severity, markers, mitigations = fullSeverity, fullMarkers, fullMitigations
+			}
+		}
+		addLockHazard(&out, seen, LockHazard{
+			ID:          "lock:" + canonical.Hash(fmt.Sprintf("risk\x00%s\x00%s\x00%d", risk.ID, risk.Path, risk.Statement))[:16],
+			RiskID:      risk.ID,
+			Path:        risk.Path,
+			Line:        risk.Statement,
+			Table:       risk.Table,
+			Surface:     lockHazardSurface(risk.Kind, risk.Path),
+			Operation:   transactionOperation(risk.Kind),
+			Severity:    severity,
+			Confidence:  lockHazardConfidence(severity, text),
+			Markers:     markers,
+			Mitigations: mitigations,
+			Evidence:    lockHazardEvidence(risk, sliceByRisk[risk.ID], markers, mitigations),
+			Identifiers: risk.Identifiers,
+			Rationale:   lockHazardRationale(severity, lockHazardSurface(risk.Kind, risk.Path)),
+		})
+	}
+	for _, fact := range facts {
+		if !isConcurrencySupportFact(fact) {
+			continue
+		}
+		text := textForBoundary(root, fact.Path)
+		severity, markers, mitigations := classifyLockHazard(text, BaselineRisk{Kind: fact.Kind, Path: fact.Path})
+		addLockHazard(&out, seen, LockHazard{
+			ID:          "lock:" + canonical.Hash(fmt.Sprintf("fact\x00%s\x00%s", fact.ID, fact.Path))[:16],
+			Path:        fact.Path,
+			Table:       firstIdentifierValue(fact.Identifiers, "table"),
+			Surface:     "job_or_runbook",
+			Operation:   "support",
+			Severity:    severity,
+			Confidence:  lockHazardConfidence(severity, text),
+			Markers:     markers,
+			Mitigations: mitigations,
+			Evidence:    []string{"project job, worker, runbook, or support file discovered by inventory"},
+			Identifiers: fact.Identifiers,
+			Rationale:   lockHazardRationale(severity, "job_or_runbook"),
+		})
+	}
+	for _, slice := range slices {
+		for _, path := range append(append([]string{}, slice.RepairPaths...), slice.SourcePaths...) {
+			if !isLockHazardSupportPath(path) {
+				continue
+			}
+			text := textForBoundary(root, path)
+			severity, markers, mitigations := classifyLockHazard(text, BaselineRisk{Kind: "support", Path: path, Table: slice.Table})
+			surface := "job_or_runbook"
+			if isGeneratedPath(path) {
+				surface = "generated_script"
+			} else if strings.HasSuffix(strings.ToLower(path), ".sql") {
+				surface = "migration_sql"
+			}
+			addLockHazard(&out, seen, LockHazard{
+				ID:          "lock:" + canonical.Hash(fmt.Sprintf("support\x00%s\x00%s", slice.RiskID, path))[:16],
+				RiskID:      slice.RiskID,
+				Path:        path,
+				Table:       slice.Table,
+				Surface:     surface,
+				Operation:   "support",
+				Severity:    severity,
+				Confidence:  lockHazardConfidence(severity, text),
+				Markers:     markers,
+				Mitigations: mitigations,
+				Evidence:    []string{"support path linked by provenance slice"},
+				Identifiers: slice.Identifiers,
+				Rationale:   lockHazardRationale(severity, surface),
+			})
+		}
+	}
+	sort.Slice(out, func(i, j int) bool {
+		if out[i].Severity != out[j].Severity {
+			return lockHazardSeverityRank(out[i].Severity) > lockHazardSeverityRank(out[j].Severity)
+		}
+		if out[i].Path != out[j].Path {
+			return out[i].Path < out[j].Path
+		}
+		return out[i].ID < out[j].ID
+	})
+	return out
+}
+
+func addLockHazard(out *[]LockHazard, seen map[string]bool, item LockHazard) bool {
+	key := item.RiskID + "\x00" + item.Path + "\x00" + item.Surface + "\x00" + item.Operation
+	if seen[key] {
+		return false
+	}
+	seen[key] = true
+	*out = append(*out, item)
+	return true
+}
+
+func riskNeedsLockHazardAnalysis(risk BaselineRisk) bool {
+	kind := strings.ToLower(risk.Kind)
+	if containsAny(kind, "alter", "create", "drop", "truncate", "update", "delete", "insert", "merge", "schema", "migration", "code-path") {
+		return true
+	}
+	for _, factor := range risk.Factors {
+		if containsAny(strings.ToLower(factor.Name), "write", "schema", "destructive", "retry", "persistent") {
+			return true
+		}
+	}
+	return false
+}
+
+func classifyLockHazard(text string, risk BaselineRisk) (string, []string, []string) {
+	lower := strings.ToLower(text)
+	kind := strings.ToLower(risk.Kind)
+	var markers []string
+	var mitigations []string
+	markerChecks := []struct {
+		Name   string
+		Tokens []string
+	}{
+		{"explicit-lock", []string{"lock table", "for update", "with (tablock", "with(tablock", "lock in share mode", "advisory_lock", "get_lock("}},
+		{"blocking-ddl", []string{"alter table", "drop table", "truncate table", "rename table", "vacuum full", "cluster "}},
+		{"index-build", []string{"create index", "add index", "add_index", "create_index"}},
+		{"non-online-index", []string{"create index ", "add index", "add_index", "create_index"}},
+		{"table-rewrite", []string{"algorithm=copy", "type: string", "default now()", "default: ->", "set not null", "not null", "modify ", "change column", "drop column"}},
+		{"broad-write", []string{"update ", "delete from", "merge into", "bulk_update", "update_all", "delete_all"}},
+		{"job-contention", []string{"worker", "background", "cron", "sidekiq", "celery", "queue", "retry", "concurrent", "parallel"}},
+		{"blast-radius-read", []string{"select count", "candidate_rows", "limit 1"}},
+	}
+	for _, check := range markerChecks {
+		for _, token := range check.Tokens {
+			if strings.Contains(lower, token) {
+				markers = append(markers, check.Name)
+				break
+			}
+		}
+	}
+	mitigationChecks := []struct {
+		Name   string
+		Tokens []string
+	}{
+		{"concurrent-index", []string{"create index concurrently", "algorithm=concurrently", "concurrently: true"}},
+		{"online-ddl", []string{"algorithm=inplace", "algorithm=instant", "lock=none", "online", "without blocking"}},
+		{"batching", []string{"batch", "in_batches", "find_each", "limit ", "chunk", "sleep", "throttle"}},
+		{"skip-locked", []string{"skip locked", "nowait"}},
+		{"transaction-boundary", []string{"transaction", "begin", "commit", "atomic"}},
+		{"advisory-lock", []string{"advisory_lock", "get_lock("}},
+		{"lock-timeout", []string{"lock_timeout", "statement_timeout", "innodb_lock_wait_timeout"}},
+	}
+	for _, check := range mitigationChecks {
+		for _, token := range check.Tokens {
+			if strings.Contains(lower, token) {
+				mitigations = append(mitigations, check.Name)
+				break
+			}
+		}
+	}
+	markers = uniqueStrings(markers)
+	mitigations = uniqueStrings(mitigations)
+	hasHazard := len(markers) > 0 || riskHasFactor(risk, "retry-hazard") || riskHasFactor(risk, "broad-write") || riskHasFactor(risk, "write-breadth-unknown")
+	if !hasHazard && containsAny(kind, "alter", "drop", "truncate", "delete", "update") {
+		markers = append(markers, "operation-lock-risk")
+		hasHazard = true
+	}
+	if containsAny(lower, "lock table", "truncate table", "drop table", "vacuum full", "algorithm=copy") {
+		if len(mitigations) == 0 || !containsAny(strings.Join(mitigations, " "), "online-ddl", "lock-timeout") {
+			return "critical", uniqueStrings(markers), mitigations
+		}
+		return "high", uniqueStrings(markers), mitigations
+	}
+	if containsAny(lower, "alter table", "set not null", "drop column", "modify ", "change column", "default now()") || containsAny(kind, "schema", "alter") {
+		if containsAny(strings.Join(mitigations, " "), "online-ddl", "concurrent-index") {
+			return "medium", markers, mitigations
+		}
+		return "high", markers, mitigations
+	}
+	if containsAny(lower, "create index", "add index", "add_index", "create_index") && !containsAny(lower, "concurrently", "algorithm=concurrently", "algorithm=inplace", "algorithm=instant", "lock=none") {
+		return "high", markers, mitigations
+	}
+	if riskHasFactor(risk, "retry-hazard") || (containsAny(lower, "worker", "background", "cron", "sidekiq", "celery", "queue", "retry") && containsAny(lower, "update ", "delete ", "insert ", "bulk_", "save!")) {
+		if containsAny(strings.Join(mitigations, " "), "batching", "skip-locked", "advisory-lock") {
+			return "medium", markers, mitigations
+		}
+		return "high", markers, mitigations
+	}
+	if riskHasFactor(risk, "broad-write") || riskHasFactor(risk, "write-breadth-unknown") || containsAny(lower, "update ", "delete from", "merge into", "bulk_update", "update_all", "delete_all") {
+		if containsAny(strings.Join(mitigations, " "), "batching", "lock-timeout", "transaction-boundary") {
+			return "medium", markers, mitigations
+		}
+		return "high", markers, mitigations
+	}
+	if hasHazard {
+		if len(mitigations) > 0 {
+			return "medium", markers, mitigations
+		}
+		return "high", markers, mitigations
+	}
+	return "low", markers, mitigations
+}
+
+func lockHazardSurface(kind, path string) string {
+	lower := strings.ToLower(kind + " " + path)
+	switch {
+	case isGeneratedPath(path):
+		return "generated_script"
+	case containsAny(lower, "job", "worker", "task", "cron", "sidekiq", "celery", "queue"):
+		return "background_job"
+	case strings.Contains(lower, "code-path"):
+		return "app_code"
+	case strings.Contains(lower, "schema"):
+		return "migration_dsl"
+	case strings.HasSuffix(lower, ".sql") || strings.Contains(lower, "sql"):
+		return "migration_sql"
+	default:
+		return "project_file"
+	}
+}
+
+func isConcurrencySupportFact(fact Fact) bool {
+	lower := strings.ToLower(fact.Kind + " " + fact.Path + " " + fact.Rationale)
+	return containsAny(lower, "job", "worker", "cron", "queue", "sidekiq", "celery", "concurrency", "lock", "backfill", "migration", "repair")
+}
+
+func isLockHazardSupportPath(path string) bool {
+	lower := strings.ToLower(path)
+	return containsAny(lower, "job", "worker", "cron", "queue", "backfill", "repair", "migration", ".sql", ".rb", ".py", ".go", ".js", ".ts", ".md", ".sh")
+}
+
+func lockHazardConfidence(severity, text string) string {
+	if text == "" {
+		return "low"
+	}
+	switch severity {
+	case "critical", "high":
+		return "high"
+	case "medium":
+		return "medium"
+	default:
+		return "derived"
+	}
+}
+
+func lockHazardEvidence(risk BaselineRisk, slice ProvenanceSlice, markers, mitigations []string) []string {
+	var evidence []string
+	if len(markers) > 0 {
+		evidence = append(evidence, "lock/concurrency markers: "+strings.Join(markers, ", "))
+	}
+	if len(mitigations) > 0 {
+		evidence = append(evidence, "mitigations: "+strings.Join(mitigations, ", "))
+	}
+	for _, factor := range risk.Factors {
+		if containsAny(factor.Name, "broad-write", "write-breadth-unknown", "retry-hazard", "missing-transaction-boundary", "destructive") {
+			evidence = append(evidence, factor.Name+": "+factor.Reason)
+		}
+	}
+	if len(slice.StagesPresent) > 0 {
+		evidence = append(evidence, "provenance stages: "+strings.Join(slice.StagesPresent, ", "))
+	}
+	return uniqueStrings(evidence)
+}
+
+func lockHazardRationale(severity, surface string) string {
+	switch severity {
+	case "critical":
+		return surface + " contains blocking DDL or explicit table-lock evidence likely to block deploys or jobs"
+	case "high":
+		return surface + " contains schema/write/job patterns with material lock or contention risk and insufficient online/batching mitigation"
+	case "medium":
+		return surface + " contains lock/contention risk with partial mitigation such as batching, online DDL, timeouts, or skip-locked behavior"
+	default:
+		return surface + " has no strong lock/concurrency hazard in the scanned context"
+	}
+}
+
+func lockHazardSeverityRank(severity string) int {
+	switch severity {
+	case "critical":
+		return 4
+	case "high":
+		return 3
+	case "medium":
+		return 2
+	case "low":
+		return 1
+	default:
+		return 0
+	}
+}
+
+func countLockHazardSeverity(hazards []LockHazard, severity string) int {
+	var count int
+	for _, hazard := range hazards {
+		if hazard.Severity == severity {
+			count++
+		}
+	}
+	return count
+}
+
 func buildPolicyChecks(risks []BaselineRisk, slices []ProvenanceSlice, symbolic []SymbolicCheck) []PolicyCheck {
 	sliceByRisk := map[string]ProvenanceSlice{}
 	for _, slice := range slices {
@@ -3124,6 +3468,11 @@ func renderBaselineMarkdown(report BaselineReport) string {
 	fmt.Fprintf(&b, "| idempotency guarded | %d |\n", report.Summary.IdempotencyGuarded)
 	fmt.Fprintf(&b, "| idempotency unknown | %d |\n", report.Summary.IdempotencyUnknown)
 	fmt.Fprintf(&b, "| idempotency non-idempotent | %d |\n", report.Summary.IdempotencyUnsafe)
+	fmt.Fprintf(&b, "| lock/concurrency hazards | %d |\n", report.Summary.LockHazards)
+	fmt.Fprintf(&b, "| lock hazard critical | %d |\n", report.Summary.LockHazardCritical)
+	fmt.Fprintf(&b, "| lock hazard high | %d |\n", report.Summary.LockHazardHigh)
+	fmt.Fprintf(&b, "| lock hazard medium | %d |\n", report.Summary.LockHazardMedium)
+	fmt.Fprintf(&b, "| lock hazard low | %d |\n", report.Summary.LockHazardLow)
 	fmt.Fprintf(&b, "| policy checks | %d |\n", report.Summary.PolicyChecks)
 	fmt.Fprintf(&b, "| policy passed | %d |\n", report.Summary.PolicyPassed)
 	fmt.Fprintf(&b, "| policy warnings | %d |\n", report.Summary.PolicyWarnings)
@@ -3213,6 +3562,14 @@ func renderBaselineMarkdown(report BaselineReport) string {
 		limit := minInt(len(report.Idempotency), 25)
 		for _, item := range report.Idempotency[:limit] {
 			fmt.Fprintf(&b, "| %s | %s | `%s` | %s | %s | %s |\n", item.Status, item.Surface, item.RiskID, item.Table, item.Path, strings.Join(item.Markers, ", "))
+		}
+		fmt.Fprintf(&b, "\n")
+	}
+	if len(report.LockHazards) > 0 {
+		fmt.Fprintf(&b, "## Lock and concurrency hazards\n\n| severity | surface | risk | table | path | markers | mitigations |\n| --- | --- | --- | --- | --- | --- | --- |\n")
+		limit := minInt(len(report.LockHazards), 25)
+		for _, item := range report.LockHazards[:limit] {
+			fmt.Fprintf(&b, "| %s | %s | `%s` | %s | %s | %s | %s |\n", item.Severity, item.Surface, item.RiskID, item.Table, item.Path, strings.Join(item.Markers, ", "), strings.Join(item.Mitigations, ", "))
 		}
 		fmt.Fprintf(&b, "\n")
 	}

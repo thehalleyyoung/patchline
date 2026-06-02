@@ -29,6 +29,7 @@ type CompareReport struct {
 	GeneratedChecks []GeneratedCheck      `json:"generated_checks,omitempty"`
 	Transactions    []TransactionBoundary `json:"transaction_boundaries,omitempty"`
 	Idempotency     []IdempotencyClass    `json:"idempotency_classifications,omitempty"`
+	LockHazards     []LockHazard          `json:"lock_concurrency_hazards,omitempty"`
 	NativeChecks    []Command             `json:"native_checks,omitempty"`
 	NativeResults   []NativeResult        `json:"native_results,omitempty"`
 	Review          []ReviewItem          `json:"review,omitempty"`
@@ -63,6 +64,11 @@ type CompareSummary struct {
 	IdempotencyGuarded    int  `json:"idempotency_guarded"`
 	IdempotencyUnknown    int  `json:"idempotency_unknown"`
 	IdempotencyUnsafe     int  `json:"idempotency_non_idempotent"`
+	LockHazards           int  `json:"lock_concurrency_hazards"`
+	LockHazardCritical    int  `json:"lock_hazard_critical"`
+	LockHazardHigh        int  `json:"lock_hazard_high"`
+	LockHazardMedium      int  `json:"lock_hazard_medium"`
+	LockHazardLow         int  `json:"lock_hazard_low"`
 	InterventionLoops     int  `json:"intervention_loops"`
 	InterventionAccepted  int  `json:"intervention_accepted"`
 	InterventionRejected  int  `json:"intervention_rejected"`
@@ -167,6 +173,7 @@ func CompareWithOptions(baseline BaselineReport, proposal ProposalReport, opts C
 	report.RiskDeltas = riskDeltas(baseline.Risks, proposal.Generated)
 	report.Transactions = generatedTransactionBoundaries(proposal.Generated)
 	report.Idempotency = generatedIdempotencyClasses(proposal.Generated)
+	report.LockHazards = generatedLockHazards(proposal.Generated)
 	report.NativeResults = runNativeChecks(baseline.InventoryRoot, baseline.NativeChecks, opts)
 	report.Summary = summarizeCompare(baseline, proposal, checks, report.RiskDeltas, report.NativeResults)
 	report.Summary.TransactionBoundaries = len(report.Transactions)
@@ -178,6 +185,11 @@ func CompareWithOptions(baseline BaselineReport, proposal ProposalReport, opts C
 	report.Summary.IdempotencyGuarded = countIdempotencyStatus(report.Idempotency, "guarded")
 	report.Summary.IdempotencyUnknown = countIdempotencyStatus(report.Idempotency, "unknown")
 	report.Summary.IdempotencyUnsafe = countIdempotencyStatus(report.Idempotency, "non_idempotent")
+	report.Summary.LockHazards = len(report.LockHazards)
+	report.Summary.LockHazardCritical = countLockHazardSeverity(report.LockHazards, "critical")
+	report.Summary.LockHazardHigh = countLockHazardSeverity(report.LockHazards, "high")
+	report.Summary.LockHazardMedium = countLockHazardSeverity(report.LockHazards, "medium")
+	report.Summary.LockHazardLow = countLockHazardSeverity(report.LockHazards, "low")
 	report.Intervention = buildInterventionLoop(baseline, proposal, report.Summary)
 	report.Summary.InterventionLoops = 1
 	if report.Intervention.Status == "accepted-for-review" {
@@ -515,6 +527,46 @@ func generatedIdempotencyClasses(generated []GeneratedArtifact) []IdempotencyCla
 func generatedArtifactNeedsIdempotency(artifact GeneratedArtifact) bool {
 	lower := strings.ToLower(artifact.Kind + " " + artifact.Path + " " + artifact.Content)
 	return containsAny(lower, "update ", "delete ", "insert ", "merge ", "drop ", "truncate ", "alter table", "create table", "repair", "rollback", "backfill", "runbook")
+}
+
+func generatedLockHazards(generated []GeneratedArtifact) []LockHazard {
+	var out []LockHazard
+	for _, artifact := range generated {
+		if artifact.Content == "" || !generatedArtifactNeedsLockHazard(artifact) {
+			continue
+		}
+		riskID := ""
+		if len(artifact.RiskIDs) > 0 {
+			riskID = artifact.RiskIDs[0]
+		}
+		operation := generatedArtifactOperation(artifact)
+		severity, markers, mitigations := classifyLockHazard(artifact.Content, BaselineRisk{ID: riskID, Path: artifact.Path, Kind: operation})
+		out = append(out, LockHazard{
+			ID:          "lock:" + canonical.Hash("generated\x00" + artifact.Path + "\x00" + canonical.Hash(artifact.Content))[:16],
+			RiskID:      riskID,
+			Path:        artifact.Path,
+			Surface:     "generated_script",
+			Operation:   operation,
+			Severity:    severity,
+			Confidence:  lockHazardConfidence(severity, artifact.Content),
+			Markers:     markers,
+			Mitigations: mitigations,
+			Evidence:    []string{"generated artifact re-scanned by compare"},
+			Rationale:   lockHazardRationale(severity, "generated_script"),
+		})
+	}
+	sort.Slice(out, func(i, j int) bool {
+		if out[i].Severity != out[j].Severity {
+			return lockHazardSeverityRank(out[i].Severity) > lockHazardSeverityRank(out[j].Severity)
+		}
+		return out[i].Path < out[j].Path
+	})
+	return out
+}
+
+func generatedArtifactNeedsLockHazard(artifact GeneratedArtifact) bool {
+	lower := strings.ToLower(artifact.Kind + " " + artifact.Path + " " + artifact.Content)
+	return containsAny(lower, "alter table", "create index", "add index", "lock table", "for update", "truncate", "drop ", "update ", "delete ", "merge ", "algorithm=copy", "worker", "background", "backfill", "repair", "guard", "select count", "candidate_rows")
 }
 
 func summarizeCompare(baseline BaselineReport, proposal ProposalReport, checks []GeneratedCheck, deltas []RiskDelta, nativeResults []NativeResult) CompareSummary {
@@ -952,6 +1004,11 @@ func renderCompareMarkdown(report CompareReport) string {
 	fmt.Fprintf(&b, "| idempotency guarded | %d |\n", report.Summary.IdempotencyGuarded)
 	fmt.Fprintf(&b, "| idempotency unknown | %d |\n", report.Summary.IdempotencyUnknown)
 	fmt.Fprintf(&b, "| idempotency non-idempotent | %d |\n", report.Summary.IdempotencyUnsafe)
+	fmt.Fprintf(&b, "| lock/concurrency hazards | %d |\n", report.Summary.LockHazards)
+	fmt.Fprintf(&b, "| lock hazard critical | %d |\n", report.Summary.LockHazardCritical)
+	fmt.Fprintf(&b, "| lock hazard high | %d |\n", report.Summary.LockHazardHigh)
+	fmt.Fprintf(&b, "| lock hazard medium | %d |\n", report.Summary.LockHazardMedium)
+	fmt.Fprintf(&b, "| lock hazard low | %d |\n", report.Summary.LockHazardLow)
 	fmt.Fprintf(&b, "| intervention loops | %d |\n", report.Summary.InterventionLoops)
 	fmt.Fprintf(&b, "| intervention accepted | %d |\n", report.Summary.InterventionAccepted)
 	fmt.Fprintf(&b, "| intervention rejected | %d |\n\n", report.Summary.InterventionRejected)
@@ -1005,6 +1062,13 @@ func renderCompareMarkdown(report CompareReport) string {
 		fmt.Fprintf(&b, "## Generated idempotency classifications\n\n| status | path | operation | markers |\n| --- | --- | --- | --- |\n")
 		for _, item := range report.Idempotency {
 			fmt.Fprintf(&b, "| %s | %s | %s | %s |\n", item.Status, item.Path, item.Operation, strings.Join(item.Markers, ", "))
+		}
+		fmt.Fprintf(&b, "\n")
+	}
+	if len(report.LockHazards) > 0 {
+		fmt.Fprintf(&b, "## Generated lock and concurrency hazards\n\n| severity | path | operation | markers | mitigations |\n| --- | --- | --- | --- | --- |\n")
+		for _, item := range report.LockHazards {
+			fmt.Fprintf(&b, "| %s | %s | %s | %s | %s |\n", item.Severity, item.Path, item.Operation, strings.Join(item.Markers, ", "), strings.Join(item.Mitigations, ", "))
 		}
 		fmt.Fprintf(&b, "\n")
 	}
