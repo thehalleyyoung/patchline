@@ -225,6 +225,8 @@ Run `make fp-adjudication-gate` to run a blinded, three-rater false-positive adj
 
 Run `make fn-discovery-gate` to seed known public-incident hazard analogues into a real migration layout, measure detection recall, and surface the false negatives Patchline under-escalates or misses (cross-validated on real repo migrations); see [docs/fn-discovery.md](docs/fn-discovery.md).
 
+Run `make ablation-study-gate` to ablate provenance links, cross-file context, generated guards, runtime traces, and risk budgets on a real downloaded baseline and report each signal's measured contribution to the ranking; see [docs/ablation-study.md](docs/ablation-study.md).
+
 Add `--redact` to write `analysis-bundle/` copies with stable redaction tokens for identifiers, literals, customer-like strings, and secret-like values while preserving joins and existing artifact hashes.
 
 Add `--ci` to write `ci/summary.md` plus upload snippets and code-quality artifacts for GitHub Actions, GitLab CI, and Bitbucket Pipelines: SARIF under `analysis-bundle/summary.sarif`, GitLab `ci/gl-code-quality-report.json`, and Bitbucket `ci/bitbucket-code-insights.json`.

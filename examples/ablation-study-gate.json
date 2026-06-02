@@ -1,0 +1,40 @@
+{
+  "version": "patchline.ablation-study-gate/v1",
+  "claim": "An ablation study quantifies how much each Patchline signal contributes to risk ranking by removing it and re-scoring a real downloaded baseline: provenance links, cross-file context, generated guards (control signals), runtime traces (proof obligations), and risk budgets (top-K selection). Each axis yields a measurable, non-degenerate effect so the contribution of every component is auditable rather than assumed.",
+  "real_repo": {
+    "repo": "lobsters/lobsters",
+    "ref": "3b80b47aa5aaba37ec44413e7d1dc96fcf1585b6",
+    "subpath": "db/migrate"
+  },
+  "top_k": 25,
+  "high_score_threshold": 100,
+  "budgets": [5, 10, 25, 50],
+  "runtime_evidence_pattern": "row count|runtime|trace|transfer|backfill|production",
+  "axes": [
+    {
+      "id": "provenance-links",
+      "kind": "score-factor",
+      "factors": ["linked-project-evidence"]
+    },
+    {
+      "id": "cross-file-context",
+      "kind": "score-factor",
+      "factors": ["broad-write", "write-breadth-unknown", "schema-write-breadth"]
+    },
+    {
+      "id": "generated-guards",
+      "kind": "score-factor",
+      "factors": ["missing-transaction-boundary", "missing-idempotency", "weak-rollback-signal"]
+    },
+    {
+      "id": "runtime-traces",
+      "kind": "proof-obligation"
+    },
+    {
+      "id": "risk-budgets",
+      "kind": "budget-selection"
+    }
+  ],
+  "minimum_score_factor_axes": 3,
+  "minimum_total_risks": 50
+}
