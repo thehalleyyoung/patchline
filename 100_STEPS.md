@@ -168,7 +168,7 @@ Every addition to the repo should be judged by whether it makes that loop more a
 122. [x] Add experiment drivers that run every research question from a clean checkout and write immutable result ledgers.
 123. [x] Add bootstrap confidence intervals for ranking, linking, generated-check, runtime, and review-burden metrics.
 124. [x] Add paired statistical tests for Patchline versus grep-only, SQL-only, identifier-only, temporal-only, and no-facts-generation baselines.
-125. [ ] Add effect-size reporting so improvements are not presented only as p-values.
+125. [x] Add effect-size reporting so improvements are not presented only as p-values.
 126. [ ] Add sensitivity analysis over budgets, finding caps, link thresholds, temporal windows, and risk-weight settings.
 127. [ ] Add ablation dashboards that show which feature families matter for each ecosystem and failure mode.
 128. [ ] Add negative controls that run on documentation-only, vendor-only, and test-only slices where Patchline should avoid high-confidence repair claims.

@@ -1,0 +1,13 @@
+{
+  "version": "patchline.effect-size-reporting/v1",
+  "source": "paired-statistical-tests",
+  "required_effect_sizes": [
+    "mean_delta",
+    "median_delta",
+    "relative_lift",
+    "win_rate",
+    "tie_rate",
+    "standardized_paired_delta"
+  ],
+  "interpretation_policy": "Report magnitude and ties even when exact sign-test p-values are limited by four public slices."
+}
