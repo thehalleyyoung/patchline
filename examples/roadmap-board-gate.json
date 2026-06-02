@@ -1,0 +1,89 @@
+{
+  "version": "patchline.roadmap-board-gate/v1",
+  "claim": "Patchline publishes a public roadmap board where every planned feature links to a real public-repository failure mode, a proof gate, and an expected artifact. The board is regenerated from pinned public-code analyses rather than maintained as an unverifiable wish list.",
+  "minimum_public_repos": 4,
+  "minimum_failure_modes": 4,
+  "minimum_features": 6,
+  "real_code": [
+    {
+      "id": "lobsters-rails-migrations",
+      "repo": "lobsters/lobsters",
+      "ref": "3b80b47aa5aaba37ec44413e7d1dc96fcf1585b6",
+      "subpath": "db/migrate"
+    },
+    {
+      "id": "forem-rails-migrations",
+      "repo": "forem/forem",
+      "ref": "9c5509c3aeecd4a86a8950206fa937ebcbc2f8d1",
+      "subpath": "db/migrate"
+    },
+    {
+      "id": "grafana-go-migrations",
+      "repo": "grafana/grafana",
+      "ref": "a54b2e1e9aaf979938813f6ed9e44de569fe1105",
+      "subpath": "pkg/services/sqlstore/migrations"
+    },
+    {
+      "id": "django-auth-migrations",
+      "repo": "django/django",
+      "ref": "9383fae0d55a553be3bda620db87fa9ee8a81478",
+      "subpath": "django/contrib/auth/migrations"
+    }
+  ],
+  "planned_features": [
+    {
+      "id": "monthly-reproducibility-reports",
+      "title": "Monthly reproducibility reports",
+      "stage": "next",
+      "owner": "artifact-maintainers",
+      "gate": "make reproducibility-report-gate",
+      "expected_artifact": "results/generated/reproducibility-report/report.md",
+      "why": "Rerun public gates on a cadence and publish cache status, failures, fixes, and benchmark trends."
+    },
+    {
+      "id": "contributor-recognition",
+      "title": "Contributor recognition",
+      "stage": "next",
+      "owner": "community-maintainers",
+      "gate": "make contributor-recognition-gate",
+      "expected_artifact": "results/generated/contributor-recognition/leaderboard.md",
+      "why": "Recognize new real-repo slices, ecosystem parsers, false-positive reductions, and artifact improvements."
+    },
+    {
+      "id": "release-quality-capstone-demo",
+      "title": "Release-quality capstone demo",
+      "stage": "next",
+      "owner": "release-reviewers",
+      "gate": "make capstone-demo-gate",
+      "expected_artifact": "results/generated/capstone-demo/session.md",
+      "why": "Show a fresh user downloading unfamiliar repos, finding high-signal risks, generating bounded interventions, rejecting bad output, and regenerating evidence."
+    },
+    {
+      "id": "ecosystem-parser-showcase",
+      "title": "Ecosystem parser showcase",
+      "stage": "planned",
+      "owner": "parser-maintainers",
+      "gate": "make ecosystem-parser-showcase-gate",
+      "expected_artifact": "results/generated/ecosystem-parser-showcase/matrix.md",
+      "why": "Make parser coverage visible by ecosystem, framework, fixture, fuzz seed, and real-repo proof."
+    },
+    {
+      "id": "runtime-evidence-bridge",
+      "title": "Runtime evidence bridge",
+      "stage": "planned",
+      "owner": "observability-integrators",
+      "gate": "make runtime-evidence-bridge-gate",
+      "expected_artifact": "results/generated/runtime-evidence-bridge/links.json",
+      "why": "Link traces, logs, deploy markers, and incident exports back to repository-native data-change findings."
+    },
+    {
+      "id": "reviewer-evidence-bundles",
+      "title": "Reviewer evidence bundles",
+      "stage": "planned",
+      "owner": "research-reviewers",
+      "gate": "make reviewer-evidence-bundle-gate",
+      "expected_artifact": "results/generated/reviewer-evidence-bundles/bundle-manifest.json",
+      "why": "Package claims, limitations, figures, case studies, and generated intervention outcomes into paper-review-ready bundles."
+    }
+  ]
+}

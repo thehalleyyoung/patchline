@@ -177,6 +177,8 @@ Run `make awesome-patchline-gate` to regenerate the Awesome Patchline catalog of
 
 Run `make comparison-pages-gate` to regenerate comparison pages against code scanning, SQL linters, migration tools, observability dashboards, and AI coding assistants from pinned public-code evidence; see [docs/comparison-pages.md](docs/comparison-pages.md).
 
+Run `make roadmap-board-gate` to regenerate the public roadmap board where every planned feature links to a real-repo failure mode, proof gate, and expected artifact; see [docs/roadmap-board.md](docs/roadmap-board.md).
+
 Add `--redact` to write `analysis-bundle/` copies with stable redaction tokens for identifiers, literals, customer-like strings, and secret-like values while preserving joins and existing artifact hashes.
 
 Add `--ci` to write `ci/summary.md` plus upload snippets and code-quality artifacts for GitHub Actions, GitLab CI, and Bitbucket Pipelines: SARIF under `analysis-bundle/summary.sarif`, GitLab `ci/gl-code-quality-report.json`, and Bitbucket `ci/bitbucket-code-insights.json`.
