@@ -223,6 +223,8 @@ Run `make severity-calibration-gate` to validate severity against independent da
 
 Run `make fp-adjudication-gate` to run a blinded, three-rater false-positive adjudication of findings and report Cohen's kappa, three-way agreement, and the majority-adjudicated false-positive rate; see [docs/fp-adjudication.md](docs/fp-adjudication.md).
 
+Run `make fn-discovery-gate` to seed known public-incident hazard analogues into a real migration layout, measure detection recall, and surface the false negatives Patchline under-escalates or misses (cross-validated on real repo migrations); see [docs/fn-discovery.md](docs/fn-discovery.md).
+
 Add `--redact` to write `analysis-bundle/` copies with stable redaction tokens for identifiers, literals, customer-like strings, and secret-like values while preserving joins and existing artifact hashes.
 
 Add `--ci` to write `ci/summary.md` plus upload snippets and code-quality artifacts for GitHub Actions, GitLab CI, and Bitbucket Pipelines: SARIF under `analysis-bundle/summary.sarif`, GitLab `ci/gl-code-quality-report.json`, and Bitbucket `ci/bitbucket-code-insights.json`.

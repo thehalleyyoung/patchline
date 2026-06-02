@@ -1,0 +1,70 @@
+{
+  "version": "patchline.fn-discovery-gate/v1",
+  "claim": "False-negative discovery seeds known public-incident hazard analogues (destructive drops, unscoped DML, NOT NULL without default, column renames, non-concurrent index builds) into a real migration layout, runs Patchline's static baseline, and measures recall so the hazards Patchline under-escalates or misses are surfaced explicitly instead of hidden.",
+  "minimum_hazards": 7,
+  "minimum_specific_detections": 4,
+  "minimum_false_negatives": 1,
+  "real_cross_validation": {
+    "repo": "lobsters/lobsters",
+    "ref": "3b80b47aa5aaba37ec44413e7d1dc96fcf1585b6",
+    "subpath": "db/migrate",
+    "expected_kind_pattern": "drop|delete|update|drop_column|drop_table|high-risk-sql"
+  },
+  "hazards": [
+    {
+      "id": "drop_column_no_backfill",
+      "incident_analogue": "destructive column drop without backfill (data-loss class)",
+      "file": "20210101000001_drop_column.sql",
+      "sql": "ALTER TABLE users DROP COLUMN email;",
+      "expected_specific_kind": "schema:drop_column"
+    },
+    {
+      "id": "drop_table",
+      "incident_analogue": "table drop removing live data",
+      "file": "20210101000002_drop_table.sql",
+      "sql": "DROP TABLE legacy_sessions;",
+      "expected_specific_kind": "schema:drop_table|^drop$"
+    },
+    {
+      "id": "delete_without_where",
+      "incident_analogue": "unscoped DELETE wiping a table (backfill-gone-wrong class)",
+      "file": "20210101000003_delete_nowhere.sql",
+      "sql": "DELETE FROM audit_logs;",
+      "expected_specific_kind": "^delete$|high-risk-sql"
+    },
+    {
+      "id": "update_without_where",
+      "incident_analogue": "unscoped UPDATE rewriting every row",
+      "file": "20210101000004_update_nowhere.sql",
+      "sql": "UPDATE accounts SET active = true;",
+      "expected_specific_kind": "^update$|high-risk-sql"
+    },
+    {
+      "id": "not_null_without_default",
+      "incident_analogue": "ADD/SET NOT NULL without default on a large table (write-blocking rewrite)",
+      "file": "20210101000005_not_null.sql",
+      "sql": "ALTER TABLE accounts ALTER COLUMN status SET NOT NULL;",
+      "expected_specific_kind": "not_null|set_not_null"
+    },
+    {
+      "id": "rename_column",
+      "incident_analogue": "column rename breaking deployed readers (multi-step expand/contract violation)",
+      "file": "20210101000006_rename_column.sql",
+      "sql": "ALTER TABLE accounts RENAME COLUMN name TO full_name;",
+      "expected_specific_kind": "rename"
+    },
+    {
+      "id": "nonconcurrent_index",
+      "incident_analogue": "non-concurrent index build taking a write lock on a hot table",
+      "file": "20210101000007_create_index.sql",
+      "sql": "CREATE INDEX idx_orders_user ON orders (user_id);",
+      "expected_specific_kind": "index|create_index"
+    }
+  ],
+  "benign_control": {
+    "id": "nullable_add_column",
+    "file": "20210101000008_safe_add.sql",
+    "sql": "ALTER TABLE orders ADD COLUMN note text;",
+    "max_severity": "medium"
+  }
+}
