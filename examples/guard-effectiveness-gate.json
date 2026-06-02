@@ -1,0 +1,11 @@
+{
+  "version": "patchline.guard-effectiveness-gate/v1",
+  "claim": "Generated migration guards are simulated against synthetic before/after datasets derived from the real public schema (tables drawn from ranked risks). Each guard is evaluated on four scenarios per table: a bounded-safe change it must allow, a broad change it must block, a missing-table case it must fail closed on, and an unknown-row-count case it must fail closed on. An effective guard scores 1.0; a no-op control guard that always allows scores strictly lower, proving the simulation discriminates.",
+  "real_repo": {
+    "repo": "lobsters/lobsters",
+    "ref": "3b80b47aa5aaba37ec44413e7d1dc96fcf1585b6",
+    "subpath": "db/migrate"
+  },
+  "minimum_scenarios": 40,
+  "scenarios": ["safe", "unsafe-broad", "unsafe-missing", "unknown-meta"]
+}
