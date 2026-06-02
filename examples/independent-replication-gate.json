@@ -1,0 +1,19 @@
+{
+  "version": "patchline.independent-replication-gate/v1",
+  "claim": "Patchline provides independent replication instructions for reviewers without GitHub credentials or proprietary tooling, using anonymous public archive URLs, checksums, command versions, and generated public-code evidence.",
+  "minimum_public_repos": 4,
+  "minimum_archives": 4,
+  "minimum_verified_archives": 4,
+  "minimum_commands": 5,
+  "release_manifest_spec": "examples/artifact-release-manifest-gate.json",
+  "forbidden_tools": ["gh", "datadog", "az", "aws", "gcloud"],
+  "forbidden_environment": ["GITHUB_TOKEN", "GH_TOKEN", "GITHUB_PAT", "DATADOG_API_KEY"],
+  "required_outputs": [
+    "independent-replication.md",
+    "independent-replication.json",
+    "replication-commands.sh",
+    "archive-verification.json",
+    "no-credential-environment.json",
+    "evidence/release-manifest/artifact-release-manifest.json"
+  ]
+}
