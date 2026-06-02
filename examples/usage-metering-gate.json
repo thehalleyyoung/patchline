@@ -1,0 +1,23 @@
+{
+  "version": "patchline.usage-metering-gate/v1",
+  "claim": "Patchline adds a billing-and-usage metering layer producing reproducible invoices from event logs, so every charge can be recomputed from raw usage. The worker checks every invoice is reproduced exactly from its event log. The gate proves every invoice is event-reproducible and that a non-reproducible invoice is rejected.",
+  "real_repo": "patchline (self): usage-metering",
+  "items": [
+    {
+      "invoice": "2026-01",
+      "reproduced_from_events": true
+    },
+    {
+      "invoice": "2026-02",
+      "reproduced_from_events": true
+    },
+    {
+      "invoice": "2026-03",
+      "reproduced_from_events": true
+    }
+  ],
+  "bad": {
+    "invoice": "phantom",
+    "reproduced_from_events": false
+  }
+}

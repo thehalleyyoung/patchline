@@ -1,0 +1,23 @@
+{
+  "version": "patchline.airgapped-distribution-gate/v1",
+  "claim": "Patchline ships an offline air-gapped enterprise distribution with the same gate guarantees, so security-sensitive customers run the full tool with no network access. The worker checks every gate still resolves offline. The gate proves every gate works air-gapped and that a network-requiring gate is rejected.",
+  "real_repo": "patchline (self): airgapped-distribution",
+  "items": [
+    {
+      "gate": "soundness-theorem-gate",
+      "works_offline": true
+    },
+    {
+      "gate": "refinement-types-columns-gate",
+      "works_offline": true
+    },
+    {
+      "gate": "multi-engine-matrix-gate",
+      "works_offline": true
+    }
+  ],
+  "bad": {
+    "gate": "phones-home-gate",
+    "works_offline": false
+  }
+}

@@ -1,0 +1,23 @@
+{
+  "version": "patchline.findings-to-ticket-bridge-gate/v1",
+  "claim": "Patchline provides a findings-to-ticket bridge for the top issue trackers with idempotent sync, so re-running never creates duplicate tickets for the same finding. The worker checks every tracker integration performs idempotent sync. The gate proves every tracker syncs idempotently and that a duplicate-creating integration is rejected.",
+  "real_repo": "patchline (self): findings-to-ticket-bridge",
+  "items": [
+    {
+      "tracker": "jira",
+      "idempotent": true
+    },
+    {
+      "tracker": "github-issues",
+      "idempotent": true
+    },
+    {
+      "tracker": "linear",
+      "idempotent": true
+    }
+  ],
+  "bad": {
+    "tracker": "naive-poster",
+    "idempotent": false
+  }
+}

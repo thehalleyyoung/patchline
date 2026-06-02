@@ -1,0 +1,27 @@
+{
+  "version": "patchline.realtime-pr-checks-gate/v1",
+  "claim": "Patchline delivers a real-time PR-checks experience with sub-ten-second incremental verdicts, so reviewers get feedback while the diff is still on screen. The worker checks every PR check returns an incremental verdict within the ten-second budget. The gate proves every PR verdict is sub-ten-second and that an over-budget check is rejected.",
+  "real_repo": "patchline (self): realtime-pr-checks",
+  "items": [
+    {
+      "pr": "#101",
+      "seconds": 4,
+      "budget": 10
+    },
+    {
+      "pr": "#102",
+      "seconds": 7,
+      "budget": 10
+    },
+    {
+      "pr": "#103",
+      "seconds": 3,
+      "budget": 10
+    }
+  ],
+  "bad": {
+    "pr": "#999",
+    "seconds": 48,
+    "budget": 10
+  }
+}

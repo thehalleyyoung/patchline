@@ -1,0 +1,27 @@
+{
+  "version": "patchline.customer-managed-keys-gate/v1",
+  "claim": "Patchline offers a customer-managed-keys option for all stored artifacts with rotation, so customers control encryption and can rotate keys on their schedule. The worker checks every stored artifact uses a customer-managed key that has been rotated. The gate proves every artifact uses a rotated CMK and that an unrotated artifact is rejected.",
+  "real_repo": "patchline (self): customer-managed-keys",
+  "items": [
+    {
+      "artifact": "bundles",
+      "cmk": true,
+      "rotated": true
+    },
+    {
+      "artifact": "logs",
+      "cmk": true,
+      "rotated": true
+    },
+    {
+      "artifact": "reports",
+      "cmk": true,
+      "rotated": true
+    }
+  ],
+  "bad": {
+    "artifact": "legacy-store",
+    "cmk": false,
+    "rotated": false
+  }
+}

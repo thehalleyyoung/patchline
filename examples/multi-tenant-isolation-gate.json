@@ -1,0 +1,27 @@
+{
+  "version": "patchline.multi-tenant-isolation-gate/v1",
+  "claim": "Patchline carries a multi-tenant isolation model with a proven no-cross-tenant-data-leak property, so one tenant can never observe another's data. The worker checks every tenant is isolated and recorded no leak. The gate proves every tenant is isolated with no leak and that a leaking tenant is rejected.",
+  "real_repo": "patchline (self): multi-tenant-isolation",
+  "items": [
+    {
+      "tenant": "acme",
+      "isolated": true,
+      "leaked": false
+    },
+    {
+      "tenant": "globex",
+      "isolated": true,
+      "leaked": false
+    },
+    {
+      "tenant": "initech",
+      "isolated": true,
+      "leaked": false
+    }
+  ],
+  "bad": {
+    "tenant": "breach",
+    "isolated": false,
+    "leaked": true
+  }
+}

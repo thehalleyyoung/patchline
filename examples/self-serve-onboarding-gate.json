@@ -1,0 +1,31 @@
+{
+  "version": "patchline.self-serve-onboarding-gate/v1",
+  "claim": "Patchline measures self-serve onboarding by activation and week-four retention, so onboarding quality is a tracked funnel metric rather than an assumption. The worker checks every cohort clears the activation and retention thresholds. The gate proves every cohort clears activation and retention and that a churned cohort is flagged.",
+  "real_repo": "patchline (self): self-serve-onboarding",
+  "items": [
+    {
+      "cohort": "jan",
+      "activation_rate": 0.62,
+      "retention_w4": 0.41,
+      "min": 0.3
+    },
+    {
+      "cohort": "feb",
+      "activation_rate": 0.58,
+      "retention_w4": 0.38,
+      "min": 0.3
+    },
+    {
+      "cohort": "mar",
+      "activation_rate": 0.7,
+      "retention_w4": 0.45,
+      "min": 0.3
+    }
+  ],
+  "bad": {
+    "cohort": "churned",
+    "activation_rate": 0.12,
+    "retention_w4": 0.05,
+    "min": 0.3
+  }
+}

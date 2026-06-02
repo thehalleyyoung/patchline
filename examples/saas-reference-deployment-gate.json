@@ -1,0 +1,31 @@
+{
+  "version": "patchline.saas-reference-deployment-gate/v1",
+  "claim": "Patchline ships a hosted SaaS reference deployment with published SLOs and a public status page, so adopters see availability and latency commitments backed by measurements rather than promises. The worker checks every SLO is currently met by its measured value. The gate proves every SLO is met and that a breached SLO is rejected.",
+  "real_repo": "patchline (self): saas-reference-deployment",
+  "items": [
+    {
+      "slo": "availability",
+      "target": "99.9",
+      "measured": "99.96",
+      "met": true
+    },
+    {
+      "slo": "p95-latency-ms",
+      "target": "800",
+      "measured": "540",
+      "met": true
+    },
+    {
+      "slo": "error-rate",
+      "target": "0.5",
+      "measured": "0.12",
+      "met": true
+    }
+  ],
+  "bad": {
+    "slo": "availability",
+    "target": "99.9",
+    "measured": "97.0",
+    "met": false
+  }
+}

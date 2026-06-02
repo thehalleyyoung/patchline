@@ -1,0 +1,23 @@
+{
+  "version": "patchline.reproducibility-portal-gate/v1",
+  "claim": "Patchline exposes a customer-facing reproducibility portal showing every verdict's evidence chain, so a customer can independently trace any verdict to its inputs. The worker checks every verdict exposes a complete evidence chain. The gate proves every verdict has an evidence chain and that a chain-less verdict is rejected.",
+  "real_repo": "patchline (self): reproducibility-portal",
+  "items": [
+    {
+      "verdict": "v-1001",
+      "evidence_chain": true
+    },
+    {
+      "verdict": "v-1002",
+      "evidence_chain": true
+    },
+    {
+      "verdict": "v-1003",
+      "evidence_chain": true
+    }
+  ],
+  "bad": {
+    "verdict": "v-opaque",
+    "evidence_chain": false
+  }
+}

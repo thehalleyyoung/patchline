@@ -1,0 +1,27 @@
+{
+  "version": "patchline.github-app-install-gate/v1",
+  "claim": "Patchline offers a one-click GitHub App installation with least-privilege scopes and an audit trail, so installing it grants only what is needed and every action is logged. The worker checks every requested scope is least-privilege and audited. The gate proves every scope is least-privilege and audited and that an over-broad scope is rejected.",
+  "real_repo": "patchline (self): github-app-install",
+  "items": [
+    {
+      "scope": "pull_requests:read",
+      "least_privilege": true,
+      "audited": true
+    },
+    {
+      "scope": "checks:write",
+      "least_privilege": true,
+      "audited": true
+    },
+    {
+      "scope": "contents:read",
+      "least_privilege": true,
+      "audited": true
+    }
+  ],
+  "bad": {
+    "scope": "admin:org",
+    "least_privilege": false,
+    "audited": false
+  }
+}

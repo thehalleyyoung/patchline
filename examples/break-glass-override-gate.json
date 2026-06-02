@@ -1,0 +1,19 @@
+{
+  "version": "patchline.break-glass-override-gate/v1",
+  "claim": "Patchline provides a migration-freeze break-glass workflow with full provenance of overrides, so an emergency override is allowed but never untraceable. The worker checks every override records complete provenance. The gate proves every break-glass override is provenance-logged and that an unlogged override is rejected.",
+  "real_repo": "patchline (self): break-glass-override",
+  "items": [
+    {
+      "override": "hotfix-2026-05-01",
+      "provenance": "user=oncall reason=sev1 approver=cto"
+    },
+    {
+      "override": "hotfix-2026-05-09",
+      "provenance": "user=oncall reason=sev2 approver=eng-lead"
+    }
+  ],
+  "bad": {
+    "override": "silent-bypass",
+    "provenance": ""
+  }
+}

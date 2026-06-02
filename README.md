@@ -556,6 +556,21 @@ Run `make human-factors-study-gate` for a human-factors study of reviewer trust 
 Run `make replication-package-ci-gate` for a replication package re-run on three different **CI provider**s, rejecting a divergent provider; see [docs/replication-package-ci.md](docs/replication-package-ci.md).
 Run `make meta-analysis-pooled-gate` for a meta-analysis combining studies into one **pooled** effect with heterogeneity reporting, rejecting a null-effect study; see [docs/meta-analysis-pooled.md](docs/meta-analysis-pooled.md).
 Run `make data-availability-statement-gate` for a data-availability statement with **DOI**-pinned raw data per figure, rejecting a figure with no DOI; see [docs/data-availability-statement.md](docs/data-availability-statement.md).
+Run `make saas-reference-deployment-gate` for a hosted reference deployment with published **SLO**s and a status page, rejecting a breached SLO; see [docs/saas-reference-deployment.md](docs/saas-reference-deployment.md).
+Run `make github-app-install-gate` for a one-click GitHub App install with **least-privilege** scopes and an audit trail, rejecting an over-broad scope; see [docs/github-app-install.md](docs/github-app-install.md).
+Run `make policy-as-code-layer-gate` for a **policy-as-code** layer mapping org rules to gate configurations, rejecting an unmapped rule; see [docs/policy-as-code-layer.md](docs/policy-as-code-layer.md).
+Run `make findings-to-ticket-bridge-gate` for a findings-to-ticket bridge with **idempotent** sync, rejecting a duplicate-creating integration; see [docs/findings-to-ticket-bridge.md](docs/findings-to-ticket-bridge.md).
+Run `make realtime-pr-checks-gate` for real-time PR checks with sub-ten-second **incremental** verdicts, rejecting an over-budget check; see [docs/realtime-pr-checks.md](docs/realtime-pr-checks.md).
+Run `make self-serve-onboarding-gate` for self-serve onboarding measured by activation and week-four **retention**, flagging a churned cohort; see [docs/self-serve-onboarding.md](docs/self-serve-onboarding.md).
+Run `make upgrade-safety-advisor-gate` for an upgrade-safety advisor pairing risky changes with a **guided fix**, rejecting a risky change with no fix; see [docs/upgrade-safety-advisor.md](docs/upgrade-safety-advisor.md).
+Run `make multi-tenant-isolation-gate` for a multi-tenant **isolation** model with a no-cross-tenant-leak property, rejecting a leaking tenant; see [docs/multi-tenant-isolation.md](docs/multi-tenant-isolation.md).
+Run `make usage-metering-gate` for usage metering with reproducible **invoice**s from event logs, rejecting a non-reproducible invoice; see [docs/usage-metering.md](docs/usage-metering.md).
+Run `make airgapped-distribution-gate` for an **air-gapped** distribution preserving every gate guarantee offline, rejecting a network-requiring gate; see [docs/airgapped-distribution.md](docs/airgapped-distribution.md).
+Run `make customer-managed-keys-gate` for customer-managed keys on all artifacts with **rotation**, rejecting an unrotated artifact; see [docs/customer-managed-keys.md](docs/customer-managed-keys.md).
+Run `make admin-analytics-dashboard-gate` for an admin dashboard tying findings to **prevented-incident** estimates, rejecting an unbacked metric; see [docs/admin-analytics-dashboard.md](docs/admin-analytics-dashboard.md).
+Run `make soc2-controls-map-gate` for a SOC2-style controls map where each **control** is automated, rejecting a manually-only control; see [docs/soc2-controls-map.md](docs/soc2-controls-map.md).
+Run `make break-glass-override-gate` for a **break-glass** migration-freeze workflow with full override provenance, rejecting an unlogged override; see [docs/break-glass-override.md](docs/break-glass-override.md).
+Run `make reproducibility-portal-gate` for a customer-facing portal exposing every verdict's **evidence chain**, rejecting a chain-less verdict; see [docs/reproducibility-portal.md](docs/reproducibility-portal.md).
 
 </details>
 

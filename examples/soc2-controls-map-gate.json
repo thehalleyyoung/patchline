@@ -1,0 +1,23 @@
+{
+  "version": "patchline.soc2-controls-map-gate/v1",
+  "claim": "Patchline carries a SOC2-style controls map where each control is backed by an automated check, so compliance is continuously verified rather than annually attested. The worker checks every control has an automated check. The gate proves every control is automated and that a manually-only control is rejected.",
+  "real_repo": "patchline (self): soc2-controls-map",
+  "items": [
+    {
+      "control": "access-review",
+      "automated_check": "scripts/access-review.sh"
+    },
+    {
+      "control": "change-management",
+      "automated_check": "make claim-freeze-gate"
+    },
+    {
+      "control": "backup-restore",
+      "automated_check": "scripts/restore-test.sh"
+    }
+  ],
+  "bad": {
+    "control": "manual-only",
+    "automated_check": ""
+  }
+}

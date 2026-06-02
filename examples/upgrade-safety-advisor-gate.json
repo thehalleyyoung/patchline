@@ -1,0 +1,27 @@
+{
+  "version": "patchline.upgrade-safety-advisor-gate/v1",
+  "claim": "Patchline adds an in-product upgrade-safety advisor for risky schema changes with guided fixes, so a hazardous change comes with a concrete safe rewrite. The worker checks every risky change carries a guided fix. The gate proves every risky change has a guided fix and that a risky change with no fix is rejected.",
+  "real_repo": "patchline (self): upgrade-safety-advisor",
+  "items": [
+    {
+      "change": "add-not-null",
+      "risky": true,
+      "guided_fix": "add nullable, backfill, then set not null"
+    },
+    {
+      "change": "drop-column",
+      "risky": true,
+      "guided_fix": "deprecate then drop after release"
+    },
+    {
+      "change": "add-fk",
+      "risky": true,
+      "guided_fix": "create index before adding constraint"
+    }
+  ],
+  "bad": {
+    "change": "mystery-change",
+    "risky": true,
+    "guided_fix": ""
+  }
+}

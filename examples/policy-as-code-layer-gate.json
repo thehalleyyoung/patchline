@@ -1,0 +1,23 @@
+{
+  "version": "patchline.policy-as-code-layer-gate/v1",
+  "claim": "Patchline adds an enterprise policy-as-code layer mapping org rules to gate configurations, so a written policy becomes an enforced configuration instead of a wiki page. The worker checks every org rule maps to a concrete gate configuration. The gate proves every rule is mapped to a gate and that an unmapped rule is rejected.",
+  "real_repo": "patchline (self): policy-as-code-layer",
+  "items": [
+    {
+      "rule": "no-destructive-drop-in-prod",
+      "mapped_gate": "rollback-check-gate"
+    },
+    {
+      "rule": "index-before-fk",
+      "mapped_gate": "index-coverage-gate"
+    },
+    {
+      "rule": "backfill-before-not-null",
+      "mapped_gate": "backfill-completeness-gate"
+    }
+  ],
+  "bad": {
+    "rule": "unenforced-policy",
+    "mapped_gate": ""
+  }
+}

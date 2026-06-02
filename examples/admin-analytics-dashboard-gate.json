@@ -1,0 +1,23 @@
+{
+  "version": "patchline.admin-analytics-dashboard-gate/v1",
+  "claim": "Patchline provides an admin analytics dashboard tying findings to prevented-incident estimates, so administrators see value in incidents avoided rather than raw counts. The worker checks every dashboard metric is backed by a prevented-incident estimate. The gate proves every metric is estimate-backed and that an unbacked metric is rejected.",
+  "real_repo": "patchline (self): admin-analytics-dashboard",
+  "items": [
+    {
+      "metric": "hazards-blocked",
+      "backed": true
+    },
+    {
+      "metric": "incidents-prevented",
+      "backed": true
+    },
+    {
+      "metric": "reviewer-hours-saved",
+      "backed": true
+    }
+  ],
+  "bad": {
+    "metric": "vanity-number",
+    "backed": false
+  }
+}
