@@ -1,0 +1,6 @@
+{
+  "version": "patchline.examples-gallery-gate/v1",
+  "claim": "Patchline renders a public examples gallery directly from the repository's own example specifications and reproducibility reports, so the gallery can never advertise a capability that is not backed by a real example spec and a gate. The gallery worker scans every examples/*.json specification, extracts its versioned claim and any pinned real-repo proof, cross-references the matching gate script and capability doc, and renders a deterministic Markdown and JSON gallery plus an HTML index. The gate proves the gallery is complete, sorted, and free of orphan entries.",
+  "real_repo": "patchline (self): examples/*.json + scripts/*-gate.sh + docs/*.md",
+  "min_entries": 60
+}

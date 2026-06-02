@@ -289,6 +289,8 @@ Run `make parser-dashboard-gate` to publish an **ecosystem parser quality dashbo
 
 Run `make onboarding-quest-gate` to scaffold a new ecosystem gate in minutes — a generator emits valid, runnable starter files and a six-step **onboarding quest** takes a contributor from zero to a passing real-repo gate in under one hour; see [docs/onboarding-quest.md](docs/onboarding-quest.md).
 
+Run `make examples-gallery-gate` to render a public **examples gallery** straight from `examples/*.json` and their **reproducibility** backing — every advertised capability is cross-checked against its gate and doc, so the gallery has zero orphan entries; see [docs/examples-gallery.md](docs/examples-gallery.md).
+
 Add `--redact` to write `analysis-bundle/` copies with stable redaction tokens for identifiers, literals, customer-like strings, and secret-like values while preserving joins and existing artifact hashes.
 
 Add `--ci` to write `ci/summary.md` plus upload snippets and code-quality artifacts for GitHub Actions, GitLab CI, and Bitbucket Pipelines: SARIF under `analysis-bundle/summary.sarif`, GitLab `ci/gl-code-quality-report.json`, and Bitbucket `ci/bitbucket-code-insights.json`.
