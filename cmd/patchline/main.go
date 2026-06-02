@@ -551,7 +551,7 @@ Examples:
 
 func repoCommand(args []string) error {
 	if len(args) == 0 {
-		return errors.New("usage: patchline repo <doctor|fetch|analyze|inventory|baseline|propose|compare|proposal-minimize|replay|suppressions|why-now|changes|hook|offline|notify-summary|minimize|recurrence|claims-evidence> ...")
+		return errors.New("usage: patchline repo <doctor|fetch|analyze|inventory|baseline|propose|compare|proposal-minimize|replay|suppressions|why-now|changes|hook|offline|notify-summary|minimize|recurrence|claims-evidence|figures> ...")
 	}
 	switch args[0] {
 	case "doctor":
@@ -608,6 +608,8 @@ func repoCommand(args []string) error {
 		return repoLimitationsLedger(args[1:])
 	case "claims-evidence":
 		return repoClaimsEvidence(args[1:])
+	case "figures":
+		return repoFigures(args[1:])
 	default:
 		return fmt.Errorf("unknown repo subcommand %q", args[0])
 	}
@@ -1030,6 +1032,49 @@ type repoPaperClaim struct {
 	AffectedRepos     []string `json:"affected_repos"`
 	RequiredForPaper  bool     `json:"required_for_paper"`
 	ExpectedPaperSlot string   `json:"expected_paper_slot"`
+}
+
+type repoFiguresReport struct {
+	Version  string             `json:"version"`
+	Summary  repoFiguresSummary `json:"summary"`
+	Figures  []repoFigure       `json:"figures"`
+	Corpus   []repoTaxonomyRepo `json:"corpus"`
+	Hash     string             `json:"hash"`
+	Markdown string             `json:"markdown,omitempty"`
+}
+
+type repoFiguresSummary struct {
+	Analyses                 int `json:"analyses"`
+	PublicRepos              int `json:"public_repos"`
+	Figures                  int `json:"figures"`
+	SVGs                     int `json:"svgs"`
+	DataFiles                int `json:"data_files"`
+	RepairAnalysisLoop       int `json:"repair_analysis_loop_figures"`
+	Architecture             int `json:"architecture_figures"`
+	CorpusComposition        int `json:"corpus_composition_figures"`
+	Ablations                int `json:"ablations_figures"`
+	InterventionOutcomes     int `json:"intervention_outcomes_figures"`
+	TotalRankedRisks         int `json:"total_ranked_risks"`
+	TotalEvidenceLinks       int `json:"total_evidence_links"`
+	TotalGeneratedFiles      int `json:"total_generated_files"`
+	TotalPatchlineChecksPass int `json:"total_patchline_checks_passed"`
+}
+
+type repoFigure struct {
+	ID              string            `json:"id"`
+	Title           string            `json:"title"`
+	Kind            string            `json:"kind"`
+	SVGPath         string            `json:"svg_path"`
+	DataPath        string            `json:"data_path"`
+	Caption         string            `json:"caption"`
+	SourceArtifacts []string          `json:"source_artifacts"`
+	Data            []repoFigureDatum `json:"data"`
+}
+
+type repoFigureDatum struct {
+	Label string `json:"label"`
+	Value int    `json:"value"`
+	Group string `json:"group,omitempty"`
 }
 
 type repoLimitationsSummary struct {
@@ -9071,6 +9116,401 @@ func renderRepoClaimsEvidenceMarkdown(report repoClaimsEvidenceReport) string {
 }
 
 func repoClaimsEvidenceHash(report repoClaimsEvidenceReport) string {
+	copy := report
+	copy.Hash = ""
+	copy.Markdown = ""
+	return canonical.Hash(copy)
+}
+
+func repoFigures(args []string) error {
+	fs := flag.NewFlagSet("repo figures", flag.ContinueOnError)
+	fs.SetOutput(ioDiscard{})
+	analysesValue := fs.String("analyses", "", "comma-separated repo analyze output directories")
+	outPath := fs.String("out", filepath.Join("results", "generated", "repo-figures"), "output directory")
+	jsonOut := fs.Bool("json", false, "emit JSON")
+	if err := fs.Parse(args); err != nil {
+		return err
+	}
+	if *analysesValue == "" || fs.NArg() != 0 {
+		return errors.New("usage: patchline repo figures --analyses analysis-dir[,analysis-dir...] [--out dir] [--json]")
+	}
+	report, err := buildRepoFiguresReport(splitNonEmpty(*analysesValue, ","), *outPath)
+	if err != nil {
+		return err
+	}
+	if err := writeRepoFiguresReport(*outPath, report); err != nil {
+		return err
+	}
+	if *jsonOut {
+		return writeJSON(os.Stdout, report)
+	}
+	fmt.Printf("repo figures figures=%d svgs=%d repos=%d hash=%s\n", report.Summary.Figures, report.Summary.SVGs, report.Summary.PublicRepos, report.Hash)
+	fmt.Printf("  out=%s\n", *outPath)
+	return nil
+}
+
+func buildRepoFiguresReport(analyses []string, outDir string) (repoFiguresReport, error) {
+	if len(analyses) == 0 {
+		return repoFiguresReport{}, errors.New("at least one analysis directory is required")
+	}
+	report := repoFiguresReport{Version: "patchline.repo-figures/v1"}
+	repos := map[string]bool{}
+	langs := map[string]int{}
+	var contexts []paperClaimContext
+	for _, analysis := range analyses {
+		analyze, err := loadRepoAnalyzeReport(filepath.Join(analysis, "analyze.json"))
+		if err != nil {
+			return repoFiguresReport{}, err
+		}
+		inv, _, err := project.LoadInventory(filepath.Join(analysis, "inventory"))
+		if err != nil {
+			return repoFiguresReport{}, err
+		}
+		baseline, err := project.LoadBaseline(filepath.Join(analysis, "baseline"))
+		if err != nil {
+			return repoFiguresReport{}, err
+		}
+		proposal, err := project.LoadProposal(filepath.Join(analysis, "proposal"))
+		if err != nil {
+			return repoFiguresReport{}, err
+		}
+		compare, err := loadCompareReport(filepath.Join(analysis, "compare", "compare.json"))
+		if err != nil {
+			return repoFiguresReport{}, err
+		}
+		repo := firstNonEmpty(analyze.Input, analyze.Source.Input)
+		repos[repo] = true
+		report.Corpus = append(report.Corpus, repoTaxonomyRepo{Repo: repo, Ref: analyze.Source.ResolvedCommit, Subpath: analyze.Subpath})
+		contexts = append(contexts, paperClaimContext{Analysis: analysis, Repo: repo, Analyze: analyze, Inventory: inv, Baseline: baseline, Proposal: proposal, Compare: compare})
+		for _, language := range inv.Languages {
+			if language.Count > 0 {
+				langs[language.Name] += language.Count
+			}
+		}
+		report.Summary.TotalRankedRisks += baseline.Summary.RankedRisks
+		report.Summary.TotalEvidenceLinks += baseline.Summary.EvidenceLinks
+		report.Summary.TotalGeneratedFiles += len(proposal.GeneratedFiles)
+		report.Summary.TotalPatchlineChecksPass += compare.Summary.PatchlineChecksPassed
+	}
+	report.Summary.Analyses = len(analyses)
+	report.Summary.PublicRepos = len(repos)
+	report.Figures = []repoFigure{
+		buildRepairLoopFigure(contexts),
+		buildArchitectureFigure(contexts),
+		buildCorpusCompositionFigure(contexts, langs),
+		buildAblationFigure(contexts),
+		buildInterventionOutcomesFigure(contexts),
+	}
+	for i := range report.Figures {
+		report.Figures[i].ID = "figure:" + canonical.Hash(strings.Join([]string{report.Figures[i].Kind, report.Figures[i].Title, report.Figures[i].SVGPath}, "\x00"))[:16]
+		report.Figures[i].SVGPath = filepath.ToSlash(filepath.Join(outDir, report.Figures[i].SVGPath))
+		report.Figures[i].DataPath = filepath.ToSlash(filepath.Join(outDir, report.Figures[i].DataPath))
+		report.Summary.DataFiles++
+		report.Summary.SVGs++
+		switch report.Figures[i].Kind {
+		case "repair_analysis_loop":
+			report.Summary.RepairAnalysisLoop++
+		case "architecture":
+			report.Summary.Architecture++
+		case "corpus_composition":
+			report.Summary.CorpusComposition++
+		case "ablations":
+			report.Summary.Ablations++
+		case "intervention_outcomes":
+			report.Summary.InterventionOutcomes++
+		}
+	}
+	report.Summary.Figures = len(report.Figures)
+	report.Hash = repoFiguresHash(report)
+	report.Markdown = renderRepoFiguresMarkdown(report)
+	return report, nil
+}
+
+func buildRepairLoopFigure(contexts []paperClaimContext) repoFigure {
+	data := []repoFigureDatum{
+		{Label: "inventory", Value: sumFigure(contexts, func(ctx paperClaimContext) int { return ctx.Inventory.FilesScanned }), Group: "analysis loop"},
+		{Label: "baseline risks", Value: sumFigure(contexts, func(ctx paperClaimContext) int { return ctx.Baseline.Summary.RankedRisks }), Group: "analysis loop"},
+		{Label: "provenance", Value: sumFigure(contexts, func(ctx paperClaimContext) int { return ctx.Baseline.Summary.ProvenanceSlices }), Group: "analysis loop"},
+		{Label: "generated", Value: sumFigure(contexts, func(ctx paperClaimContext) int { return len(ctx.Proposal.GeneratedFiles) }), Group: "analysis loop"},
+		{Label: "checks passed", Value: sumFigure(contexts, func(ctx paperClaimContext) int { return ctx.Compare.Summary.PatchlineChecksPassed }), Group: "analysis loop"},
+	}
+	return repoFigure{
+		Title:           "Repair-analysis loop",
+		Kind:            "repair_analysis_loop",
+		SVGPath:         "repair-analysis-loop.svg",
+		DataPath:        "repair-analysis-loop.json",
+		Caption:         "Deterministic loop from inventory to baseline risk ranking, provenance, bounded generated artifacts, and compare re-analysis.",
+		SourceArtifacts: figureArtifacts(contexts, "inventory/inventory.json", "baseline/baseline.json", "proposal/proposal.json", "compare/compare.json"),
+		Data:            data,
+	}
+}
+
+func buildArchitectureFigure(contexts []paperClaimContext) repoFigure {
+	data := []repoFigureDatum{
+		{Label: "fetch", Value: len(contexts), Group: "trusted inputs"},
+		{Label: "inventory", Value: sumFigure(contexts, func(ctx paperClaimContext) int { return ctx.Inventory.FilesScanned }), Group: "static analysis"},
+		{Label: "baseline", Value: sumFigure(contexts, func(ctx paperClaimContext) int { return ctx.Baseline.Summary.RankedRisks }), Group: "static analysis"},
+		{Label: "proposal", Value: sumFigure(contexts, func(ctx paperClaimContext) int { return len(ctx.Proposal.GeneratedFiles) }), Group: "untrusted generated"},
+		{Label: "compare", Value: sumFigure(contexts, func(ctx paperClaimContext) int {
+			return ctx.Compare.Summary.PatchlineChecksPassed + ctx.Compare.Summary.PatchlineChecksFailed
+		}), Group: "deterministic re-analysis"},
+		{Label: "reports", Value: len(contexts) * 4, Group: "shareable outputs"},
+	}
+	return repoFigure{
+		Title:           "Patchline architecture",
+		Kind:            "architecture",
+		SVGPath:         "architecture.svg",
+		DataPath:        "architecture.json",
+		Caption:         "Layered architecture: trusted fetched inputs, static inventory/baseline analysis, quarantined generated artifacts, deterministic compare, and reports.",
+		SourceArtifacts: figureArtifacts(contexts, "analyze.json", "commands.md", "analysis-bundle"),
+		Data:            data,
+	}
+}
+
+func buildCorpusCompositionFigure(contexts []paperClaimContext, langs map[string]int) repoFigure {
+	var data []repoFigureDatum
+	for _, repo := range sortedFigureRepos(contexts) {
+		data = append(data, repoFigureDatum{Label: repo, Value: 1, Group: "public repo"})
+	}
+	for _, lang := range sortedIntKeys(langs) {
+		data = append(data, repoFigureDatum{Label: lang, Value: langs[lang], Group: "language"})
+	}
+	return repoFigure{
+		Title:           "Corpus composition",
+		Kind:            "corpus_composition",
+		SVGPath:         "corpus-composition.svg",
+		DataPath:        "corpus-composition.json",
+		Caption:         "Pinned public repository slices and detected language composition used by the figure-generation gate.",
+		SourceArtifacts: figureArtifacts(contexts, "analyze.json", "inventory/inventory.json"),
+		Data:            data,
+	}
+}
+
+func buildAblationFigure(contexts []paperClaimContext) repoFigure {
+	data := []repoFigureDatum{
+		{Label: "grep-only matches", Value: sumFigure(contexts, func(ctx paperClaimContext) int { return ctx.Baseline.Summary.GrepOnlyMatches }), Group: "baseline"},
+		{Label: "SQL-only risks", Value: sumFigure(contexts, func(ctx paperClaimContext) int { return ctx.Baseline.Summary.SQLOnlyRankedRisks }), Group: "baseline"},
+		{Label: "Patchline risks", Value: sumFigure(contexts, func(ctx paperClaimContext) int { return ctx.Baseline.Summary.RankedRisks }), Group: "patchline"},
+		{Label: "provenance slices", Value: sumFigure(contexts, func(ctx paperClaimContext) int { return ctx.Baseline.Summary.ProvenanceSlices }), Group: "patchline"},
+		{Label: "policy checks", Value: sumFigure(contexts, func(ctx paperClaimContext) int { return ctx.Baseline.Summary.PolicyChecks }), Group: "patchline"},
+	}
+	return repoFigure{
+		Title:           "Ablations against grep-only and SQL-only views",
+		Kind:            "ablations",
+		SVGPath:         "ablations.svg",
+		DataPath:        "ablations.json",
+		Caption:         "Ablation-style comparison of grep-only matches, SQL-only risks, and Patchline's richer risk/provenance/policy outputs.",
+		SourceArtifacts: figureArtifacts(contexts, "baseline/baseline.json"),
+		Data:            data,
+	}
+}
+
+func buildInterventionOutcomesFigure(contexts []paperClaimContext) repoFigure {
+	data := []repoFigureDatum{
+		{Label: "baseline risks", Value: sumFigure(contexts, func(ctx paperClaimContext) int { return ctx.Compare.Summary.BaselineRisks }), Group: "before"},
+		{Label: "targeted risks", Value: sumFigure(contexts, func(ctx paperClaimContext) int { return ctx.Compare.Summary.TargetedRisks }), Group: "before"},
+		{Label: "generated files", Value: sumFigure(contexts, func(ctx paperClaimContext) int { return len(ctx.Proposal.GeneratedFiles) }), Group: "after"},
+		{Label: "passed checks", Value: sumFigure(contexts, func(ctx paperClaimContext) int { return ctx.Compare.Summary.PatchlineChecksPassed }), Group: "after"},
+		{Label: "failed checks", Value: sumFigure(contexts, func(ctx paperClaimContext) int { return ctx.Compare.Summary.PatchlineChecksFailed }), Group: "after"},
+		{Label: "rejected", Value: sumFigure(contexts, func(ctx paperClaimContext) int { return ctx.Compare.Summary.InterventionRejected }), Group: "after"},
+	}
+	return repoFigure{
+		Title:           "Before/after intervention outcomes",
+		Kind:            "intervention_outcomes",
+		SVGPath:         "intervention-outcomes.svg",
+		DataPath:        "intervention-outcomes.json",
+		Caption:         "Before/after view of baseline risks, targeted risks, generated review artifacts, deterministic checks, and rejected interventions.",
+		SourceArtifacts: figureArtifacts(contexts, "baseline/baseline.json", "proposal/proposal.json", "compare/compare.json"),
+		Data:            data,
+	}
+}
+
+func sumFigure(contexts []paperClaimContext, fn func(paperClaimContext) int) int {
+	total := 0
+	for _, ctx := range contexts {
+		total += fn(ctx)
+	}
+	return total
+}
+
+func figureArtifacts(contexts []paperClaimContext, rels ...string) []string {
+	var artifacts []string
+	for _, ctx := range contexts {
+		for _, rel := range rels {
+			artifacts = append(artifacts, filepath.ToSlash(filepath.Join(ctx.Analysis, filepath.FromSlash(rel))))
+		}
+	}
+	return compactEvidence(artifacts, 24)
+}
+
+func sortedFigureRepos(contexts []paperClaimContext) []string {
+	repos := map[string]bool{}
+	for _, ctx := range contexts {
+		repos[ctx.Repo] = true
+	}
+	return sortedKeys(repos)
+}
+
+func sortedIntKeys(values map[string]int) []string {
+	keys := make([]string, 0, len(values))
+	for key := range values {
+		if strings.TrimSpace(key) != "" {
+			keys = append(keys, key)
+		}
+	}
+	sort.Strings(keys)
+	return keys
+}
+
+func writeRepoFiguresReport(outDir string, report repoFiguresReport) error {
+	if err := os.MkdirAll(outDir, 0o755); err != nil {
+		return err
+	}
+	for _, figure := range report.Figures {
+		svgName := filepath.Base(figure.SVGPath)
+		dataName := filepath.Base(figure.DataPath)
+		if err := os.WriteFile(filepath.Join(outDir, svgName), []byte(renderFigureSVG(figure)), 0o644); err != nil {
+			return err
+		}
+		data, err := json.MarshalIndent(figure.Data, "", "  ")
+		if err != nil {
+			return err
+		}
+		if err := os.WriteFile(filepath.Join(outDir, dataName), append(data, '\n'), 0o644); err != nil {
+			return err
+		}
+	}
+	copy := report
+	copy.Markdown = ""
+	data, err := json.MarshalIndent(copy, "", "  ")
+	if err != nil {
+		return err
+	}
+	if err := os.WriteFile(filepath.Join(outDir, "figures.json"), append(data, '\n'), 0o644); err != nil {
+		return err
+	}
+	return os.WriteFile(filepath.Join(outDir, "figures.md"), []byte(report.Markdown), 0o644)
+}
+
+func renderFigureSVG(figure repoFigure) string {
+	if figure.Kind == "repair_analysis_loop" || figure.Kind == "architecture" {
+		return renderFlowFigureSVG(figure)
+	}
+	return renderBarFigureSVG(figure)
+}
+
+func renderFlowFigureSVG(figure repoFigure) string {
+	width, height := 960, 280
+	var b strings.Builder
+	fmt.Fprintf(&b, `<svg xmlns="http://www.w3.org/2000/svg" width="%d" height="%d" viewBox="0 0 %d %d" role="img" aria-label="%s">`, width, height, width, height, svgEscape(figure.Title))
+	fmt.Fprintf(&b, `<rect width="100%%" height="100%%" fill="#ffffff"/><text x="32" y="38" font-family="Arial" font-size="24" font-weight="700" fill="#1f2937">%s</text>`, svgEscape(figure.Title))
+	steps := figure.Data
+	if len(steps) > 6 {
+		steps = steps[:6]
+	}
+	boxW, boxH, startX, gap, y := 130, 72, 34, 22, 92
+	for i, datum := range steps {
+		x := startX + i*(boxW+gap)
+		fmt.Fprintf(&b, `<rect x="%d" y="%d" width="%d" height="%d" rx="12" fill="#eef2ff" stroke="#4f46e5" stroke-width="2"/>`, x, y, boxW, boxH)
+		fmt.Fprintf(&b, `<text x="%d" y="%d" font-family="Arial" font-size="13" font-weight="700" fill="#312e81">%s</text>`, x+12, y+28, svgEscape(datum.Label))
+		fmt.Fprintf(&b, `<text x="%d" y="%d" font-family="Arial" font-size="20" font-weight="700" fill="#111827">%d</text>`, x+12, y+56, datum.Value)
+		if i < len(steps)-1 {
+			ax := x + boxW
+			fmt.Fprintf(&b, `<line x1="%d" y1="%d" x2="%d" y2="%d" stroke="#6b7280" stroke-width="2"/><polygon points="%d,%d %d,%d %d,%d" fill="#6b7280"/>`, ax+4, y+boxH/2, ax+gap-6, y+boxH/2, ax+gap-6, y+boxH/2, ax+gap-16, y+boxH/2-6, ax+gap-16, y+boxH/2+6)
+		}
+	}
+	fmt.Fprintf(&b, `<text x="32" y="220" font-family="Arial" font-size="14" fill="#374151">%s</text>`, svgEscape(figure.Caption))
+	fmt.Fprintf(&b, `</svg>`)
+	return b.String()
+}
+
+func renderBarFigureSVG(figure repoFigure) string {
+	width := 980
+	rowH := 38
+	height := 110 + rowH*len(figure.Data)
+	if height < 260 {
+		height = 260
+	}
+	maxValue := maxFigureValue(figure.Data)
+	var b strings.Builder
+	fmt.Fprintf(&b, `<svg xmlns="http://www.w3.org/2000/svg" width="%d" height="%d" viewBox="0 0 %d %d" role="img" aria-label="%s">`, width, height, width, height, svgEscape(figure.Title))
+	fmt.Fprintf(&b, `<rect width="100%%" height="100%%" fill="#ffffff"/><text x="32" y="38" font-family="Arial" font-size="24" font-weight="700" fill="#1f2937">%s</text>`, svgEscape(figure.Title))
+	for i, datum := range figure.Data {
+		y := 76 + i*rowH
+		barW := 0
+		if maxValue > 0 {
+			barW = 620 * datum.Value / maxValue
+		}
+		fmt.Fprintf(&b, `<text x="32" y="%d" font-family="Arial" font-size="13" fill="#374151">%s</text>`, y+18, svgEscape(datum.Label))
+		fmt.Fprintf(&b, `<rect x="240" y="%d" width="%d" height="22" rx="4" fill="%s"/>`, y, barW, figureColor(datum.Group))
+		fmt.Fprintf(&b, `<text x="%d" y="%d" font-family="Arial" font-size="13" font-weight="700" fill="#111827">%d</text>`, 250+barW, y+16, datum.Value)
+		if datum.Group != "" {
+			fmt.Fprintf(&b, `<text x="890" y="%d" font-family="Arial" font-size="12" fill="#6b7280">%s</text>`, y+16, svgEscape(datum.Group))
+		}
+	}
+	fmt.Fprintf(&b, `<text x="32" y="%d" font-family="Arial" font-size="14" fill="#374151">%s</text>`, height-28, svgEscape(figure.Caption))
+	fmt.Fprintf(&b, `</svg>`)
+	return b.String()
+}
+
+func maxFigureValue(data []repoFigureDatum) int {
+	maxValue := 1
+	for _, datum := range data {
+		if datum.Value > maxValue {
+			maxValue = datum.Value
+		}
+	}
+	return maxValue
+}
+
+func figureColor(group string) string {
+	switch group {
+	case "baseline", "before":
+		return "#f97316"
+	case "patchline", "after", "deterministic re-analysis":
+		return "#16a34a"
+	case "language", "static analysis":
+		return "#2563eb"
+	case "public repo", "trusted inputs":
+		return "#7c3aed"
+	case "untrusted generated":
+		return "#dc2626"
+	default:
+		return "#4f46e5"
+	}
+}
+
+func svgEscape(value string) string {
+	return strings.NewReplacer("&", "&amp;", "<", "&lt;", ">", "&gt;", `"`, "&quot;").Replace(value)
+}
+
+func renderRepoFiguresMarkdown(report repoFiguresReport) string {
+	var b strings.Builder
+	fmt.Fprintf(&b, "# Patchline paper figures\n\n")
+	fmt.Fprintf(&b, "- analyses: `%d`\n", report.Summary.Analyses)
+	fmt.Fprintf(&b, "- public repos: `%d`\n", report.Summary.PublicRepos)
+	fmt.Fprintf(&b, "- figures: `%d`\n", report.Summary.Figures)
+	fmt.Fprintf(&b, "- SVGs: `%d`\n", report.Summary.SVGs)
+	fmt.Fprintf(&b, "- data files: `%d`\n", report.Summary.DataFiles)
+	fmt.Fprintf(&b, "- hash: `%s`\n\n", report.Hash)
+	fmt.Fprintf(&b, "## Corpus coverage\n\n")
+	for _, repo := range report.Corpus {
+		fmt.Fprintf(&b, "- `%s` `%s` `%s`\n", repo.Repo, repo.Subpath, repo.Ref)
+	}
+	fmt.Fprintf(&b, "\n## Figures\n\n")
+	for _, figure := range report.Figures {
+		fmt.Fprintf(&b, "### %s `%s`\n\n", figure.Title, figure.ID)
+		fmt.Fprintf(&b, "- kind: `%s`\n", figure.Kind)
+		fmt.Fprintf(&b, "- svg: `%s`\n", figure.SVGPath)
+		fmt.Fprintf(&b, "- data: `%s`\n", figure.DataPath)
+		fmt.Fprintf(&b, "- caption: %s\n", figure.Caption)
+		fmt.Fprintf(&b, "- source artifacts: `%s`\n", strings.Join(figure.SourceArtifacts, "`, `"))
+		fmt.Fprintf(&b, "- data points: `%d`\n\n", len(figure.Data))
+	}
+	return b.String()
+}
+
+func repoFiguresHash(report repoFiguresReport) string {
 	copy := report
 	copy.Hash = ""
 	copy.Markdown = ""

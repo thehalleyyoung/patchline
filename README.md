@@ -121,6 +121,8 @@ Run `make limitations-ledger-gate` to publish a public-corpus limitations ledger
 
 Run `make claims-evidence-gate` to map future abstract, introduction, and evaluation claims to concrete public-corpus artifacts, limitations, missing evidence, and reviewer checks; see [docs/claims-evidence.md](docs/claims-evidence.md).
 
+Run `make paper-figures-gate` to regenerate SVG/JSON figures for the repair-analysis loop, architecture, corpus composition, ablations, and before/after intervention outcomes; see [docs/paper-figures.md](docs/paper-figures.md).
+
 Add `--redact` to write `analysis-bundle/` copies with stable redaction tokens for identifiers, literals, customer-like strings, and secret-like values while preserving joins and existing artifact hashes.
 
 Add `--ci` to write `ci/summary.md` plus upload snippets and code-quality artifacts for GitHub Actions, GitLab CI, and Bitbucket Pipelines: SARIF under `analysis-bundle/summary.sarif`, GitLab `ci/gl-code-quality-report.json`, and Bitbucket `ci/bitbucket-code-insights.json`.

@@ -1336,6 +1336,41 @@ func TestRepoClaimsEvidenceMapsPaperClaimsToArtifacts(t *testing.T) {
 	}
 }
 
+func TestRepoFiguresWritesPaperFigureSVGs(t *testing.T) {
+	root := t.TempDir()
+	left := filepath.Join(root, "left")
+	right := filepath.Join(root, "right")
+	out := filepath.Join(root, "figures")
+	writeClaimsEvidenceAnalysisForTest(t, left, "example/rails", "Ruby", "aaaabbbbccccddddeeeeffff0000111122223333")
+	writeClaimsEvidenceAnalysisForTest(t, right, "example/go", "Go", "bbbbccccddddeeeeffff00001111222233334444")
+
+	report, err := buildRepoFiguresReport([]string{left, right}, out)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if report.Summary.Figures != 5 || report.Summary.SVGs != 5 || report.Summary.DataFiles != 5 || report.Summary.PublicRepos != 2 || report.Hash == "" {
+		t.Fatalf("unexpected figure summary: %#v", report.Summary)
+	}
+	if report.Summary.RepairAnalysisLoop != 1 || report.Summary.Architecture != 1 || report.Summary.CorpusComposition != 1 || report.Summary.Ablations != 1 || report.Summary.InterventionOutcomes != 1 {
+		t.Fatalf("missing required figure kinds: %#v", report.Summary)
+	}
+	if err := writeRepoFiguresReport(out, report); err != nil {
+		t.Fatal(err)
+	}
+	for _, name := range []string{"repair-analysis-loop.svg", "architecture.svg", "corpus-composition.svg", "ablations.svg", "intervention-outcomes.svg", "figures.json", "figures.md"} {
+		data, err := os.ReadFile(filepath.Join(out, name))
+		if err != nil {
+			t.Fatalf("expected %s: %v", name, err)
+		}
+		if strings.HasSuffix(name, ".svg") && (!strings.Contains(string(data), "<svg") || !strings.Contains(string(data), "</svg>")) {
+			t.Fatalf("expected svg content in %s: %s", name, data)
+		}
+	}
+	if !strings.Contains(report.Markdown, "paper figures") || !strings.Contains(report.Markdown, "Before/after intervention outcomes") {
+		t.Fatalf("expected figure markdown, got: %s", report.Markdown)
+	}
+}
+
 func writeClaimsEvidenceAnalysisForTest(t *testing.T, root, repo, language, ref string) {
 	t.Helper()
 	writeMainTestFile(t, root, "analyze.json", `{
