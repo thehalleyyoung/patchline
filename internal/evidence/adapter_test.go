@@ -50,6 +50,51 @@ func TestAdaptOTLPSpansToEvidence(t *testing.T) {
 	}
 }
 
+func TestAdaptOTLPCollectorLogsToEvidence(t *testing.T) {
+	input := `{
+	  "resourceLogs": [{
+	    "resource": {"attributes": [
+	      {"key":"service.name","value":{"stringValue":"billing-api"}},
+	      {"key":"git.commit.sha","value":{"stringValue":"8f3c2ab"}},
+	      {"key":"patchline.deploy_id","value":{"stringValue":"2026-05-29T12:00Z"}}
+	    ]},
+	    "scopeLogs": [{
+	      "logRecords": [{
+	        "traceId": "abc",
+	        "spanId": "def",
+	        "severityText": "ERROR",
+	        "body": {"stringValue": "UPDATE invoices SET total_cents = 0 WHERE status = 'open' failed"},
+	        "attributes": [
+	          {"key":"patchline.migration_id","value":{"stringValue":"migration:bad_backfill"}},
+	          {"key":"db.statement","value":{"stringValue":"UPDATE invoices SET total_cents = 0 WHERE status = 'open'"}}
+	        ]
+	      }]
+	    }]
+	  }]
+	}`
+
+	result, err := AdaptJSON(strings.NewReader(input), "otlp")
+	if err != nil {
+		t.Fatal(err)
+	}
+	counts := map[string]int{}
+	for _, event := range result.Events {
+		counts[event["type"]]++
+	}
+	for _, eventType := range []string{"deploy", "migration", "trace", "sql_mutation", "log"} {
+		if counts[eventType] == 0 {
+			t.Fatalf("expected %s event in %#v", eventType, result.Events)
+		}
+	}
+	ingested, err := IngestJSONL(strings.NewReader(eventsJSONL(result.Events)))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !ingested.OK {
+		t.Fatalf("adapted OTLP log evidence should ingest cleanly: %#v events=%#v", ingested.Errors, result.Events)
+	}
+}
+
 func TestAdaptDatadogSpanAndDeployEvent(t *testing.T) {
 	input := `{
 	  "events": [{

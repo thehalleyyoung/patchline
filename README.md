@@ -379,7 +379,7 @@ go run ./cmd/patchline lint-repair repair.json --json
 go run ./cmd/patchline dry-run repair.json --store store.json --json
 ```
 
-The Datadog-style adapter recognizes deploy events, incidents, traces, logs, monitors, SLOs, and notebooks from exported JSON or exported IaC-shaped JSON without requiring Datadog API access.
+The Datadog-style adapter recognizes deploy events, incidents, traces, logs, monitors, SLOs, and notebooks from exported JSON or exported IaC-shaped JSON without requiring Datadog API access. The OTLP adapter ingests OpenTelemetry collector `resourceSpans` and `resourceLogs` exports so traces and logs can join the same deterministic evidence graph.
 
 ## What deeper checks add
 

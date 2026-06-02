@@ -342,6 +342,7 @@ func deployAndMigrationEvents(source, deployID, commit, service, migrationID, na
 
 type otlpPayload struct {
 	ResourceSpans []otlpResourceSpan `json:"resourceSpans"`
+	ResourceLogs  []otlpResourceLog  `json:"resourceLogs"`
 }
 
 type otlpResourceSpan struct {
@@ -358,11 +359,29 @@ type otlpScopeSpans struct {
 	Spans []otlpSpan `json:"spans"`
 }
 
+type otlpResourceLog struct {
+	Resource                  otlpResource    `json:"resource"`
+	ScopeLogs                 []otlpScopeLogs `json:"scopeLogs"`
+	InstrumentationLibraryLog []otlpScopeLogs `json:"instrumentationLibraryLogs"`
+}
+
+type otlpScopeLogs struct {
+	LogRecords []otlpLogRecord `json:"logRecords"`
+}
+
 type otlpSpan struct {
 	TraceID    string          `json:"traceId"`
 	SpanID     string          `json:"spanId"`
 	Name       string          `json:"name"`
 	Attributes []otlpAttribute `json:"attributes"`
+}
+
+type otlpLogRecord struct {
+	TraceID      string          `json:"traceId"`
+	SpanID       string          `json:"spanId"`
+	SeverityText string          `json:"severityText"`
+	Body         otlpValue       `json:"body"`
+	Attributes   []otlpAttribute `json:"attributes"`
 }
 
 type otlpAttribute struct {
@@ -397,27 +416,92 @@ func adaptOTLP(content []byte) ([]map[string]string, []string, error) {
 			}
 		}
 	}
+	for _, resourceLog := range payload.ResourceLogs {
+		resourceAttrs := attrsFromOTLP(resourceLog.Resource.Attributes)
+		scopes := append([]otlpScopeLogs{}, resourceLog.ScopeLogs...)
+		scopes = append(scopes, resourceLog.InstrumentationLibraryLog...)
+		for _, scope := range scopes {
+			for _, record := range scope.LogRecords {
+				logEvents, logWarnings := adaptOTLPLogRecord(resourceAttrs, record)
+				events = append(events, logEvents...)
+				warnings = append(warnings, logWarnings...)
+			}
+		}
+	}
 	return events, warnings, nil
+}
+
+func adaptOTLPLogRecord(resourceAttrs map[string]string, record otlpLogRecord) ([]map[string]string, []string) {
+	attrs := mergeAttrs(resourceAttrs, attrsFromOTLP(record.Attributes))
+	body := firstNonEmpty(valueFromOTLP(record.Body), attrs["body"], attrs["message"], attrs["log.message"])
+	traceID := firstNonEmpty(record.TraceID, attrs["trace_id"], attrs["traceId"])
+	spanID := firstNonEmpty(record.SpanID, attrs["span_id"], attrs["spanId"])
+	traceEntity := ""
+	if traceID != "" && spanID != "" {
+		traceEntity = "trace:" + cleanID(traceID) + "/" + cleanID(spanID)
+	} else if traceID != "" {
+		traceEntity = ensurePrefix(cleanID(traceID), "trace:")
+	}
+	id := firstNonEmpty(attrs["log.record.uid"], attrs["log.iostream"], attrs["event.id"], traceEntity, body)
+	if id == "" {
+		return nil, []string{"otlp log record has no stable id, trace id, or body"}
+	}
+	event := map[string]string{
+		"type":   "log",
+		"id":     ensurePrefix(cleanID(id), "log:otlp/"),
+		"source": "otlp",
+	}
+	for _, pair := range []struct {
+		field  string
+		values []string
+	}{
+		{"service", []string{attrs["service.name"], attrs["service"]}},
+		{"trace", []string{traceEntity}},
+		{"deploy", []string{attrs["patchline.deploy_id"], attrs["deployment.id"]}},
+		{"migration", []string{attrs["patchline.migration_id"], attrs["db.migration.id"], attrs["migration.id"]}},
+		{"commit", []string{attrs["git.commit.sha"], attrs["git.sha"], attrs["commit"]}},
+		{"status", []string{record.SeverityText, attrs["severity"], attrs["log.level"]}},
+		{"message", []string{body}},
+	} {
+		if found := firstNonEmpty(pair.values...); found != "" {
+			event[pair.field] = normalizeDatadogEventField(pair.field, found)
+		}
+	}
+	var events []map[string]string
+	if traceID != "" && spanID != "" && firstNonEmpty(attrs["patchline.migration_id"], attrs["db.migration.id"], attrs["migration.id"]) != "" {
+		spanEvents, spanWarnings := adaptTraceSpan("otlp", traceID, spanID, body, attrs)
+		events = append(events, spanEvents...)
+		events = append(events, event)
+		return events, spanWarnings
+	}
+	return []map[string]string{event}, nil
 }
 
 func attrsFromOTLP(attributes []otlpAttribute) map[string]string {
 	attrs := map[string]string{}
 	for _, attr := range attributes {
-		value := attr.Value.StringValue
-		if value == "" {
-			value = attr.Value.IntValue
-		}
-		if value == "" && attr.Value.DoubleValue != 0 {
-			value = fmt.Sprintf("%g", attr.Value.DoubleValue)
-		}
-		if value == "" && attr.Value.BoolValue != nil {
-			value = fmt.Sprintf("%t", *attr.Value.BoolValue)
-		}
+		value := valueFromOTLP(attr.Value)
 		if attr.Key != "" && value != "" {
 			attrs[attr.Key] = value
 		}
 	}
 	return attrs
+}
+
+func valueFromOTLP(value otlpValue) string {
+	if value.StringValue != "" {
+		return value.StringValue
+	}
+	if value.IntValue != "" {
+		return value.IntValue
+	}
+	if value.DoubleValue != 0 {
+		return fmt.Sprintf("%g", value.DoubleValue)
+	}
+	if value.BoolValue != nil {
+		return fmt.Sprintf("%t", *value.BoolValue)
+	}
+	return ""
 }
 
 func adaptDatadog(content []byte) ([]map[string]string, []string, error) {

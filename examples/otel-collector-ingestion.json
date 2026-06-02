@@ -1,0 +1,36 @@
+{
+  "version": "patchline.otel-collector-ingestion/v1",
+  "claim": "OpenTelemetry collector resourceSpans/resourceLogs ingestion is validated against public OTLP log fixtures from repositories not designed for Patchline.",
+  "minimum_public_repos": 4,
+  "required_event_types": [
+    "trace",
+    "log",
+    "sql_mutation"
+  ],
+  "slices": [
+    {
+      "id": "highlight-otel-log-sample",
+      "repo": "highlight/highlight",
+      "ref": "7a297b5fea4233d99e92177f53dada3236513616",
+      "path": "backend/otel/samples/log.json"
+    },
+    {
+      "id": "dashhotel-otel-log-export",
+      "repo": "patdx/dashhotel",
+      "ref": "f55e0dc2729cbe3c1371a7a4271846fd23f01173",
+      "path": "v1/logs/1724425739099.json"
+    },
+    {
+      "id": "monoscope-otel-log-fixture",
+      "repo": "monoscope-tech/monoscope",
+      "ref": "184b1398c1c33875675d05c06b8477549cf8d7a5",
+      "path": "test/collector/fixtures/05-plain-text.json"
+    },
+    {
+      "id": "openshift-otel-audit-log",
+      "repo": "openshift/cluster-logging-operator",
+      "ref": "30cde0a2af8fb80cd9db6e4e026aae3d36f8a4c8",
+      "path": "hack/logsamples/otlp_audit_host.json"
+    }
+  ]
+}
