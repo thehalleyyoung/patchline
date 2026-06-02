@@ -16,6 +16,7 @@ import (
 	"github.com/thehalleyyoung/patchline/internal/artifact"
 	"github.com/thehalleyyoung/patchline/internal/attest"
 	"github.com/thehalleyyoung/patchline/internal/evidence"
+	"github.com/thehalleyyoung/patchline/internal/feedback"
 	"github.com/thehalleyyoung/patchline/internal/intake"
 	"github.com/thehalleyyoung/patchline/internal/project"
 )
@@ -129,6 +130,102 @@ func TestRepoMetricsWritesPrivacyPreservingAggregates(t *testing.T) {
 	}
 	if !strings.Contains(string(markdown), "privacy-preserving aggregate metrics") || !strings.Contains(string(markdown), "Suppressed fields") {
 		t.Fatalf("expected metrics markdown privacy summary:\n%s", string(markdown))
+	}
+}
+
+func TestFeedbackThresholdUpdateRequiresBoundGateForCandidatePolicy(t *testing.T) {
+	root := t.TempDir()
+	inputPath := filepath.Join(root, "feedback-input.json")
+	writeMainTestFile(t, root, "feedback-input.json", `{
+  "version": "patchline.live-feedback-ingestion/v1",
+  "adopter_id": "team-gamma",
+  "salt": "threshold-update-secret-salt",
+  "min_group_size": 3,
+  "outcomes": [
+    {"finding_id":"finding-001","detector":"orm.write-breadth","release":"v1.0.0","confidence":0.73,"verdict":"false_positive","action":"dismissed","burden_minutes":4,"evidence_hash":"ev-001","reviewer_role":"maintainer"},
+    {"finding_id":"finding-002","detector":"orm.write-breadth","release":"v1.0.0","confidence":0.76,"verdict":"false_positive","action":"dismissed","burden_minutes":4,"evidence_hash":"ev-002","reviewer_role":"dba"},
+    {"finding_id":"finding-003","detector":"orm.write-breadth","release":"v1.0.0","confidence":0.78,"verdict":"false_positive","action":"dismissed","burden_minutes":4,"evidence_hash":"ev-003","reviewer_role":"sre"},
+    {"finding_id":"finding-004","detector":"sql.destructive-ddl","release":"v1.0.0","confidence":0.93,"verdict":"confirmed","action":"blocked","burden_minutes":9,"evidence_hash":"ev-004","reviewer_role":"maintainer"},
+    {"finding_id":"finding-005","detector":"sql.destructive-ddl","release":"v1.0.0","confidence":0.91,"verdict":"confirmed","action":"blocked","burden_minutes":9,"evidence_hash":"ev-005","reviewer_role":"dba"},
+    {"finding_id":"finding-006","detector":"sql.destructive-ddl","release":"v1.0.0","confidence":0.95,"verdict":"confirmed","action":"blocked","burden_minutes":9,"evidence_hash":"ev-006","reviewer_role":"sre"}
+  ]
+}`)
+	ingestOut := filepath.Join(t.TempDir(), "feedback")
+	if err := run([]string{"feedback", "ingest", inputPath, "--out", ingestOut, "--json"}); err != nil {
+		t.Fatalf("feedback ingest failed: %v", err)
+	}
+
+	policyPath := filepath.Join(root, "threshold-policy.json")
+	writeMainTestFile(t, root, "threshold-policy.json", `{
+  "version": "patchline.threshold-policy/v1",
+  "name": "stage63-policy",
+  "thresholds": [
+    {"detector":"orm.write-breadth","blocking_threshold":0.70},
+    {"detector":"sql.destructive-ddl","blocking_threshold":0.90}
+  ]
+}`)
+	policyBefore, err := os.ReadFile(policyPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	advisoryOut := filepath.Join(t.TempDir(), "threshold-advisory")
+	if err := run([]string{"feedback", "threshold-update", "--feedback", filepath.Join(ingestOut, "live-feedback.json"), "--policy", policyPath, "--out", advisoryOut, "--json"}); err != nil {
+		t.Fatalf("threshold update failed: %v", err)
+	}
+	var advisory feedback.ThresholdUpdateReport
+	readMainTestJSON(t, filepath.Join(advisoryOut, "threshold-update.json"), &advisory)
+	if advisory.PolicyChangeAllowed || advisory.CandidatePolicy != nil || advisory.BlockingPolicyChanged {
+		t.Fatalf("expected advisory-only update without gate: %#v", advisory)
+	}
+	if _, err := os.Stat(filepath.Join(advisoryOut, "candidate-threshold-policy.json")); !errors.Is(err, os.ErrNotExist) {
+		t.Fatalf("candidate policy should be absent without gate, stat err=%v", err)
+	}
+
+	staleGatePath := filepath.Join(root, "stale-gate.json")
+	writeMainTestFile(t, root, "stale-gate.json", fmt.Sprintf(`{
+  "version": "patchline.threshold-policy-gate/v1",
+  "gate": "drift-threshold-update-gate",
+  "ok": true,
+  "policy_hash": "stale-policy",
+  "feedback_hash": %q,
+  "allows_blocking_policy_change": true
+}`, advisory.FeedbackHash))
+	staleOut := filepath.Join(t.TempDir(), "threshold-stale")
+	if err := run([]string{"feedback", "threshold-update", "--feedback", filepath.Join(ingestOut, "live-feedback.json"), "--policy", policyPath, "--gate", staleGatePath, "--out", staleOut, "--json"}); err != nil {
+		t.Fatalf("threshold update with stale gate failed: %v", err)
+	}
+	if _, err := os.Stat(filepath.Join(staleOut, "candidate-threshold-policy.json")); !errors.Is(err, os.ErrNotExist) {
+		t.Fatalf("candidate policy should be absent with stale gate, stat err=%v", err)
+	}
+
+	validGatePath := filepath.Join(root, "valid-gate.json")
+	writeMainTestFile(t, root, "valid-gate.json", fmt.Sprintf(`{
+  "version": "patchline.threshold-policy-gate/v1",
+  "gate": "drift-threshold-update-gate",
+  "ok": true,
+  "policy_hash": %q,
+  "feedback_hash": %q,
+  "allows_blocking_policy_change": true
+}`, advisory.PolicyHash, advisory.FeedbackHash))
+	gatedOut := filepath.Join(t.TempDir(), "threshold-gated")
+	if err := run([]string{"feedback", "threshold-update", "--feedback", filepath.Join(ingestOut, "live-feedback.json"), "--policy", policyPath, "--gate", validGatePath, "--out", gatedOut, "--json"}); err != nil {
+		t.Fatalf("threshold update with valid gate failed: %v", err)
+	}
+	var gated feedback.ThresholdUpdateReport
+	readMainTestJSON(t, filepath.Join(gatedOut, "threshold-update.json"), &gated)
+	if !gated.PolicyChangeAllowed || gated.CandidatePolicy == nil || gated.BlockingPolicyChanged {
+		t.Fatalf("expected separate candidate policy under valid gate: %#v", gated)
+	}
+	if _, err := os.Stat(filepath.Join(gatedOut, "candidate-threshold-policy.json")); err != nil {
+		t.Fatalf("expected candidate policy file: %v", err)
+	}
+	policyAfter, err := os.ReadFile(policyPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if string(policyBefore) != string(policyAfter) {
+		t.Fatalf("threshold update mutated input policy:\n%s\n---\n%s", policyBefore, policyAfter)
 	}
 }
 

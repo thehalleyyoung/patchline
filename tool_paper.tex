@@ -512,6 +512,10 @@ examples nearest the decision boundary for scarce human adjudication. A newly ad
 ingester closes the first operational loop: adopters can submit reviewer outcomes as a typed local JSON
 export, while \tool{} rejects source-like fields and values, discards finding/evidence identifiers after
 in-memory deduplication, enforces a k-anonymity floor, and emits only aggregate calibration signals.
+On top of those aggregates, the drift-aware threshold updater computes source-free confirmation,
+false-positive, missed-outcome, and previous-release drift statistics. It can recommend a threshold
+change, but it cannot silently change blocking policy: without a gate receipt bound to both the feedback
+hash and the policy hash, every recommendation remains advisory and no candidate policy is written.
 
 \paragraph{Multi-agent review and interoperability.} A simulated panel of reviewer agents with
 distinct risk tolerances votes per migration, and the same panel is shown to yield different outcomes
@@ -1113,13 +1117,13 @@ implicit.
 %======================================================================
 
 The completed roadmap now extends beyond the original 700-step artifact into standard-scale certificate
-interoperability and source-free live feedback ingestion. \tool{} therefore already combines
+interoperability, source-free live feedback ingestion, and gate-bound drift-aware threshold updates.
+\tool{} therefore already combines
 deterministic analysis, bounded generation, real-repo gates, formal and causal scaffolding, autonomy
 safety cases, standards hooks, privacy-preserving reviewer-outcome aggregation, and long-horizon impact
 evidence. The remaining frontier is not another isolated detector; it is the transition from a
 generational artifact to shared infrastructure. The open roadmap items around this transition include:
-drift-aware threshold suggestions that cannot silently weaken policy; counterfactual logging for
-previous releases; shadow-mode online evaluation; adopter-local active-learning queues;
+counterfactual logging for previous releases; shadow-mode online evaluation; adopter-local active-learning queues;
 production-grade remediation loops for expand/contract, backfill, rollback, and patch-series safety; a
 public evidence marketplace with licenses, bounties, minimization, and governance; engine-version
 semantics for production databases, locks, replication, partitioning, and online schema change;
@@ -1379,7 +1383,9 @@ make fixture-minimizer-gate \hspace{0.7em}\# 1-minimal reproductions per ecosyst
 make parser-dashboard-gate \hspace{1.1em}\# coverage + fuzz robustness dashboard\\
 make certificate-interop-dashboard-gate \quad\# PLCI checker drift dashboard\\
 make certificate-migration-gate \hspace{0.1em}\# PLCI/0 verdicts recheck as PLCI/1\\
-make certificate-plugfest-gate \hspace{0.25em}\# offline PLCI lifecycle submission replay
+make certificate-plugfest-gate \hspace{0.25em}\# offline PLCI lifecycle submission replay\\
+make live-feedback-ingestion-gate \hspace{0.15em}\# source-free reviewer outcome aggregates\\
+make drift-threshold-update-gate \hspace{0.02em}\# gate-bound advisory calibration updates
 \end{quote}
 
 \noindent

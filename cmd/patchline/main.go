@@ -14495,7 +14495,7 @@ func adaptEvidence(adapter, path string, jsonOut bool, outPath string) error {
 
 func feedbackCommand(args []string) error {
 	if len(args) == 0 {
-		return errors.New("usage: patchline feedback ingest <input.json> --out <dir> [--json]")
+		return errors.New("usage: patchline feedback ingest <input.json> --out <dir> [--json] | patchline feedback threshold-update --feedback live-feedback.json --policy thresholds.json --out <dir> [--previous live-feedback.json] [--gate gate.json] [--json]")
 	}
 	switch args[0] {
 	case "ingest":
@@ -14507,6 +14507,8 @@ func feedbackCommand(args []string) error {
 			return errors.New("usage: patchline feedback ingest <input.json> --out <dir> [--json]")
 		}
 		return feedbackIngest(args[1], outPath, hasFlag(args[2:], "--json"))
+	case "threshold-update":
+		return feedbackThresholdUpdate(args[1:], hasFlag(args[1:], "--json"))
 	default:
 		return fmt.Errorf("unknown feedback command %q", args[0])
 	}
@@ -14544,6 +14546,84 @@ func feedbackIngest(inputPath, outPath string, jsonOut bool) error {
 		return writeJSON(os.Stdout, report)
 	}
 	fmt.Printf("ingested %d source-free live feedback outcomes to %s\n", report.Summary.AcceptedRecords, outPath)
+	return nil
+}
+
+func feedbackThresholdUpdate(args []string, jsonOut bool) error {
+	feedbackPath, ok := flagValue(args, "--feedback")
+	if !ok || feedbackPath == "" {
+		return errors.New("usage: patchline feedback threshold-update --feedback live-feedback.json --policy thresholds.json --out <dir> [--previous live-feedback.json] [--gate gate.json] [--json]")
+	}
+	policyPath, ok := flagValue(args, "--policy")
+	if !ok || policyPath == "" {
+		return errors.New("usage: patchline feedback threshold-update --feedback live-feedback.json --policy thresholds.json --out <dir> [--previous live-feedback.json] [--gate gate.json] [--json]")
+	}
+	outPath, ok := flagValue(args, "--out")
+	if !ok || outPath == "" {
+		return errors.New("usage: patchline feedback threshold-update --feedback live-feedback.json --policy thresholds.json --out <dir> [--previous live-feedback.json] [--gate gate.json] [--json]")
+	}
+	report, err := readLiveFeedbackReport(feedbackPath)
+	if err != nil {
+		return err
+	}
+	policy, err := readThresholdPolicy(policyPath)
+	if err != nil {
+		return err
+	}
+	var previous *feedback.Report
+	if previousPath, ok := flagValue(args, "--previous"); ok && previousPath != "" {
+		loaded, err := readLiveFeedbackReport(previousPath)
+		if err != nil {
+			return err
+		}
+		previous = &loaded
+	}
+	var gateReceipt *feedback.ThresholdGateReceipt
+	if gatePath, ok := flagValue(args, "--gate"); ok && gatePath != "" {
+		loaded, err := readThresholdGate(gatePath)
+		if err != nil {
+			return err
+		}
+		gateReceipt = &loaded
+	}
+	update, err := feedback.ComputeThresholdUpdate(report, policy, previous, gateReceipt, feedback.ThresholdUpdateOptions{})
+	if err != nil {
+		return err
+	}
+	if err := os.MkdirAll(outPath, 0o755); err != nil {
+		return err
+	}
+	jsonFile, err := os.Create(filepath.Join(outPath, "threshold-update.json"))
+	if err != nil {
+		return err
+	}
+	if err := writeJSON(jsonFile, update); err != nil {
+		jsonFile.Close()
+		return err
+	}
+	if err := jsonFile.Close(); err != nil {
+		return err
+	}
+	if update.CandidatePolicy != nil {
+		candidateFile, err := os.Create(filepath.Join(outPath, "candidate-threshold-policy.json"))
+		if err != nil {
+			return err
+		}
+		if err := writeJSON(candidateFile, update.CandidatePolicy); err != nil {
+			candidateFile.Close()
+			return err
+		}
+		if err := candidateFile.Close(); err != nil {
+			return err
+		}
+	}
+	if err := os.WriteFile(filepath.Join(outPath, "threshold-update.md"), []byte(renderThresholdUpdateMarkdown(update)), 0o644); err != nil {
+		return err
+	}
+	if jsonOut {
+		return writeJSON(os.Stdout, update)
+	}
+	fmt.Printf("computed %d drift-aware threshold recommendation(s) to %s\n", update.Summary.Recommendations, outPath)
 	return nil
 }
 
@@ -14593,6 +14673,50 @@ func renderLiveFeedbackMarkdown(report feedback.Report) string {
 		for _, rejected := range report.Rejected {
 			fmt.Fprintf(&b, "| %d | `%s` |\n", rejected.Index, rejected.Reason)
 		}
+	}
+	return b.String()
+}
+
+func renderThresholdUpdateMarkdown(report feedback.ThresholdUpdateReport) string {
+	var b strings.Builder
+	fmt.Fprintf(&b, "# Drift-aware threshold update\n\n")
+	fmt.Fprintf(&b, "Patchline computed **advisory** calibration recommendations from published k-anonymous live-feedback groups. It did not modify the blocking policy in place.\n\n")
+	fmt.Fprintf(&b, "## Safety gate\n\n")
+	fmt.Fprintf(&b, "| Check | Value |\n| --- | --- |\n")
+	fmt.Fprintf(&b, "| Policy change allowed | `%t` |\n", report.PolicyChangeAllowed)
+	fmt.Fprintf(&b, "| Blocking policy changed | `%t` |\n", report.BlockingPolicyChanged)
+	fmt.Fprintf(&b, "| Gate provided | `%t` |\n", report.Gate.Provided)
+	fmt.Fprintf(&b, "| Gate OK | `%t` |\n", report.Gate.OK)
+	fmt.Fprintf(&b, "| Policy hash matches | `%t` |\n", report.Gate.PolicyHashMatches)
+	fmt.Fprintf(&b, "| Feedback hash matches | `%t` |\n", report.Gate.FeedbackHashMatches)
+	fmt.Fprintf(&b, "| Reason | `%s` |\n\n", report.Gate.Reason)
+	fmt.Fprintf(&b, "Evidence basis: `%s`; min evidence: `%d`; drift tolerance: `%.3f`.\n\n", report.EvidenceBasis, report.Summary.MinEvidence, report.Summary.DriftTolerance)
+	if len(report.Recommendations) == 0 {
+		fmt.Fprintf(&b, "No threshold changes were recommended from the published aggregate feedback.\n")
+		return b.String()
+	}
+	fmt.Fprintf(&b, "## Recommendations\n\n")
+	fmt.Fprintf(&b, "| Detector | Direction | Current | Suggested | Apply status | Published count | Confirmed | False positive | Drift |\n")
+	fmt.Fprintf(&b, "| --- | --- | ---: | ---: | --- | ---: | ---: | ---: | ---: |\n")
+	for _, recommendation := range report.Recommendations {
+		fmt.Fprintf(
+			&b,
+			"| `%s` | `%s` | %.2f | %.2f | `%s` | %d | %.3f | %.3f | %.3f |\n",
+			recommendation.Detector,
+			recommendation.Direction,
+			recommendation.CurrentThreshold,
+			recommendation.SuggestedThreshold,
+			recommendation.ApplyStatus,
+			recommendation.Evidence.PublishedCount,
+			recommendation.Evidence.ConfirmedRate,
+			recommendation.Evidence.FalsePositiveRate,
+			recommendation.Evidence.DriftMagnitude,
+		)
+	}
+	if report.CandidatePolicy != nil {
+		fmt.Fprintf(&b, "\nA separate `candidate-threshold-policy.json` was written because the gate receipt was bound to this feedback hash and policy hash. Review and commit that file explicitly if the blocking policy should change.\n")
+	} else {
+		fmt.Fprintf(&b, "\nNo candidate policy was written because a valid policy gate was not provided.\n")
 	}
 	return b.String()
 }
@@ -14811,6 +14935,33 @@ func readPolicy(path string) (policy.Policy, error) {
 	}
 	defer file.Close()
 	return policy.Read(file)
+}
+
+func readLiveFeedbackReport(path string) (feedback.Report, error) {
+	file, err := os.Open(path)
+	if err != nil {
+		return feedback.Report{}, err
+	}
+	defer file.Close()
+	return feedback.ReadReport(file)
+}
+
+func readThresholdPolicy(path string) (feedback.ThresholdPolicy, error) {
+	file, err := os.Open(path)
+	if err != nil {
+		return feedback.ThresholdPolicy{}, err
+	}
+	defer file.Close()
+	return feedback.ReadThresholdPolicy(file)
+}
+
+func readThresholdGate(path string) (feedback.ThresholdGateReceipt, error) {
+	file, err := os.Open(path)
+	if err != nil {
+		return feedback.ThresholdGateReceipt{}, err
+	}
+	defer file.Close()
+	return feedback.ReadThresholdGate(file)
 }
 
 func readBenchmarkSpec(path string) (bench.Spec, error) {

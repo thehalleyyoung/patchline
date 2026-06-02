@@ -1,0 +1,18 @@
+{
+  "version": "patchline.threshold-policy/v1",
+  "name": "stage63-policy",
+  "thresholds": [
+    {
+      "detector": "migration.guard",
+      "blocking_threshold": 0.50
+    },
+    {
+      "detector": "orm.write-breadth",
+      "blocking_threshold": 0.70
+    },
+    {
+      "detector": "sql.destructive-ddl",
+      "blocking_threshold": 0.90
+    }
+  ]
+}
