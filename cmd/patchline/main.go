@@ -453,6 +453,7 @@ Usage:
   patchline repo minimize --analysis analysis-dir [--out dir] [--json]
   patchline repo recurrence --analyses analysis-dir[,analysis-dir...] [--out dir] [--json]
   patchline repo metrics --analyses analysis-dir[,analysis-dir...] [--salt value] [--out dir] [--json]
+  patchline repo case-studies --analyses analysis-dir[,analysis-dir...] [--out dir] [--json]
   patchline intake <path> [--out results/generated/intake] [--json]
   patchline intake --github owner/repo [--ref ref] [--subpath path] [--out results/generated/intake] [--json]
   patchline semantics-contract [--json]
@@ -585,6 +586,8 @@ func repoCommand(args []string) error {
 		return repoRecurrence(args[1:])
 	case "metrics":
 		return repoMetrics(args[1:])
+	case "case-studies":
+		return repoCaseStudies(args[1:])
 	default:
 		return fmt.Errorf("unknown repo subcommand %q", args[0])
 	}
@@ -689,6 +692,43 @@ type repoMetricsTrendDelta struct {
 	HighSignalsDelta int    `json:"high_signals_delta"`
 	TrendScoreDelta  int    `json:"trend_score_delta"`
 	GeneratedDelta   int    `json:"generated_delta"`
+}
+
+type repoCaseStudiesReport struct {
+	Version  string          `json:"version"`
+	Cases    []repoCaseStudy `json:"cases"`
+	Summary  repoCaseSummary `json:"summary"`
+	Hash     string          `json:"hash"`
+	Markdown string          `json:"markdown,omitempty"`
+}
+
+type repoCaseSummary struct {
+	Cases                 int `json:"cases"`
+	PublicRepos           int `json:"public_repos"`
+	Accepted              int `json:"accepted"`
+	Rejected              int `json:"rejected"`
+	GeneratedArtifacts    int `json:"generated_artifacts"`
+	MaintainerActions     int `json:"maintainer_actions"`
+	DeterministicOutcomes int `json:"deterministic_outcomes"`
+}
+
+type repoCaseStudy struct {
+	ID                    string   `json:"id"`
+	Repo                  string   `json:"repo"`
+	Ref                   string   `json:"ref,omitempty"`
+	Subpath               string   `json:"subpath,omitempty"`
+	Problem               string   `json:"problem"`
+	Evidence              []string `json:"evidence"`
+	GeneratedIntervention string   `json:"generated_intervention"`
+	DeterministicOutcome  string   `json:"deterministic_outcome"`
+	MaintainerAction      string   `json:"maintainer_action"`
+	TopRiskID             string   `json:"top_risk_id,omitempty"`
+	TopRiskSeverity       string   `json:"top_risk_severity,omitempty"`
+	TopRiskScore          int      `json:"top_risk_score,omitempty"`
+	GeneratedFiles        int      `json:"generated_files"`
+	CompareChecksFailed   int      `json:"compare_checks_failed"`
+	ReviewBadge           string   `json:"review_badge,omitempty"`
+	Commands              []string `json:"commands"`
 }
 
 type repoAnalyzeCIArtifacts struct {
@@ -6411,6 +6451,255 @@ func repoMetrics(args []string) error {
 	fmt.Printf("repo metrics analyses=%d risks=%d high_signals=%d hash=%s\n", report.Summary.Analyses, report.Summary.TotalRankedRisks, report.Summary.TotalHighSignals, report.Hash)
 	fmt.Printf("  out=%s\n", *outPath)
 	return nil
+}
+
+func repoCaseStudies(args []string) error {
+	fs := flag.NewFlagSet("repo case-studies", flag.ContinueOnError)
+	fs.SetOutput(ioDiscard{})
+	analysesValue := fs.String("analyses", "", "comma-separated repo analyze output directories")
+	outPath := fs.String("out", filepath.Join("results", "generated", "repo-case-studies"), "output directory")
+	jsonOut := fs.Bool("json", false, "emit JSON")
+	if err := fs.Parse(args); err != nil {
+		return err
+	}
+	if *analysesValue == "" || fs.NArg() != 0 {
+		return errors.New("usage: patchline repo case-studies --analyses analysis-dir[,analysis-dir...] [--out dir] [--json]")
+	}
+	report, err := buildRepoCaseStudiesReport(splitNonEmpty(*analysesValue, ","))
+	if err != nil {
+		return err
+	}
+	if err := writeRepoCaseStudiesReport(*outPath, report); err != nil {
+		return err
+	}
+	if *jsonOut {
+		return writeJSON(os.Stdout, report)
+	}
+	fmt.Printf("repo case-studies cases=%d accepted=%d rejected=%d hash=%s\n", report.Summary.Cases, report.Summary.Accepted, report.Summary.Rejected, report.Hash)
+	fmt.Printf("  out=%s\n", *outPath)
+	return nil
+}
+
+func buildRepoCaseStudiesReport(analyses []string) (repoCaseStudiesReport, error) {
+	if len(analyses) == 0 {
+		return repoCaseStudiesReport{}, errors.New("at least one analysis directory is required")
+	}
+	report := repoCaseStudiesReport{Version: "patchline.repo-case-studies/v1"}
+	repos := map[string]bool{}
+	for index, analysis := range analyses {
+		study, err := loadRepoCaseStudy(index, analysis)
+		if err != nil {
+			return repoCaseStudiesReport{}, err
+		}
+		report.Cases = append(report.Cases, study)
+		if study.Repo != "" {
+			repos[study.Repo] = true
+		}
+		report.Summary.GeneratedArtifacts += study.GeneratedFiles
+		if study.MaintainerAction != "" {
+			report.Summary.MaintainerActions++
+		}
+		if study.DeterministicOutcome != "" {
+			report.Summary.DeterministicOutcomes++
+		}
+		if strings.Contains(study.DeterministicOutcome, "accepted-for-review") {
+			report.Summary.Accepted++
+		} else {
+			report.Summary.Rejected++
+		}
+	}
+	report.Summary.Cases = len(report.Cases)
+	report.Summary.PublicRepos = len(repos)
+	report.Hash = repoCaseStudiesHash(report)
+	report.Markdown = renderRepoCaseStudiesMarkdown(report)
+	return report, nil
+}
+
+func loadRepoCaseStudy(index int, analysis string) (repoCaseStudy, error) {
+	analyze, err := loadRepoAnalyzeReport(filepath.Join(analysis, "analyze.json"))
+	if err != nil {
+		return repoCaseStudy{}, err
+	}
+	baseline, err := project.LoadBaseline(filepath.Join(analysis, "baseline"))
+	if err != nil {
+		return repoCaseStudy{}, err
+	}
+	proposal, err := project.LoadProposal(filepath.Join(analysis, "proposal"))
+	if err != nil {
+		return repoCaseStudy{}, err
+	}
+	compare, err := loadCompareReport(filepath.Join(analysis, "compare", "compare.json"))
+	if err != nil {
+		return repoCaseStudy{}, err
+	}
+	repo := analyze.Input
+	ref := analyze.Source.ResolvedCommit
+	subpath := analyze.Subpath
+	if repo == "" && analyze.Source.Input != "" {
+		repo = analyze.Source.Input
+	}
+	top := project.BaselineRisk{}
+	if len(baseline.Risks) > 0 {
+		top = baseline.Risks[0]
+	}
+	idSeed := fmt.Sprintf("%02d\x00%s\x00%s\x00%s", index, repo, ref, subpath)
+	study := repoCaseStudy{
+		ID:                    "case:" + canonical.Hash(idSeed)[:16],
+		Repo:                  repo,
+		Ref:                   ref,
+		Subpath:               subpath,
+		Problem:               caseProblem(top, baseline),
+		Evidence:              caseEvidence(baseline, compare),
+		GeneratedIntervention: caseGeneratedIntervention(proposal, compare),
+		DeterministicOutcome:  caseDeterministicOutcome(compare),
+		MaintainerAction:      caseMaintainerAction(compare),
+		TopRiskID:             firstNonEmpty(top.StableID, top.ID),
+		TopRiskSeverity:       top.Severity,
+		TopRiskScore:          top.Score,
+		GeneratedFiles:        len(proposal.GeneratedFiles),
+		CompareChecksFailed:   compare.Summary.PatchlineChecksFailed,
+		ReviewBadge:           compare.ReviewBadge.Status,
+		Commands: []string{
+			fmt.Sprintf("patchline repo analyze --github %s --ref %s --subpath %s --stages inventory,baseline,propose,compare --no-llm", repo, ref, subpath),
+			"patchline repo compare --before baseline --after proposal",
+		},
+	}
+	if strings.TrimSpace(study.Problem) == "" {
+		study.Problem = "No ranked data-change problem was found; case documents a low-risk deterministic analysis slice."
+	}
+	if len(study.Evidence) == 0 {
+		study.Evidence = []string{"baseline, proposal, and compare artifacts were generated successfully"}
+	}
+	if study.GeneratedIntervention == "" {
+		study.GeneratedIntervention = "No generated files were needed for this slice."
+	}
+	if study.MaintainerAction == "" {
+		study.MaintainerAction = "Review the generated compare report and preserve proof holes before applying any intervention."
+	}
+	return study, nil
+}
+
+func loadRepoAnalyzeReport(path string) (repoAnalyzeReport, error) {
+	var report repoAnalyzeReport
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return report, err
+	}
+	if err := json.Unmarshal(data, &report); err != nil {
+		return report, err
+	}
+	return report, nil
+}
+
+func caseProblem(risk project.BaselineRisk, baseline project.BaselineReport) string {
+	if risk.ID == "" {
+		return fmt.Sprintf("Patchline scanned %d files and found %d ranked risks.", baseline.Summary.CodePathRankedRisks, baseline.Summary.RankedRisks)
+	}
+	target := risk.Table
+	if target == "" {
+		target = risk.Path
+	}
+	return fmt.Sprintf("%s %s risk on %s scored %d: %s", risk.Severity, risk.Kind, target, risk.Score, risk.Rationale)
+}
+
+func caseEvidence(baseline project.BaselineReport, compare project.CompareReport) []string {
+	var evidence []string
+	if baseline.Summary.ProvenanceSlices > 0 {
+		evidence = append(evidence, fmt.Sprintf("%d provenance slices connect migrations, source, tests, and repair evidence", baseline.Summary.ProvenanceSlices))
+	}
+	if baseline.Summary.EvidenceLinks > 0 {
+		evidence = append(evidence, fmt.Sprintf("%d evidence links connect problems, causes, and repairs", baseline.Summary.EvidenceLinks))
+	}
+	if baseline.Summary.PolicyChecks > 0 {
+		evidence = append(evidence, fmt.Sprintf("%d policy checks with %d warnings and %d failures", baseline.Summary.PolicyChecks, baseline.Summary.PolicyWarnings, baseline.Summary.PolicyFailed))
+	}
+	if baseline.Summary.ProofMinimizations > 0 {
+		evidence = append(evidence, fmt.Sprintf("%d proof-hole minimizations identify missing evidence", baseline.Summary.ProofMinimizations))
+	}
+	if compare.Summary.GeneratedFiles > 0 {
+		evidence = append(evidence, fmt.Sprintf("%d generated artifacts were deterministically re-analyzed", compare.Summary.GeneratedFiles))
+	}
+	return evidence
+}
+
+func caseGeneratedIntervention(proposal project.ProposalReport, compare project.CompareReport) string {
+	kinds := map[string]bool{}
+	for _, file := range proposal.GeneratedFiles {
+		if file.Kind != "" {
+			kinds[file.Kind] = true
+		}
+	}
+	kindList := make([]string, 0, len(kinds))
+	for kind := range kinds {
+		kindList = append(kindList, kind)
+	}
+	sort.Strings(kindList)
+	if len(kindList) == 0 {
+		return ""
+	}
+	return fmt.Sprintf("%d untrusted generated artifacts (%s), quarantined=%t, deterministic checks failed=%d", len(proposal.GeneratedFiles), strings.Join(kindList, ", "), compare.Quarantine.Status == "enforced", compare.Summary.PatchlineChecksFailed)
+}
+
+func caseDeterministicOutcome(compare project.CompareReport) string {
+	return fmt.Sprintf("%s with review badge %s: %s", compare.Intervention.Status, compare.ReviewBadge.Status, compare.Intervention.Rationale)
+}
+
+func caseMaintainerAction(compare project.CompareReport) string {
+	if len(compare.Intervention.RequiredNextActions) > 0 {
+		return compare.Intervention.RequiredNextActions[0]
+	}
+	if len(compare.Review) > 0 {
+		return compare.Review[0].Message
+	}
+	return ""
+}
+
+func writeRepoCaseStudiesReport(outDir string, report repoCaseStudiesReport) error {
+	if err := os.MkdirAll(outDir, 0o755); err != nil {
+		return err
+	}
+	copy := report
+	copy.Markdown = ""
+	data, err := json.MarshalIndent(copy, "", "  ")
+	if err != nil {
+		return err
+	}
+	if err := os.WriteFile(filepath.Join(outDir, "case-studies.json"), append(data, '\n'), 0o644); err != nil {
+		return err
+	}
+	return os.WriteFile(filepath.Join(outDir, "case-studies.md"), []byte(report.Markdown), 0o644)
+}
+
+func renderRepoCaseStudiesMarkdown(report repoCaseStudiesReport) string {
+	var b strings.Builder
+	fmt.Fprintf(&b, "# Patchline generated public-repo case studies\n\n")
+	fmt.Fprintf(&b, "- cases: `%d`\n", report.Summary.Cases)
+	fmt.Fprintf(&b, "- public repos: `%d`\n", report.Summary.PublicRepos)
+	fmt.Fprintf(&b, "- accepted: `%d`\n", report.Summary.Accepted)
+	fmt.Fprintf(&b, "- rejected: `%d`\n", report.Summary.Rejected)
+	fmt.Fprintf(&b, "- hash: `%s`\n\n", report.Hash)
+	for _, study := range report.Cases {
+		fmt.Fprintf(&b, "## %s\n\n", study.Repo)
+		fmt.Fprintf(&b, "- ref: `%s`\n", study.Ref)
+		fmt.Fprintf(&b, "- subpath: `%s`\n", study.Subpath)
+		fmt.Fprintf(&b, "- problem: %s\n", study.Problem)
+		fmt.Fprintf(&b, "- generated intervention: %s\n", study.GeneratedIntervention)
+		fmt.Fprintf(&b, "- deterministic outcome: %s\n", study.DeterministicOutcome)
+		fmt.Fprintf(&b, "- maintainer action: %s\n", study.MaintainerAction)
+		fmt.Fprintf(&b, "- evidence:\n")
+		for _, evidence := range study.Evidence {
+			fmt.Fprintf(&b, "  - %s\n", evidence)
+		}
+		fmt.Fprintf(&b, "\n")
+	}
+	return b.String()
+}
+
+func repoCaseStudiesHash(report repoCaseStudiesReport) string {
+	copy := report
+	copy.Hash = ""
+	copy.Markdown = ""
+	return canonical.Hash(copy)
 }
 
 func buildRepoMetricsReport(analyses []string, salt string) (repoMetricsReport, error) {

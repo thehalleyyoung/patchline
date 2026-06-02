@@ -165,6 +165,45 @@ func TestSecurityReviewPassesWithSurfaceGatesAndWritesReport(t *testing.T) {
 	}
 }
 
+func TestRepoCaseStudiesGenerateNarrativesFromAnalyses(t *testing.T) {
+	rootA := t.TempDir()
+	writeMainTestFile(t, rootA, "db/migrate/001_update.sql", "UPDATE accounts SET status = 'active';\n")
+	outA := filepath.Join(t.TempDir(), "analysis-a")
+	if err := run([]string{"repo", "analyze", rootA, "--stages", "inventory,baseline,propose,compare", "--proposal-kind", "all", "--budget", "files=2,lines=60,tokens=4000,changes=1", "--no-llm", "--out", outA, "--json"}); err != nil {
+		t.Fatalf("first analysis failed: %v", err)
+	}
+	rootB := t.TempDir()
+	writeMainTestFile(t, rootB, "db/migrate/001_delete.sql", "DELETE FROM account_events;\n")
+	outB := filepath.Join(t.TempDir(), "analysis-b")
+	if err := run([]string{"repo", "analyze", rootB, "--stages", "inventory,baseline,propose,compare", "--proposal-kind", "all", "--budget", "files=2,lines=60,tokens=4000,changes=1", "--no-llm", "--out", outB, "--json"}); err != nil {
+		t.Fatalf("second analysis failed: %v", err)
+	}
+	caseOut := filepath.Join(t.TempDir(), "cases")
+	if err := run([]string{"repo", "case-studies", "--analyses", outA + "," + outB, "--out", caseOut, "--json"}); err != nil {
+		t.Fatalf("case studies failed: %v", err)
+	}
+	var report repoCaseStudiesReport
+	readMainTestJSON(t, filepath.Join(caseOut, "case-studies.json"), &report)
+	if report.Version != "patchline.repo-case-studies/v1" || report.Summary.Cases != 2 || len(report.Cases) != 2 || report.Hash == "" {
+		t.Fatalf("unexpected case-study report: %#v", report)
+	}
+	for _, study := range report.Cases {
+		if study.Problem == "" || len(study.Evidence) == 0 || study.GeneratedIntervention == "" || study.DeterministicOutcome == "" || study.MaintainerAction == "" {
+			t.Fatalf("case missing required narrative fields: %#v", study)
+		}
+		if study.GeneratedFiles == 0 || !strings.Contains(study.GeneratedIntervention, "untrusted generated") {
+			t.Fatalf("expected generated intervention summary, got %#v", study)
+		}
+	}
+	markdown, err := os.ReadFile(filepath.Join(caseOut, "case-studies.md"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(string(markdown), "generated public-repo case studies") || !strings.Contains(string(markdown), "maintainer action") {
+		t.Fatalf("expected narrative markdown, got:\n%s", string(markdown))
+	}
+}
+
 func TestGoldenFixtureGenerateCommand(t *testing.T) {
 	root := t.TempDir()
 	writeMainTestFile(t, root, "db/migrate/001_delete_events.sql", "DELETE FROM account_events;\n")

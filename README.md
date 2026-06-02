@@ -105,6 +105,8 @@ Run `make privacy-metrics-gate` to emit source-free aggregate risk trend metrics
 
 Run `make security-review-gate` to prove adapter, generator, archive-handler, and execution-feature changes are blocked unless their required proof gates have passed; see [docs/security-review-gates.md](docs/security-review-gates.md).
 
+Run `make generated-case-studies-gate` to generate case studies for eight pinned public repositories with problem, evidence, generated intervention, deterministic outcome, and maintainer action narratives; see [docs/generated-case-studies.md](docs/generated-case-studies.md).
+
 Add `--redact` to write `analysis-bundle/` copies with stable redaction tokens for identifiers, literals, customer-like strings, and secret-like values while preserving joins and existing artifact hashes.
 
 Add `--ci` to write `ci/summary.md` plus upload snippets and code-quality artifacts for GitHub Actions, GitLab CI, and Bitbucket Pipelines: SARIF under `analysis-bundle/summary.sarif`, GitLab `ci/gl-code-quality-report.json`, and Bitbucket `ci/bitbucket-code-insights.json`.

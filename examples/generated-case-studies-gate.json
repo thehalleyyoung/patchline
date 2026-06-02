@@ -1,0 +1,61 @@
+{
+  "version": "patchline.generated-case-studies-gate/v1",
+  "claim": "Patchline generates paper-quality case studies for at least eight public repositories, each showing a data-change problem, evidence, generated intervention, deterministic outcome, and maintainer action.",
+  "required_case_fields": [
+    "problem",
+    "evidence",
+    "generated_intervention",
+    "deterministic_outcome",
+    "maintainer_action"
+  ],
+  "real_code": [
+    {
+      "id": "lobsters-rails-migrations",
+      "repo": "lobsters/lobsters",
+      "ref": "3b80b47aa5aaba37ec44413e7d1dc96fcf1585b6",
+      "subpath": "db/migrate"
+    },
+    {
+      "id": "bytebase-go-migrator",
+      "repo": "bytebase/bytebase",
+      "ref": "0765652ea2dbdf8e93ae44bff5acafc1b97a92cc",
+      "subpath": "backend/migrator/migration"
+    },
+    {
+      "id": "forem-rails-migrations",
+      "repo": "forem/forem",
+      "ref": "9c5509c3aeecd4a86a8950206fa937ebcbc2f8d1",
+      "subpath": "db/migrate"
+    },
+    {
+      "id": "mastodon-rails-migrations",
+      "repo": "mastodon/mastodon",
+      "ref": "facb552c9cdbe8a2ebff0b94ebf2c9e9ec385347",
+      "subpath": "db/migrate"
+    },
+    {
+      "id": "django-auth-migrations",
+      "repo": "django/django",
+      "ref": "9383fae0d55a553be3bda620db87fa9ee8a81478",
+      "subpath": "django/contrib/auth/migrations"
+    },
+    {
+      "id": "wagtail-image-migrations",
+      "repo": "wagtail/wagtail",
+      "ref": "a99be99ce1b172d6613de75056182d69f1d5fb04",
+      "subpath": "wagtail/images/migrations"
+    },
+    {
+      "id": "golang-migrate-postgres",
+      "repo": "golang-migrate/migrate",
+      "ref": "2bd822b3aad4e86f3028324a5b754fc6b4ea54a1",
+      "subpath": "database/postgres/examples/migrations"
+    },
+    {
+      "id": "grafana-go-migrations",
+      "repo": "grafana/grafana",
+      "ref": "a54b2e1e9aaf979938813f6ed9e44de569fe1105",
+      "subpath": "pkg/services/sqlstore/migrations"
+    }
+  ]
+}
