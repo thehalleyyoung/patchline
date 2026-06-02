@@ -1,0 +1,12 @@
+{
+  "version": "patchline.lock-duration-gate/v1",
+  "claim": "Patchline estimates how long each migration operation will hold a lock using table size hints, the index/column operation kind, dialect rules, and public configuration such as concurrent-index flags, so that a blocking operation on a large table is predicted before it freezes production rather than after. The worker computes an estimated lock duration and a lock class for each operation from row-count hints and dialect-specific rules, and shows how a concurrent flag or a metadata-only operation collapses the estimate. The gate proves a non-concurrent index build on a large table is blocking, the same build with a concurrent flag is short, a small-table index is short, a defaulted column add that rewrites the table is blocking, and a nullable column add on Postgres is instant.",
+  "real_repo": "synthetic-from-real patterns: Postgres/MySQL index + column ops with size hints",
+  "operations": [
+    {"id": "big_index", "op": "add_index", "table_rows": 10000000, "dialect": "postgres", "concurrent": false},
+    {"id": "big_index_concurrent", "op": "add_index", "table_rows": 10000000, "dialect": "postgres", "concurrent": true},
+    {"id": "small_index", "op": "add_index", "table_rows": 1000, "dialect": "postgres", "concurrent": false},
+    {"id": "col_default", "op": "add_column_default", "table_rows": 10000000, "dialect": "mysql", "concurrent": false},
+    {"id": "col_nullable", "op": "add_column_nullable", "table_rows": 10000000, "dialect": "postgres", "concurrent": false}
+  ]
+}

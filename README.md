@@ -335,6 +335,8 @@ Run `make query-shape-gate` to extract a normalized **query shape** from ORM, ra
 
 Run `make rollback-check-gate` to run **rollback** semantic checks — each migration step is classified reversible, data_lossy, **irreversible**, or partial from its up/down pair, so dangerous rollbacks are named before deploy; see [docs/rollback-check.md](docs/rollback-check.md).
 
+Run `make lock-duration-gate` to estimate **lock-duration** from table size hints, op kind, dialect rules, and **concurrent**-index config — a blocking large-table index is predicted while a concurrent or metadata-only op collapses to short/instant; see [docs/lock-duration.md](docs/lock-duration.md).
+
 Add `--redact` to write `analysis-bundle/` copies with stable redaction tokens for identifiers, literals, customer-like strings, and secret-like values while preserving joins and existing artifact hashes.
 
 Add `--ci` to write `ci/summary.md` plus upload snippets and code-quality artifacts for GitHub Actions, GitLab CI, and Bitbucket Pipelines: SARIF under `analysis-bundle/summary.sarif`, GitLab `ci/gl-code-quality-report.json`, and Bitbucket `ci/bitbucket-code-insights.json`.
