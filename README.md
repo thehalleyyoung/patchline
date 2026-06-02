@@ -166,6 +166,7 @@ make sensitivity-analysis-gate
 make ablation-dashboard-gate
 make negative-control-gate
 make reviewer-mode-gate
+make artifact-consistency-gate
 ```
 
 The demo downloads real GitHub project subpaths and writes:
@@ -257,6 +258,8 @@ The real-repo slice matrix is backed by `examples/real-repo-slices.json` and `ex
 `make negative-control-gate` runs documentation-only, vendor-only, and test-only public slices and verifies Patchline does not emit high-confidence repair claims for them.
 
 `make reviewer-mode-gate` rebuilds reviewer tables, an SVG figure, and claim ledgers from raw generated JSON outputs without manual copying.
+
+`make artifact-consistency-gate` verifies README command coverage, regenerated reviewer tables, claim ledgers, checksums, and raw experiment JSON stay consistent.
 
 Current default projects:
 

@@ -1,0 +1,24 @@
+{
+  "version": "patchline.artifact-consistency/v1",
+  "required_readme_commands": [
+    "make reviewer-mode-gate",
+    "make artifact-consistency-gate"
+  ],
+  "required_claims": [
+    "effect_size_comparisons",
+    "positive_effect_size_comparisons",
+    "tied_effect_size_comparisons",
+    "ablation_ecosystems",
+    "ablation_failure_modes",
+    "negative_control_slices",
+    "negative_control_high_confidence_repairs",
+    "negative_control_checked_repair_proofs"
+  ],
+  "required_tables": [
+    "tables/effect-sizes.md",
+    "tables/ablation-ecosystems.md",
+    "tables/negative-controls.md"
+  ],
+  "required_hash_manifest": "manifest.sha256",
+  "claim": "README-visible reviewer commands, generated tables, claim ledgers, hashes, and raw experiment outputs must agree."
+}
