@@ -1,0 +1,12 @@
+{
+  "version": "patchline.incident-export-gate/v1",
+  "claim": "Findings with observed runtime impact are exported to incident-management adapters in each provider's native schema: PagerDuty Events API v2, Opsgenie alerts, Slack Block Kit, and Statuspage incidents. Each payload validates against its provider's required-field contract, maps Patchline severity to the provider's severity/priority vocabulary, and links back to the originating finding and table.",
+  "real_repo": {
+    "repo": "lobsters/lobsters",
+    "ref": "3b80b47aa5aaba37ec44413e7d1dc96fcf1585b6",
+    "subpath": "db/migrate"
+  },
+  "max_findings": 8,
+  "minimum_findings": 4,
+  "adapters": ["pagerduty", "opsgenie", "slack", "statuspage"]
+}
