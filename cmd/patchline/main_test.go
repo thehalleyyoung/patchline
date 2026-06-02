@@ -204,6 +204,51 @@ func TestRepoCaseStudiesGenerateNarrativesFromAnalyses(t *testing.T) {
 	}
 }
 
+func TestRepoTaxonomyClassifiesFailureModesFromAnalyses(t *testing.T) {
+	rootA := t.TempDir()
+	writeMainTestFile(t, rootA, "db/migrate/001_update.sql", "UPDATE accounts SET status = 'active';\n")
+	writeMainTestFile(t, rootA, "db/migrate/002_add_index.sql", "CREATE INDEX idx_accounts_status ON accounts(status);\n")
+	outA := filepath.Join(t.TempDir(), "analysis-a")
+	if err := run([]string{"repo", "analyze", rootA, "--stages", "inventory,baseline,propose,compare", "--proposal-kind", "all", "--budget", "files=3,lines=80,tokens=4000,changes=2", "--no-llm", "--out", outA, "--json"}); err != nil {
+		t.Fatalf("first analysis failed: %v", err)
+	}
+	rootB := t.TempDir()
+	writeMainTestFile(t, rootB, "db/migrate/001_delete.sql", "DELETE FROM account_events;\n")
+	writeMainTestFile(t, rootB, "scripts/repair_backfill.sql", "UPDATE account_events SET repaired = true;\n")
+	outB := filepath.Join(t.TempDir(), "analysis-b")
+	if err := run([]string{"repo", "analyze", rootB, "--stages", "inventory,baseline,propose,compare", "--proposal-kind", "all", "--budget", "files=3,lines=80,tokens=4000,changes=2", "--no-llm", "--out", outB, "--json"}); err != nil {
+		t.Fatalf("second analysis failed: %v", err)
+	}
+	out := filepath.Join(t.TempDir(), "taxonomy")
+	if err := run([]string{"repo", "taxonomy", "--analyses", outA + "," + outB, "--out", out, "--json"}); err != nil {
+		t.Fatalf("taxonomy failed: %v", err)
+	}
+	var report repoTaxonomyReport
+	readMainTestJSON(t, filepath.Join(out, "failure-taxonomy.json"), &report)
+	if report.Version != "patchline.repo-failure-taxonomy/v1" || report.Summary.Analyses != 2 || report.Summary.FailureModes < 3 || report.Summary.Occurrences < 3 || report.Hash == "" {
+		t.Fatalf("unexpected taxonomy report: %#v", report)
+	}
+	seen := map[string]bool{}
+	for _, mode := range report.Modes {
+		seen[mode.ID] = true
+		if mode.Definition == "" || mode.RepairRisk == "" || mode.MaintainerDecision == "" || mode.Occurrences == 0 || len(mode.Examples) == 0 {
+			t.Fatalf("mode missing taxonomy fields: %#v", mode)
+		}
+	}
+	for _, id := range []string{"broad-or-destructive-mutation", "missing-transaction-boundary", "non-idempotent-or-unknown-repair"} {
+		if !seen[id] {
+			t.Fatalf("expected failure mode %s in %#v", id, report.Modes)
+		}
+	}
+	markdown, err := os.ReadFile(filepath.Join(out, "failure-taxonomy.md"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(string(markdown), "public-corpus failure-mode taxonomy") || !strings.Contains(string(markdown), "maintainer decision") {
+		t.Fatalf("expected taxonomy markdown, got:\n%s", string(markdown))
+	}
+}
+
 func TestGoldenFixtureGenerateCommand(t *testing.T) {
 	root := t.TempDir()
 	writeMainTestFile(t, root, "db/migrate/001_delete_events.sql", "DELETE FROM account_events;\n")

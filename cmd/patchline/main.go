@@ -454,6 +454,7 @@ Usage:
   patchline repo recurrence --analyses analysis-dir[,analysis-dir...] [--out dir] [--json]
   patchline repo metrics --analyses analysis-dir[,analysis-dir...] [--salt value] [--out dir] [--json]
   patchline repo case-studies --analyses analysis-dir[,analysis-dir...] [--out dir] [--json]
+  patchline repo taxonomy --analyses analysis-dir[,analysis-dir...] [--out dir] [--json]
   patchline intake <path> [--out results/generated/intake] [--json]
   patchline intake --github owner/repo [--ref ref] [--subpath path] [--out results/generated/intake] [--json]
   patchline semantics-contract [--json]
@@ -588,6 +589,8 @@ func repoCommand(args []string) error {
 		return repoMetrics(args[1:])
 	case "case-studies":
 		return repoCaseStudies(args[1:])
+	case "taxonomy":
+		return repoTaxonomy(args[1:])
 	default:
 		return fmt.Errorf("unknown repo subcommand %q", args[0])
 	}
@@ -729,6 +732,56 @@ type repoCaseStudy struct {
 	CompareChecksFailed   int      `json:"compare_checks_failed"`
 	ReviewBadge           string   `json:"review_badge,omitempty"`
 	Commands              []string `json:"commands"`
+}
+
+type repoTaxonomyReport struct {
+	Version  string              `json:"version"`
+	Modes    []repoFailureMode   `json:"failure_modes"`
+	Summary  repoTaxonomySummary `json:"summary"`
+	Corpus   []repoTaxonomyRepo  `json:"corpus"`
+	Hash     string              `json:"hash"`
+	Markdown string              `json:"markdown,omitempty"`
+}
+
+type repoTaxonomySummary struct {
+	Analyses       int `json:"analyses"`
+	PublicRepos    int `json:"public_repos"`
+	FailureModes   int `json:"failure_modes"`
+	Occurrences    int `json:"occurrences"`
+	HighSeverity   int `json:"high_severity_occurrences"`
+	GeneratedLinks int `json:"generated_intervention_links"`
+}
+
+type repoFailureMode struct {
+	ID                     string               `json:"id"`
+	Title                  string               `json:"title"`
+	Definition             string               `json:"definition"`
+	RepairRisk             string               `json:"repair_risk"`
+	MaintainerDecision     string               `json:"maintainer_decision"`
+	Occurrences            int                  `json:"occurrences"`
+	PublicRepos            int                  `json:"public_repos"`
+	HighSeverity           int                  `json:"high_severity"`
+	GeneratedInterventions int                  `json:"generated_interventions"`
+	Examples               []repoFailureExample `json:"examples"`
+	EvidenceKinds          []string             `json:"evidence_kinds"`
+}
+
+type repoFailureExample struct {
+	Repo      string `json:"repo"`
+	Ref       string `json:"ref,omitempty"`
+	Subpath   string `json:"subpath,omitempty"`
+	RiskID    string `json:"risk_id,omitempty"`
+	Severity  string `json:"severity,omitempty"`
+	Score     int    `json:"score,omitempty"`
+	Evidence  string `json:"evidence"`
+	Generated int    `json:"generated_files"`
+	Outcome   string `json:"outcome,omitempty"`
+}
+
+type repoTaxonomyRepo struct {
+	Repo    string `json:"repo"`
+	Ref     string `json:"ref,omitempty"`
+	Subpath string `json:"subpath,omitempty"`
 }
 
 type repoAnalyzeCIArtifacts struct {
@@ -6696,6 +6749,330 @@ func renderRepoCaseStudiesMarkdown(report repoCaseStudiesReport) string {
 }
 
 func repoCaseStudiesHash(report repoCaseStudiesReport) string {
+	copy := report
+	copy.Hash = ""
+	copy.Markdown = ""
+	return canonical.Hash(copy)
+}
+
+func repoTaxonomy(args []string) error {
+	fs := flag.NewFlagSet("repo taxonomy", flag.ContinueOnError)
+	fs.SetOutput(ioDiscard{})
+	analysesValue := fs.String("analyses", "", "comma-separated repo analyze output directories")
+	outPath := fs.String("out", filepath.Join("results", "generated", "repo-taxonomy"), "output directory")
+	jsonOut := fs.Bool("json", false, "emit JSON")
+	if err := fs.Parse(args); err != nil {
+		return err
+	}
+	if *analysesValue == "" || fs.NArg() != 0 {
+		return errors.New("usage: patchline repo taxonomy --analyses analysis-dir[,analysis-dir...] [--out dir] [--json]")
+	}
+	report, err := buildRepoTaxonomyReport(splitNonEmpty(*analysesValue, ","))
+	if err != nil {
+		return err
+	}
+	if err := writeRepoTaxonomyReport(*outPath, report); err != nil {
+		return err
+	}
+	if *jsonOut {
+		return writeJSON(os.Stdout, report)
+	}
+	fmt.Printf("repo taxonomy modes=%d occurrences=%d repos=%d hash=%s\n", report.Summary.FailureModes, report.Summary.Occurrences, report.Summary.PublicRepos, report.Hash)
+	fmt.Printf("  out=%s\n", *outPath)
+	return nil
+}
+
+func buildRepoTaxonomyReport(analyses []string) (repoTaxonomyReport, error) {
+	if len(analyses) == 0 {
+		return repoTaxonomyReport{}, errors.New("at least one analysis directory is required")
+	}
+	modeMap := map[string]*repoFailureMode{}
+	repos := map[string]bool{}
+	var corpus []repoTaxonomyRepo
+	for _, analysis := range analyses {
+		analyze, err := loadRepoAnalyzeReport(filepath.Join(analysis, "analyze.json"))
+		if err != nil {
+			return repoTaxonomyReport{}, err
+		}
+		baseline, err := project.LoadBaseline(filepath.Join(analysis, "baseline"))
+		if err != nil {
+			return repoTaxonomyReport{}, err
+		}
+		compare, err := loadCompareReport(filepath.Join(analysis, "compare", "compare.json"))
+		if err != nil {
+			return repoTaxonomyReport{}, err
+		}
+		repo := analyze.Input
+		if repo == "" {
+			repo = analyze.Source.Input
+		}
+		repos[repo] = true
+		corpus = append(corpus, repoTaxonomyRepo{Repo: repo, Ref: analyze.Source.ResolvedCommit, Subpath: analyze.Subpath})
+		for _, risk := range baseline.Risks {
+			for _, key := range taxonomyKeysForRisk(risk) {
+				addFailureOccurrence(modeMap, key, repoFailureExample{
+					Repo:      repo,
+					Ref:       analyze.Source.ResolvedCommit,
+					Subpath:   analyze.Subpath,
+					RiskID:    firstNonEmpty(risk.StableID, risk.ID),
+					Severity:  risk.Severity,
+					Score:     risk.Score,
+					Evidence:  risk.Rationale,
+					Generated: compare.Summary.GeneratedFiles,
+					Outcome:   compare.Intervention.Status,
+				})
+			}
+		}
+		if baseline.Summary.TransactionMissing > 0 {
+			addFailureOccurrence(modeMap, "missing-transaction-boundary", taxonomySummaryExample(repo, analyze, compare, baseline.Summary.TransactionMissing, "generated or source write path lacks explicit transaction evidence"))
+		}
+		if baseline.Summary.IdempotencyUnsafe > 0 || baseline.Summary.IdempotencyUnknown > 0 {
+			count := baseline.Summary.IdempotencyUnsafe + baseline.Summary.IdempotencyUnknown
+			addFailureOccurrence(modeMap, "non-idempotent-or-unknown-repair", taxonomySummaryExample(repo, analyze, compare, count, "idempotency could not be proven for data-change operations"))
+		}
+		if baseline.Summary.LockHazards > 0 {
+			addFailureOccurrence(modeMap, "lock-concurrency-hazard", taxonomySummaryExample(repo, analyze, compare, baseline.Summary.LockHazards, "migration or generated intervention can block concurrent production work"))
+		}
+		if baseline.Summary.PrivacyHazards > 0 {
+			addFailureOccurrence(modeMap, "retention-privacy-hazard", taxonomySummaryExample(repo, analyze, compare, baseline.Summary.PrivacyHazards, "data change touches deletion, retention, export, or sensitive identifier flows"))
+		}
+		if baseline.Summary.RepairProofOpen > 0 || baseline.Summary.ProofMinimizations > 0 {
+			count := baseline.Summary.RepairProofOpen + baseline.Summary.ProofMinimizations
+			addFailureOccurrence(modeMap, "open-proof-hole", taxonomySummaryExample(repo, analyze, compare, count, "repair review is blocked by missing row-count, rollback, owner, or runtime evidence"))
+		}
+	}
+	var modes []repoFailureMode
+	for _, mode := range modeMap {
+		mode.EvidenceKinds = sortedStrings(mode.EvidenceKinds)
+		if len(mode.Examples) > 5 {
+			mode.Examples = mode.Examples[:5]
+		}
+		modes = append(modes, *mode)
+	}
+	sort.Slice(modes, func(i, j int) bool {
+		if modes[i].PublicRepos != modes[j].PublicRepos {
+			return modes[i].PublicRepos > modes[j].PublicRepos
+		}
+		if modes[i].Occurrences != modes[j].Occurrences {
+			return modes[i].Occurrences > modes[j].Occurrences
+		}
+		return modes[i].ID < modes[j].ID
+	})
+	report := repoTaxonomyReport{Version: "patchline.repo-failure-taxonomy/v1", Modes: modes, Corpus: corpus}
+	report.Summary.Analyses = len(analyses)
+	report.Summary.PublicRepos = len(repos)
+	report.Summary.FailureModes = len(modes)
+	for _, mode := range modes {
+		report.Summary.Occurrences += mode.Occurrences
+		report.Summary.HighSeverity += mode.HighSeverity
+		report.Summary.GeneratedLinks += mode.GeneratedInterventions
+	}
+	report.Hash = repoTaxonomyHash(report)
+	report.Markdown = renderRepoTaxonomyMarkdown(report)
+	return report, nil
+}
+
+func taxonomySummaryExample(repo string, analyze repoAnalyzeReport, compare project.CompareReport, count int, evidence string) repoFailureExample {
+	return repoFailureExample{
+		Repo:      repo,
+		Ref:       analyze.Source.ResolvedCommit,
+		Subpath:   analyze.Subpath,
+		Severity:  "high",
+		Score:     count,
+		Evidence:  evidence,
+		Generated: compare.Summary.GeneratedFiles,
+		Outcome:   compare.Intervention.Status,
+	}
+}
+
+func taxonomyKeysForRisk(risk project.BaselineRisk) []string {
+	lower := strings.ToLower(risk.Kind + " " + risk.Rationale + " " + risk.Path)
+	var keys []string
+	if containsAny(lower, "unbounded", "broad", "update", "delete", "drop", "truncate") {
+		keys = append(keys, "broad-or-destructive-mutation")
+	}
+	if containsAny(lower, "rollback", "revert", "restore") && containsAny(lower, "missing", "weak", "no ") {
+		keys = append(keys, "missing-rollback-evidence")
+	}
+	if containsAny(lower, "backfill", "batch", "repair script") {
+		keys = append(keys, "unsafe-backfill-or-repair-script")
+	}
+	if containsAny(lower, "schema", "alter", "column", "index", "constraint") {
+		keys = append(keys, "schema-evolution-risk")
+	}
+	if len(keys) == 0 && risk.Severity == "high" {
+		keys = append(keys, "high-risk-uncategorized-data-change")
+	}
+	return keys
+}
+
+func addFailureOccurrence(modes map[string]*repoFailureMode, key string, example repoFailureExample) {
+	mode := modes[key]
+	if mode == nil {
+		spec := failureModeSpec(key)
+		mode = &repoFailureMode{
+			ID:                 key,
+			Title:              spec.Title,
+			Definition:         spec.Definition,
+			RepairRisk:         spec.RepairRisk,
+			MaintainerDecision: spec.MaintainerDecision,
+			EvidenceKinds:      append([]string(nil), spec.EvidenceKinds...),
+		}
+		modes[key] = mode
+	}
+	mode.Occurrences++
+	if example.Generated > 0 {
+		mode.GeneratedInterventions++
+	}
+	if example.Severity == "high" || example.Severity == "critical" {
+		mode.HighSeverity++
+	}
+	repoSeen := map[string]bool{}
+	for _, existing := range mode.Examples {
+		repoSeen[existing.Repo] = true
+	}
+	if !repoSeen[example.Repo] {
+		mode.PublicRepos++
+	}
+	mode.Examples = append(mode.Examples, example)
+}
+
+type failureModeSpecData struct {
+	Title              string
+	Definition         string
+	RepairRisk         string
+	MaintainerDecision string
+	EvidenceKinds      []string
+}
+
+func failureModeSpec(key string) failureModeSpecData {
+	specs := map[string]failureModeSpecData{
+		"broad-or-destructive-mutation": {
+			Title:              "Broad or destructive mutation",
+			Definition:         "A migration or repair path can update, delete, drop, or truncate more data than the evidence can bound.",
+			RepairRisk:         "Generated fixes may preserve the broad mutation shape while adding only superficial guards.",
+			MaintainerDecision: "Require row-count, predicate, backup, and rollback evidence before applying.",
+			EvidenceKinds:      []string{"ranked risk", "SQL analysis", "policy checks"},
+		},
+		"missing-rollback-evidence": {
+			Title:              "Missing rollback evidence",
+			Definition:         "The data change lacks a concrete rollback, restore, or reversible repair path.",
+			RepairRisk:         "A generated intervention can look useful but leave operators without an exit plan.",
+			MaintainerDecision: "Ask for explicit rollback commands and owner review before merge.",
+			EvidenceKinds:      []string{"repair proof", "policy checks", "proposal compare"},
+		},
+		"unsafe-backfill-or-repair-script": {
+			Title:              "Unsafe backfill or repair script",
+			Definition:         "A backfill or repair script touches production data without enough batching, idempotency, or observability evidence.",
+			RepairRisk:         "Generated scripts can amplify load or double-apply changes.",
+			MaintainerDecision: "Require batching, idempotency, progress metrics, and dry-run hooks.",
+			EvidenceKinds:      []string{"source scan", "idempotency classification", "native checks"},
+		},
+		"schema-evolution-risk": {
+			Title:              "Schema evolution risk",
+			Definition:         "A migration changes columns, indexes, constraints, or table shape in ways that can affect application writes.",
+			RepairRisk:         "Generated guards may miss application-level compatibility hazards.",
+			MaintainerDecision: "Review lock behavior, compatibility windows, and affected code paths.",
+			EvidenceKinds:      []string{"schema facts", "blast radius", "lock hazards"},
+		},
+		"missing-transaction-boundary": {
+			Title:              "Missing transaction boundary",
+			Definition:         "The change performs data writes without clear transaction scope.",
+			RepairRisk:         "Partial generated repairs can leave mixed old/new state on failure.",
+			MaintainerDecision: "Require explicit transaction or documented non-transactional safety.",
+			EvidenceKinds:      []string{"transaction boundary", "generated compare"},
+		},
+		"non-idempotent-or-unknown-repair": {
+			Title:              "Non-idempotent or unknown repair",
+			Definition:         "A change cannot be safely retried or Patchline cannot prove retry safety.",
+			RepairRisk:         "Generated repair commands may double-apply under retries.",
+			MaintainerDecision: "Require idempotency guards and repeated-run tests.",
+			EvidenceKinds:      []string{"idempotency classification", "symbolic checks"},
+		},
+		"lock-concurrency-hazard": {
+			Title:              "Lock and concurrency hazard",
+			Definition:         "A migration or repair can block concurrent writes, trigger table rewrites, or contend with jobs.",
+			RepairRisk:         "Generated interventions may add guards but still run under unsafe lock modes.",
+			MaintainerDecision: "Require online migration strategy or maintenance-window plan.",
+			EvidenceKinds:      []string{"lock hazard", "infrastructure scan"},
+		},
+		"retention-privacy-hazard": {
+			Title:              "Retention or privacy hazard",
+			Definition:         "The change touches deletion, export, anonymization, or sensitive identifiers.",
+			RepairRisk:         "Generated fixes can leak or retain data contrary to policy.",
+			MaintainerDecision: "Require privacy review, redaction proof, and retention-policy evidence.",
+			EvidenceKinds:      []string{"privacy hazard", "secret scan", "redaction"},
+		},
+		"open-proof-hole": {
+			Title:              "Open proof hole",
+			Definition:         "The analysis identifies missing evidence required to upgrade a warning into a checked claim.",
+			RepairRisk:         "Generated code can be accepted because it is plausible rather than proven.",
+			MaintainerDecision: "Resolve the smallest listed proof holes before applying generated changes.",
+			EvidenceKinds:      []string{"proof-hole minimization", "repair proof"},
+		},
+		"high-risk-uncategorized-data-change": {
+			Title:              "High-risk uncategorized data change",
+			Definition:         "Patchline ranks the change as high risk but the current taxonomy needs a more specific subtype.",
+			RepairRisk:         "Generated intervention review needs human classification before automation expands.",
+			MaintainerDecision: "Capture qualitative notes and extend the taxonomy when repeated.",
+			EvidenceKinds:      []string{"ranked risk", "case study"},
+		},
+	}
+	if spec, ok := specs[key]; ok {
+		return spec
+	}
+	return failureModeSpecData{Title: key, Definition: "Unclassified failure mode.", RepairRisk: "Unknown.", MaintainerDecision: "Review manually.", EvidenceKinds: []string{"unknown"}}
+}
+
+func writeRepoTaxonomyReport(outDir string, report repoTaxonomyReport) error {
+	if err := os.MkdirAll(outDir, 0o755); err != nil {
+		return err
+	}
+	copy := report
+	copy.Markdown = ""
+	data, err := json.MarshalIndent(copy, "", "  ")
+	if err != nil {
+		return err
+	}
+	if err := os.WriteFile(filepath.Join(outDir, "failure-taxonomy.json"), append(data, '\n'), 0o644); err != nil {
+		return err
+	}
+	return os.WriteFile(filepath.Join(outDir, "failure-taxonomy.md"), []byte(report.Markdown), 0o644)
+}
+
+func renderRepoTaxonomyMarkdown(report repoTaxonomyReport) string {
+	var b strings.Builder
+	fmt.Fprintf(&b, "# Patchline public-corpus failure-mode taxonomy\n\n")
+	fmt.Fprintf(&b, "- analyses: `%d`\n", report.Summary.Analyses)
+	fmt.Fprintf(&b, "- public repos: `%d`\n", report.Summary.PublicRepos)
+	fmt.Fprintf(&b, "- failure modes: `%d`\n", report.Summary.FailureModes)
+	fmt.Fprintf(&b, "- occurrences: `%d`\n", report.Summary.Occurrences)
+	fmt.Fprintf(&b, "- hash: `%s`\n\n", report.Hash)
+	fmt.Fprintf(&b, "## Corpus coverage\n\n")
+	for _, repo := range report.Corpus {
+		fmt.Fprintf(&b, "- `%s` `%s` `%s`\n", repo.Repo, repo.Subpath, repo.Ref)
+	}
+	fmt.Fprintf(&b, "\n")
+	for _, mode := range report.Modes {
+		fmt.Fprintf(&b, "## %s\n\n", mode.Title)
+		fmt.Fprintf(&b, "- id: `%s`\n", mode.ID)
+		fmt.Fprintf(&b, "- definition: %s\n", mode.Definition)
+		fmt.Fprintf(&b, "- repair risk: %s\n", mode.RepairRisk)
+		fmt.Fprintf(&b, "- maintainer decision: %s\n", mode.MaintainerDecision)
+		fmt.Fprintf(&b, "- occurrences: `%d` across `%d` repos\n", mode.Occurrences, mode.PublicRepos)
+		fmt.Fprintf(&b, "- evidence kinds: %s\n", strings.Join(mode.EvidenceKinds, ", "))
+		if len(mode.Examples) > 0 {
+			fmt.Fprintf(&b, "\nExamples:\n")
+			for _, example := range mode.Examples {
+				fmt.Fprintf(&b, "- `%s` `%s`: %s\n", example.Repo, example.Subpath, example.Evidence)
+			}
+		}
+		fmt.Fprintf(&b, "\n")
+	}
+	return b.String()
+}
+
+func repoTaxonomyHash(report repoTaxonomyReport) string {
 	copy := report
 	copy.Hash = ""
 	copy.Markdown = ""
