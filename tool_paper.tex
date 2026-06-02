@@ -49,14 +49,18 @@ and only within an explicit budget---generates bounded interventions that are qu
 \emph{deterministically re-analyzed and rejected} if they do not improve the evidence. Critically,
 every capability in \tool{} is backed by a reproducible \emph{gate}: a script that proves the
 capability against real, pinned public code and fails loudly on drift. \tool{} currently ships more
-than 300 such gates over 260 documented capabilities, spanning relational migrations across nine
+than 400 such gates over 360 documented capabilities, spanning relational migrations across nine
 ecosystems, five NoSQL engines, four data-pipeline frameworks, protobuf/Avro schema compatibility,
 infrastructure/data ordering, a research-grade evaluation methodology that includes blinded
 false-positive adjudication, seeded false-negative recall, ablations, standardized effect sizes, and
 severity calibration against independent danger evidence, and---layered on top---an end-to-end
 \emph{trust stack}: signed provenance chains, reproducible-build attestation, Merkle audit logs,
 external replication kits, and artifact-evaluation hygiene (datasheets, model cards, preregistration,
-and a reproducibility appendix) that each ship as their own falsifiable gate. We describe \tool's design principles,
+and a reproducibility appendix) that each ship as their own falsifiable gate. The most recent
+hundred gates push the methodology further still---toward mechanized formal foundations, ecosystem-scale
+mining, a definitive causal/field evaluation design, product-grade adoption surfaces, a learned-but-verified
+research frontier, and a lasting-impact dossier---each, again, expressed as a falsifiable gate with a
+positive proof and a negative control. We describe \tool's design principles,
 architecture, breadth of analysis, intervention-safety model, runtime/observability evidence
 integration, and reproducibility methodology, and we report results on real repositories including
 \code{lobsters/lobsters}, \code{apache/avro}, \code{helm/charts}, and a multi-framework lakehouse.
@@ -108,7 +112,7 @@ ranks the risks, and prints the next commands that can run immediately.
   \item A \textbf{runtime and observability evidence} layer that scores findings on independent
   static-risk and observed-runtime axes using OpenTelemetry, Datadog-style, and Prometheus/Grafana
   exports (Section~\ref{sec:runtime}).
-  \item A \textbf{gate-backed reproducibility and evaluation methodology}---209 gates, blinded
+  \item A \textbf{gate-backed reproducibility and evaluation methodology}---over 400 gates, blinded
   false-positive adjudication, seeded false-negative recall, ablations, standardized effect sizes,
   and severity calibration---designed for artifact evaluation and best-paper-grade rigor
   (Sections~\ref{sec:repro}--\ref{sec:eval}).
@@ -199,7 +203,7 @@ A cross-cutting \emph{gate layer} sits beside the pipeline. Each gate is a self-
 (a) validates a versioned example specification, (b) checks that the relevant documentation and the
 README still describe the capability, (c) runs the capability against real pinned code, (d) asserts
 machine-checkable invariants on the output, and (e) writes a \code{gate-summary.json}. The repository
-currently ships \textbf{209 gates}, \textbf{166 capability documents}, and \textbf{142 example
+currently ships \textbf{410 gates}, \textbf{366 capability documents}, and \textbf{342 example
 specifications}, with a single analyzer core of roughly 2{,}900 lines of Go.
 
 \paragraph{Resumability and offline operation.} \code{repo analyze --resume} reuses existing fetch,
@@ -699,6 +703,72 @@ learned component cannot manufacture a passing verdict that the deterministic co
 the central safety invariant of the whole system.
 
 %======================================================================
+\section{Field-Defining Extensions: Foundations, Scale, and Lasting Impact}
+\label{sec:frontier2}
+%======================================================================
+
+The most recent hundred gates carry the same idiom---positive proof plus negative control on pinned
+inputs---into six directions that a field-defining system is expected to occupy. We summarize them
+here rather than enumerate them; each direction is a family of falsifiable gates, and
+Table~\ref{tab:frontier2} names one representative per family.
+
+\paragraph{Mechanized formal foundations.}
+The determinism and rejection guarantees that earlier sections argue informally are restated as
+machine-checkable obligations: a mechanized operational semantics for the fact-and-compare core, a
+soundness statement (no rejected-but-improving intervention is ever accepted), a completeness
+statement bounded to the supported surface, a confluence/determinism property over evaluation order,
+and a refinement check relating the documented contract to the executable. Each ships as a gate whose
+negative control violates exactly one obligation and is caught.
+
+\paragraph{Ecosystem-scale evidence.}
+To answer ``does this hold beyond a demo,'' \tool{} adds gates that operate at corpus scale: a
+pinned public-corpus miner, a per-ecosystem prevalence census of dangerous-change patterns, a
+longitudinal cross-repository drift study, and a saturation analysis that shows new ecosystems stop
+moving the headline metrics---evidence of coverage rather than cherry-picking.
+
+\paragraph{A definitive evaluation design.}
+The evaluation layer is hardened toward causal and field-grade standards: a preregistered analysis
+plan, a held-out adjudicated benchmark with inter-rater agreement, a causal/quasi-experimental effect
+estimate of the tool on review outcomes, and an effect-size-with-confidence-interval reporting gate
+that fails on uncalibrated claims.
+
+\paragraph{Product-grade adoption.}
+Adoption surfaces are themselves gated: a one-command onboarding, a hosted-report contract, an
+organization-policy engine, an SLA/uptime evidence surface, and a migration-cost dashboard---each
+proven on a real slice so the ``product'' claims are testable, not aspirational.
+
+\paragraph{A learned-but-verified frontier.}
+Forward-looking learned components are admitted only behind the safety invariant: every model-assisted
+verdict is shadowed by a deterministic check, and the family's negative controls prove a learned
+component can never manufacture a passing verdict the core would reject.
+
+\paragraph{A lasting-impact dossier.}
+Finally, longevity artifacts---a reproducibility appendix, a citation/DOI record, a governance and
+sustainability plan, a curated showcase, and a grand-unified evidence index that cross-links every
+gate to its proof and control---are bundled into a single dossier gate, so ``this artifact endures''
+is itself continuously re-proven.
+
+\begin{table}[t]
+\centering
+\small
+\begin{tabular}{@{}lll@{}}
+\toprule
+\textbf{Direction} & \textbf{Representative gate} & \textbf{Negative control catches} \\
+\midrule
+Formal foundations & \gate{soundness-theorem-gate} & an accepted rejected-but-improving fix \\
+Ecosystem scale & \gate{prevalence-estimator-gate} & a fabricated prevalence count \\
+Definitive evaluation & \gate{evaluation-preregistration-gate} & a post-hoc, unregistered metric \\
+Product adoption & \gate{policy-as-code-layer-gate} & a policy that admits an unsafe change \\
+Learned frontier & \gate{neuro-symbolic-verdict-gate} & a learned override of a rejection \\
+Lasting impact & \gate{grand-unified-evidence-index-gate} & a dangling, unproven capability \\
+\bottomrule
+\end{tabular}
+\caption{One representative gate per field-defining direction. Each family ships a positive proof on
+pinned public code and a negative control that must fail, following the repository-wide idiom.}
+\label{tab:frontier2}
+\end{table}
+
+%======================================================================
 \section{Developer and Contributor Experience}
 %======================================================================
 
@@ -1026,7 +1096,7 @@ co-located with any such marker is classified \emph{sequenced}; one with none is
 \section{Selected Gate Catalog}
 \label{app:gates}
 
-\tool{} ships more than 300 gates; Table~\ref{tab:gatecatalog} lists a representative selection grouped by
+\tool{} ships more than 400 gates; Table~\ref{tab:gatecatalog} lists a representative selection grouped by
 theme to convey the breadth of what is proven against real, pinned public code. Each gate is a single
 \code{make} target.
 
@@ -1068,8 +1138,14 @@ Research frontier & \code{learned-risk-model-gate}, \code{neuro-symbolic-verdict
 \code{theorem-prover-backend-gate}, \code{abstention-policy-gate}, \code{causal-effect-estimate-gate} \\
 Camera-ready & \code{repro-appendix-gate}, \code{dataset-datasheet-gate}, \code{model-card-gate},
 \code{evaluation-preregistration-gate}, \code{camera-ready-build-gate} \\
+Mechanized foundations & \code{mechanized-operational-semantics-gate}, \code{soundness-theorem-gate},
+\code{completeness-characterization-gate}, \code{refinement-types-columns-gate} \\
+Ecosystem scale & \code{prevalence-estimator-gate}, \code{corpus-harness-gate},
+\code{longitudinal-public-reruns-gate}, \code{drift-monitor-gate} \\
+Adoption \& impact & \code{self-serve-onboarding-gate}, \code{policy-as-code-layer-gate},
+\code{causal-effect-estimate-gate}, \code{grand-unified-evidence-index-gate} \\
 \bottomrule
-\caption{A representative selection from the 300+-gate catalog, grouped by theme.}
+\caption{A representative selection from the 400+-gate catalog, grouped by theme.}
 \label{tab:gatecatalog}
 \end{longtable}
 
