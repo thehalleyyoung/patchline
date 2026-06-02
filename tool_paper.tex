@@ -520,7 +520,16 @@ companion reviewer-outcome counterfactual log replays those same aggregate group
 historical policies, showing what prior releases would have blocked, allowed, or left ambiguous. It is
 conservative by design: if a threshold falls inside a published confidence decile, the group is marked
 \code{boundary\_ambiguous}; if the reviewer outcome is \code{missed}, the log records a detector
-non-emission rather than pretending a blocking threshold would have surfaced it.
+non-emission rather than pretending a blocking threshold would have surfaced it. The newest operational
+learning layer keeps that invariant while closing the loop: new detectors run in a safe online-evaluation
+lane and remain \code{shadow\_only} until precision, recall-proxy, and burden gates pass; adopter-local
+active-learning queues keep individual examples inside the organization while publishing only aggregate
+uncertainty and information-gain metrics; high-stakes organizations can freeze policy to audited detector
+versions during incidents; a live calibration monitor alerts on pre-registered confidence-decile drift;
+an evidence-retention lifecycle proves feedback expires, anonymizes, or remains aggregated according to a
+fixed policy date; and a human-trust regression suite checks explanation faithfulness, citation coverage,
+uncertainty disclosure, over-reliance, and burden before a learned update is accepted. A methodology report
+ties the loop together by requiring recall gains without increased reviewer over-reliance.
 
 \paragraph{Multi-agent review and interoperability.} A simulated panel of reviewer agents with
 distinct risk tolerances votes per migration, and the same panel is shown to yield different outcomes
@@ -1122,14 +1131,14 @@ implicit.
 %======================================================================
 
 The completed roadmap now extends beyond the original 700-step artifact into standard-scale certificate
-interoperability, source-free live feedback ingestion, gate-bound drift-aware threshold updates, and
-reviewer-outcome counterfactual logging for previous releases.
+interoperability, source-free live feedback ingestion, gate-bound drift-aware threshold updates,
+reviewer-outcome counterfactual logging for previous releases, and operational learning that remains
+shadowed, local, frozen, calibrated, retained, and trust-regressed before it influences policy.
 \tool{} therefore already combines
 deterministic analysis, bounded generation, real-repo gates, formal and causal scaffolding, autonomy
 safety cases, standards hooks, privacy-preserving reviewer-outcome aggregation, and long-horizon impact
 evidence. The remaining frontier is not another isolated detector; it is the transition from a
 generational artifact to shared infrastructure. The open roadmap items around this transition include:
-shadow-mode online evaluation; adopter-local active-learning queues;
 production-grade remediation loops for expand/contract, backfill, rollback, and patch-series safety; a
 public evidence marketplace with licenses, bounties, minimization, and governance; engine-version
 semantics for production databases, locks, replication, partitioning, and online schema change;
@@ -1319,7 +1328,7 @@ Stratification & \code{ecosystem-balanced-benchmark-gate}, \code{repository-size
 \code{migration-age-stratification-gate}, \code{longitudinal-public-reruns-gate} \\
 Security \& privacy & \code{secret-scan-gate}, \code{archive-security-gate}, \code{threat-model-gate},
 \code{redaction-stability-gate}, \code{privacy-metrics-gate}, \code{live-feedback-ingestion-gate},
-\code{supply-chain-provenance-gate} \\
+\code{feedback-retention-lifecycle-gate}, \code{supply-chain-provenance-gate} \\
 Robustness \& DX & \code{fuzz-coverage-gate}, \code{parser-dashboard-gate},
 \code{fixture-minimizer-gate}, \code{onboarding-quest-gate}, \code{performance-budget-gate} \\
 Artifact \& paper & \code{reviewer-walkthrough-gate}, \code{artifact-evaluation-kit-gate},
@@ -1328,7 +1337,10 @@ Formal methods & \code{invariant-extract-gate}, \code{symexec-gate}, \code{model
 \code{causal-graph-gate}, \code{counterfactual-gate} \\
 Decision science & \code{risk-economics-gate}, \code{uncertainty-calibration-gate},
 \code{active-learning-gate}, \code{reviewer-sim-gate}, \code{live-feedback-ingestion-gate},
-\code{drift-threshold-update-gate}, \code{reviewer-counterfactual-log-gate} \\
+\code{drift-threshold-update-gate}, \code{reviewer-counterfactual-log-gate},
+\code{safe-online-evaluation-gate}, \code{adopter-active-learning-gate},
+\code{policy-freeze-gate}, \code{live-calibration-monitor-gate},
+\code{human-trust-regression-gate}, \code{live-learning-methodology-gate} \\
 Release \& interop & \code{rc-rehearsal-gate}, \code{leaderboard-gate}, \code{dossier-gate},
 \code{interop-gate}, \code{standards-body-conformance-corpus-gate},
 \code{certificate-interop-dashboard-gate}, \code{conformance-failure-minimizer-gate},
@@ -1372,8 +1384,11 @@ adopter reviewer outcomes: it stores no source, diffs, paths, raw evidence, find
 hashes, adopter IDs, or salts, and low-count detector groups are folded into a dimension-free residual
 bucket. Counterfactual replay over previous releases consumes only those published groups, excludes
 raw confidence values, and reports decile-boundary ambiguity rather than reconstructing private
-individual outcomes. Binaries, release archives, and public-corpus downloads carry deterministic
-provenance and sorted checksums.
+individual outcomes. The live-learning gates extend this privacy model: local active-learning queues are
+explicitly non-shareable, shareable aggregates exclude local case identifiers, incident freezes name only
+source-free organization cohorts and audited releases, calibration alerts operate over published deciles,
+and retention reports use a fixed as-of date rather than a wall clock. Binaries, release archives, and
+public-corpus downloads carry deterministic provenance and sorted checksums.
 
 \section{Reproduction Guide}
 \label{app:repro}
@@ -1394,7 +1409,14 @@ make certificate-migration-gate \hspace{0.1em}\# PLCI/0 verdicts recheck as PLCI
 make certificate-plugfest-gate \hspace{0.25em}\# offline PLCI lifecycle submission replay\\
 make live-feedback-ingestion-gate \hspace{0.15em}\# source-free reviewer outcome aggregates\\
 make drift-threshold-update-gate \hspace{0.02em}\# gate-bound advisory calibration updates\\
-make reviewer-counterfactual-log-gate \quad\# previous-release replay without raw outcomes
+make reviewer-counterfactual-log-gate \quad\# previous-release replay without raw outcomes\\
+make safe-online-evaluation-gate \quad\# shadow detectors until gates pass\\
+make adopter-active-learning-gate \quad\# local examples, aggregate uncertainty\\
+make policy-freeze-gate \hspace{2.35em}\# high-stakes incident pinning\\
+make live-calibration-monitor-gate \quad\# decile drift alerts\\
+make feedback-retention-lifecycle-gate \quad\# expiry/anonymization proof\\
+make human-trust-regression-gate \quad\# explanation faithfulness checks\\
+make live-learning-methodology-gate \quad\# recall gain without over-reliance
 \end{quote}
 
 \noindent

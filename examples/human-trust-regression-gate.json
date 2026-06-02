@@ -1,0 +1,27 @@
+{
+  "version": "patchline.human-trust-regression/v1",
+  "claim": "Patchline can measure whether explanations remain faithful after learned components update by comparing faithfulness, evidence citation coverage, uncertainty disclosure, reviewer over-reliance, and review burden against explicit tolerances before a release is trusted.",
+  "baseline": {
+    "release": "v1.0.0",
+    "explanation_faithfulness_bp": 9000,
+    "evidence_citation_coverage_bp": 8800,
+    "uncertainty_disclosure_bp": 8500,
+    "overreliance_rate_bp": 1200,
+    "mean_review_burden_minutes": 9
+  },
+  "current": {
+    "release": "v1.1.0",
+    "explanation_faithfulness_bp": 8950,
+    "evidence_citation_coverage_bp": 8800,
+    "uncertainty_disclosure_bp": 8600,
+    "overreliance_rate_bp": 1150,
+    "mean_review_burden_minutes": 9
+  },
+  "tolerances": {
+    "max_faithfulness_drop_bp": 100,
+    "max_citation_coverage_drop_bp": 100,
+    "max_uncertainty_drop_bp": 100,
+    "max_overreliance_increase_bp": 50,
+    "max_burden_increase_minutes": 1
+  }
+}

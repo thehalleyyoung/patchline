@@ -1,0 +1,24 @@
+{
+  "version": "patchline.safe-online-evaluation/v1",
+  "claim": "Patchline can run new detectors in a safe online-evaluation lane where every candidate remains shadow-only until source-free live reviewer feedback proves minimum precision, recall, and review-burden gates. The report uses only k-anonymous aggregate groups and never mutates blocking policy.",
+  "candidate_detectors": [
+    {
+      "detector": "orm.write-breadth",
+      "release": "v1.0.0",
+      "min_evidence": 3,
+      "min_precision_bp": 9000,
+      "min_recall_bp": 9000,
+      "max_average_burden_minutes": 8,
+      "requires_human_gate": true
+    },
+    {
+      "detector": "sql.destructive-ddl",
+      "release": "v1.0.0",
+      "min_evidence": 3,
+      "min_precision_bp": 9000,
+      "min_recall_bp": 9000,
+      "max_average_burden_minutes": 12,
+      "requires_human_gate": true
+    }
+  ]
+}

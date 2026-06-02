@@ -1,0 +1,9 @@
+{
+  "version": "patchline.live-calibration-monitor/v1",
+  "claim": "Patchline can monitor live calibration by comparing published confidence deciles with observed reviewer confirmation rates and alerting only when drift exceeds a pre-registered tolerance. The monitor uses aggregate feedback and never inspects source snippets or individual findings.",
+  "pre_registered_tolerance_bp": 2000,
+  "min_evidence": 3,
+  "alert_channels": [
+    "artifact-review"
+  ]
+}

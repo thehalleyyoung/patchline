@@ -1,0 +1,39 @@
+{
+  "version": "patchline.feedback-retention-lifecycle/v1",
+  "claim": "Patchline can prove operational feedback follows a deterministic evidence-retention lifecycle: raw local feedback expires, mid-age operational examples anonymize, and aggregate evidence remains only inside its retention window. The fixed as-of date makes the proof reproducible.",
+  "as_of_date": "2026-06-02",
+  "policies": [
+    {
+      "class": "live-feedback",
+      "raw_retention_days": 30,
+      "anonymize_after_days": 14,
+      "aggregate_retention_days": 365
+    }
+  ],
+  "artifacts": [
+    {
+      "artifact_id": "raw-old",
+      "class": "live-feedback",
+      "created_at": "2026-04-01",
+      "contains_raw_evidence": true,
+      "contains_local_examples": true,
+      "observed_action": "delete"
+    },
+    {
+      "artifact_id": "raw-mid",
+      "class": "live-feedback",
+      "created_at": "2026-05-10",
+      "contains_raw_evidence": true,
+      "contains_local_examples": true,
+      "observed_action": "anonymize"
+    },
+    {
+      "artifact_id": "agg-new",
+      "class": "live-feedback",
+      "created_at": "2026-05-15",
+      "aggregated": true,
+      "anonymized": true,
+      "observed_action": "retain_aggregate"
+    }
+  ]
+}

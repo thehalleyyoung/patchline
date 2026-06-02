@@ -543,6 +543,13 @@ Usage:
   patchline ingest-evidence <events.jsonl> [--json] [--out graph.json]
   patchline adapt-evidence <otlp|datadog|postgres|github|migration-runner|jira|linear> <input.json> [--json] [--out events.jsonl]
   patchline feedback counterfactual-log --feedback live-feedback.json --history policy-history.json --out dir [--json]
+  patchline feedback online-eval --feedback live-feedback.json --spec online-evaluation.json --out dir [--json]
+  patchline feedback active-learning-queue --spec active-learning.json --out dir [--json]
+  patchline feedback policy-freeze --spec policy-freeze.json --out dir [--json]
+  patchline feedback calibration-monitor --feedback live-feedback.json --spec calibration-monitor.json --out dir [--json]
+  patchline feedback retention-lifecycle --spec retention-lifecycle.json --out dir [--json]
+  patchline feedback trust-regression --spec trust-regression.json --out dir [--json]
+  patchline feedback methodology-report --spec methodology.json --out dir [--json]
   patchline ci-gate <suite.json> [--min-precision 0.95] [--min-recall 0.95] [--json]
   patchline ledger-verify [--json]
 
@@ -14496,7 +14503,7 @@ func adaptEvidence(adapter, path string, jsonOut bool, outPath string) error {
 
 func feedbackCommand(args []string) error {
 	if len(args) == 0 {
-		return errors.New("usage: patchline feedback ingest <input.json> --out <dir> [--json] | patchline feedback threshold-update --feedback live-feedback.json --policy thresholds.json --out <dir> [--previous live-feedback.json] [--gate gate.json] [--json] | patchline feedback counterfactual-log --feedback live-feedback.json --history policy-history.json --out <dir> [--json]")
+		return errors.New("usage: patchline feedback <ingest|threshold-update|counterfactual-log|online-eval|active-learning-queue|policy-freeze|calibration-monitor|retention-lifecycle|trust-regression|methodology-report> ...")
 	}
 	switch args[0] {
 	case "ingest":
@@ -14512,6 +14519,20 @@ func feedbackCommand(args []string) error {
 		return feedbackThresholdUpdate(args[1:], hasFlag(args[1:], "--json"))
 	case "counterfactual-log":
 		return feedbackCounterfactualLog(args[1:], hasFlag(args[1:], "--json"))
+	case "online-eval":
+		return feedbackOnlineEvaluation(args[1:], hasFlag(args[1:], "--json"))
+	case "active-learning-queue":
+		return feedbackActiveLearningQueue(args[1:], hasFlag(args[1:], "--json"))
+	case "policy-freeze":
+		return feedbackPolicyFreeze(args[1:], hasFlag(args[1:], "--json"))
+	case "calibration-monitor":
+		return feedbackCalibrationMonitor(args[1:], hasFlag(args[1:], "--json"))
+	case "retention-lifecycle":
+		return feedbackRetentionLifecycle(args[1:], hasFlag(args[1:], "--json"))
+	case "trust-regression":
+		return feedbackTrustRegression(args[1:], hasFlag(args[1:], "--json"))
+	case "methodology-report":
+		return feedbackMethodologyReport(args[1:], hasFlag(args[1:], "--json"))
 	default:
 		return fmt.Errorf("unknown feedback command %q", args[0])
 	}
@@ -14679,6 +14700,259 @@ func feedbackCounterfactualLog(args []string, jsonOut bool) error {
 	return nil
 }
 
+func feedbackOnlineEvaluation(args []string, jsonOut bool) error {
+	feedbackPath, specPath, outPath, err := feedbackFeedbackSpecOut(args, "patchline feedback online-eval --feedback live-feedback.json --spec online-evaluation.json --out <dir> [--json]")
+	if err != nil {
+		return err
+	}
+	report, err := readLiveFeedbackReport(feedbackPath)
+	if err != nil {
+		return err
+	}
+	spec, err := readOnlineEvaluationSpec(specPath)
+	if err != nil {
+		return err
+	}
+	evaluation, err := feedback.ComputeOnlineEvaluation(report, spec)
+	if err != nil {
+		return err
+	}
+	if err := os.MkdirAll(outPath, 0o755); err != nil {
+		return err
+	}
+	if err := writeJSONArtifact(filepath.Join(outPath, "online-evaluation.json"), evaluation); err != nil {
+		return err
+	}
+	if err := os.WriteFile(filepath.Join(outPath, "online-evaluation.md"), []byte(renderOnlineEvaluationMarkdown(evaluation)), 0o644); err != nil {
+		return err
+	}
+	if jsonOut {
+		return writeJSON(os.Stdout, evaluation)
+	}
+	fmt.Printf("wrote safe online-evaluation lane report with %d detector(s) to %s\n", evaluation.Summary.DetectorsEvaluated, outPath)
+	return nil
+}
+
+func feedbackActiveLearningQueue(args []string, jsonOut bool) error {
+	specPath, outPath, err := feedbackSpecOut(args, "patchline feedback active-learning-queue --spec active-learning.json --out <dir> [--json]")
+	if err != nil {
+		return err
+	}
+	spec, err := readActiveLearningSpec(specPath)
+	if err != nil {
+		return err
+	}
+	report, err := feedback.ComputeActiveLearningQueue(spec)
+	if err != nil {
+		return err
+	}
+	if err := os.MkdirAll(outPath, 0o755); err != nil {
+		return err
+	}
+	if err := writeJSONArtifact(filepath.Join(outPath, "active-learning-queue.json"), report); err != nil {
+		return err
+	}
+	if err := writeJSONArtifact(filepath.Join(outPath, "active-learning-local-queue.json"), report.LocalQueue); err != nil {
+		return err
+	}
+	if err := writeJSONArtifact(filepath.Join(outPath, "active-learning-aggregate.json"), report.Aggregate); err != nil {
+		return err
+	}
+	if err := os.WriteFile(filepath.Join(outPath, "active-learning-queue.md"), []byte(renderActiveLearningMarkdown(report)), 0o644); err != nil {
+		return err
+	}
+	if jsonOut {
+		return writeJSON(os.Stdout, report)
+	}
+	fmt.Printf("wrote adopter-local active-learning queue with %d local case(s) to %s\n", report.Summary.QueuedCases, outPath)
+	return nil
+}
+
+func feedbackPolicyFreeze(args []string, jsonOut bool) error {
+	specPath, outPath, err := feedbackSpecOut(args, "patchline feedback policy-freeze --spec policy-freeze.json --out <dir> [--json]")
+	if err != nil {
+		return err
+	}
+	spec, err := readPolicyFreezeSpec(specPath)
+	if err != nil {
+		return err
+	}
+	report, err := feedback.ComputePolicyFreeze(spec)
+	if err != nil {
+		return err
+	}
+	if err := os.MkdirAll(outPath, 0o755); err != nil {
+		return err
+	}
+	if err := writeJSONArtifact(filepath.Join(outPath, "policy-freeze.json"), report); err != nil {
+		return err
+	}
+	if err := os.WriteFile(filepath.Join(outPath, "policy-freeze.md"), []byte(renderPolicyFreezeMarkdown(report)), 0o644); err != nil {
+		return err
+	}
+	if jsonOut {
+		return writeJSON(os.Stdout, report)
+	}
+	fmt.Printf("wrote policy-freeze report with %d decision(s) to %s\n", report.Summary.OrganizationsEvaluated, outPath)
+	return nil
+}
+
+func feedbackCalibrationMonitor(args []string, jsonOut bool) error {
+	feedbackPath, specPath, outPath, err := feedbackFeedbackSpecOut(args, "patchline feedback calibration-monitor --feedback live-feedback.json --spec calibration-monitor.json --out <dir> [--json]")
+	if err != nil {
+		return err
+	}
+	report, err := readLiveFeedbackReport(feedbackPath)
+	if err != nil {
+		return err
+	}
+	spec, err := readCalibrationMonitorSpec(specPath)
+	if err != nil {
+		return err
+	}
+	monitor, err := feedback.ComputeCalibrationMonitor(report, spec)
+	if err != nil {
+		return err
+	}
+	if err := os.MkdirAll(outPath, 0o755); err != nil {
+		return err
+	}
+	if err := writeJSONArtifact(filepath.Join(outPath, "calibration-monitor.json"), monitor); err != nil {
+		return err
+	}
+	if err := os.WriteFile(filepath.Join(outPath, "calibration-monitor.md"), []byte(renderCalibrationMonitorMarkdown(monitor)), 0o644); err != nil {
+		return err
+	}
+	if jsonOut {
+		return writeJSON(os.Stdout, monitor)
+	}
+	fmt.Printf("wrote live calibration monitor report with %d alert(s) to %s\n", monitor.Summary.Alerts, outPath)
+	return nil
+}
+
+func feedbackRetentionLifecycle(args []string, jsonOut bool) error {
+	specPath, outPath, err := feedbackSpecOut(args, "patchline feedback retention-lifecycle --spec retention-lifecycle.json --out <dir> [--json]")
+	if err != nil {
+		return err
+	}
+	spec, err := readRetentionLifecycleSpec(specPath)
+	if err != nil {
+		return err
+	}
+	report, err := feedback.ComputeRetentionLifecycle(spec)
+	if err != nil {
+		return err
+	}
+	if err := os.MkdirAll(outPath, 0o755); err != nil {
+		return err
+	}
+	if err := writeJSONArtifact(filepath.Join(outPath, "retention-lifecycle.json"), report); err != nil {
+		return err
+	}
+	if err := os.WriteFile(filepath.Join(outPath, "retention-lifecycle.md"), []byte(renderRetentionLifecycleMarkdown(report)), 0o644); err != nil {
+		return err
+	}
+	if jsonOut {
+		return writeJSON(os.Stdout, report)
+	}
+	fmt.Printf("wrote evidence-retention lifecycle report with %d artifact(s) to %s\n", report.Summary.ArtifactsEvaluated, outPath)
+	return nil
+}
+
+func feedbackTrustRegression(args []string, jsonOut bool) error {
+	specPath, outPath, err := feedbackSpecOut(args, "patchline feedback trust-regression --spec trust-regression.json --out <dir> [--json]")
+	if err != nil {
+		return err
+	}
+	spec, err := readTrustRegressionSpec(specPath)
+	if err != nil {
+		return err
+	}
+	report, err := feedback.ComputeTrustRegression(spec)
+	if err != nil {
+		return err
+	}
+	if err := os.MkdirAll(outPath, 0o755); err != nil {
+		return err
+	}
+	if err := writeJSONArtifact(filepath.Join(outPath, "trust-regression.json"), report); err != nil {
+		return err
+	}
+	if err := os.WriteFile(filepath.Join(outPath, "trust-regression.md"), []byte(renderTrustRegressionMarkdown(report)), 0o644); err != nil {
+		return err
+	}
+	if jsonOut {
+		return writeJSON(os.Stdout, report)
+	}
+	fmt.Printf("wrote human-trust regression report with %d failed check(s) to %s\n", report.Summary.FailedChecks, outPath)
+	return nil
+}
+
+func feedbackMethodologyReport(args []string, jsonOut bool) error {
+	specPath, outPath, err := feedbackSpecOut(args, "patchline feedback methodology-report --spec methodology.json --out <dir> [--json]")
+	if err != nil {
+		return err
+	}
+	spec, err := readMethodologySpec(specPath)
+	if err != nil {
+		return err
+	}
+	report, err := feedback.ComputeMethodologyReport(spec)
+	if err != nil {
+		return err
+	}
+	if err := os.MkdirAll(outPath, 0o755); err != nil {
+		return err
+	}
+	if err := writeJSONArtifact(filepath.Join(outPath, "live-learning-methodology.json"), report); err != nil {
+		return err
+	}
+	if err := os.WriteFile(filepath.Join(outPath, "live-learning-methodology.md"), []byte(renderMethodologyMarkdown(report)), 0o644); err != nil {
+		return err
+	}
+	if jsonOut {
+		return writeJSON(os.Stdout, report)
+	}
+	fmt.Printf("wrote live-learning methodology report with %d experiment(s) to %s\n", report.Summary.Experiments, outPath)
+	return nil
+}
+
+func feedbackSpecOut(args []string, usageText string) (string, string, error) {
+	specPath, ok := flagValue(args, "--spec")
+	if !ok || specPath == "" {
+		return "", "", errors.New("usage: " + usageText)
+	}
+	outPath, ok := flagValue(args, "--out")
+	if !ok || outPath == "" {
+		return "", "", errors.New("usage: " + usageText)
+	}
+	return specPath, outPath, nil
+}
+
+func feedbackFeedbackSpecOut(args []string, usageText string) (string, string, string, error) {
+	feedbackPath, ok := flagValue(args, "--feedback")
+	if !ok || feedbackPath == "" {
+		return "", "", "", errors.New("usage: " + usageText)
+	}
+	specPath, outPath, err := feedbackSpecOut(args, usageText)
+	if err != nil {
+		return "", "", "", err
+	}
+	return feedbackPath, specPath, outPath, nil
+}
+
+func writeJSONArtifact(path string, value any) error {
+	file, err := os.Create(path)
+	if err != nil {
+		return err
+	}
+	if err := writeJSON(file, value); err != nil {
+		file.Close()
+		return err
+	}
+	return file.Close()
+}
+
 func renderLiveFeedbackMarkdown(report feedback.Report) string {
 	var b strings.Builder
 	fmt.Fprintf(&b, "# Source-free live feedback\n\n")
@@ -14818,6 +15092,154 @@ func renderCounterfactualLogMarkdown(report feedback.CounterfactualLog) string {
 		for _, warning := range report.Warnings {
 			fmt.Fprintf(&b, "- `%s`\n", warning)
 		}
+	}
+	return b.String()
+}
+
+func renderOnlineEvaluationMarkdown(report feedback.OnlineEvaluationReport) string {
+	var b strings.Builder
+	fmt.Fprintf(&b, "# Safe online-evaluation lane\n\n")
+	fmt.Fprintf(&b, "Patchline ran candidate detectors in **shadow mode** against published k-anonymous live-feedback groups. A detector is only a review candidate after precision, recall, and burden gates pass; the blocking policy is never mutated by this report.\n\n")
+	fmt.Fprintf(&b, "| Metric | Value |\n| --- | ---: |\n")
+	fmt.Fprintf(&b, "| Detectors evaluated | %d |\n", report.Summary.DetectorsEvaluated)
+	fmt.Fprintf(&b, "| Candidate-ready detectors | %d |\n", report.Summary.PromotionCandidates)
+	fmt.Fprintf(&b, "| Shadow-only detectors | %d |\n", report.Summary.ShadowOnly)
+	fmt.Fprintf(&b, "| Gates failed | %d |\n\n", report.Summary.GatesFailed)
+	fmt.Fprintf(&b, "| Detector | Release | Status | Count | Precision bp | Recall bp | Avg burden |\n")
+	fmt.Fprintf(&b, "| --- | --- | --- | ---: | ---: | ---: | ---: |\n")
+	for _, detector := range report.Detectors {
+		fmt.Fprintf(&b, "| `%s` | `%s` | `%s` | %d | %d | %d | %d |\n",
+			detector.Detector,
+			detector.Release,
+			detector.Status,
+			detector.Metrics.PublishedCount,
+			detector.Metrics.PrecisionBP,
+			detector.Metrics.RecallBP,
+			detector.Metrics.AverageBurdenMinutes,
+		)
+	}
+	return b.String()
+}
+
+func renderActiveLearningMarkdown(report feedback.ActiveLearningReport) string {
+	var b strings.Builder
+	fmt.Fprintf(&b, "# Adopter-local active-learning queue\n\n")
+	fmt.Fprintf(&b, "Patchline ranked local examples for reviewer labeling while keeping individual examples in a `shareable: false` artifact. The separate aggregate is source-free and shareable.\n\n")
+	fmt.Fprintf(&b, "| Metric | Count |\n| --- | ---: |\n")
+	fmt.Fprintf(&b, "| Input cases | %d |\n", report.Summary.InputCases)
+	fmt.Fprintf(&b, "| Eligible cases | %d |\n", report.Summary.EligibleCases)
+	fmt.Fprintf(&b, "| Queued local cases | %d |\n", report.Summary.QueuedCases)
+	fmt.Fprintf(&b, "| Already labeled | %d |\n", report.Summary.AlreadyLabeledCases)
+	fmt.Fprintf(&b, "| Below threshold | %d |\n\n", report.Summary.BelowThresholdCases)
+	fmt.Fprintf(&b, "Local queue shareable: `%t`; aggregate shareable: `%t`; aggregate hash: `%s`.\n\n", report.LocalQueue.Shareable, report.Aggregate.Shareable, report.Aggregate.Hash)
+	if len(report.Aggregate.ByDetector) > 0 {
+		fmt.Fprintf(&b, "| Detector | Release | Queued | Mean uncertainty bp | Mean info gain bp |\n")
+		fmt.Fprintf(&b, "| --- | --- | ---: | ---: | ---: |\n")
+		for _, aggregate := range report.Aggregate.ByDetector {
+			fmt.Fprintf(&b, "| `%s` | `%s` | %d | %d | %d |\n",
+				aggregate.Detector,
+				aggregate.Release,
+				aggregate.QueuedCases,
+				aggregate.MeanUncertaintyBP,
+				aggregate.MeanExpectedInformationGainBP,
+			)
+		}
+	}
+	return b.String()
+}
+
+func renderPolicyFreezeMarkdown(report feedback.PolicyFreezeReport) string {
+	var b strings.Builder
+	fmt.Fprintf(&b, "# Policy freeze\n\n")
+	fmt.Fprintf(&b, "Patchline evaluated high-stakes organizations against audited detector releases and pinned active incidents to audited versions.\n\n")
+	fmt.Fprintf(&b, "| Metric | Count |\n| --- | ---: |\n")
+	fmt.Fprintf(&b, "| Organizations evaluated | %d |\n", report.Summary.OrganizationsEvaluated)
+	fmt.Fprintf(&b, "| Pinned organizations | %d |\n", report.Summary.PinnedOrganizations)
+	fmt.Fprintf(&b, "| Allowed updates | %d |\n", report.Summary.AllowedUpdates)
+	fmt.Fprintf(&b, "| Missing-audit blocks | %d |\n\n", report.Summary.BlockedMissingAudit)
+	fmt.Fprintf(&b, "| Organization | High stakes | Incident active | Pinned release | Proposed release | Allowed | Reason |\n")
+	fmt.Fprintf(&b, "| --- | --- | --- | --- | --- | --- | --- |\n")
+	for _, decision := range report.Decisions {
+		fmt.Fprintf(&b, "| `%s` | `%t` | `%t` | `%s` | `%s` | `%t` | `%s` |\n",
+			decision.Organization,
+			decision.HighStakes,
+			decision.IncidentActive,
+			decision.PinnedRelease,
+			decision.ProposedRelease,
+			decision.PolicyChangeAllowed,
+			decision.Reason,
+		)
+	}
+	return b.String()
+}
+
+func renderCalibrationMonitorMarkdown(report feedback.CalibrationMonitorReport) string {
+	var b strings.Builder
+	fmt.Fprintf(&b, "# Live calibration monitor\n\n")
+	fmt.Fprintf(&b, "Patchline compared confidence deciles with observed reviewer confirmation rates and emitted alerts only when pre-registered tolerance was exceeded.\n\n")
+	fmt.Fprintf(&b, "| Metric | Value |\n| --- | ---: |\n")
+	fmt.Fprintf(&b, "| Deciles evaluated | %d |\n", report.Summary.DecilesEvaluated)
+	fmt.Fprintf(&b, "| Alerts | %d |\n", report.Summary.Alerts)
+	fmt.Fprintf(&b, "| Tolerance bp | %d |\n\n", report.Summary.ToleranceBP)
+	if len(report.Alerts) == 0 {
+		fmt.Fprintf(&b, "No calibration drift alerts exceeded the pre-registered tolerance.\n")
+		return b.String()
+	}
+	fmt.Fprintf(&b, "| Detector | Release | Decile | Drift bp | Tolerance bp | Severity |\n")
+	fmt.Fprintf(&b, "| --- | --- | --- | ---: | ---: | --- |\n")
+	for _, alert := range report.Alerts {
+		fmt.Fprintf(&b, "| `%s` | `%s` | `%s` | %d | %d | `%s` |\n", alert.Detector, alert.Release, alert.ConfidenceDecile, alert.DriftBP, alert.ToleranceBP, alert.Severity)
+	}
+	return b.String()
+}
+
+func renderRetentionLifecycleMarkdown(report feedback.RetentionLifecycleReport) string {
+	var b strings.Builder
+	fmt.Fprintf(&b, "# Evidence-retention lifecycle\n\n")
+	fmt.Fprintf(&b, "Patchline checked operational feedback artifacts against deterministic expiry, anonymization, and aggregate-retention policy as of `%s`.\n\n", report.AsOfDate)
+	fmt.Fprintf(&b, "| Metric | Count |\n| --- | ---: |\n")
+	fmt.Fprintf(&b, "| Artifacts evaluated | %d |\n", report.Summary.ArtifactsEvaluated)
+	fmt.Fprintf(&b, "| Compliant artifacts | %d |\n", report.Summary.CompliantArtifacts)
+	fmt.Fprintf(&b, "| Violations | %d |\n", report.Summary.Violations)
+	fmt.Fprintf(&b, "| Delete required | %d |\n", report.Summary.DeleteRequired)
+	fmt.Fprintf(&b, "| Anonymize required | %d |\n\n", report.Summary.AnonymizeRequired)
+	fmt.Fprintf(&b, "| Artifact | Class | Age days | Expected | Observed | Compliant | Reason |\n")
+	fmt.Fprintf(&b, "| --- | --- | ---: | --- | --- | --- | --- |\n")
+	for _, artifact := range report.Artifacts {
+		fmt.Fprintf(&b, "| `%s` | `%s` | %d | `%s` | `%s` | `%t` | `%s` |\n", artifact.ArtifactID, artifact.Class, artifact.AgeDays, artifact.ExpectedAction, artifact.ObservedAction, artifact.Compliant, artifact.Reason)
+	}
+	return b.String()
+}
+
+func renderTrustRegressionMarkdown(report feedback.TrustRegressionReport) string {
+	var b strings.Builder
+	fmt.Fprintf(&b, "# Human-trust regression\n\n")
+	fmt.Fprintf(&b, "Patchline compared explanation faithfulness, evidence citations, uncertainty disclosure, over-reliance, and review burden after learned components updated.\n\n")
+	fmt.Fprintf(&b, "| Metric | Count |\n| --- | ---: |\n")
+	fmt.Fprintf(&b, "| Checks | %d |\n", report.Summary.Checks)
+	fmt.Fprintf(&b, "| Passed | %d |\n", report.Summary.PassedChecks)
+	fmt.Fprintf(&b, "| Failed | %d |\n\n", report.Summary.FailedChecks)
+	fmt.Fprintf(&b, "| Check | Passed | Delta | Comparator | Tolerance |\n")
+	fmt.Fprintf(&b, "| --- | --- | ---: | --- | ---: |\n")
+	for _, check := range report.Checks {
+		fmt.Fprintf(&b, "| `%s` | `%t` | %d | `%s` | %d |\n", check.Name, check.Passed, check.Delta, check.Comparator, check.Tolerance)
+	}
+	return b.String()
+}
+
+func renderMethodologyMarkdown(report feedback.MethodologyReport) string {
+	var b strings.Builder
+	fmt.Fprintf(&b, "# Live-learning methodology report\n\n")
+	fmt.Fprintf(&b, "Patchline summarizes whether live learning improved recall without increasing reviewer over-reliance, with each claim linked to gate-backed evidence.\n\n")
+	fmt.Fprintf(&b, "| Metric | Count |\n| --- | ---: |\n")
+	fmt.Fprintf(&b, "| Experiments | %d |\n", report.Summary.Experiments)
+	fmt.Fprintf(&b, "| Recall improved | %d |\n", report.Summary.RecallImproved)
+	fmt.Fprintf(&b, "| Over-reliance not increased | %d |\n", report.Summary.OverrelianceNotIncreased)
+	fmt.Fprintf(&b, "| Linked gate evidence | %d |\n\n", report.Summary.LinkedGateEvidence)
+	fmt.Fprintf(&b, "| Experiment | Population | Recall delta bp | Over-reliance delta bp | Burden delta min |\n")
+	fmt.Fprintf(&b, "| --- | --- | ---: | ---: | ---: |\n")
+	for _, experiment := range report.Experiments {
+		fmt.Fprintf(&b, "| `%s` | `%s` | %d | %d | %d |\n", experiment.Name, experiment.Population, experiment.RecallDeltaBP, experiment.OverrelianceDeltaBP, experiment.BurdenDeltaMinutes)
 	}
 	return b.String()
 }
@@ -15072,6 +15494,69 @@ func readCounterfactualPolicyHistory(path string) (feedback.CounterfactualPolicy
 	}
 	defer file.Close()
 	return feedback.ReadCounterfactualPolicyHistory(file)
+}
+
+func readOnlineEvaluationSpec(path string) (feedback.OnlineEvaluationSpec, error) {
+	file, err := os.Open(path)
+	if err != nil {
+		return feedback.OnlineEvaluationSpec{}, err
+	}
+	defer file.Close()
+	return feedback.ReadOnlineEvaluationSpec(file)
+}
+
+func readActiveLearningSpec(path string) (feedback.ActiveLearningSpec, error) {
+	file, err := os.Open(path)
+	if err != nil {
+		return feedback.ActiveLearningSpec{}, err
+	}
+	defer file.Close()
+	return feedback.ReadActiveLearningSpec(file)
+}
+
+func readPolicyFreezeSpec(path string) (feedback.PolicyFreezeSpec, error) {
+	file, err := os.Open(path)
+	if err != nil {
+		return feedback.PolicyFreezeSpec{}, err
+	}
+	defer file.Close()
+	return feedback.ReadPolicyFreezeSpec(file)
+}
+
+func readCalibrationMonitorSpec(path string) (feedback.CalibrationMonitorSpec, error) {
+	file, err := os.Open(path)
+	if err != nil {
+		return feedback.CalibrationMonitorSpec{}, err
+	}
+	defer file.Close()
+	return feedback.ReadCalibrationMonitorSpec(file)
+}
+
+func readRetentionLifecycleSpec(path string) (feedback.RetentionLifecycleSpec, error) {
+	file, err := os.Open(path)
+	if err != nil {
+		return feedback.RetentionLifecycleSpec{}, err
+	}
+	defer file.Close()
+	return feedback.ReadRetentionLifecycleSpec(file)
+}
+
+func readTrustRegressionSpec(path string) (feedback.TrustRegressionSpec, error) {
+	file, err := os.Open(path)
+	if err != nil {
+		return feedback.TrustRegressionSpec{}, err
+	}
+	defer file.Close()
+	return feedback.ReadTrustRegressionSpec(file)
+}
+
+func readMethodologySpec(path string) (feedback.MethodologySpec, error) {
+	file, err := os.Open(path)
+	if err != nil {
+		return feedback.MethodologySpec{}, err
+	}
+	defer file.Close()
+	return feedback.ReadMethodologySpec(file)
 }
 
 func readBenchmarkSpec(path string) (bench.Spec, error) {

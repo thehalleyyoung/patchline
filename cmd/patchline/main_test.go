@@ -305,6 +305,173 @@ func TestFeedbackCounterfactualLogWritesPreviousReleaseRecommendations(t *testin
 	}
 }
 
+func TestFeedbackLiveLearningCommandsWriteReports(t *testing.T) {
+	root := t.TempDir()
+	writeMainTestFile(t, root, "feedback-input.json", `{
+  "version": "patchline.live-feedback-ingestion/v1",
+  "adopter_id": "team-omega",
+  "salt": "live-learning-secret-salt",
+  "min_group_size": 3,
+  "outcomes": [
+    {"finding_id":"finding-001","detector":"orm.write-breadth","release":"v1.0.0","confidence":0.73,"verdict":"false_positive","action":"dismissed","burden_minutes":4,"evidence_hash":"ev-001","reviewer_role":"maintainer"},
+    {"finding_id":"finding-002","detector":"orm.write-breadth","release":"v1.0.0","confidence":0.76,"verdict":"false_positive","action":"dismissed","burden_minutes":4,"evidence_hash":"ev-002","reviewer_role":"dba"},
+    {"finding_id":"finding-003","detector":"orm.write-breadth","release":"v1.0.0","confidence":0.78,"verdict":"false_positive","action":"dismissed","burden_minutes":4,"evidence_hash":"ev-003","reviewer_role":"sre"},
+    {"finding_id":"finding-004","detector":"sql.destructive-ddl","release":"v1.0.0","confidence":0.93,"verdict":"confirmed","action":"blocked","burden_minutes":9,"evidence_hash":"ev-004","reviewer_role":"maintainer"},
+    {"finding_id":"finding-005","detector":"sql.destructive-ddl","release":"v1.0.0","confidence":0.91,"verdict":"confirmed","action":"blocked","burden_minutes":9,"evidence_hash":"ev-005","reviewer_role":"dba"},
+    {"finding_id":"finding-006","detector":"sql.destructive-ddl","release":"v1.0.0","confidence":0.95,"verdict":"confirmed","action":"blocked","burden_minutes":9,"evidence_hash":"ev-006","reviewer_role":"sre"}
+  ]
+}`)
+	ingestOut := filepath.Join(t.TempDir(), "feedback")
+	if err := run([]string{"feedback", "ingest", filepath.Join(root, "feedback-input.json"), "--out", ingestOut, "--json"}); err != nil {
+		t.Fatalf("feedback ingest failed: %v", err)
+	}
+
+	writeMainTestFile(t, root, "online-evaluation.json", `{
+  "version": "patchline.safe-online-evaluation/v1",
+  "claim": "Candidate detectors run in shadow mode against live aggregate feedback until precision, recall, and burden gates pass, while policy mutation remains impossible without a separate human gate.",
+  "candidate_detectors": [
+    {"detector":"orm.write-breadth","release":"v1.0.0","min_evidence":3,"min_precision_bp":9000,"min_recall_bp":9000,"max_average_burden_minutes":8,"requires_human_gate":true},
+    {"detector":"sql.destructive-ddl","release":"v1.0.0","min_evidence":3,"min_precision_bp":9000,"min_recall_bp":9000,"max_average_burden_minutes":12,"requires_human_gate":true}
+  ]
+}`)
+	onlineOut := filepath.Join(t.TempDir(), "online")
+	if err := run([]string{"feedback", "online-eval", "--feedback", filepath.Join(ingestOut, "live-feedback.json"), "--spec", filepath.Join(root, "online-evaluation.json"), "--out", onlineOut, "--json"}); err != nil {
+		t.Fatalf("online evaluation failed: %v", err)
+	}
+	var online feedback.OnlineEvaluationReport
+	readMainTestJSON(t, filepath.Join(onlineOut, "online-evaluation.json"), &online)
+	if online.Summary.PromotionCandidates != 1 || online.Summary.ShadowOnly != 1 || online.PolicyMutationAllowed {
+		t.Fatalf("unexpected online evaluation: %#v", online.Summary)
+	}
+
+	writeMainTestFile(t, root, "active-learning.json", `{
+  "version": "patchline.adopter-active-learning/v1",
+  "claim": "Adopter-local active learning ranks uncertain examples for local reviewer attention while publishing only aggregate uncertainty and information-gain metrics outside the organization.",
+  "min_uncertainty_bp": 2500,
+  "min_information_gain_bp": 3000,
+  "max_queue_size": 2,
+  "cases": [
+    {"local_case_id":"case-001","detector":"sql.destructive-ddl","release":"v1.0.0","confidence_bp":5100,"uncertainty_bp":4900,"expected_information_gain_bp":8100,"estimated_burden_minutes":8},
+    {"local_case_id":"case-002","detector":"orm.write-breadth","release":"v1.0.0","confidence_bp":5400,"uncertainty_bp":4600,"expected_information_gain_bp":7600,"estimated_burden_minutes":6},
+    {"local_case_id":"case-003","detector":"migration.guard","release":"v1.0.0","confidence_bp":9000,"uncertainty_bp":1000,"expected_information_gain_bp":1800,"estimated_burden_minutes":4}
+  ]
+}`)
+	activeOut := filepath.Join(t.TempDir(), "active")
+	if err := run([]string{"feedback", "active-learning-queue", "--spec", filepath.Join(root, "active-learning.json"), "--out", activeOut, "--json"}); err != nil {
+		t.Fatalf("active-learning queue failed: %v", err)
+	}
+	var active feedback.ActiveLearningReport
+	readMainTestJSON(t, filepath.Join(activeOut, "active-learning-queue.json"), &active)
+	if active.Shareable || active.Aggregate.QueuedCases != 2 || active.LocalQueue.Shareable {
+		t.Fatalf("unexpected active-learning report: %#v", active)
+	}
+	aggregateData, err := os.ReadFile(filepath.Join(activeOut, "active-learning-aggregate.json"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if strings.Contains(string(aggregateData), "case-001") || strings.Contains(string(aggregateData), "local_case_id") {
+		t.Fatalf("shareable active-learning aggregate leaked local IDs:\n%s", aggregateData)
+	}
+
+	writeMainTestFile(t, root, "policy-freeze.json", `{
+  "version": "patchline.policy-freeze/v1",
+  "claim": "High-stakes organizations are pinned to audited detector releases during active incidents so experimental detector updates cannot alter blocking policy until incident review completes.",
+  "as_of_date": "2026-06-02",
+  "audited_releases": [
+    {"release":"v1.0.0","audit_hash":"audit-v1-0-0","approved_for_high_stakes":true},
+    {"release":"v1.1.0","audit_hash":"audit-v1-1-0","approved_for_high_stakes":true}
+  ],
+  "organizations": [
+    {"organization":"critical-payments","high_stakes":true,"incident_active":true,"incident_id":"inc-2026-06","current_release":"v1.0.0","proposed_release":"v1.1.0"}
+  ]
+}`)
+	policyOut := filepath.Join(t.TempDir(), "policy")
+	if err := run([]string{"feedback", "policy-freeze", "--spec", filepath.Join(root, "policy-freeze.json"), "--out", policyOut, "--json"}); err != nil {
+		t.Fatalf("policy freeze failed: %v", err)
+	}
+	var freeze feedback.PolicyFreezeReport
+	readMainTestJSON(t, filepath.Join(policyOut, "policy-freeze.json"), &freeze)
+	if !freeze.OK || freeze.Summary.PinnedOrganizations != 1 || freeze.Decisions[0].PolicyChangeAllowed {
+		t.Fatalf("unexpected policy freeze: %#v", freeze)
+	}
+
+	writeMainTestFile(t, root, "calibration-monitor.json", `{
+  "version": "patchline.live-calibration-monitor/v1",
+  "claim": "A live calibration monitor watches confidence deciles against reviewer-confirmation rates and alerts only when drift exceeds a pre-registered tolerance.",
+  "pre_registered_tolerance_bp": 2000,
+  "min_evidence": 3,
+  "alert_channels": ["artifact-review"]
+}`)
+	calibrationOut := filepath.Join(t.TempDir(), "calibration")
+	if err := run([]string{"feedback", "calibration-monitor", "--feedback", filepath.Join(ingestOut, "live-feedback.json"), "--spec", filepath.Join(root, "calibration-monitor.json"), "--out", calibrationOut, "--json"}); err != nil {
+		t.Fatalf("calibration monitor failed: %v", err)
+	}
+	var calibration feedback.CalibrationMonitorReport
+	readMainTestJSON(t, filepath.Join(calibrationOut, "calibration-monitor.json"), &calibration)
+	if calibration.Summary.Alerts != 1 {
+		t.Fatalf("unexpected calibration monitor: %#v", calibration)
+	}
+
+	writeMainTestFile(t, root, "retention-lifecycle.json", `{
+  "version": "patchline.feedback-retention-lifecycle/v1",
+  "claim": "Operational feedback follows deterministic lifecycle policy: raw local evidence expires, mid-age evidence anonymizes, and aggregate evidence remains only within its retention window.",
+  "as_of_date": "2026-06-02",
+  "policies": [{"class":"live-feedback","raw_retention_days":30,"anonymize_after_days":14,"aggregate_retention_days":365}],
+  "artifacts": [
+    {"artifact_id":"raw-old","class":"live-feedback","created_at":"2026-04-01","contains_raw_evidence":true,"contains_local_examples":true,"observed_action":"delete"},
+    {"artifact_id":"raw-mid","class":"live-feedback","created_at":"2026-05-10","contains_raw_evidence":true,"contains_local_examples":true,"observed_action":"anonymize"},
+    {"artifact_id":"agg-new","class":"live-feedback","created_at":"2026-05-15","aggregated":true,"anonymized":true,"observed_action":"retain_aggregate"}
+  ]
+}`)
+	retentionOut := filepath.Join(t.TempDir(), "retention")
+	if err := run([]string{"feedback", "retention-lifecycle", "--spec", filepath.Join(root, "retention-lifecycle.json"), "--out", retentionOut, "--json"}); err != nil {
+		t.Fatalf("retention lifecycle failed: %v", err)
+	}
+	var retention feedback.RetentionLifecycleReport
+	readMainTestJSON(t, filepath.Join(retentionOut, "retention-lifecycle.json"), &retention)
+	if !retention.OK || retention.Summary.DeleteRequired != 1 || retention.Summary.AnonymizeRequired != 1 {
+		t.Fatalf("unexpected retention lifecycle: %#v", retention)
+	}
+
+	writeMainTestFile(t, root, "trust-regression.json", `{
+  "version": "patchline.human-trust-regression/v1",
+  "claim": "Human-trust regression checks learned-component updates for faithful explanations, citations, uncertainty disclosure, over-reliance, and review burden before accepting a new release.",
+  "baseline": {"release":"v1.0.0","explanation_faithfulness_bp":9000,"evidence_citation_coverage_bp":8800,"uncertainty_disclosure_bp":8500,"overreliance_rate_bp":1200,"mean_review_burden_minutes":9},
+  "current": {"release":"v1.1.0","explanation_faithfulness_bp":8950,"evidence_citation_coverage_bp":8800,"uncertainty_disclosure_bp":8600,"overreliance_rate_bp":1150,"mean_review_burden_minutes":9},
+  "tolerances": {"max_faithfulness_drop_bp":100,"max_citation_coverage_drop_bp":100,"max_uncertainty_drop_bp":100,"max_overreliance_increase_bp":50,"max_burden_increase_minutes":1}
+}`)
+	trustOut := filepath.Join(t.TempDir(), "trust")
+	if err := run([]string{"feedback", "trust-regression", "--spec", filepath.Join(root, "trust-regression.json"), "--out", trustOut, "--json"}); err != nil {
+		t.Fatalf("trust regression failed: %v", err)
+	}
+	var trust feedback.TrustRegressionReport
+	readMainTestJSON(t, filepath.Join(trustOut, "trust-regression.json"), &trust)
+	if !trust.OK || trust.Summary.FailedChecks != 0 {
+		t.Fatalf("unexpected trust regression: %#v", trust)
+	}
+
+	writeMainTestFile(t, root, "methodology.json", `{
+  "version": "patchline.live-learning-methodology/v1",
+  "claim": "The public methodology report demonstrates that live learning improves recall while avoiding increased reviewer over-reliance by linking every reported result to gate-backed evidence.",
+  "experiments": [
+    {"name":"shadow-detectors","population":"public-slices","baseline_recall_bp":7100,"live_learning_recall_bp":7900,"baseline_overreliance_bp":1300,"live_learning_overreliance_bp":1200,"baseline_burden_minutes":12,"live_learning_burden_minutes":11,"evidence":["safe-online-evaluation-gate","live-calibration-monitor-gate"]}
+  ],
+  "gate_evidence": [
+    {"gate":"safe-online-evaluation-gate","report_hash":"hash-online","reproduction_command":"make safe-online-evaluation-gate"},
+    {"gate":"live-calibration-monitor-gate","report_hash":"hash-calibration","reproduction_command":"make live-calibration-monitor-gate"}
+  ]
+}`)
+	methodologyOut := filepath.Join(t.TempDir(), "methodology")
+	if err := run([]string{"feedback", "methodology-report", "--spec", filepath.Join(root, "methodology.json"), "--out", methodologyOut, "--json"}); err != nil {
+		t.Fatalf("methodology report failed: %v", err)
+	}
+	var methodology feedback.MethodologyReport
+	readMainTestJSON(t, filepath.Join(methodologyOut, "live-learning-methodology.json"), &methodology)
+	if !methodology.OK || methodology.Summary.RecallImproved != 1 || methodology.Summary.OverrelianceNotIncreased != 1 {
+		t.Fatalf("unexpected methodology report: %#v", methodology)
+	}
+}
+
 func TestSecurityReviewBlocksProtectedSurfaceWithoutRequiredGates(t *testing.T) {
 	report := buildSecurityReviewReport(
 		[]string{"internal/evidence/adapter.go", "internal/project/propose.go", "internal/archive/archive.go", "internal/dbdryrun/dryrun.go"},

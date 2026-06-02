@@ -1,0 +1,55 @@
+{
+  "version": "patchline.adopter-active-learning/v1",
+  "claim": "Patchline can build an adopter-local active-learning queue whose individual examples and local case identifiers never need to leave the organization. Only source-free aggregate uncertainty and information-gain metrics are written as a shareable artifact for calibration and methodology reports.",
+  "min_uncertainty_bp": 2500,
+  "min_information_gain_bp": 3000,
+  "max_queue_size": 3,
+  "cases": [
+    {
+      "local_case_id": "case-001",
+      "detector": "sql.destructive-ddl",
+      "release": "v1.0.0",
+      "confidence_bp": 5100,
+      "uncertainty_bp": 4900,
+      "expected_information_gain_bp": 8100,
+      "estimated_burden_minutes": 8
+    },
+    {
+      "local_case_id": "case-002",
+      "detector": "orm.write-breadth",
+      "release": "v1.0.0",
+      "confidence_bp": 5400,
+      "uncertainty_bp": 4600,
+      "expected_information_gain_bp": 7600,
+      "estimated_burden_minutes": 6
+    },
+    {
+      "local_case_id": "case-003",
+      "detector": "migration.guard",
+      "release": "v1.0.0",
+      "confidence_bp": 5700,
+      "uncertainty_bp": 4300,
+      "expected_information_gain_bp": 6900,
+      "estimated_burden_minutes": 7
+    },
+    {
+      "local_case_id": "case-004",
+      "detector": "migration.guard",
+      "release": "v1.0.0",
+      "confidence_bp": 9000,
+      "uncertainty_bp": 1000,
+      "expected_information_gain_bp": 1800,
+      "estimated_burden_minutes": 4
+    },
+    {
+      "local_case_id": "case-005",
+      "detector": "sql.destructive-ddl",
+      "release": "v1.0.0",
+      "confidence_bp": 5000,
+      "uncertainty_bp": 5000,
+      "expected_information_gain_bp": 9000,
+      "estimated_burden_minutes": 9,
+      "already_labeled": true
+    }
+  ]
+}

@@ -1,0 +1,51 @@
+{
+  "version": "patchline.live-learning-methodology/v1",
+  "claim": "Patchline can publish a live-learning methodology report that shows aggregate feedback improves recall without increasing reviewer over-reliance. Each result links to gate-backed evidence from shadow evaluation, calibration monitoring, local active learning, and trust regression.",
+  "experiments": [
+    {
+      "name": "shadow-detectors",
+      "population": "public-slices",
+      "baseline_recall_bp": 7100,
+      "live_learning_recall_bp": 7900,
+      "baseline_overreliance_bp": 1300,
+      "live_learning_overreliance_bp": 1200,
+      "baseline_burden_minutes": 12,
+      "live_learning_burden_minutes": 11,
+      "evidence": [
+        "safe-online-evaluation-gate",
+        "live-calibration-monitor-gate"
+      ]
+    },
+    {
+      "name": "local-queue",
+      "population": "adopter-aggregates",
+      "baseline_recall_bp": 6900,
+      "live_learning_recall_bp": 7600,
+      "baseline_overreliance_bp": 1400,
+      "live_learning_overreliance_bp": 1300,
+      "baseline_burden_minutes": 10,
+      "live_learning_burden_minutes": 9,
+      "evidence": [
+        "adopter-active-learning-gate",
+        "human-trust-regression-gate"
+      ]
+    }
+  ],
+  "gate_evidence": [
+    {
+      "gate": "safe-online-evaluation-gate",
+      "report_hash": "hash-online",
+      "reproduction_command": "make safe-online-evaluation-gate"
+    },
+    {
+      "gate": "live-calibration-monitor-gate",
+      "report_hash": "hash-calibration",
+      "reproduction_command": "make live-calibration-monitor-gate"
+    },
+    {
+      "gate": "human-trust-regression-gate",
+      "report_hash": "hash-trust",
+      "reproduction_command": "make human-trust-regression-gate"
+    }
+  ]
+}
