@@ -1,0 +1,32 @@
+{
+  "version": "patchline.paired-statistical-tests/v1",
+  "method": "exact two-sided paired sign test",
+  "minimum_public_slices": 4,
+  "comparisons": [
+    {
+      "id": "grep-only",
+      "metric": "ranked risk coverage",
+      "alternative": "Patchline ranks more evidence-backed risks than grep-only broad-match counts."
+    },
+    {
+      "id": "sql-only",
+      "metric": "ranked risk coverage",
+      "alternative": "Patchline ranks more repo-native risks than SQL-only risk extraction."
+    },
+    {
+      "id": "identifier-only",
+      "metric": "evidence link coverage",
+      "alternative": "Patchline is paired against identifier-only linking to quantify evidence-link deltas, including ties."
+    },
+    {
+      "id": "temporal-only",
+      "metric": "evidence link coverage",
+      "alternative": "Patchline links more evidence than temporal-only linking without identifiers."
+    },
+    {
+      "id": "no-facts-generation",
+      "metric": "fact-grounded generation distinction",
+      "alternative": "Patchline fact-grounded generation produces distinct audited prompts and outputs versus no-facts generation."
+    }
+  ]
+}

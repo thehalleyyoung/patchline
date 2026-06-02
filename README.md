@@ -160,6 +160,7 @@ make corpus-release-gate
 make research-question-gate
 make research-experiment-driver-gate
 make bootstrap-confidence-gate
+make paired-statistical-tests-gate
 ```
 
 The demo downloads real GitHub project subpaths and writes:
@@ -239,6 +240,8 @@ The real-repo slice matrix is backed by `examples/real-repo-slices.json` and `ex
 `make research-experiment-driver-gate` runs the research-question experiment driver from a detached clean checkout and writes immutable hashed result ledgers.
 
 `make bootstrap-confidence-gate` computes deterministic bootstrap confidence intervals for ranking, linking, generated-check, runtime, and review-burden metrics across the four pinned public slices.
+
+`make paired-statistical-tests-gate` regenerates the four-slice matrix and runs exact paired sign tests for Patchline versus grep-only, SQL-only, identifier-only, temporal-only, and no-facts-generation baselines.
 
 Current default projects:
 
