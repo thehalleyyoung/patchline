@@ -181,6 +181,8 @@ Run `make roadmap-board-gate` to regenerate the public roadmap board where every
 
 Run `make reproducibility-report-gate` to regenerate monthly reproducibility reports that rerun public gates and publish cache status, failures, fixes, and benchmark trends; see [docs/reproducibility-reports.md](docs/reproducibility-reports.md).
 
+Run `make contributor-recognition-gate` to regenerate contributor recognition for new real-repo slices, ecosystem parsers, false-positive reductions, and artifact improvements from public proof gates; see [docs/contributor-recognition.md](docs/contributor-recognition.md).
+
 Add `--redact` to write `analysis-bundle/` copies with stable redaction tokens for identifiers, literals, customer-like strings, and secret-like values while preserving joins and existing artifact hashes.
 
 Add `--ci` to write `ci/summary.md` plus upload snippets and code-quality artifacts for GitHub Actions, GitLab CI, and Bitbucket Pipelines: SARIF under `analysis-bundle/summary.sarif`, GitLab `ci/gl-code-quality-report.json`, and Bitbucket `ci/bitbucket-code-insights.json`.

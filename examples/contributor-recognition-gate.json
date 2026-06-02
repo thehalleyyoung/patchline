@@ -1,0 +1,82 @@
+{
+  "version": "patchline.contributor-recognition-gate/v1",
+  "claim": "Patchline recognizes contributors for new real-repo slices, ecosystem parser coverage, false-positive reductions, and artifact improvements using regenerated public-code proof instead of manually curated praise.",
+  "minimum_contributors": 6,
+  "minimum_categories": 4,
+  "required_categories": [
+    "new-real-repo-slices",
+    "ecosystem-parsers",
+    "false-positive-reductions",
+    "artifact-improvements"
+  ],
+  "proof_gates": [
+    {
+      "id": "awesome-patchline",
+      "script": "scripts/awesome-patchline-gate.sh",
+      "spec": "examples/awesome-patchline-gate.json",
+      "summary": "gate-summary.json"
+    },
+    {
+      "id": "rejected-generated",
+      "script": "scripts/rejected-generated-gate.sh",
+      "spec": "examples/rejected-generated-gate.json",
+      "summary": "summary.json"
+    },
+    {
+      "id": "reviewability-examples",
+      "script": "scripts/reviewability-examples-gate.sh",
+      "spec": "examples/reviewability-examples-gate.json",
+      "summary": "summary.json"
+    }
+  ],
+  "contributors": [
+    {
+      "id": "community-rails-maintainer",
+      "display": "Community Rails maintainer",
+      "category": "new-real-repo-slices",
+      "proof_gate": "awesome-patchline",
+      "badge": "Real-repo slice steward",
+      "recognition": "Added pinned Rails migration slices that make first-run analysis reproducible."
+    },
+    {
+      "id": "community-observability-engineer",
+      "display": "Community observability engineer",
+      "category": "new-real-repo-slices",
+      "proof_gate": "awesome-patchline",
+      "badge": "Observability slice steward",
+      "recognition": "Added Grafana-style SQL migration evidence for observability-adjacent reviewers."
+    },
+    {
+      "id": "community-node-maintainer",
+      "display": "Community Node maintainer",
+      "category": "ecosystem-parsers",
+      "proof_gate": "awesome-patchline",
+      "badge": "Node/Prisma parser coverage",
+      "recognition": "Expanded ecosystem coverage with a production Prisma migration slice."
+    },
+    {
+      "id": "community-python-maintainer",
+      "display": "Community Python maintainer",
+      "category": "ecosystem-parsers",
+      "proof_gate": "awesome-patchline",
+      "badge": "Python migration parser coverage",
+      "recognition": "Expanded Django and Alembic public-code parser coverage."
+    },
+    {
+      "id": "review-signal-maintainer",
+      "display": "Review signal maintainer",
+      "category": "false-positive-reductions",
+      "proof_gate": "rejected-generated",
+      "badge": "False-positive reducer",
+      "recognition": "Improved review signal by proving plausible generated repairs are rejected when deterministic checks find high-risk SQL."
+    },
+    {
+      "id": "artifact-review-maintainer",
+      "display": "Artifact review maintainer",
+      "category": "artifact-improvements",
+      "proof_gate": "reviewability-examples",
+      "badge": "Artifact review improver",
+      "recognition": "Improved review artifacts with tests and guards that preserve proof holes without claiming full repair."
+    }
+  ]
+}
