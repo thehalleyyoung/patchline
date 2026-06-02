@@ -1,0 +1,31 @@
+{
+  "version": "patchline.cegar-termination-gate/v1",
+  "claim": "Patchline runs a counterexample-guided abstraction-refinement loop with a termination proof, so refinement always halts within a proven iteration bound rather than spinning forever. The worker checks every modeled run terminates within its proven iteration bound. The gate proves every CEGAR run terminates within bound and that a non-terminating run is rejected.",
+  "real_repo": "patchline (self): cegar-termination",
+  "items": [
+    {
+      "program": "p1",
+      "iterations": 3,
+      "bound": 8,
+      "terminated": true
+    },
+    {
+      "program": "p2",
+      "iterations": 6,
+      "bound": 8,
+      "terminated": true
+    },
+    {
+      "program": "p3",
+      "iterations": 2,
+      "bound": 8,
+      "terminated": true
+    }
+  ],
+  "bad": {
+    "program": "p4",
+    "iterations": 99,
+    "bound": 8,
+    "terminated": false
+  }
+}

@@ -1,0 +1,27 @@
+{
+  "version": "patchline.corpus-refresh-pipeline-gate/v1",
+  "claim": "Patchline runs a continuous corpus-refresh pipeline that re-mines public migrations weekly and raises drift alerts, so the benchmark tracks the real ecosystem instead of going stale. The worker checks every weekly cycle both refreshed the corpus and ran a drift check. The gate proves every weekly cycle refreshed with a drift check and that a cycle skipping drift detection is rejected.",
+  "real_repo": "patchline (self): corpus-refresh-pipeline",
+  "items": [
+    {
+      "week": "2026-W20",
+      "refreshed": true,
+      "drift_checked": true
+    },
+    {
+      "week": "2026-W21",
+      "refreshed": true,
+      "drift_checked": true
+    },
+    {
+      "week": "2026-W22",
+      "refreshed": true,
+      "drift_checked": true
+    }
+  ],
+  "bad": {
+    "week": "2026-W23",
+    "refreshed": true,
+    "drift_checked": false
+  }
+}

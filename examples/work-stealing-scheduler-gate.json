@@ -1,0 +1,27 @@
+{
+  "version": "patchline.work-stealing-scheduler-gate/v1",
+  "claim": "Patchline schedules corpus analysis with a distributed work-stealing scheduler carrying no-lost-task and no-duplicate guarantees, so every migration is analyzed exactly once even as workers join and fail. The worker checks every task was assigned exactly once and never lost. The gate proves every task runs exactly once and that a lost or duplicated task is rejected.",
+  "real_repo": "patchline (self): work-stealing-scheduler",
+  "items": [
+    {
+      "id": "t1",
+      "assigned_once": true,
+      "lost": false
+    },
+    {
+      "id": "t2",
+      "assigned_once": true,
+      "lost": false
+    },
+    {
+      "id": "t3",
+      "assigned_once": true,
+      "lost": false
+    }
+  ],
+  "bad": {
+    "id": "t4",
+    "assigned_once": false,
+    "lost": true
+  }
+}

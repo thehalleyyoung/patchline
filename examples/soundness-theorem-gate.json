@@ -1,0 +1,27 @@
+{
+  "version": "patchline.soundness-theorem-gate/v1",
+  "claim": "Patchline carries a soundness theorem proving that every 'safe' verdict implies the absence of the modeled hazard class, so a green light is a logical guarantee over the model rather than a heuristic. The worker checks every modeled hazard class has a soundness lemma with a checked proof. The gate proves every hazard class is covered by a sound, proof-backed lemma and that a class asserted safe without a proof is rejected.",
+  "real_repo": "patchline (self): soundness-theorem",
+  "items": [
+    {
+      "hazard": "not-null-without-default",
+      "safe_implies_absent": true,
+      "proof": "lemma_nn.v"
+    },
+    {
+      "hazard": "destructive-drop",
+      "safe_implies_absent": true,
+      "proof": "lemma_drop.v"
+    },
+    {
+      "hazard": "unindexed-fk",
+      "safe_implies_absent": true,
+      "proof": "lemma_fk.v"
+    }
+  ],
+  "bad": {
+    "hazard": "lock-escalation",
+    "safe_implies_absent": true,
+    "proof": ""
+  }
+}

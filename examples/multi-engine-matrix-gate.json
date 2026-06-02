@@ -1,0 +1,32 @@
+{
+  "version": "patchline.multi-engine-matrix-gate/v1",
+  "claim": "Patchline carries a multi-database-engine matrix covering Postgres, MySQL, SQLite, and SQL Server with per-engine semantics, so a migration safe on one engine is not assumed safe on another. The worker checks every engine has defined semantics and at least one differentiating case. The gate proves every engine has per-engine semantics with cases and that an engine with undefined semantics is rejected.",
+  "real_repo": "patchline (self): multi-engine-matrix",
+  "items": [
+    {
+      "engine": "postgres",
+      "semantics_defined": true,
+      "cases": 7
+    },
+    {
+      "engine": "mysql",
+      "semantics_defined": true,
+      "cases": 6
+    },
+    {
+      "engine": "sqlite",
+      "semantics_defined": true,
+      "cases": 4
+    },
+    {
+      "engine": "sqlserver",
+      "semantics_defined": true,
+      "cases": 5
+    }
+  ],
+  "bad": {
+    "engine": "toydb",
+    "semantics_defined": false,
+    "cases": 0
+  }
+}

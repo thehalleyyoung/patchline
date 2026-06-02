@@ -1,0 +1,23 @@
+{
+  "version": "patchline.cutover-protocol-model-gate/v1",
+  "claim": "Patchline carries a formal model of the backfill/cutover protocol with a proven safety invariant, so the multi-step rollout cannot reach a state where readers see partial data. The worker checks every reachable protocol state preserves the safety invariant. The gate proves the invariant holds in every modeled state and that an invariant-violating state is rejected.",
+  "real_repo": "patchline (self): cutover-protocol-model",
+  "items": [
+    {
+      "state": "dual-write-on",
+      "invariant_holds": true
+    },
+    {
+      "state": "backfill-complete",
+      "invariant_holds": true
+    },
+    {
+      "state": "cutover-done",
+      "invariant_holds": true
+    }
+  ],
+  "bad": {
+    "state": "read-new-before-backfill",
+    "invariant_holds": false
+  }
+}

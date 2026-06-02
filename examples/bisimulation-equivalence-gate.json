@@ -1,0 +1,27 @@
+{
+  "version": "patchline.bisimulation-equivalence-gate/v1",
+  "claim": "Patchline establishes a bisimulation argument that the analyzer and the reference semantics agree on every DSL program, so the fast analyzer provably mirrors the trusted model. The worker checks the analyzer verdict equals the reference verdict on every program in the suite. The gate proves analyzer and reference agree on every program and that a seeded divergence is detected.",
+  "real_repo": "patchline (self): bisimulation-equivalence",
+  "items": [
+    {
+      "program": "add_then_backfill",
+      "analyzer": "safe",
+      "reference": "safe"
+    },
+    {
+      "program": "drop_used_column",
+      "analyzer": "hazard",
+      "reference": "hazard"
+    },
+    {
+      "program": "nn_no_default",
+      "analyzer": "hazard",
+      "reference": "hazard"
+    }
+  ],
+  "bad": {
+    "program": "seeded_divergence",
+    "analyzer": "safe",
+    "reference": "hazard"
+  }
+}

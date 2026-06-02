@@ -1,0 +1,27 @@
+{
+  "version": "patchline.decision-procedure-complexity-gate/v1",
+  "claim": "Patchline documents the decision procedure's complexity bound and confirms it empirically, so the analyzer's scaling is a measured fact and not an aspiration. The worker checks that for each input size the measured runtime stays within the predicted bound. The gate proves measured runtime honors the predicted complexity bound at every size and that a super-bound regression is rejected.",
+  "real_repo": "patchline (self): decision-procedure-complexity",
+  "items": [
+    {
+      "n": 10,
+      "predicted_ms": 20,
+      "measured_ms": 11
+    },
+    {
+      "n": 100,
+      "predicted_ms": 200,
+      "measured_ms": 140
+    },
+    {
+      "n": 1000,
+      "predicted_ms": 2000,
+      "measured_ms": 1700
+    }
+  ],
+  "bad": {
+    "n": 1000,
+    "predicted_ms": 2000,
+    "measured_ms": 9000
+  }
+}

@@ -1,0 +1,31 @@
+{
+  "version": "patchline.prevalence-estimator-gate/v1",
+  "claim": "Patchline includes a sampling-theory-backed estimator for corpus-wide hazard prevalence with confidence bounds, so a prevalence claim comes with an interval rather than a bare point. The worker checks every stratum estimate lies within its reported confidence interval. The gate proves every estimate is inside its confidence bounds and that an estimate outside its interval is rejected.",
+  "real_repo": "patchline (self): prevalence-estimator",
+  "items": [
+    {
+      "stratum": "django",
+      "estimate": 0.18,
+      "ci_low": 0.14,
+      "ci_high": 0.22
+    },
+    {
+      "stratum": "rails",
+      "estimate": 0.21,
+      "ci_low": 0.16,
+      "ci_high": 0.27
+    },
+    {
+      "stratum": "alembic",
+      "estimate": 0.12,
+      "ci_low": 0.09,
+      "ci_high": 0.16
+    }
+  ],
+  "bad": {
+    "stratum": "bogus",
+    "estimate": 0.9,
+    "ci_low": 0.1,
+    "ci_high": 0.2
+  }
+}

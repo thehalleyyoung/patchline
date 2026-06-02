@@ -1,0 +1,31 @@
+{
+  "version": "patchline.hardware-cost-model-gate/v1",
+  "claim": "Patchline reports a hardware-cost model giving analysis throughput per dollar across machine classes, so adopters can pick the cheapest machine that meets their throughput need. The worker checks every machine class reports positive throughput, cost, and a derived per-dollar figure. The gate proves every machine class has a valid throughput-per-dollar number and that a zero-throughput class is rejected.",
+  "real_repo": "patchline (self): hardware-cost-model",
+  "items": [
+    {
+      "class": "t3.medium",
+      "throughput": 120,
+      "dollars": 0.04,
+      "per_dollar": 3000
+    },
+    {
+      "class": "c6i.large",
+      "throughput": 260,
+      "dollars": 0.085,
+      "per_dollar": 3058
+    },
+    {
+      "class": "m6g.xlarge",
+      "throughput": 410,
+      "dollars": 0.154,
+      "per_dollar": 2662
+    }
+  ],
+  "bad": {
+    "class": "broken",
+    "throughput": 0,
+    "dollars": 1,
+    "per_dollar": 0
+  }
+}

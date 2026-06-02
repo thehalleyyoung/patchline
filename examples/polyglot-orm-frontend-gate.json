@@ -1,0 +1,52 @@
+{
+  "version": "patchline.polyglot-orm-frontend-gate/v1",
+  "claim": "Patchline provides a polyglot ORM front-end covering at least eight frameworks that all lower into one shared core semantics, so adding a framework does not fork the analysis logic. The worker checks every framework has an extractor that targets the shared core. The gate proves all eight-plus frameworks share one core and that a framework with no extractor is rejected.",
+  "real_repo": "patchline (self): polyglot-orm-frontend",
+  "items": [
+    {
+      "framework": "django",
+      "extractor": "django.py",
+      "shared_core": true
+    },
+    {
+      "framework": "alembic",
+      "extractor": "alembic.py",
+      "shared_core": true
+    },
+    {
+      "framework": "rails",
+      "extractor": "rails.rb",
+      "shared_core": true
+    },
+    {
+      "framework": "prisma",
+      "extractor": "prisma.ts",
+      "shared_core": true
+    },
+    {
+      "framework": "sequelize",
+      "extractor": "sequelize.js",
+      "shared_core": true
+    },
+    {
+      "framework": "gorm",
+      "extractor": "gorm.go",
+      "shared_core": true
+    },
+    {
+      "framework": "ecto",
+      "extractor": "ecto.ex",
+      "shared_core": true
+    },
+    {
+      "framework": "flyway",
+      "extractor": "flyway.sql",
+      "shared_core": true
+    }
+  ],
+  "bad": {
+    "framework": "homegrown",
+    "extractor": "",
+    "shared_core": false
+  }
+}

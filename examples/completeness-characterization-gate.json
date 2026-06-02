@@ -1,0 +1,27 @@
+{
+  "version": "patchline.completeness-characterization-gate/v1",
+  "claim": "Patchline publishes a completeness characterization stating exactly which hazards are provably caught versus best-effort, so users know the guarantee's boundary precisely instead of assuming total coverage. The worker checks every hazard has an explicit provable-or-best-effort status and a justification. The gate proves every hazard is characterized with a justified status and that an uncharacterized hazard is rejected.",
+  "real_repo": "patchline (self): completeness-characterization",
+  "items": [
+    {
+      "hazard": "not-null-without-default",
+      "status": "provable",
+      "why": "static rule"
+    },
+    {
+      "hazard": "long-lock",
+      "status": "best-effort",
+      "why": "runtime-dependent"
+    },
+    {
+      "hazard": "data-loss-drop",
+      "status": "provable",
+      "why": "syntactic"
+    }
+  ],
+  "bad": {
+    "hazard": "semantic-drift",
+    "status": "",
+    "why": ""
+  }
+}

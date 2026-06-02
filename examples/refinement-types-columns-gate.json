@@ -1,0 +1,27 @@
+{
+  "version": "patchline.refinement-types-columns-gate/v1",
+  "claim": "Patchline encodes column invariants as refinement types checked against extracted fixtures, so an invariant like 'amount must be non-negative' is enforced by the type system rather than convention. The worker checks every column has a refinement predicate that is checked against fixtures. The gate proves every column invariant is encoded and fixture-checked and that an unchecked refinement is rejected.",
+  "real_repo": "patchline (self): refinement-types-columns",
+  "items": [
+    {
+      "column": "amount",
+      "refinement": "v >= 0",
+      "checked": true
+    },
+    {
+      "column": "email",
+      "refinement": "v ~ /@/",
+      "checked": true
+    },
+    {
+      "column": "status",
+      "refinement": "v in {active,closed}",
+      "checked": true
+    }
+  ],
+  "bad": {
+    "column": "legacy_flag",
+    "refinement": "v != null",
+    "checked": false
+  }
+}

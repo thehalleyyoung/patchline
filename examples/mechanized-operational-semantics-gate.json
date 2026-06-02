@@ -1,0 +1,27 @@
+{
+  "version": "patchline.mechanized-operational-semantics-gate/v1",
+  "claim": "Patchline pins a mechanized operational semantics for its migration DSL, where every reduction rule carries a checked-in machine proof so the language's meaning is fixed rather than folklore. The worker checks every DSL rule has a non-empty statement and a checked proof. The gate proves every reduction rule is mechanized and proof-checked and that a rule shipped without a checked proof is rejected.",
+  "real_repo": "patchline (self): mechanized-operational-semantics",
+  "items": [
+    {
+      "op": "add_column",
+      "rule": "sigma -> sigma[c:=null]",
+      "proof_checked": true
+    },
+    {
+      "op": "drop_column",
+      "rule": "sigma -> sigma\\c",
+      "proof_checked": true
+    },
+    {
+      "op": "backfill",
+      "rule": "sigma -> sigma[c:=f(r)]",
+      "proof_checked": true
+    }
+  ],
+  "bad": {
+    "op": "rename_column",
+    "rule": "",
+    "proof_checked": false
+  }
+}

@@ -1,0 +1,23 @@
+{
+  "version": "patchline.git-history-streaming-gate/v1",
+  "claim": "Patchline offers a streaming-from-git-history mode that analyzes every historical migration in a repository, so a team can retroactively audit which past migrations would have been flagged. The worker checks every migration-bearing commit in the history was analyzed. The gate proves every historical migration is analyzed and that a skipped migration commit is rejected.",
+  "real_repo": "patchline (self): git-history-streaming",
+  "items": [
+    {
+      "sha": "a1b2",
+      "migration_analyzed": true
+    },
+    {
+      "sha": "c3d4",
+      "migration_analyzed": true
+    },
+    {
+      "sha": "e5f6",
+      "migration_analyzed": true
+    }
+  ],
+  "bad": {
+    "sha": "dead",
+    "migration_analyzed": false
+  }
+}

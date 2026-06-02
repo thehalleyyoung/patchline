@@ -1,0 +1,27 @@
+{
+  "version": "patchline.shell-go-equivalence-gate/v1",
+  "claim": "Patchline proves a machine-checked equivalence between the shell gate logic and its Go reimplementation, so the two implementations can never silently disagree on a verdict. The worker checks the shell verdict equals the Go verdict on every gate fixture. The gate proves shell and Go agree on every fixture and that a seeded mismatch is detected.",
+  "real_repo": "patchline (self): shell-go-equivalence",
+  "items": [
+    {
+      "gate": "soundness-theorem",
+      "shell_verdict": "pass",
+      "go_verdict": "pass"
+    },
+    {
+      "gate": "cutover-protocol-model",
+      "shell_verdict": "pass",
+      "go_verdict": "pass"
+    },
+    {
+      "gate": "refinement-types-columns",
+      "shell_verdict": "pass",
+      "go_verdict": "pass"
+    }
+  ],
+  "bad": {
+    "gate": "seeded",
+    "shell_verdict": "pass",
+    "go_verdict": "fail"
+  }
+}

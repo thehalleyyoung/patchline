@@ -1,0 +1,27 @@
+{
+  "version": "patchline.certificate-composition-gate/v1",
+  "claim": "Patchline proves its gate certificates compose without contradiction, so stacking many independent gates never yields a self-contradictory overall verdict. The worker checks every pair of co-fired certificates is mutually consistent. The gate proves all certificate pairs compose consistently and that a contradictory pair is rejected.",
+  "real_repo": "patchline (self): certificate-composition",
+  "items": [
+    {
+      "a": "soundness-theorem",
+      "b": "completeness-characterization",
+      "consistent": true
+    },
+    {
+      "a": "refinement-types-columns",
+      "b": "bisimulation-equivalence",
+      "consistent": true
+    },
+    {
+      "a": "decision-procedure-complexity",
+      "b": "certificate-composition",
+      "consistent": true
+    }
+  ],
+  "bad": {
+    "a": "safe-if-X",
+    "b": "hazard-if-X",
+    "consistent": false
+  }
+}

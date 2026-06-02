@@ -1,0 +1,31 @@
+{
+  "version": "patchline.million-migration-harness-gate/v1",
+  "claim": "Patchline ships a million-migration corpus harness with sharded, resumable analysis under an explicit cost budget, so an ecosystem-scale run is checkpointed and never exceeds its compute allowance. The worker checks every shard is resumable and finishes within its cost budget. The gate proves every shard is resumable and on-budget and that an over-budget shard is rejected.",
+  "real_repo": "patchline (self): million-migration-harness",
+  "items": [
+    {
+      "shard": 0,
+      "resumable": true,
+      "cost_units": 80,
+      "budget": 100
+    },
+    {
+      "shard": 1,
+      "resumable": true,
+      "cost_units": 95,
+      "budget": 100
+    },
+    {
+      "shard": 2,
+      "resumable": true,
+      "cost_units": 60,
+      "budget": 100
+    }
+  ],
+  "bad": {
+    "shard": 3,
+    "resumable": false,
+    "cost_units": 400,
+    "budget": 100
+  }
+}

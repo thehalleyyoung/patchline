@@ -1,0 +1,31 @@
+{
+  "version": "patchline.cross-repo-dependency-analysis-gate/v1",
+  "claim": "Patchline performs cross-repository dependency analysis that detects hazards spanning multiple services, so a column dropped in one repo that another service still reads is caught before deploy. The worker checks every cross-service dependency edge that fires a hazard carries concrete evidence. The gate proves every detected cross-repo hazard is evidence-backed and that an evidence-free detection is rejected.",
+  "real_repo": "patchline (self): cross-repo-dependency-analysis",
+  "items": [
+    {
+      "from": "billing",
+      "to": "reporting",
+      "hazard": "dropped-column-read",
+      "evidence": "reporting/q.sql:12"
+    },
+    {
+      "from": "auth",
+      "to": "audit",
+      "hazard": "renamed-fk",
+      "evidence": "audit/models.py:44"
+    },
+    {
+      "from": "orders",
+      "to": "search",
+      "hazard": "type-narrowing",
+      "evidence": "search/index.go:9"
+    }
+  ],
+  "bad": {
+    "from": "x",
+    "to": "y",
+    "hazard": "phantom",
+    "evidence": ""
+  }
+}

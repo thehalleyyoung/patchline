@@ -1,0 +1,27 @@
+{
+  "version": "patchline.incremental-hazard-index-gate/v1",
+  "claim": "Patchline maintains an incremental index over the corpus that answers hazard queries in sub-second time at scale, so investigating a hazard pattern across a million migrations is interactive rather than a batch job. The worker checks every benchmark query returns within the sub-second budget. The gate proves every query is sub-second and that an over-budget query is rejected.",
+  "real_repo": "patchline (self): incremental-hazard-index",
+  "items": [
+    {
+      "q": "not-null-without-default",
+      "ms": 120,
+      "budget_ms": 1000
+    },
+    {
+      "q": "destructive-drop",
+      "ms": 340,
+      "budget_ms": 1000
+    },
+    {
+      "q": "unindexed-fk",
+      "ms": 210,
+      "budget_ms": 1000
+    }
+  ],
+  "bad": {
+    "q": "full-scan",
+    "ms": 42000,
+    "budget_ms": 1000
+  }
+}
