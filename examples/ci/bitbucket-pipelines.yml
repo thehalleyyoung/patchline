@@ -1,0 +1,13 @@
+pipelines:
+  pull-requests:
+    "**":
+      - step:
+          name: Patchline data-risk analysis
+          image: golang:1.24
+          script:
+            - go run github.com/thehalleyyoung/patchline/cmd/patchline@main repo analyze . --stages inventory,baseline --ci --out results/patchline
+          artifacts:
+            - results/patchline/analysis-bundle/**
+            - results/patchline/ci/summary.md
+            - results/patchline/analysis-bundle/summary.sarif
+            - results/patchline/ci/bitbucket-code-insights.json

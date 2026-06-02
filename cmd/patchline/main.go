@@ -584,13 +584,53 @@ type repoAnalyzeSummary struct {
 }
 
 type repoAnalyzeCIArtifacts struct {
-	SummaryPath       string `json:"summary_path,omitempty"`
-	SARIFPath         string `json:"sarif_path,omitempty"`
-	BundlePath        string `json:"bundle_path,omitempty"`
-	ActionsSnippet    string `json:"actions_snippet,omitempty"`
-	ArtifactName      string `json:"artifact_name,omitempty"`
-	CodeScanningTool  string `json:"code_scanning_tool,omitempty"`
-	GitHubStepSummary bool   `json:"github_step_summary"`
+	SummaryPath           string `json:"summary_path,omitempty"`
+	SARIFPath             string `json:"sarif_path,omitempty"`
+	GitLabCodeQualityPath string `json:"gitlab_code_quality_path,omitempty"`
+	BitbucketInsightsPath string `json:"bitbucket_insights_path,omitempty"`
+	BundlePath            string `json:"bundle_path,omitempty"`
+	ActionsSnippet        string `json:"actions_snippet,omitempty"`
+	GitLabSnippet         string `json:"gitlab_snippet,omitempty"`
+	BitbucketSnippet      string `json:"bitbucket_snippet,omitempty"`
+	ArtifactName          string `json:"artifact_name,omitempty"`
+	CodeScanningTool      string `json:"code_scanning_tool,omitempty"`
+	GitHubStepSummary     bool   `json:"github_step_summary"`
+}
+
+type gitlabCodeQualityIssue struct {
+	Description string                    `json:"description"`
+	CheckName   string                    `json:"check_name"`
+	Fingerprint string                    `json:"fingerprint"`
+	Severity    string                    `json:"severity"`
+	Location    gitlabCodeQualityLocation `json:"location"`
+}
+
+type gitlabCodeQualityLocation struct {
+	Path  string                 `json:"path"`
+	Lines gitlabCodeQualityLines `json:"lines"`
+}
+
+type gitlabCodeQualityLines struct {
+	Begin int `json:"begin"`
+}
+
+type bitbucketCodeInsightsReport struct {
+	Version     string                           `json:"version"`
+	Title       string                           `json:"title"`
+	Details     string                           `json:"details"`
+	Reporter    string                           `json:"reporter"`
+	Result      string                           `json:"result"`
+	Link        string                           `json:"link,omitempty"`
+	Annotations []bitbucketCodeInsightAnnotation `json:"annotations"`
+}
+
+type bitbucketCodeInsightAnnotation struct {
+	ExternalID string `json:"external_id"`
+	Title      string `json:"title"`
+	Summary    string `json:"summary"`
+	Severity   string `json:"severity"`
+	Path       string `json:"path"`
+	Line       int    `json:"line"`
 }
 
 type repoAnalyzeDeepSummary struct {
@@ -2123,12 +2163,20 @@ func writeRepoAnalyzeCIArtifacts(outDir string, report repoAnalyzeReport) (repoA
 		return repoAnalyzeCIArtifacts{}, err
 	}
 	artifacts := repoAnalyzeCIArtifacts{
-		SummaryPath:      filepath.Join(ciDir, "summary.md"),
-		SARIFPath:        filepath.Join(outDir, "analysis-bundle", "summary.sarif"),
-		BundlePath:       filepath.Join(outDir, "analysis-bundle"),
-		ActionsSnippet:   filepath.Join(ciDir, "github-actions-upload.yml"),
-		ArtifactName:     "patchline-analysis-bundle",
-		CodeScanningTool: "patchline",
+		SummaryPath:           filepath.Join(ciDir, "summary.md"),
+		SARIFPath:             filepath.Join(outDir, "analysis-bundle", "summary.sarif"),
+		GitLabCodeQualityPath: filepath.Join(ciDir, "gl-code-quality-report.json"),
+		BitbucketInsightsPath: filepath.Join(ciDir, "bitbucket-code-insights.json"),
+		BundlePath:            filepath.Join(outDir, "analysis-bundle"),
+		ActionsSnippet:        filepath.Join(ciDir, "github-actions-upload.yml"),
+		GitLabSnippet:         filepath.Join(ciDir, "gitlab-ci-snippet.yml"),
+		BitbucketSnippet:      filepath.Join(ciDir, "bitbucket-pipelines-snippet.yml"),
+		ArtifactName:          "patchline-analysis-bundle",
+		CodeScanningTool:      "patchline",
+	}
+	baseline, err := project.LoadBaseline(filepath.Join(outDir, "baseline"))
+	if err != nil {
+		return repoAnalyzeCIArtifacts{}, err
 	}
 	var summary strings.Builder
 	fmt.Fprintf(&summary, "# Patchline CI analysis\n\n")
@@ -2136,8 +2184,16 @@ func writeRepoAnalyzeCIArtifacts(outDir string, report repoAnalyzeReport) (repoA
 	fmt.Fprintf(&summary, "- generated files: %d\n", report.Summary.GeneratedFiles)
 	fmt.Fprintf(&summary, "- intervention loops: %d\n", report.Summary.InterventionLoops)
 	fmt.Fprintf(&summary, "- SARIF: `%s`\n", artifacts.SARIFPath)
+	fmt.Fprintf(&summary, "- GitLab Code Quality: `%s`\n", artifacts.GitLabCodeQualityPath)
+	fmt.Fprintf(&summary, "- Bitbucket Code Insights JSON: `%s`\n", artifacts.BitbucketInsightsPath)
 	fmt.Fprintf(&summary, "- bundle: `%s`\n", artifacts.BundlePath)
 	if err := os.WriteFile(artifacts.SummaryPath, []byte(summary.String()), 0o644); err != nil {
+		return repoAnalyzeCIArtifacts{}, err
+	}
+	if err := writeGitLabCodeQuality(artifacts.GitLabCodeQualityPath, baseline); err != nil {
+		return repoAnalyzeCIArtifacts{}, err
+	}
+	if err := writeBitbucketInsights(artifacts.BitbucketInsightsPath, baseline); err != nil {
 		return repoAnalyzeCIArtifacts{}, err
 	}
 	snippet := fmt.Sprintf(`- name: Upload Patchline SARIF
@@ -2151,6 +2207,35 @@ func writeRepoAnalyzeCIArtifacts(outDir string, report repoAnalyzeReport) (repoA
     path: %s
 `, artifacts.SARIFPath, artifacts.ArtifactName, artifacts.BundlePath)
 	if err := os.WriteFile(artifacts.ActionsSnippet, []byte(snippet), 0o644); err != nil {
+		return repoAnalyzeCIArtifacts{}, err
+	}
+	gitlabSnippet := fmt.Sprintf(`patchline:
+  image: golang:1.24
+  script:
+    - go run github.com/thehalleyyoung/patchline/cmd/patchline@main repo analyze . --stages inventory,baseline --ci --out results/patchline
+  artifacts:
+    when: always
+    paths:
+      - %s
+    reports:
+      codequality: %s
+`, artifacts.BundlePath, artifacts.GitLabCodeQualityPath)
+	if err := os.WriteFile(artifacts.GitLabSnippet, []byte(gitlabSnippet), 0o644); err != nil {
+		return repoAnalyzeCIArtifacts{}, err
+	}
+	bitbucketSnippet := fmt.Sprintf(`pipelines:
+  pull-requests:
+    "**":
+      - step:
+          name: Patchline data-risk analysis
+          image: golang:1.24
+          script:
+            - go run github.com/thehalleyyoung/patchline/cmd/patchline@main repo analyze . --stages inventory,baseline --ci --out results/patchline
+          artifacts:
+            - %s/**
+            - %s
+`, artifacts.BundlePath, artifacts.BitbucketInsightsPath)
+	if err := os.WriteFile(artifacts.BitbucketSnippet, []byte(bitbucketSnippet), 0o644); err != nil {
 		return repoAnalyzeCIArtifacts{}, err
 	}
 	if stepSummary := os.Getenv("GITHUB_STEP_SUMMARY"); stepSummary != "" {
@@ -2168,6 +2253,86 @@ func writeRepoAnalyzeCIArtifacts(outDir string, report repoAnalyzeReport) (repoA
 		artifacts.GitHubStepSummary = true
 	}
 	return artifacts, nil
+}
+
+func writeGitLabCodeQuality(path string, baseline project.BaselineReport) error {
+	issues := make([]gitlabCodeQualityIssue, 0, len(baseline.Risks))
+	for _, risk := range baseline.Risks {
+		issues = append(issues, gitlabCodeQualityIssue{
+			Description: fmt.Sprintf("%s data-risk score %d: %s", risk.Severity, risk.Score, risk.Rationale),
+			CheckName:   "patchline/" + firstNonEmpty(risk.Kind, "data-risk"),
+			Fingerprint: firstNonEmpty(risk.StableID, risk.ID, canonical.Hash(risk.Path+"\x00"+risk.Kind+"\x00"+risk.Table)),
+			Severity:    gitlabCodeQualitySeverity(risk.Severity),
+			Location: gitlabCodeQualityLocation{
+				Path: firstNonEmpty(risk.Path, "unknown"),
+				Lines: gitlabCodeQualityLines{
+					Begin: riskLine(risk),
+				},
+			},
+		})
+	}
+	data, err := json.MarshalIndent(issues, "", "  ")
+	if err != nil {
+		return err
+	}
+	return os.WriteFile(path, append(data, '\n'), 0o644)
+}
+
+func writeBitbucketInsights(path string, baseline project.BaselineReport) error {
+	report := bitbucketCodeInsightsReport{
+		Version:  "patchline.bitbucket-code-insights/v1",
+		Title:    "Patchline data-risk analysis",
+		Details:  fmt.Sprintf("%d ranked data-risk findings from Patchline baseline %s", len(baseline.Risks), baseline.Hash),
+		Reporter: "patchline",
+		Result:   "PASSED",
+	}
+	for _, risk := range baseline.Risks {
+		if risk.Severity == "high" {
+			report.Result = "FAILED"
+		}
+		report.Annotations = append(report.Annotations, bitbucketCodeInsightAnnotation{
+			ExternalID: firstNonEmpty(risk.StableID, risk.ID),
+			Title:      firstNonEmpty(risk.Kind, "data-risk"),
+			Summary:    fmt.Sprintf("%s risk score %d: %s", risk.Severity, risk.Score, risk.Rationale),
+			Severity:   bitbucketInsightSeverity(risk.Severity),
+			Path:       firstNonEmpty(risk.Path, "unknown"),
+			Line:       riskLine(risk),
+		})
+	}
+	data, err := json.MarshalIndent(report, "", "  ")
+	if err != nil {
+		return err
+	}
+	return os.WriteFile(path, append(data, '\n'), 0o644)
+}
+
+func riskLine(risk project.BaselineRisk) int {
+	if risk.Statement > 0 {
+		return risk.Statement
+	}
+	return 1
+}
+
+func gitlabCodeQualitySeverity(severity string) string {
+	switch severity {
+	case "high":
+		return "major"
+	case "medium":
+		return "minor"
+	default:
+		return "info"
+	}
+}
+
+func bitbucketInsightSeverity(severity string) string {
+	switch severity {
+	case "high":
+		return "HIGH"
+	case "medium":
+		return "MEDIUM"
+	default:
+		return "LOW"
+	}
 }
 
 func copyBundleFile(src, dst string, redact bool, redactor *bundleRedactor) error {

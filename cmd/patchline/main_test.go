@@ -191,6 +191,49 @@ func TestBuildPRCommentReportOnlyIncludesNewAndChangedRisks(t *testing.T) {
 	}
 }
 
+func TestWriteRepoAnalyzeCIArtifactsIncludesGitLabAndBitbucketOutputs(t *testing.T) {
+	out := t.TempDir()
+	baseline := project.BaselineReport{
+		Hash: "baseline-hash",
+		Risks: []project.BaselineRisk{{
+			ID:        "risk:1",
+			StableID:  "stable-risk:ci000000000000",
+			Path:      "db/migrate/001.sql",
+			Kind:      "sql",
+			Table:     "accounts",
+			Severity:  "high",
+			Score:     99,
+			Rationale: "broad account update",
+		}},
+	}
+	if err := project.WriteBaseline(filepath.Join(out, "baseline"), baseline); err != nil {
+		t.Fatal(err)
+	}
+	artifacts, err := writeRepoAnalyzeCIArtifacts(out, repoAnalyzeReport{Summary: repoAnalyzeSummary{RankedRisks: 1}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, path := range []string{artifacts.GitLabCodeQualityPath, artifacts.BitbucketInsightsPath, artifacts.GitLabSnippet, artifacts.BitbucketSnippet} {
+		if _, err := os.Stat(path); err != nil {
+			t.Fatal(err)
+		}
+	}
+	gitlabData, err := os.ReadFile(artifacts.GitLabCodeQualityPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(string(gitlabData), `"fingerprint": "stable-risk:ci000000000000"`) || !strings.Contains(string(gitlabData), `"severity": "major"`) {
+		t.Fatalf("unexpected GitLab code quality report:\n%s", string(gitlabData))
+	}
+	bitbucketData, err := os.ReadFile(artifacts.BitbucketInsightsPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(string(bitbucketData), `"result": "FAILED"`) || !strings.Contains(string(bitbucketData), `"severity": "HIGH"`) {
+		t.Fatalf("unexpected Bitbucket insights report:\n%s", string(bitbucketData))
+	}
+}
+
 func TestBuildChangesReportComparesAnalysisArtifacts(t *testing.T) {
 	root := t.TempDir()
 	previous := filepath.Join(root, "previous")

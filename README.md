@@ -65,7 +65,7 @@ Rerun `repo analyze --resume --out <same-dir>` to reuse existing fetch, inventor
 
 Add `--redact` to write `analysis-bundle/` copies with stable redaction tokens for identifiers, literals, customer-like strings, and secret-like values while preserving joins and existing artifact hashes.
 
-Add `--ci` to write `ci/summary.md` plus a GitHub Actions upload snippet for `github/codeql-action/upload-sarif` and `actions/upload-artifact`, pointing at `analysis-bundle/summary.sarif` and the full analysis bundle.
+Add `--ci` to write `ci/summary.md` plus upload snippets and code-quality artifacts for GitHub Actions, GitLab CI, and Bitbucket Pipelines: SARIF under `analysis-bundle/summary.sarif`, GitLab `ci/gl-code-quality-report.json`, and Bitbucket `ci/bitbucket-code-insights.json`.
 
 For pull requests, `repo pr-comment --base <baseline> --head <baseline>` writes a Markdown body that includes only new or changed data-risk findings; the composite GitHub Action can post that body when `comment-on-pr: "true"` and a pull-request token are provided.
 
