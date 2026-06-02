@@ -177,6 +177,64 @@ func TestProposalPromptContextMinimizesUnselectedEvidence(t *testing.T) {
 	}
 }
 
+func TestInventoryDetectsMonorepoPackageBoundaries(t *testing.T) {
+	root := t.TempDir()
+	// Bazel workspace with two packages.
+	writeFile(t, root, "WORKSPACE", "workspace(name = \"mono\")\n")
+	writeFile(t, root, "services/billing/BUILD.bazel", "go_library(name = \"billing\")\n")
+	writeFile(t, root, "services/ledger/BUILD.bazel", "go_library(name = \"ledger\")\n")
+	// Maven module.
+	writeFile(t, root, "java/pom.xml", "<project><artifactId>core</artifactId></project>\n")
+	// Gradle subproject.
+	writeFile(t, root, "android/build.gradle", "apply plugin: 'java'\n")
+	// Go workspace + module.
+	writeFile(t, root, "go.work", "go 1.22\nuse ./svc\n")
+	writeFile(t, root, "svc/go.mod", "module example.com/svc\n")
+	// Nx workspace + JS package.
+	writeFile(t, root, "nx.json", "{\"npmScope\":\"mono\"}\n")
+	writeFile(t, root, "apps/web/project.json", "{\"name\":\"web\"}\n")
+
+	inv, err := InventoryPath(InventoryOptions{Path: root})
+	if err != nil {
+		t.Fatal(err)
+	}
+	systems := map[string]int{}
+	paths := map[string]bool{}
+	for _, b := range inv.PackageBoundaries {
+		systems[b.System]++
+		paths[b.System+":"+b.Path] = true
+	}
+	for _, want := range []string{"bazel", "maven", "gradle", "go-workspace", "nx"} {
+		if systems[want] == 0 {
+			t.Fatalf("expected %s package boundary, got %#v", want, inv.PackageBoundaries)
+		}
+	}
+	for _, want := range []string{"bazel:services/billing", "bazel:services/ledger", "maven:java", "gradle:android", "go-workspace:svc", "nx:apps/web"} {
+		if !paths[want] {
+			t.Fatalf("expected boundary %s, got %#v", want, inv.PackageBoundaries)
+		}
+	}
+}
+
+func TestInventoryIgnoresBuildFilesWithoutWorkspace(t *testing.T) {
+	root := t.TempDir()
+	// A lone BUILD.bazel with no WORKSPACE marker must not be treated as a Bazel package.
+	writeFile(t, root, "docs/BUILD.bazel", "# unrelated\n")
+	writeFile(t, root, "web/package.json", "{\"name\":\"web\"}\n")
+	inv, err := InventoryPath(InventoryOptions{Path: root})
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, b := range inv.PackageBoundaries {
+		if b.System == "bazel" {
+			t.Fatalf("did not expect bazel boundary without workspace marker: %#v", inv.PackageBoundaries)
+		}
+		if b.System == "nx" || b.System == "turborepo" {
+			t.Fatalf("did not expect JS package boundary without nx/turbo workspace: %#v", inv.PackageBoundaries)
+		}
+	}
+}
+
 func TestFetchLocalMercurialRecordsVCSAndCaches(t *testing.T) {
 	src := t.TempDir()
 	writeFile(t, src, "db/migrate/001.sql", "drop table accounts;")

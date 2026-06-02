@@ -89,6 +89,7 @@ type Inventory struct {
 	OperationalDocs   []Finding      `json:"operational_docs,omitempty"`
 	EvidenceExports   []Finding      `json:"evidence_exports,omitempty"`
 	Infrastructure    []Finding      `json:"infrastructure_scans,omitempty"`
+	PackageBoundaries []PackageBoundary `json:"package_boundaries,omitempty"`
 	NextCommands      []Command      `json:"next_commands,omitempty"`
 	SkippedDirs       []string       `json:"skipped_dirs,omitempty"`
 	SummaryByCategory map[string]int `json:"summary_by_category,omitempty"`
@@ -112,6 +113,15 @@ type Finding struct {
 type Command struct {
 	Command string `json:"command"`
 	Reason  string `json:"reason"`
+}
+
+// PackageBoundary marks a package root inside a (possibly mono-) repository, identified by the
+// build system whose manifest declares it. Boundaries let Patchline attribute data-change risks to
+// the owning package rather than to an undifferentiated repository root.
+type PackageBoundary struct {
+	System   string `json:"system"`
+	Path     string `json:"path"`
+	Manifest string `json:"manifest"`
 }
 
 type Fact struct {
@@ -339,8 +349,130 @@ func InventoryPath(opts InventoryOptions) (Inventory, error) {
 		inv.inspectFile(file)
 	}
 	inv.Languages = countsFromMap(languages)
+	inv.detectPackageBoundaries(files)
 	inv.finalize()
 	return inv, nil
+}
+
+// detectPackageBoundaries scans the discovered files for monorepo build-system manifests and
+// records one boundary per package root. It recognizes Bazel, Pants, Nx, Turborepo, Maven,
+// Gradle, and Go workspaces. The presence of a workspace-level manifest (WORKSPACE, MODULE.bazel,
+// pants.toml, nx.json, turbo.json, go.work) raises confidence that per-directory manifests are
+// genuine package boundaries rather than incidental build files.
+func (inv *Inventory) detectPackageBoundaries(files []scanFile) {
+	type sysInfo struct {
+		system     string
+		isWorkspce bool
+	}
+	classify := func(base string) (sysInfo, bool) {
+		switch base {
+		case "workspace", "workspace.bazel", "workspace.bzlmod", "module.bazel":
+			return sysInfo{"bazel", true}, true
+		case "build.bazel", "build.bzl":
+			return sysInfo{"bazel", false}, true
+		case "pants.toml":
+			return sysInfo{"pants", true}, true
+		case "nx.json":
+			return sysInfo{"nx", true}, true
+		case "turbo.json":
+			return sysInfo{"turborepo", true}, true
+		case "go.work":
+			return sysInfo{"go-workspace", true}, true
+		case "pom.xml":
+			return sysInfo{"maven", false}, true
+		case "build.gradle", "build.gradle.kts":
+			return sysInfo{"gradle", false}, true
+		case "settings.gradle", "settings.gradle.kts":
+			return sysInfo{"gradle", true}, true
+		case "go.mod":
+			return sysInfo{"go-workspace", false}, true
+		case "project.json", "package.json":
+			// Only meaningful as a package boundary when an Nx/Turborepo workspace exists.
+			return sysInfo{"", false}, false
+		}
+		return sysInfo{}, false
+	}
+
+	workspaceSystems := map[string]bool{}
+	type cand struct {
+		system   string
+		path     string
+		manifest string
+	}
+	var bazelPlain, otherManifests []cand
+	var jsPackages []cand
+	for _, f := range files {
+		base := strings.ToLower(filepath.Base(f.Rel))
+		dir := filepath.ToSlash(filepath.Dir(f.Rel))
+		if dir == "." {
+			dir = "."
+		}
+		if base == "project.json" || base == "package.json" {
+			jsPackages = append(jsPackages, cand{system: "", path: dir, manifest: filepath.ToSlash(f.Rel)})
+			continue
+		}
+		info, ok := classify(base)
+		if !ok {
+			continue
+		}
+		if info.isWorkspce {
+			workspaceSystems[info.system] = true
+		}
+		c := cand{system: info.system, path: dir, manifest: filepath.ToSlash(f.Rel)}
+		if info.system == "bazel" && !info.isWorkspce {
+			bazelPlain = append(bazelPlain, c)
+		} else if !info.isWorkspce {
+			otherManifests = append(otherManifests, c)
+		}
+	}
+
+	seen := map[string]bool{}
+	add := func(system, p, manifest string) {
+		key := system + "\x00" + p
+		if seen[key] {
+			return
+		}
+		seen[key] = true
+		boundary := PackageBoundary{System: system, Path: p, Manifest: manifest}
+		inv.PackageBoundaries = append(inv.PackageBoundaries, boundary)
+		inv.addFindingFact("package_boundary", Finding{Kind: system, Path: p, Confidence: "manifest", Rationale: system + " package boundary declared by " + manifest})
+	}
+
+	// Per-directory manifests (Maven modules, Gradle subprojects, Go modules) are always package
+	// boundaries.
+	for _, c := range otherManifests {
+		add(c.system, c.path, c.manifest)
+	}
+	// Bazel BUILD files are boundaries only when a Bazel workspace marker exists, to avoid treating
+	// unrelated files named BUILD as packages.
+	if workspaceSystems["bazel"] {
+		for _, c := range bazelPlain {
+			add("bazel", c.path, c.manifest)
+		}
+	}
+	// JS packages count when an Nx or Turborepo workspace exists.
+	if workspaceSystems["nx"] || workspaceSystems["turborepo"] {
+		system := "turborepo"
+		if workspaceSystems["nx"] {
+			system = "nx"
+		}
+		for _, c := range jsPackages {
+			if c.path == "." {
+				continue
+			}
+			add(system, c.path, c.manifest)
+		}
+	}
+	// Record workspace roots themselves so a single-module workspace is still represented.
+	for system := range workspaceSystems {
+		add(system, ".", system+" workspace root")
+	}
+	sort.Slice(inv.PackageBoundaries, func(i, j int) bool {
+		if inv.PackageBoundaries[i].System != inv.PackageBoundaries[j].System {
+			return inv.PackageBoundaries[i].System < inv.PackageBoundaries[j].System
+		}
+		return inv.PackageBoundaries[i].Path < inv.PackageBoundaries[j].Path
+	})
 }
 
 func (inv *Inventory) inspectRoot(root string) {

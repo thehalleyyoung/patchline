@@ -271,6 +271,8 @@ Run `make intervention-regression-archive-gate` to archive every generated inter
 
 Run `make mercurial-fossil-source-gate` to ingest **Mercurial and Fossil** working trees as first-class sources — detecting the VCS, recording its revision as provenance, content-addressing the tree independently of VCS metadata, and proving a destructive migration survives ingestion; see [docs/mercurial-fossil-source.md](docs/mercurial-fossil-source.md).
 
+Run `make monorepo-boundary-gate` to detect **package boundaries** in monorepos (Bazel, Pants, Nx, Turborepo, Maven, Gradle, Go workspaces) so risks attribute to the owning package — proven on a real Turborepo monorepo with a no-false-positive rule for incidental build files; see [docs/monorepo-boundary.md](docs/monorepo-boundary.md).
+
 Add `--redact` to write `analysis-bundle/` copies with stable redaction tokens for identifiers, literals, customer-like strings, and secret-like values while preserving joins and existing artifact hashes.
 
 Add `--ci` to write `ci/summary.md` plus upload snippets and code-quality artifacts for GitHub Actions, GitLab CI, and Bitbucket Pipelines: SARIF under `analysis-bundle/summary.sarif`, GitLab `ci/gl-code-quality-report.json`, and Bitbucket `ci/bitbucket-code-insights.json`.

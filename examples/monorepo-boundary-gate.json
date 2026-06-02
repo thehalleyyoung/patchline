@@ -1,0 +1,13 @@
+{
+  "version": "patchline.monorepo-boundary-gate/v1",
+  "claim": "Patchline detects package boundaries inside monorepos so that data-change risks can be attributed to the owning package instead of an undifferentiated repository root. The inventory recognizes Bazel, Pants, Nx, Turborepo, Maven, Gradle, and Go workspaces from their build manifests, and only treats per-directory build files as boundaries when a workspace marker confirms the monorepo, avoiding false positives from incidental files named BUILD or package.json. The gate proves boundary detection against a real Turborepo monorepo fetched from GitHub, and proves the full ecosystem matrix and the no-false-positive rule through deterministic unit tests.",
+  "real_repo": {
+    "repo": "vercel/turbo",
+    "ref": "main",
+    "subpath": "examples/basic",
+    "expected_system": "turborepo",
+    "minimum_boundaries": 4,
+    "expected_paths": ["apps/web", "apps/docs", "packages/ui"]
+  },
+  "ecosystems": ["bazel", "pants", "nx", "turborepo", "maven", "gradle", "go-workspace"]
+}
