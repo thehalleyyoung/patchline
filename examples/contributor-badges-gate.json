@@ -1,0 +1,15 @@
+{
+  "version": "patchline.contributor-badges-gate/v1",
+  "claim": "Patchline renders contributor recognition badges exclusively from gate-backed data, so a badge can never claim credit for a capability that is not proven by a real gate. Each contributor lists the capabilities they shipped; the badge worker keeps only the contributions whose gate script actually exists, computes a deterministic recognition tier from the count of gate-backed contributions, and emits shields-style badge endpoints plus a Markdown wall of fame. The gate proves that every awarded badge is backed by an existing gate and that tiers are computed deterministically from verified counts alone.",
+  "real_repo": "patchline (self): contributions validated against scripts/*-gate.sh",
+  "tiers": [
+    {"name": "bronze", "min": 1},
+    {"name": "silver", "min": 3},
+    {"name": "gold", "min": 6}
+  ],
+  "contributors": [
+    {"handle": "alice", "contributions": ["nosql-change", "data-pipeline", "schema-compat", "infra-ordering", "fixture-minimizer", "parser-dashboard"]},
+    {"handle": "bob", "contributions": ["examples-gallery", "issue-to-artifact", "onboarding-quest"]},
+    {"handle": "carol", "contributions": ["nosql-change", "this-capability-has-no-gate"]}
+  ]
+}
