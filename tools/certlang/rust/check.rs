@@ -42,6 +42,10 @@ struct VectorResult {
     expected: String,
     accepted: bool,
     ok: bool,
+    certificate_id: Option<String>,
+    verdict: Option<String>,
+    risk_bps: Option<i64>,
+    canonical_sha256: Option<String>,
     error: Option<String>,
 }
 
@@ -110,7 +114,17 @@ fn check_directory(spec_dir: &Path, root: &Path) -> Result<Report, String> {
         paths.sort();
         for path in paths {
             let result = parse_certificate(&path, root);
-            let is_accepted = result.is_ok();
+            let (is_accepted, certificate_id, verdict, risk_bps, canonical_sha256, error) = match result {
+                Ok(cert) => (
+                    true,
+                    Some(cert.certificate_id),
+                    Some(cert.verdict),
+                    Some(cert.risk_bps),
+                    Some(cert.canonical_sha256),
+                    None,
+                ),
+                Err(err) => (false, None, None, None, None, Some(err)),
+            };
             if is_accepted {
                 accepted += 1;
             } else {
@@ -127,7 +141,11 @@ fn check_directory(spec_dir: &Path, root: &Path) -> Result<Report, String> {
                 expected: expected.to_string(),
                 accepted: is_accepted,
                 ok,
-                error: result.err(),
+                certificate_id,
+                verdict,
+                risk_bps,
+                canonical_sha256,
+                error,
             });
         }
     }
@@ -145,7 +163,7 @@ fn check_directory(spec_dir: &Path, root: &Path) -> Result<Report, String> {
     })
 }
 
-fn parse_certificate(path: &Path, root: &Path) -> Result<(), String> {
+fn parse_certificate(path: &Path, root: &Path) -> Result<Certificate, String> {
     let raw = fs::read(path).map_err(|err| format!("{}: {err}", path.display()))?;
     if raw.is_empty() {
         return Err("empty certificate".to_string());
@@ -224,7 +242,8 @@ fn parse_certificate(path: &Path, root: &Path) -> Result<(), String> {
         evidence,
         obligations,
     };
-    validate_certificate(&cert, root)
+    validate_certificate(&cert, root)?;
+    Ok(cert)
 }
 
 fn parse_field(lines: &[&str], index: &mut usize, prefix: &str) -> Result<String, String> {
@@ -560,6 +579,18 @@ fn report_json(report: &Report) -> String {
         out.push_str(&format!("      \"expected\": \"{}\",\n", json_escape(&row.expected)));
         out.push_str(&format!("      \"accepted\": {},\n", row.accepted));
         out.push_str(&format!("      \"ok\": {}", row.ok));
+        if let Some(value) = &row.certificate_id {
+            out.push_str(&format!(",\n      \"certificate_id\": \"{}\"", json_escape(value)));
+        }
+        if let Some(value) = &row.verdict {
+            out.push_str(&format!(",\n      \"verdict\": \"{}\"", json_escape(value)));
+        }
+        if let Some(value) = row.risk_bps {
+            out.push_str(&format!(",\n      \"risk_bps\": {}", value));
+        }
+        if let Some(value) = &row.canonical_sha256 {
+            out.push_str(&format!(",\n      \"canonical_sha256\": \"{}\"", json_escape(value)));
+        }
         if let Some(err) = &row.error {
             out.push_str(&format!(",\n      \"error\": \"{}\"", json_escape(err)));
         }

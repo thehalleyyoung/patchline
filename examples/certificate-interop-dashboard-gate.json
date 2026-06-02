@@ -1,0 +1,8 @@
+{
+  "version": "patchline.certificate-interop-dashboard-gate/v1",
+  "claim": "Patchline publishes a certificate interop dashboard for the frozen PLCI/1 standards-body conformance corpus. The gate rebuilds a corpus-vector view without changing certificate bytes, reruns the Go, Rust, Python, and TypeScript checkers against real Patchline source/spec/doc evidence, verifies signed reference outputs, compares every checker's accepted positive fields and rejected negative controls against the reference payloads, emits public JSON and Markdown drift deltas, and proves a tampered checker report is caught as dashboard drift via `make certificate-interop-dashboard-gate`.",
+  "real_repo": "patchline (self): frozen PLCI/1 conformance corpus over cmd/patchline/main.go, internal repair proof code, grammar, and certificate docs",
+  "corpus": "specs/certificate-conformance/v1/corpus.json",
+  "checkers": ["go", "rust", "python", "typescript"],
+  "minimum_cases": 4
+}

@@ -109,7 +109,7 @@ function verifyFile(root: string, value: string, expected: string): void {
   }
 }
 
-function parseCertificate(filePath: string, root: string): void {
+function parseCertificate(filePath: string, root: string): Cert {
   const raw = fs.readFileSync(filePath);
   if (raw.length === 0) {
     throw new Error("empty certificate");
@@ -172,7 +172,7 @@ function parseCertificate(filePath: string, root: string): void {
   if (got !== canonicalSha256) {
     throw new Error(`canonical-sha256 mismatch: got ${canonicalSha256} want ${got}`);
   }
-  validateCertificate({
+  const cert = {
     certificateId,
     subjectRepo,
     subjectRef,
@@ -185,7 +185,9 @@ function parseCertificate(filePath: string, root: string): void {
     canonicalSha256,
     evidence,
     obligations,
-  }, root);
+  };
+  validateCertificate(cert, root);
+  return cert;
 }
 
 function validateCertificate(cert: Cert, root: string): void {
@@ -285,8 +287,9 @@ function checkDirectory(specDir: string, root: string) {
       const filePath = path.join(dir, file);
       let isAccepted = false;
       let error: string | undefined;
+      let cert: Cert | undefined;
       try {
-        parseCertificate(filePath, root);
+        cert = parseCertificate(filePath, root);
         isAccepted = true;
         accepted += 1;
       } catch (err) {
@@ -294,12 +297,18 @@ function checkDirectory(specDir: string, root: string) {
         rejected += 1;
       }
       const ok = (expected === "valid" && isAccepted) || (expected === "invalid" && !isAccepted);
-      const row: Record<string, string | boolean> = {
+      const row: Record<string, string | boolean | number> = {
         path: path.relative(path.join(specDir, "vectors"), filePath).replaceAll(path.sep, "/"),
         expected,
         accepted: isAccepted,
         ok,
       };
+      if (cert) {
+        row.certificate_id = cert.certificateId;
+        row.verdict = cert.verdict;
+        row.risk_bps = cert.riskBps;
+        row.canonical_sha256 = cert.canonicalSha256;
+      }
       if (error) row.error = error;
       vectors.push(row);
     }

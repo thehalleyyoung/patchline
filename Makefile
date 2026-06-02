@@ -1904,6 +1904,10 @@ certificate-migration-gate:
 standards-body-conformance-corpus-gate:
 	bash scripts/standards-body-conformance-corpus-gate.sh
 
+.PHONY: certificate-interop-dashboard-gate
+certificate-interop-dashboard-gate:
+	bash scripts/certificate-interop-dashboard-gate.sh
+
 .PHONY: cross-tool-verdict-exchange-gate
 cross-tool-verdict-exchange-gate:
 	bash scripts/cross-tool-verdict-exchange-gate.sh

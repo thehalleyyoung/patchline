@@ -62,11 +62,15 @@ type Options struct {
 }
 
 type VectorResult struct {
-	Path     string `json:"path"`
-	Expected string `json:"expected"`
-	Accepted bool   `json:"accepted"`
-	OK       bool   `json:"ok"`
-	Error    string `json:"error,omitempty"`
+	Path            string `json:"path"`
+	Expected        string `json:"expected"`
+	Accepted        bool   `json:"accepted"`
+	OK              bool   `json:"ok"`
+	CertificateID   string `json:"certificate_id,omitempty"`
+	Verdict         string `json:"verdict,omitempty"`
+	RiskBPS         *int   `json:"risk_bps,omitempty"`
+	CanonicalSHA256 string `json:"canonical_sha256,omitempty"`
+	Error           string `json:"error,omitempty"`
 }
 
 type DirectoryReport struct {
@@ -229,7 +233,7 @@ func CheckDirectory(specDir string, opts Options) (DirectoryReport, error) {
 		}
 		sort.Strings(paths)
 		for _, path := range paths {
-			_, err := CheckFile(path, opts)
+			cert, err := CheckFile(path, opts)
 			accepted := err == nil
 			ok := (group.expected == "valid" && accepted) || (group.expected == "invalid" && !accepted)
 			rel, relErr := filepath.Rel(filepath.Join(specDir, "vectors"), path)
@@ -241,6 +245,12 @@ func CheckDirectory(specDir string, opts Options) (DirectoryReport, error) {
 				Expected: group.expected,
 				Accepted: accepted,
 				OK:       ok,
+			}
+			if cert != nil {
+				result.CertificateID = cert.CertificateID
+				result.Verdict = cert.Verdict
+				result.RiskBPS = &cert.RiskBPS
+				result.CanonicalSHA256 = cert.CanonicalHash
 			}
 			if err != nil {
 				result.Error = err.Error()

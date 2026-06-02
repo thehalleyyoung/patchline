@@ -917,6 +917,15 @@ checker output is Ed25519-signed and verified against a pinned public key. The g
 signed reference output and proves the tamper is rejected, making the corpus suitable for external
 implementers rather than merely internal regression tests.
 
+\gate{certificate-interop-dashboard-gate} turns that corpus into a public drift dashboard. The gate
+rebuilds a byte-preserving vector view of the frozen corpus, reruns the Go, Rust, Python, and
+TypeScript checkers with real repository evidence verification, and compares each checker's acceptance,
+rejection, verdict, risk score, certificate identifier, canonical hash, certificate bytes, and
+negative-control error text against the signed reference payload. It publishes both
+\code{dashboard.json} and \code{dashboard.md}; a tampered checker report must produce a
+\code{canonical\_sha256} drift and a failing dashboard. This changes interoperability from ``the
+implementations agreed once'' to a release-time, reviewer-readable drift surface.
+
 The latest compatibility gate adds schema evolution to that story. Legacy PLCI/0 certificates use a
 coarser \code{risk-class} field; \gate{certificate-migration-gate} verifies their legacy canonical
 hashes, maps \code{low}, \code{medium}, \code{high}, and \code{unknown} into PLCI/1 basis-point risk
@@ -1287,7 +1296,8 @@ Formal methods & \code{invariant-extract-gate}, \code{symexec-gate}, \code{model
 Decision science & \code{risk-economics-gate}, \code{uncertainty-calibration-gate},
 \code{active-learning-gate}, \code{reviewer-sim-gate}, \code{explainable-ranking-gate} \\
 Release \& interop & \code{rc-rehearsal-gate}, \code{leaderboard-gate}, \code{dossier-gate},
-\code{interop-gate}, \code{standards-body-conformance-corpus-gate}, \code{certificate-migration-gate} \\
+\code{interop-gate}, \code{standards-body-conformance-corpus-gate},
+\code{certificate-interop-dashboard-gate}, \code{certificate-migration-gate} \\
 Generalization & \code{framework-holdout-gate}, \code{perturbation-robustness-gate},
 \code{historical-replay-study-gate}, \code{external-replication-kit-gate} \\
 Trust stack & \code{signed-provenance-chain-gate}, \code{reproducible-build-attestation-gate},
@@ -1337,6 +1347,7 @@ make schema-compat-gate \hspace{2.4em}\# Avro + protobuf on apache/avro\\
 make infra-ordering-gate \hspace{2.0em}\# Kong/Anchore sequencing on helm/charts\\
 make fixture-minimizer-gate \hspace{0.7em}\# 1-minimal reproductions per ecosystem\\
 make parser-dashboard-gate \hspace{1.1em}\# coverage + fuzz robustness dashboard\\
+make certificate-interop-dashboard-gate \quad\# PLCI checker drift dashboard\\
 make certificate-migration-gate \hspace{0.1em}\# PLCI/0 verdicts recheck as PLCI/1
 \end{quote}
 

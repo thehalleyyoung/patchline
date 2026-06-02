@@ -147,6 +147,7 @@ def parse_certificate(path, root):
         raise ValueError(f"canonical-sha256 mismatch: got {cert['canonical_sha256']} want {got}")
 
     validate_certificate(cert, evidence, obligations, root)
+    return cert
 
 
 def validate_certificate(cert, evidence, obligations, root):
@@ -221,8 +222,9 @@ def check_directory(spec_dir, root):
     for dirname, expected in [("valid", "valid"), ("invalid", "invalid")]:
         for path in sorted((spec_dir / "vectors" / dirname).glob("*.plci")):
             error = None
+            cert = None
             try:
-                parse_certificate(path, root)
+                cert = parse_certificate(path, root)
                 is_accepted = True
                 accepted += 1
             except Exception as exc:  # reported as checker output, not swallowed
@@ -236,6 +238,11 @@ def check_directory(spec_dir, root):
                 "accepted": is_accepted,
                 "ok": ok,
             }
+            if cert is not None:
+                row["certificate_id"] = cert["certificate_id"]
+                row["verdict"] = cert["verdict"]
+                row["risk_bps"] = cert["risk_bps"]
+                row["canonical_sha256"] = cert["canonical_sha256"]
             if error:
                 row["error"] = error
             vectors.append(row)
