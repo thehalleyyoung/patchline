@@ -170,7 +170,7 @@ Every addition to the repo should be judged by whether it makes that loop more a
 124. [x] Add paired statistical tests for Patchline versus grep-only, SQL-only, identifier-only, temporal-only, and no-facts-generation baselines.
 125. [x] Add effect-size reporting so improvements are not presented only as p-values.
 126. [x] Add sensitivity analysis over budgets, finding caps, link thresholds, temporal windows, and risk-weight settings.
-127. [ ] Add ablation dashboards that show which feature families matter for each ecosystem and failure mode.
+127. [x] Add ablation dashboards that show which feature families matter for each ecosystem and failure mode.
 128. [ ] Add negative controls that run on documentation-only, vendor-only, and test-only slices where Patchline should avoid high-confidence repair claims.
 129. [ ] Add reviewer-mode scripts that rebuild all tables, figures, and claims from raw generated JSON without manual copying.
 130. [ ] Add an artifact consistency checker that fails when README claims, generated tables, expected hashes, and experiment outputs diverge.

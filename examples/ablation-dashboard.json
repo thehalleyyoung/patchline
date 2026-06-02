@@ -1,0 +1,12 @@
+{
+  "version": "patchline.ablation-dashboard/v1",
+  "minimum_public_slices": 4,
+  "feature_families": [
+    {"id": "destructive", "match": ["destructive", "drop", "truncate", "delete"]},
+    {"id": "persistent-write", "match": ["persistent-write", "write"]},
+    {"id": "safety-guard", "match": ["missing-transaction", "missing-idempotency", "retry", "rollback"]},
+    {"id": "project-evidence", "match": ["linked-project-evidence", "evidence"]},
+    {"id": "scope-breadth", "match": ["broad", "scope", "where"]}
+  ],
+  "dashboards": ["by-ecosystem", "by-failure-mode", "by-slice"]
+}
