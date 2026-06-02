@@ -1,0 +1,51 @@
+{
+  "version": "patchline.reviewer-walkthrough-gate/v1",
+  "claim": "Patchline provides a reviewer walkthrough that starts from a fresh checkout and regenerates public-repo analyses, evaluation tables, SVG figures, reports, and a case-study bundle from pinned real code.",
+  "required_outputs": [
+    "environment.json",
+    "tables/evaluation-tables.json",
+    "tables/evaluation-tables.md",
+    "figures/figures.json",
+    "reports/claims/claims-evidence.json",
+    "reports/limitations/limitations-ledger.json",
+    "reports/taxonomy/failure-taxonomy.json",
+    "reports/qualitative/qualitative-notes.json",
+    "reports/metrics/metrics.json",
+    "case-study-bundle/case-studies/case-studies.json",
+    "case-study-bundle/manifest.json",
+    "case-study-bundle/checksums.txt",
+    "walkthrough.md",
+    "summary.json"
+  ],
+  "minimum_public_repos": 4,
+  "minimum_tables": 4,
+  "minimum_figures": 5,
+  "minimum_reports": 5,
+  "minimum_case_studies": 4,
+  "real_code": [
+    {
+      "id": "lobsters-rails-migrations",
+      "repo": "lobsters/lobsters",
+      "ref": "3b80b47aa5aaba37ec44413e7d1dc96fcf1585b6",
+      "subpath": "db/migrate"
+    },
+    {
+      "id": "forem-rails-migrations",
+      "repo": "forem/forem",
+      "ref": "9c5509c3aeecd4a86a8950206fa937ebcbc2f8d1",
+      "subpath": "db/migrate"
+    },
+    {
+      "id": "mastodon-rails-migrations",
+      "repo": "mastodon/mastodon",
+      "ref": "facb552c9cdbe8a2ebff0b94ebf2c9e9ec385347",
+      "subpath": "db/migrate"
+    },
+    {
+      "id": "grafana-go-migrations",
+      "repo": "grafana/grafana",
+      "ref": "a54b2e1e9aaf979938813f6ed9e44de569fe1105",
+      "subpath": "pkg/services/sqlstore/migrations"
+    }
+  ]
+}
