@@ -450,6 +450,7 @@ Usage:
   patchline repo notify-summary --analysis analysis-dir [--bundle-link url] [--out dir] [--json]
   patchline repo minimize --analysis analysis-dir [--out dir] [--json]
   patchline repo recurrence --analyses analysis-dir[,analysis-dir...] [--out dir] [--json]
+  patchline repo metrics --analyses analysis-dir[,analysis-dir...] [--salt value] [--out dir] [--json]
   patchline intake <path> [--out results/generated/intake] [--json]
   patchline intake --github owner/repo [--ref ref] [--subpath path] [--out results/generated/intake] [--json]
   patchline semantics-contract [--json]
@@ -579,6 +580,8 @@ func repoCommand(args []string) error {
 		return repoMinimize(args[1:])
 	case "recurrence":
 		return repoRecurrence(args[1:])
+	case "metrics":
+		return repoMetrics(args[1:])
 	default:
 		return fmt.Errorf("unknown repo subcommand %q", args[0])
 	}
@@ -623,6 +626,66 @@ type repoAnalyzeSummary struct {
 	BaselineHash         string `json:"baseline_hash,omitempty"`
 	ProposalHash         string `json:"proposal_hash,omitempty"`
 	CompareHash          string `json:"compare_hash,omitempty"`
+}
+
+type repoMetricsReport struct {
+	Version      string                  `json:"version"`
+	Privacy      repoMetricsPrivacy      `json:"privacy"`
+	Summary      repoMetricsSummary      `json:"summary"`
+	Analyses     []repoMetricsAnalysis   `json:"analyses"`
+	TrendDeltas  []repoMetricsTrendDelta `json:"trend_deltas,omitempty"`
+	Buckets      map[string]int          `json:"buckets"`
+	Shareable    bool                    `json:"shareable"`
+	RedactedKeys []string                `json:"redacted_keys"`
+	Hash         string                  `json:"hash"`
+	Markdown     string                  `json:"markdown,omitempty"`
+}
+
+type repoMetricsPrivacy struct {
+	SourceFree       bool     `json:"source_free"`
+	RawEvidenceFree  bool     `json:"raw_evidence_free"`
+	PathFree         bool     `json:"path_free"`
+	SaltedCohortIDs  bool     `json:"salted_cohort_ids"`
+	SaltHash         string   `json:"salt_hash"`
+	AllowedFields    []string `json:"allowed_fields"`
+	SuppressedFields []string `json:"suppressed_fields"`
+}
+
+type repoMetricsSummary struct {
+	Analyses                    int `json:"analyses"`
+	TotalFilesScannedLowerBound int `json:"total_files_scanned_lower_bound"`
+	TotalRankedRisks            int `json:"total_ranked_risks"`
+	TotalHighSignals            int `json:"total_high_signals"`
+	TotalGenerated              int `json:"total_generated_files"`
+	TotalRejected               int `json:"total_rejected_interventions"`
+}
+
+type repoMetricsAnalysis struct {
+	Index                int    `json:"index"`
+	CohortID             string `json:"cohort_id"`
+	StageLabel           string `json:"stage_label"`
+	FilesScannedBucket   string `json:"files_scanned_bucket"`
+	RankedRisks          int    `json:"ranked_risks"`
+	CodePathRisks        int    `json:"code_path_risks"`
+	PolicyWarnings       int    `json:"policy_warnings"`
+	PolicyFailed         int    `json:"policy_failed"`
+	LockCritical         int    `json:"lock_critical"`
+	PrivacyCritical      int    `json:"privacy_critical"`
+	ProofOpen            int    `json:"proof_open"`
+	GeneratedFiles       int    `json:"generated_files"`
+	CompareChecksFailed  int    `json:"compare_checks_failed"`
+	NativeChecksSkipped  int    `json:"native_checks_skipped"`
+	InterventionRejected int    `json:"intervention_rejected"`
+	TrendScore           int    `json:"trend_score"`
+}
+
+type repoMetricsTrendDelta struct {
+	FromCohortID     string `json:"from_cohort_id"`
+	ToCohortID       string `json:"to_cohort_id"`
+	RankedRisksDelta int    `json:"ranked_risks_delta"`
+	HighSignalsDelta int    `json:"high_signals_delta"`
+	TrendScoreDelta  int    `json:"trend_score_delta"`
+	GeneratedDelta   int    `json:"generated_delta"`
 }
 
 type repoAnalyzeCIArtifacts struct {
@@ -6050,6 +6113,246 @@ func repoRecurrence(args []string) error {
 	fmt.Printf("repo recurrence analyses=%d repeated=%d signatures=%d hash=%s\n", report.Summary.Analyses, report.Summary.Repeated, report.Summary.Signatures, report.Hash)
 	fmt.Printf("  out=%s\n", *outPath)
 	return nil
+}
+
+func repoMetrics(args []string) error {
+	fs := flag.NewFlagSet("repo metrics", flag.ContinueOnError)
+	fs.SetOutput(ioDiscard{})
+	analysesValue := fs.String("analyses", "", "comma-separated repo analyze output directories")
+	salt := fs.String("salt", "", "salt used to derive shareable cohort IDs")
+	outPath := fs.String("out", filepath.Join("results", "generated", "repo-metrics"), "output directory")
+	jsonOut := fs.Bool("json", false, "emit JSON")
+	if err := fs.Parse(args); err != nil {
+		return err
+	}
+	if *analysesValue == "" || fs.NArg() != 0 {
+		return errors.New("usage: patchline repo metrics --analyses analysis-dir[,analysis-dir...] [--salt value] [--out dir] [--json]")
+	}
+	analyses := splitNonEmpty(*analysesValue, ",")
+	report, err := buildRepoMetricsReport(analyses, *salt)
+	if err != nil {
+		return err
+	}
+	if err := writeRepoMetricsReport(*outPath, report); err != nil {
+		return err
+	}
+	if *jsonOut {
+		return writeJSON(os.Stdout, report)
+	}
+	fmt.Printf("repo metrics analyses=%d risks=%d high_signals=%d hash=%s\n", report.Summary.Analyses, report.Summary.TotalRankedRisks, report.Summary.TotalHighSignals, report.Hash)
+	fmt.Printf("  out=%s\n", *outPath)
+	return nil
+}
+
+func buildRepoMetricsReport(analyses []string, salt string) (repoMetricsReport, error) {
+	if len(analyses) == 0 {
+		return repoMetricsReport{}, errors.New("at least one analysis directory is required")
+	}
+	if strings.TrimSpace(salt) == "" {
+		salt = "patchline-default-local-salt"
+	}
+	report := repoMetricsReport{
+		Version: "patchline.repo-metrics/v1",
+		Privacy: repoMetricsPrivacy{
+			SourceFree:      true,
+			RawEvidenceFree: true,
+			PathFree:        true,
+			SaltedCohortIDs: true,
+			SaltHash:        "sha256:" + canonical.Hash("metrics-salt\x00"+salt),
+			AllowedFields: []string{
+				"salted cohort ids",
+				"bucketed file counts",
+				"summary risk counts",
+				"policy/proof/compare counts",
+				"trend deltas",
+			},
+			SuppressedFields: []string{
+				"repository names",
+				"source paths",
+				"raw evidence",
+				"prompts",
+				"generated content",
+				"risk identifiers",
+				"hashes from source artifacts",
+			},
+		},
+		Buckets:      map[string]int{},
+		Shareable:    true,
+		RedactedKeys: []string{"input", "subpath", "outputs", "source", "baseline_hash", "proposal_hash", "compare_hash", "risk_id", "path", "statement", "evidence", "prompt", "generated"},
+	}
+	for i, analysis := range analyses {
+		metric, err := loadRepoMetricAnalysis(i, analysis, salt)
+		if err != nil {
+			return repoMetricsReport{}, err
+		}
+		report.Analyses = append(report.Analyses, metric)
+		report.Summary.Analyses++
+		report.Summary.TotalRankedRisks += metric.RankedRisks
+		report.Summary.TotalFilesScannedLowerBound += bucketLowerBound(metric.FilesScannedBucket)
+		report.Summary.TotalHighSignals += metric.LockCritical + metric.PrivacyCritical + metric.PolicyFailed + metric.ProofOpen
+		report.Summary.TotalGenerated += metric.GeneratedFiles
+		report.Summary.TotalRejected += metric.InterventionRejected
+		report.Buckets["files_scanned:"+metric.FilesScannedBucket]++
+		report.Buckets["trend_score:"+scoreBucket(metric.TrendScore)]++
+	}
+	for i := 1; i < len(report.Analyses); i++ {
+		prev := report.Analyses[i-1]
+		curr := report.Analyses[i]
+		report.TrendDeltas = append(report.TrendDeltas, repoMetricsTrendDelta{
+			FromCohortID:     prev.CohortID,
+			ToCohortID:       curr.CohortID,
+			RankedRisksDelta: curr.RankedRisks - prev.RankedRisks,
+			HighSignalsDelta: (curr.LockCritical + curr.PrivacyCritical + curr.PolicyFailed + curr.ProofOpen) - (prev.LockCritical + prev.PrivacyCritical + prev.PolicyFailed + prev.ProofOpen),
+			TrendScoreDelta:  curr.TrendScore - prev.TrendScore,
+			GeneratedDelta:   curr.GeneratedFiles - prev.GeneratedFiles,
+		})
+	}
+	report.Hash = repoMetricsHash(report)
+	report.Markdown = renderRepoMetricsMarkdown(report)
+	return report, nil
+}
+
+func loadRepoMetricAnalysis(index int, analysis, salt string) (repoMetricsAnalysis, error) {
+	baseline, err := project.LoadBaseline(filepath.Join(analysis, "baseline"))
+	if err != nil {
+		return repoMetricsAnalysis{}, err
+	}
+	metric := repoMetricsAnalysis{
+		Index:              index,
+		CohortID:           "cohort:" + canonical.Hash("metrics\x00" + salt + "\x00" + strconv.Itoa(index))[:16],
+		StageLabel:         fmt.Sprintf("analysis-%02d", index+1),
+		RankedRisks:        baseline.Summary.RankedRisks,
+		CodePathRisks:      baseline.Summary.CodePathRankedRisks,
+		PolicyWarnings:     baseline.Summary.PolicyWarnings,
+		PolicyFailed:       baseline.Summary.PolicyFailed,
+		LockCritical:       baseline.Summary.LockHazardCritical,
+		PrivacyCritical:    baseline.Summary.PrivacyCritical,
+		ProofOpen:          baseline.Summary.RepairProofOpen,
+		FilesScannedBucket: "0",
+	}
+	if analyzeData, err := os.ReadFile(filepath.Join(analysis, "analyze.json")); err == nil {
+		var analyze repoAnalyzeReport
+		if err := json.Unmarshal(analyzeData, &analyze); err != nil {
+			return repoMetricsAnalysis{}, err
+		}
+		metric.FilesScannedBucket = countBucket(analyze.Summary.FilesScanned)
+		metric.GeneratedFiles = analyze.Summary.GeneratedFiles
+		metric.CompareChecksFailed = analyze.Summary.CompareChecksFailed
+		metric.NativeChecksSkipped = analyze.Summary.NativeChecksSkipped
+	} else if errors.Is(err, os.ErrNotExist) {
+		metric.FilesScannedBucket = countBucket(len(baseline.Risks))
+	} else {
+		return repoMetricsAnalysis{}, err
+	}
+	if compare, err := loadCompareReport(filepath.Join(analysis, "compare", "compare.json")); err == nil {
+		metric.GeneratedFiles = compare.Summary.GeneratedFiles
+		metric.CompareChecksFailed = compare.Summary.PatchlineChecksFailed
+		metric.NativeChecksSkipped = compare.Summary.NativeChecksSkipped
+		metric.InterventionRejected = compare.Summary.InterventionRejected
+	} else if !errors.Is(err, os.ErrNotExist) {
+		return repoMetricsAnalysis{}, err
+	}
+	metric.TrendScore = metric.RankedRisks + 3*metric.PolicyFailed + 3*metric.LockCritical + 3*metric.PrivacyCritical + 2*metric.ProofOpen + metric.CompareChecksFailed
+	return metric, nil
+}
+
+func writeRepoMetricsReport(outDir string, report repoMetricsReport) error {
+	if err := os.MkdirAll(outDir, 0o755); err != nil {
+		return err
+	}
+	copy := report
+	copy.Markdown = ""
+	data, err := json.MarshalIndent(copy, "", "  ")
+	if err != nil {
+		return err
+	}
+	if err := os.WriteFile(filepath.Join(outDir, "metrics.json"), append(data, '\n'), 0o644); err != nil {
+		return err
+	}
+	return os.WriteFile(filepath.Join(outDir, "metrics.md"), []byte(report.Markdown), 0o644)
+}
+
+func renderRepoMetricsMarkdown(report repoMetricsReport) string {
+	var b strings.Builder
+	fmt.Fprintf(&b, "# Patchline privacy-preserving aggregate metrics\n\n")
+	fmt.Fprintf(&b, "- version: `%s`\n", report.Version)
+	fmt.Fprintf(&b, "- hash: `%s`\n", report.Hash)
+	fmt.Fprintf(&b, "- shareable: `%t`\n", report.Shareable)
+	fmt.Fprintf(&b, "- source free: `%t`\n", report.Privacy.SourceFree)
+	fmt.Fprintf(&b, "- raw evidence free: `%t`\n", report.Privacy.RawEvidenceFree)
+	fmt.Fprintf(&b, "- path free: `%t`\n\n", report.Privacy.PathFree)
+	fmt.Fprintf(&b, "## Summary\n\n| metric | count |\n| --- | ---: |\n")
+	fmt.Fprintf(&b, "| analyses | %d |\n", report.Summary.Analyses)
+	fmt.Fprintf(&b, "| ranked risks | %d |\n", report.Summary.TotalRankedRisks)
+	fmt.Fprintf(&b, "| high signals | %d |\n", report.Summary.TotalHighSignals)
+	fmt.Fprintf(&b, "| generated files | %d |\n", report.Summary.TotalGenerated)
+	fmt.Fprintf(&b, "| rejected interventions | %d |\n\n", report.Summary.TotalRejected)
+	fmt.Fprintf(&b, "## Analysis trend rows\n\n| cohort | files bucket | risks | high signals | trend score | generated |\n| --- | --- | ---: | ---: | ---: | ---: |\n")
+	for _, item := range report.Analyses {
+		high := item.LockCritical + item.PrivacyCritical + item.PolicyFailed + item.ProofOpen
+		fmt.Fprintf(&b, "| `%s` | %s | %d | %d | %d | %d |\n", item.CohortID, item.FilesScannedBucket, item.RankedRisks, high, item.TrendScore, item.GeneratedFiles)
+	}
+	if len(report.TrendDeltas) > 0 {
+		fmt.Fprintf(&b, "\n## Trend deltas\n\n| from | to | risk delta | high-signal delta | score delta |\n| --- | --- | ---: | ---: | ---: |\n")
+		for _, delta := range report.TrendDeltas {
+			fmt.Fprintf(&b, "| `%s` | `%s` | %+d | %+d | %+d |\n", delta.FromCohortID, delta.ToCohortID, delta.RankedRisksDelta, delta.HighSignalsDelta, delta.TrendScoreDelta)
+		}
+	}
+	fmt.Fprintf(&b, "\n## Suppressed fields\n\n")
+	for _, field := range report.Privacy.SuppressedFields {
+		fmt.Fprintf(&b, "- %s\n", field)
+	}
+	return b.String()
+}
+
+func repoMetricsHash(report repoMetricsReport) string {
+	copy := report
+	copy.Hash = ""
+	copy.Markdown = ""
+	return canonical.Hash(copy)
+}
+
+func countBucket(value int) string {
+	switch {
+	case value <= 0:
+		return "0"
+	case value <= 10:
+		return "1-10"
+	case value <= 100:
+		return "11-100"
+	case value <= 1000:
+		return "101-1000"
+	default:
+		return "1001+"
+	}
+}
+
+func bucketLowerBound(bucket string) int {
+	switch bucket {
+	case "1-10":
+		return 1
+	case "11-100":
+		return 11
+	case "101-1000":
+		return 101
+	case "1001+":
+		return 1001
+	default:
+		return 0
+	}
+}
+
+func scoreBucket(score int) string {
+	switch {
+	case score <= 0:
+		return "none"
+	case score < 10:
+		return "low"
+	case score < 50:
+		return "medium"
+	default:
+		return "high"
+	}
 }
 
 func buildRecurrenceReport(analyses []string) (recurrenceReport, error) {

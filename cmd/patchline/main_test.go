@@ -55,6 +55,56 @@ func TestPluginsListAndProbeCommands(t *testing.T) {
 	}
 }
 
+func TestRepoMetricsWritesPrivacyPreservingAggregates(t *testing.T) {
+	rootA := t.TempDir()
+	writeMainTestFile(t, rootA, "db/migrate/001_backfill.sql", "UPDATE accounts SET status = 'active';\n")
+	outA := filepath.Join(t.TempDir(), "analysis-a")
+	if err := run([]string{"repo", "analyze", rootA, "--stages", "inventory,baseline,propose,compare", "--proposal-kind", "all", "--budget", "files=2,lines=60,tokens=4000,changes=1", "--no-llm", "--out", outA, "--json"}); err != nil {
+		t.Fatalf("first repo analyze failed: %v", err)
+	}
+
+	rootB := t.TempDir()
+	writeMainTestFile(t, rootB, "db/migrate/001_backfill.sql", "UPDATE accounts SET status = 'active';\n")
+	writeMainTestFile(t, rootB, "db/migrate/002_delete.sql", "DELETE FROM account_events;\n")
+	outB := filepath.Join(t.TempDir(), "analysis-b")
+	if err := run([]string{"repo", "analyze", rootB, "--stages", "inventory,baseline,propose,compare", "--proposal-kind", "all", "--budget", "files=3,lines=60,tokens=4000,changes=2", "--no-llm", "--out", outB, "--json"}); err != nil {
+		t.Fatalf("second repo analyze failed: %v", err)
+	}
+
+	metricsOut := filepath.Join(t.TempDir(), "metrics")
+	if err := run([]string{"repo", "metrics", "--analyses", outA + "," + outB, "--salt", "team-local-salt", "--out", metricsOut, "--json"}); err != nil {
+		t.Fatalf("repo metrics failed: %v", err)
+	}
+	var report repoMetricsReport
+	readMainTestJSON(t, filepath.Join(metricsOut, "metrics.json"), &report)
+	if report.Version != "patchline.repo-metrics/v1" || !report.Shareable || !report.Privacy.SourceFree || !report.Privacy.RawEvidenceFree || !report.Privacy.PathFree {
+		t.Fatalf("expected shareable privacy-preserving metrics, got %#v", report)
+	}
+	if report.Summary.Analyses != 2 || len(report.Analyses) != 2 || len(report.TrendDeltas) != 1 {
+		t.Fatalf("expected two analyses and one delta, got summary=%#v analyses=%d deltas=%d", report.Summary, len(report.Analyses), len(report.TrendDeltas))
+	}
+	if report.Analyses[0].CohortID == report.Analyses[1].CohortID || strings.Contains(report.Analyses[0].CohortID, rootA) || strings.Contains(report.Analyses[1].CohortID, rootB) {
+		t.Fatalf("expected salted opaque cohort IDs, got %#v", report.Analyses)
+	}
+	data, err := os.ReadFile(filepath.Join(metricsOut, "metrics.json"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	serialized := string(data)
+	for _, forbidden := range []string{rootA, rootB, "db/migrate", "UPDATE accounts", "DELETE FROM", "001_backfill.sql", "002_delete.sql"} {
+		if strings.Contains(serialized, forbidden) {
+			t.Fatalf("metrics leaked forbidden raw/source value %q:\n%s", forbidden, serialized)
+		}
+	}
+	markdown, err := os.ReadFile(filepath.Join(metricsOut, "metrics.md"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(string(markdown), "privacy-preserving aggregate metrics") || !strings.Contains(string(markdown), "Suppressed fields") {
+		t.Fatalf("expected metrics markdown privacy summary:\n%s", string(markdown))
+	}
+}
+
 func TestGoldenFixtureGenerateCommand(t *testing.T) {
 	root := t.TempDir()
 	writeMainTestFile(t, root, "db/migrate/001_delete_events.sql", "DELETE FROM account_events;\n")

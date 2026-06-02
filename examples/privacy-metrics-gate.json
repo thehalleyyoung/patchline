@@ -1,0 +1,30 @@
+{
+  "version": "patchline.privacy-metrics-gate/v1",
+  "claim": "Patchline emits shareable aggregate metrics for risk trend comparison using only bucketed counts and salted cohort IDs, without source paths, raw evidence, prompts, generated content, or repository names.",
+  "real_code": [
+    {
+      "repo": "lobsters/lobsters",
+      "ref": "3b80b47aa5aaba37ec44413e7d1dc96fcf1585b6",
+      "subpath": "db/migrate"
+    },
+    {
+      "repo": "bytebase/bytebase",
+      "ref": "0765652ea2dbdf8e93ae44bff5acafc1b97a92cc",
+      "subpath": "backend/migrator/migration"
+    }
+  ],
+  "required_privacy_fields": [
+    "source_free",
+    "raw_evidence_free",
+    "path_free",
+    "salted_cohort_ids"
+  ],
+  "forbidden_terms": [
+    "lobsters/lobsters",
+    "bytebase/bytebase",
+    "db/migrate",
+    "backend/migrator/migration",
+    "prompt.txt",
+    "proposal.patch"
+  ]
+}
