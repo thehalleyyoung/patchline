@@ -1,0 +1,11 @@
+{
+  "version": "patchline.artifact-mirror-gate/v1",
+  "claim": "Patchline publishes public mirrors of its generated evidence but only after scanning each artifact for sensitive markers, so that reproducible non-sensitive results are shared while anything resembling a secret, private key, or access token is held back automatically rather than by manual review. The worker materializes candidate artifacts, scans each for a catalog of sensitivity markers, mirrors only the clean artifacts with their checksums, and quarantines the rest with the marker that triggered exclusion. The gate proves the clean artifacts are mirrored with checksums while an artifact containing a secret marker is quarantined and never appears in the public mirror.",
+  "real_repo": "patchline (self): public mirror with secret-marker quarantine",
+  "markers": ["PRIVATE KEY", "SECRET", "ACCESS_TOKEN"],
+  "artifacts": [
+    {"name": "metrics.json", "content": "{\"determinism\":true,\"gates\":190}"},
+    {"name": "summary.json", "content": "{\"status\":\"ok\",\"reproduced\":true}"},
+    {"name": "leaked.txt", "content": "ACCESS_TOKEN=abc123 do-not-publish"}
+  ]
+}
