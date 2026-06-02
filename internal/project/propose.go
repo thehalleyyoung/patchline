@@ -57,12 +57,13 @@ type ProposalReport struct {
 }
 
 type ProposalContext struct {
-	Version      string                `json:"version"`
-	BaselineHash string                `json:"baseline_hash"`
-	Kind         string                `json:"kind"`
-	Constraints  []string              `json:"constraints"`
-	Risks        []ProposalRiskContext `json:"risks"`
-	NativeChecks []Command             `json:"native_checks,omitempty"`
+	Version       string                `json:"version"`
+	BaselineHash  string                `json:"baseline_hash"`
+	Kind          string                `json:"kind"`
+	InventoryRoot string                `json:"inventory_root,omitempty"`
+	Constraints   []string              `json:"constraints"`
+	Risks         []ProposalRiskContext `json:"risks"`
+	NativeChecks  []Command             `json:"native_checks,omitempty"`
 }
 
 type ProposalRiskContext struct {
@@ -90,6 +91,11 @@ type GeneratedArtifact struct {
 	Kind    string
 	Content string
 	RiskIDs []string
+}
+
+type testPlacement struct {
+	Path     string
+	Language string
 }
 
 type ProposalBudget struct {
@@ -263,9 +269,10 @@ func LoadBaseline(path string) (BaselineReport, error) {
 
 func buildProposalContext(baseline BaselineReport, kind string, budget int) ProposalContext {
 	context := ProposalContext{
-		Version:      ProposalVersion,
-		BaselineHash: baseline.Hash,
-		Kind:         kind,
+		Version:       ProposalVersion,
+		BaselineHash:  baseline.Hash,
+		Kind:          kind,
+		InventoryRoot: baseline.InventoryRoot,
 		Constraints: []string{
 			"Generated output is untrusted until re-analyzed.",
 			"Do not assume production data access.",
@@ -385,7 +392,8 @@ func generateTemplateArtifacts(context ProposalContext) []GeneratedArtifact {
 			slug := safeProposalSlug(risk.ID + "-" + risk.Path)
 			switch kind {
 			case "tests":
-				artifacts = append(artifacts, GeneratedArtifact{Path: "patchline-proposals/tests/" + slug + ".md", Kind: kind, Content: renderTestProposal(risk), RiskIDs: []string{risk.ID}})
+				placement := languageAwareTestPlacement(context, risk, slug)
+				artifacts = append(artifacts, GeneratedArtifact{Path: placement.Path, Kind: kind, Content: renderTestProposal(risk, placement.Language), RiskIDs: []string{risk.ID}})
 			case "guards":
 				artifacts = append(artifacts, GeneratedArtifact{Path: "patchline-proposals/guards/" + slug + ".sql", Kind: kind, Content: renderGuardProposal(risk), RiskIDs: []string{risk.ID}})
 			case "instrumentation":
@@ -399,6 +407,77 @@ func generateTemplateArtifacts(context ProposalContext) []GeneratedArtifact {
 	}
 	sort.Slice(artifacts, func(i, j int) bool { return artifacts[i].Path < artifacts[j].Path })
 	return artifacts
+}
+
+func languageAwareTestPlacement(context ProposalContext, risk ProposalRiskContext, slug string) testPlacement {
+	lowerPath := strings.ToLower(filepath.ToSlash(risk.Path))
+	lowerRoot := strings.ToLower(filepath.ToSlash(context.InventoryRoot))
+	haystack := lowerPath + "\n" + lowerRoot
+	commands := strings.ToLower(nativeCommandText(context.NativeChecks))
+	switch {
+	case (strings.Contains(haystack, "db/migrate") && strings.HasSuffix(lowerPath, ".rb")) || isRailsMigrationFile(lowerPath) || strings.Contains(commands, "rails db:migrate") || strings.Contains(commands, "rails test"):
+		return testPlacement{Path: "test/patchline/" + slug + "_test.rb", Language: "ruby"}
+	case strings.Contains(commands, "manage.py") || (strings.Contains(haystack, "migrations") && strings.HasSuffix(lowerPath, ".py")):
+		return testPlacement{Path: "tests/patchline/test_" + slug + ".py", Language: "python"}
+	case strings.HasSuffix(lowerPath, ".go") || strings.Contains(commands, "go test") || strings.Contains(haystack, "/go/") || strings.Contains(haystack, "migrator/migration"):
+		return testPlacement{Path: "patchline-proposals/tests/" + slug + "_test.go", Language: "go"}
+	case strings.Contains(haystack, "src/main/resources") || strings.HasSuffix(lowerPath, ".java") || strings.HasSuffix(lowerPath, ".xml") || strings.Contains(commands, "mvn ") || strings.Contains(commands, "gradle"):
+		return testPlacement{Path: "src/test/java/patchline/" + javaClassName(slug) + "Test.java", Language: "java"}
+	case strings.Contains(haystack, "prisma") || strings.Contains(haystack, "typeorm") || strings.Contains(haystack, "database/migrations") || strings.HasSuffix(lowerPath, ".js") || strings.HasSuffix(lowerPath, ".ts") || strings.Contains(commands, "npm ") || strings.Contains(commands, "npx ") || strings.Contains(commands, "yarn "):
+		return testPlacement{Path: "test/patchline/" + slug + ".test.js", Language: "javascript"}
+	case strings.HasSuffix(lowerPath, ".py") || strings.Contains(commands, "pytest"):
+		return testPlacement{Path: "tests/patchline/test_" + slug + ".py", Language: "python"}
+	default:
+		return testPlacement{Path: "patchline-proposals/tests/" + slug + ".md", Language: "markdown"}
+	}
+}
+
+func isRailsMigrationFile(path string) bool {
+	base := filepath.Base(path)
+	if !strings.HasSuffix(base, ".rb") || len(base) < len("20060102150405_x.rb") {
+		return false
+	}
+	prefix := strings.TrimSuffix(base, ".rb")
+	if len(prefix) < 15 || prefix[14] != '_' {
+		return false
+	}
+	for _, r := range prefix[:14] {
+		if r < '0' || r > '9' {
+			return false
+		}
+	}
+	return true
+}
+
+func nativeCommandText(commands []Command) string {
+	var parts []string
+	for _, command := range commands {
+		parts = append(parts, command.Command, command.Reason)
+	}
+	return strings.Join(parts, "\n")
+}
+
+func javaClassName(slug string) string {
+	parts := strings.FieldsFunc(slug, func(r rune) bool {
+		return r == '-' || r == '_' || r == '.' || r == '/'
+	})
+	if len(parts) == 0 {
+		return "PatchlineGenerated"
+	}
+	var b strings.Builder
+	for _, part := range parts {
+		if part == "" {
+			continue
+		}
+		b.WriteString(strings.ToUpper(part[:1]))
+		if len(part) > 1 {
+			b.WriteString(part[1:])
+		}
+	}
+	if b.Len() == 0 {
+		return "PatchlineGenerated"
+	}
+	return b.String()
 }
 
 func expandProposalKinds(kind string) []string {
@@ -530,13 +609,13 @@ func buildRepairIntervention(baselineHash, outputHash string, riskIDs []string, 
 	}
 }
 
-func renderTestProposal(risk ProposalRiskContext) string {
-	return fmt.Sprintf(`# Untrusted generated test proposal
+func renderTestProposal(risk ProposalRiskContext, language string) string {
+	body := fmt.Sprintf(`Untrusted generated test proposal
 
-- risk: %s
-- path: %s
-- table: %s
-- rationale: %s
+risk: %s
+path: %s
+table: %s
+rationale: %s
 
 Suggested assertions:
 
@@ -544,6 +623,26 @@ Suggested assertions:
 2. Run the project-native migration or repair path touching %q.
 3. Assert row counts, scoped predicates, and rollback behavior before accepting the change.
 `, risk.ID, risk.Path, risk.Table, risk.Rationale, risk.Table, risk.Table)
+	switch language {
+	case "ruby", "python":
+		return commentLines(body, "# ")
+	case "go", "java", "javascript":
+		return commentLines(body, "// ")
+	default:
+		return "# " + strings.ReplaceAll(body, "\n", "\n")
+	}
+}
+
+func commentLines(content, prefix string) string {
+	lines := strings.Split(strings.TrimSuffix(content, "\n"), "\n")
+	for i, line := range lines {
+		if strings.TrimSpace(line) == "" {
+			lines[i] = prefix
+		} else {
+			lines[i] = prefix + line
+		}
+	}
+	return strings.Join(lines, "\n") + "\n"
 }
 
 func renderGuardProposal(risk ProposalRiskContext) string {

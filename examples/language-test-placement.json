@@ -1,0 +1,11 @@
+{
+  "version": "patchline.language-test-placement/v1",
+  "cases": [
+    {"id": "rails", "repo": "lobsters/lobsters", "ref": "3b80b47aa5aaba37ec44413e7d1dc96fcf1585b6", "subpath": "db/migrate", "expected_prefix": "test/patchline/", "expected_suffix": "_test.rb"},
+    {"id": "django", "repo": "django/django", "ref": "9383fae0d55a553be3bda620db87fa9ee8a81478", "subpath": "django/contrib/auth/migrations", "expected_prefix": "tests/patchline/", "expected_suffix": ".py"},
+    {"id": "go", "repo": "bytebase/bytebase", "ref": "0765652ea2dbdf8e93ae44bff5acafc1b97a92cc", "subpath": "backend/migrator/migration", "expected_prefix": "patchline-proposals/tests/", "expected_suffix": "_test.go"},
+    {"id": "java", "repo": "keycloak/keycloak", "ref": "bf0df40a91a05e550891dcdae2d922b556db7e7b", "subpath": "model/jpa/src/main/resources/META-INF", "expected_prefix": "src/test/java/patchline/", "expected_suffix": "Test.java"},
+    {"id": "node", "repo": "calcom/cal.com", "ref": "180ede28f0bddf2738933a6e60a8e80f6116d7da", "subpath": "packages/prisma/migrations", "expected_prefix": "test/patchline/", "expected_suffix": ".test.js"},
+    {"id": "python", "repo": "apache/airflow", "ref": "707e3168816bedc52f30a2e675af2dfc5b8cd4d8", "subpath": "airflow-core/src/airflow/migrations/versions", "expected_prefix": "tests/patchline/", "expected_suffix": ".py"}
+  ]
+}

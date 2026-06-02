@@ -259,6 +259,69 @@ func TestWriteInventoryEmitsFactsAndProjectMap(t *testing.T) {
 	}
 }
 
+func TestLanguageAwareTestPlacement(t *testing.T) {
+	tests := []struct {
+		name     string
+		context  ProposalContext
+		risk     ProposalRiskContext
+		wantPath string
+		wantText string
+	}{
+		{
+			name:     "rails",
+			risk:     ProposalRiskContext{ID: "risk:1", Path: "db/migrate/001_drop_users.rb", Table: "users"},
+			wantPath: "test/patchline/risk-1-db-migrate-001-drop-users-rb_test.rb",
+			wantText: "# Untrusted generated test proposal",
+		},
+		{
+			name:     "django",
+			context:  ProposalContext{NativeChecks: []Command{{Command: "python manage.py test"}}},
+			risk:     ProposalRiskContext{ID: "risk:2", Path: "django/contrib/auth/migrations/0001_initial.py", Table: "auth_user"},
+			wantPath: "tests/patchline/test_risk-2-django-contrib-auth-migrations-0001-initial-py.py",
+			wantText: "# Untrusted generated test proposal",
+		},
+		{
+			name:     "go",
+			context:  ProposalContext{NativeChecks: []Command{{Command: "go test ./..."}}},
+			risk:     ProposalRiskContext{ID: "risk:3", Path: "backend/migrator/migration/001.sql", Table: "instances"},
+			wantPath: "patchline-proposals/tests/risk-3-backend-migrator-migration-001-sql_test.go",
+			wantText: "// Untrusted generated test proposal",
+		},
+		{
+			name:     "java",
+			risk:     ProposalRiskContext{ID: "risk:4", Path: "src/main/resources/db/migration/V1__init.sql", Table: "accounts"},
+			wantPath: "src/test/java/patchline/Risk4SrcMainResourcesDbMigrationV1InitSqlTest.java",
+			wantText: "// Untrusted generated test proposal",
+		},
+		{
+			name:     "node",
+			context:  ProposalContext{NativeChecks: []Command{{Command: "npm test"}}},
+			risk:     ProposalRiskContext{ID: "risk:5", Path: "packages/prisma/migrations/001/migration.sql", Table: "users"},
+			wantPath: "test/patchline/risk-5-packages-prisma-migrations-001-migration-sql.test.js",
+			wantText: "// Untrusted generated test proposal",
+		},
+		{
+			name:     "fallback",
+			risk:     ProposalRiskContext{ID: "risk:6", Path: "migrations/001.sql", Table: "users"},
+			wantPath: "patchline-proposals/tests/risk-6-migrations-001-sql.md",
+			wantText: "# Untrusted generated test proposal",
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			slug := safeProposalSlug(tt.risk.ID + "-" + tt.risk.Path)
+			placement := languageAwareTestPlacement(tt.context, tt.risk, slug)
+			if placement.Path != tt.wantPath {
+				t.Fatalf("path mismatch: got %q want %q", placement.Path, tt.wantPath)
+			}
+			content := renderTestProposal(tt.risk, placement.Language)
+			if !strings.Contains(content, tt.wantText) {
+				t.Fatalf("expected %q in content:\n%s", tt.wantText, content)
+			}
+		})
+	}
+}
+
 func TestIdentifiersIgnoreSQLExistenceKeywords(t *testing.T) {
 	ids := identifiersFromText("CREATE TABLE IF NOT EXISTS sheet_blob (id int); ALTER TABLE IF EXISTS sheet ADD COLUMN x int; update the record")
 	var values []string
