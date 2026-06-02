@@ -161,6 +161,36 @@ func TestBuildWhyNowReportFindsNewRisks(t *testing.T) {
 	}
 }
 
+func TestBuildPRCommentReportOnlyIncludesNewAndChangedRisks(t *testing.T) {
+	unchanged := project.BaselineRisk{ID: "risk:unchanged", StableID: "stable-risk:unchanged000", Path: "db/migrate/001.sql", Kind: "sql", Table: "accounts", Severity: "medium", Score: 60, Rationale: "same"}
+	changedBase := project.BaselineRisk{ID: "risk:changed", StableID: "stable-risk:changed0000", Path: "db/migrate/002.sql", Kind: "sql", Table: "users", Severity: "medium", Score: 50, Rationale: "old"}
+	changedHead := changedBase
+	changedHead.Severity = "high"
+	changedHead.Score = 90
+	changedHead.Rationale = "new broader write"
+	newRisk := project.BaselineRisk{ID: "risk:new", StableID: "stable-risk:new000000000", Path: "db/migrate/003.sql", Kind: "sql", Table: "payments", Severity: "high", Score: 95, Rationale: "new risk"}
+	report := buildPRCommentReport(
+		project.BaselineReport{Hash: "base", Risks: []project.BaselineRisk{unchanged, changedBase}},
+		project.BaselineReport{Hash: "head", Risks: []project.BaselineRisk{unchanged, changedHead, newRisk}},
+		10,
+	)
+	if report.Summary.NewFindings != 1 || report.Summary.ChangedFindings != 1 || report.Summary.UnchangedRisks != 1 || len(report.Findings) != 2 {
+		t.Fatalf("unexpected PR comment report: %#v", report)
+	}
+	if strings.Contains(report.Markdown, "stable-risk:unchanged") || !strings.Contains(report.Markdown, "Only new or changed") || !strings.Contains(report.Markdown, "severity medium -> high") {
+		t.Fatalf("unexpected markdown:\n%s", report.Markdown)
+	}
+	out := filepath.Join(t.TempDir(), "pr-comment")
+	if err := writePRCommentReport(out, report); err != nil {
+		t.Fatal(err)
+	}
+	for _, name := range []string{"pr-comment.json", "pr-comment.md"} {
+		if _, err := os.Stat(filepath.Join(out, name)); err != nil {
+			t.Fatal(err)
+		}
+	}
+}
+
 func TestBuildChangesReportComparesAnalysisArtifacts(t *testing.T) {
 	root := t.TempDir()
 	previous := filepath.Join(root, "previous")

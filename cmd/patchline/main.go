@@ -411,6 +411,7 @@ Usage:
   patchline repo suppressions --baseline baseline-dir --suppressions suppressions.json [--out dir] [--json]
   patchline repo why-now --previous baseline-dir --current baseline-dir [--out dir] [--json]
   patchline repo changes --previous analysis-dir --current analysis-dir [--out dir] [--json]
+  patchline repo pr-comment --base baseline-dir --head baseline-dir [--max-findings N] [--out dir] [--json]
   patchline repo notify-summary --analysis analysis-dir [--bundle-link url] [--out dir] [--json]
   patchline repo minimize --analysis analysis-dir [--out dir] [--json]
   patchline repo recurrence --analyses analysis-dir[,analysis-dir...] [--out dir] [--json]
@@ -530,6 +531,8 @@ func repoCommand(args []string) error {
 		return repoWhyNow(args[1:])
 	case "changes":
 		return repoChanges(args[1:])
+	case "pr-comment":
+		return repoPRComment(args[1:])
 	case "notify-summary":
 		return repoNotifySummary(args[1:])
 	case "minimize":
@@ -768,6 +771,42 @@ type whyNowRisk struct {
 	Severity string `json:"severity"`
 	Score    int    `json:"score"`
 	Reason   string `json:"reason"`
+}
+
+type prCommentReport struct {
+	Version     string             `json:"version"`
+	BaseHash    string             `json:"base_hash"`
+	HeadHash    string             `json:"head_hash"`
+	Summary     prCommentSummary   `json:"summary"`
+	Findings    []prCommentFinding `json:"findings,omitempty"`
+	Truncated   bool               `json:"truncated"`
+	PostCommand string             `json:"post_command,omitempty"`
+	Hash        string             `json:"hash"`
+	Markdown    string             `json:"markdown,omitempty"`
+}
+
+type prCommentSummary struct {
+	BaseRisks        int `json:"base_risks"`
+	HeadRisks        int `json:"head_risks"`
+	NewFindings      int `json:"new_findings"`
+	ChangedFindings  int `json:"changed_findings"`
+	UnchangedRisks   int `json:"unchanged_risks"`
+	RenderedFindings int `json:"rendered_findings"`
+}
+
+type prCommentFinding struct {
+	Status           string `json:"status"`
+	StableID         string `json:"stable_id"`
+	RiskID           string `json:"risk_id"`
+	Path             string `json:"path"`
+	Kind             string `json:"kind"`
+	Table            string `json:"table,omitempty"`
+	Severity         string `json:"severity"`
+	PreviousSeverity string `json:"previous_severity,omitempty"`
+	Score            int    `json:"score"`
+	PreviousScore    int    `json:"previous_score,omitempty"`
+	Reason           string `json:"reason"`
+	Rationale        string `json:"rationale,omitempty"`
 }
 
 type changesReport struct {
@@ -3200,6 +3239,211 @@ func renderWhyNowMarkdown(report whyNowReport) string {
 		for _, risk := range report.NewRisks[:limit] {
 			fmt.Fprintf(&b, "| `%s` | %d | %s | %s | %s |\n", risk.StableID, risk.Score, risk.Severity, risk.Path, risk.Reason)
 		}
+	}
+	return b.String()
+}
+
+func repoPRComment(args []string) error {
+	fs := flag.NewFlagSet("repo pr-comment", flag.ContinueOnError)
+	fs.SetOutput(ioDiscard{})
+	basePath := fs.String("base", "", "base branch baseline output directory or baseline.json")
+	headPath := fs.String("head", "", "head branch baseline output directory or baseline.json")
+	maxFindings := fs.Int("max-findings", 20, "maximum new or changed findings to render in the PR comment")
+	outPath := fs.String("out", "", "output directory")
+	jsonOut := fs.Bool("json", false, "emit JSON")
+	if err := fs.Parse(args); err != nil {
+		return err
+	}
+	if *basePath == "" || *headPath == "" || fs.NArg() != 0 {
+		return errors.New("usage: patchline repo pr-comment --base baseline-dir --head baseline-dir [--max-findings N] [--out dir] [--json]")
+	}
+	base, err := project.LoadBaseline(*basePath)
+	if err != nil {
+		return err
+	}
+	head, err := project.LoadBaseline(*headPath)
+	if err != nil {
+		return err
+	}
+	report := buildPRCommentReport(base, head, *maxFindings)
+	if *outPath != "" {
+		if err := writePRCommentReport(*outPath, report); err != nil {
+			return err
+		}
+	}
+	if *jsonOut {
+		return writeJSON(os.Stdout, report)
+	}
+	fmt.Printf("pr-comment new=%d changed=%d rendered=%d hash=%s\n", report.Summary.NewFindings, report.Summary.ChangedFindings, report.Summary.RenderedFindings, report.Hash)
+	if *outPath != "" {
+		fmt.Printf("  out=%s\n", *outPath)
+	}
+	return nil
+}
+
+func buildPRCommentReport(base, head project.BaselineReport, maxFindings int) prCommentReport {
+	if maxFindings <= 0 {
+		maxFindings = 20
+	}
+	baseByKey := risksByStableID(base.Risks)
+	headByKey := risksByStableID(head.Risks)
+	report := prCommentReport{
+		Version:  "patchline.pr-comment/v1",
+		BaseHash: base.Hash,
+		HeadHash: head.Hash,
+		Summary: prCommentSummary{
+			BaseRisks: len(baseByKey),
+			HeadRisks: len(headByKey),
+		},
+	}
+	for stableID, risk := range headByKey {
+		previous, existed := baseByKey[stableID]
+		if !existed {
+			report.Findings = append(report.Findings, prCommentFindingFromRisk(risk, "new", project.BaselineRisk{}, "stable risk key is present in the PR baseline but absent from the base baseline"))
+			continue
+		}
+		if prRiskSignature(previous) != prRiskSignature(risk) {
+			report.Findings = append(report.Findings, prCommentFindingFromRisk(risk, "changed", previous, prRiskChangeReason(previous, risk)))
+		} else {
+			report.Summary.UnchangedRisks++
+		}
+	}
+	sort.Slice(report.Findings, func(i, j int) bool {
+		if report.Findings[i].Status != report.Findings[j].Status {
+			return report.Findings[i].Status == "new"
+		}
+		if report.Findings[i].Score != report.Findings[j].Score {
+			return report.Findings[i].Score > report.Findings[j].Score
+		}
+		return report.Findings[i].StableID < report.Findings[j].StableID
+	})
+	for _, finding := range report.Findings {
+		if finding.Status == "new" {
+			report.Summary.NewFindings++
+		}
+		if finding.Status == "changed" {
+			report.Summary.ChangedFindings++
+		}
+	}
+	if len(report.Findings) > maxFindings {
+		report.Findings = append([]prCommentFinding(nil), report.Findings[:maxFindings]...)
+		report.Truncated = true
+	}
+	report.Summary.RenderedFindings = len(report.Findings)
+	report.PostCommand = `gh pr comment "$PR_NUMBER" --body-file pr-comment.md`
+	report.Hash = prCommentHash(report)
+	report.Markdown = renderPRCommentMarkdown(report)
+	return report
+}
+
+func prCommentFindingFromRisk(risk project.BaselineRisk, status string, previous project.BaselineRisk, reason string) prCommentFinding {
+	stableID := risk.StableID
+	if stableID == "" {
+		stableID = risk.ID
+	}
+	finding := prCommentFinding{
+		Status:    status,
+		StableID:  stableID,
+		RiskID:    risk.ID,
+		Path:      risk.Path,
+		Kind:      risk.Kind,
+		Table:     risk.Table,
+		Severity:  risk.Severity,
+		Score:     risk.Score,
+		Reason:    reason,
+		Rationale: risk.Rationale,
+	}
+	if previous.ID != "" {
+		finding.PreviousSeverity = previous.Severity
+		finding.PreviousScore = previous.Score
+	}
+	return finding
+}
+
+func prRiskSignature(risk project.BaselineRisk) string {
+	return strings.Join([]string{
+		risk.Path,
+		risk.Kind,
+		risk.Table,
+		risk.Severity,
+		fmt.Sprintf("%d", risk.Score),
+		risk.Rationale,
+	}, "\x00")
+}
+
+func prRiskChangeReason(previous, current project.BaselineRisk) string {
+	var reasons []string
+	if previous.Severity != current.Severity {
+		reasons = append(reasons, "severity "+previous.Severity+" -> "+current.Severity)
+	}
+	if previous.Score != current.Score {
+		reasons = append(reasons, fmt.Sprintf("score %d -> %d", previous.Score, current.Score))
+	}
+	if previous.Path != current.Path {
+		reasons = append(reasons, "path changed")
+	}
+	if previous.Kind != current.Kind {
+		reasons = append(reasons, "kind changed")
+	}
+	if previous.Table != current.Table {
+		reasons = append(reasons, "table changed")
+	}
+	if previous.Rationale != current.Rationale {
+		reasons = append(reasons, "rationale changed")
+	}
+	if len(reasons) == 0 {
+		return "risk details changed"
+	}
+	return strings.Join(reasons, "; ")
+}
+
+func writePRCommentReport(outDir string, report prCommentReport) error {
+	if err := os.MkdirAll(outDir, 0o755); err != nil {
+		return err
+	}
+	copy := report
+	copy.Markdown = ""
+	data, err := json.MarshalIndent(copy, "", "  ")
+	if err != nil {
+		return err
+	}
+	if err := os.WriteFile(filepath.Join(outDir, "pr-comment.json"), append(data, '\n'), 0o644); err != nil {
+		return err
+	}
+	return os.WriteFile(filepath.Join(outDir, "pr-comment.md"), []byte(report.Markdown), 0o644)
+}
+
+func prCommentHash(report prCommentReport) string {
+	copy := report
+	copy.Hash = ""
+	copy.Markdown = ""
+	return canonical.Hash(copy)
+}
+
+func renderPRCommentMarkdown(report prCommentReport) string {
+	var b strings.Builder
+	fmt.Fprintf(&b, "## Patchline data-risk changes\n\n")
+	fmt.Fprintf(&b, "Only new or changed data-risk findings are shown. Unchanged baseline risks are intentionally omitted.\n\n")
+	fmt.Fprintf(&b, "| metric | count |\n| --- | ---: |\n")
+	fmt.Fprintf(&b, "| base risks | %d |\n", report.Summary.BaseRisks)
+	fmt.Fprintf(&b, "| head risks | %d |\n", report.Summary.HeadRisks)
+	fmt.Fprintf(&b, "| new findings | %d |\n", report.Summary.NewFindings)
+	fmt.Fprintf(&b, "| changed findings | %d |\n", report.Summary.ChangedFindings)
+	fmt.Fprintf(&b, "| unchanged omitted | %d |\n\n", report.Summary.UnchangedRisks)
+	if len(report.Findings) == 0 {
+		fmt.Fprintf(&b, "No new or changed data-risk findings were detected.\n")
+		return b.String()
+	}
+	fmt.Fprintf(&b, "| status | severity | score | path | kind | table | reason |\n| --- | --- | ---: | --- | --- | --- | --- |\n")
+	for _, finding := range report.Findings {
+		severity := finding.Severity
+		if finding.PreviousSeverity != "" && finding.PreviousSeverity != finding.Severity {
+			severity = finding.PreviousSeverity + " -> " + finding.Severity
+		}
+		fmt.Fprintf(&b, "| %s | %s | %d | `%s` | %s | %s | %s |\n", finding.Status, severity, finding.Score, finding.Path, finding.Kind, finding.Table, finding.Reason)
+	}
+	if report.Truncated {
+		fmt.Fprintf(&b, "\n_Comment truncated to %d rendered findings; inspect the Patchline analysis bundle for the complete machine-readable report._\n", report.Summary.RenderedFindings)
 	}
 	return b.String()
 }

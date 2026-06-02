@@ -67,6 +67,8 @@ Add `--redact` to write `analysis-bundle/` copies with stable redaction tokens f
 
 Add `--ci` to write `ci/summary.md` plus a GitHub Actions upload snippet for `github/codeql-action/upload-sarif` and `actions/upload-artifact`, pointing at `analysis-bundle/summary.sarif` and the full analysis bundle.
 
+For pull requests, `repo pr-comment --base <baseline> --head <baseline>` writes a Markdown body that includes only new or changed data-risk findings; the composite GitHub Action can post that body when `comment-on-pr: "true"` and a pull-request token are provided.
+
 For example, with an OpenAI key already exported as `OPENAI_API_KEY` or `openai_api_key`, you can pass a command that reads Patchline's prompt from stdin and writes generated text to stdout:
 
 ```bash

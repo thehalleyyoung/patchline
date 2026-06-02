@@ -22,6 +22,18 @@ inputs:
     description: Output directory for summary.json, summary.md, and summary.sarif.
     required: false
     default: "results/patchline-intake"
+  comment-on-pr:
+    description: When true on pull_request events, post a comment containing only new or changed data-risk findings.
+    required: false
+    default: "false"
+  github-token:
+    description: GitHub token with pull-requests:write permission for comment-on-pr mode.
+    required: false
+    default: ""
+  max-comment-findings:
+    description: Maximum new or changed findings to render in the pull request comment.
+    required: false
+    default: "20"
 
 runs:
   using: composite
@@ -42,3 +54,47 @@ runs:
         go run github.com/thehalleyyoung/patchline/cmd/patchline@main intake \
           "${{ inputs.path }}" \
           --out "${{ inputs.out }}"
+    - name: Analyze pull request base
+      if: ${{ inputs.comment-on-pr == 'true' && github.event_name == 'pull_request' }}
+      shell: bash
+      run: |
+        go run github.com/thehalleyyoung/patchline/cmd/patchline@main repo analyze \
+          --github "${{ github.repository }}" \
+          --ref "${{ github.event.pull_request.base.sha }}" \
+          --subpath "${{ inputs.subpath }}" \
+          --stages inventory,baseline \
+          --ci \
+          --out "${{ inputs.out }}/pr-base"
+    - name: Analyze pull request head
+      if: ${{ inputs.comment-on-pr == 'true' && github.event_name == 'pull_request' }}
+      shell: bash
+      run: |
+        go run github.com/thehalleyyoung/patchline/cmd/patchline@main repo analyze \
+          "${{ inputs.path }}" \
+          --stages inventory,baseline \
+          --ci \
+          --out "${{ inputs.out }}/pr-head"
+    - name: Build pull request comment
+      if: ${{ inputs.comment-on-pr == 'true' && github.event_name == 'pull_request' }}
+      shell: bash
+      run: |
+        go run github.com/thehalleyyoung/patchline/cmd/patchline@main repo pr-comment \
+          --base "${{ inputs.out }}/pr-base/baseline" \
+          --head "${{ inputs.out }}/pr-head/baseline" \
+          --max-findings "${{ inputs.max-comment-findings }}" \
+          --out "${{ inputs.out }}/pr-comment"
+    - name: Comment on pull request
+      if: ${{ inputs.comment-on-pr == 'true' && github.event_name == 'pull_request' }}
+      shell: bash
+      env:
+        GH_TOKEN: ${{ inputs.github-token }}
+      run: |
+        if [ -z "${GH_TOKEN:-}" ]; then
+          echo "::error::github-token is required when comment-on-pr is true"
+          exit 1
+        fi
+        gh pr comment "${{ github.event.pull_request.number }}" \
+          --repo "${{ github.repository }}" \
+          --body-file "${{ inputs.out }}/pr-comment/pr-comment.md" \
+          --edit-last \
+          --create-if-none
