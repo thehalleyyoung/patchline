@@ -111,7 +111,7 @@ Patchline also emits runnable follow-up commands such as:
 patchline analyze-migration .../backend/migrator/migration/3.1/0000##sheet_blob.sql --json
 ```
 
-Migration analysis can normalize PostgreSQL, MySQL, SQLite, SQL Server, Oracle, and BigQuery syntax with `--dialect`; source scanning also extracts ORM write effects, transaction-boundary evidence, idempotency signals, and lock/concurrency hazards from common application frameworks.
+Migration analysis can normalize PostgreSQL, MySQL, SQLite, SQL Server, Oracle, and BigQuery syntax with `--dialect`; source scanning also extracts ORM write effects, transaction-boundary evidence, idempotency signals, lock/concurrency hazards, and data-retention/privacy hazards from common application frameworks.
 
 That is the core value: before you write custom labels, manifests, or benchmark cases, Patchline can already tell you where risky data transitions, possible causes, and possible repair/rollback evidence are hiding in a real project.
 

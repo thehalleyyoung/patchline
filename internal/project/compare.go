@@ -30,6 +30,7 @@ type CompareReport struct {
 	Transactions    []TransactionBoundary `json:"transaction_boundaries,omitempty"`
 	Idempotency     []IdempotencyClass    `json:"idempotency_classifications,omitempty"`
 	LockHazards     []LockHazard          `json:"lock_concurrency_hazards,omitempty"`
+	PrivacyHazards  []PrivacyHazard       `json:"data_retention_privacy_hazards,omitempty"`
 	NativeChecks    []Command             `json:"native_checks,omitempty"`
 	NativeResults   []NativeResult        `json:"native_results,omitempty"`
 	Review          []ReviewItem          `json:"review,omitempty"`
@@ -69,6 +70,11 @@ type CompareSummary struct {
 	LockHazardHigh        int  `json:"lock_hazard_high"`
 	LockHazardMedium      int  `json:"lock_hazard_medium"`
 	LockHazardLow         int  `json:"lock_hazard_low"`
+	PrivacyHazards        int  `json:"data_retention_privacy_hazards"`
+	PrivacyCritical       int  `json:"privacy_hazard_critical"`
+	PrivacyHigh           int  `json:"privacy_hazard_high"`
+	PrivacyMedium         int  `json:"privacy_hazard_medium"`
+	PrivacyLow            int  `json:"privacy_hazard_low"`
 	InterventionLoops     int  `json:"intervention_loops"`
 	InterventionAccepted  int  `json:"intervention_accepted"`
 	InterventionRejected  int  `json:"intervention_rejected"`
@@ -174,6 +180,7 @@ func CompareWithOptions(baseline BaselineReport, proposal ProposalReport, opts C
 	report.Transactions = generatedTransactionBoundaries(proposal.Generated)
 	report.Idempotency = generatedIdempotencyClasses(proposal.Generated)
 	report.LockHazards = generatedLockHazards(proposal.Generated)
+	report.PrivacyHazards = generatedPrivacyHazards(proposal.Generated)
 	report.NativeResults = runNativeChecks(baseline.InventoryRoot, baseline.NativeChecks, opts)
 	report.Summary = summarizeCompare(baseline, proposal, checks, report.RiskDeltas, report.NativeResults)
 	report.Summary.TransactionBoundaries = len(report.Transactions)
@@ -190,6 +197,11 @@ func CompareWithOptions(baseline BaselineReport, proposal ProposalReport, opts C
 	report.Summary.LockHazardHigh = countLockHazardSeverity(report.LockHazards, "high")
 	report.Summary.LockHazardMedium = countLockHazardSeverity(report.LockHazards, "medium")
 	report.Summary.LockHazardLow = countLockHazardSeverity(report.LockHazards, "low")
+	report.Summary.PrivacyHazards = len(report.PrivacyHazards)
+	report.Summary.PrivacyCritical = countPrivacyHazardSeverity(report.PrivacyHazards, "critical")
+	report.Summary.PrivacyHigh = countPrivacyHazardSeverity(report.PrivacyHazards, "high")
+	report.Summary.PrivacyMedium = countPrivacyHazardSeverity(report.PrivacyHazards, "medium")
+	report.Summary.PrivacyLow = countPrivacyHazardSeverity(report.PrivacyHazards, "low")
 	report.Intervention = buildInterventionLoop(baseline, proposal, report.Summary)
 	report.Summary.InterventionLoops = 1
 	if report.Intervention.Status == "accepted-for-review" {
@@ -567,6 +579,46 @@ func generatedLockHazards(generated []GeneratedArtifact) []LockHazard {
 func generatedArtifactNeedsLockHazard(artifact GeneratedArtifact) bool {
 	lower := strings.ToLower(artifact.Kind + " " + artifact.Path + " " + artifact.Content)
 	return containsAny(lower, "alter table", "create index", "add index", "lock table", "for update", "truncate", "drop ", "update ", "delete ", "merge ", "algorithm=copy", "worker", "background", "backfill", "repair", "guard", "select count", "candidate_rows")
+}
+
+func generatedPrivacyHazards(generated []GeneratedArtifact) []PrivacyHazard {
+	var out []PrivacyHazard
+	for _, artifact := range generated {
+		if artifact.Content == "" || !generatedArtifactNeedsPrivacyHazard(artifact) {
+			continue
+		}
+		riskID := ""
+		if len(artifact.RiskIDs) > 0 {
+			riskID = artifact.RiskIDs[0]
+		}
+		operation := generatedArtifactOperation(artifact)
+		severity, markers, mitigations := classifyPrivacyHazard(artifact.Content, BaselineRisk{ID: riskID, Path: artifact.Path, Kind: operation}, ProvenanceSlice{})
+		out = append(out, PrivacyHazard{
+			ID:          "privacy:" + canonical.Hash("generated\x00" + artifact.Path + "\x00" + canonical.Hash(artifact.Content))[:16],
+			RiskID:      riskID,
+			Path:        artifact.Path,
+			Surface:     "generated_script",
+			Operation:   operation,
+			Severity:    severity,
+			Confidence:  privacyHazardConfidence(severity, artifact.Content),
+			Markers:     markers,
+			Mitigations: mitigations,
+			Evidence:    []string{"generated artifact re-scanned by compare"},
+			Rationale:   privacyHazardRationale(severity, "generated_script"),
+		})
+	}
+	sort.Slice(out, func(i, j int) bool {
+		if out[i].Severity != out[j].Severity {
+			return privacyHazardSeverityRank(out[i].Severity) > privacyHazardSeverityRank(out[j].Severity)
+		}
+		return out[i].Path < out[j].Path
+	})
+	return out
+}
+
+func generatedArtifactNeedsPrivacyHazard(artifact GeneratedArtifact) bool {
+	lower := strings.ToLower(artifact.Kind + " " + artifact.Path + " " + artifact.Content)
+	return containsAny(lower, "delete ", "delete from", "truncate", "drop ", "update ", "export", "dump", "select *", "copy ", "csv", "parquet", "anonym", "redact", "mask", "scrub", "privacy", "retention", "gdpr", "ccpa", "email", "phone", "address", "user", "customer", "account", "rollback", "repair", "backfill", "guard", "candidate_rows")
 }
 
 func summarizeCompare(baseline BaselineReport, proposal ProposalReport, checks []GeneratedCheck, deltas []RiskDelta, nativeResults []NativeResult) CompareSummary {
@@ -1009,6 +1061,11 @@ func renderCompareMarkdown(report CompareReport) string {
 	fmt.Fprintf(&b, "| lock hazard high | %d |\n", report.Summary.LockHazardHigh)
 	fmt.Fprintf(&b, "| lock hazard medium | %d |\n", report.Summary.LockHazardMedium)
 	fmt.Fprintf(&b, "| lock hazard low | %d |\n", report.Summary.LockHazardLow)
+	fmt.Fprintf(&b, "| data-retention/privacy hazards | %d |\n", report.Summary.PrivacyHazards)
+	fmt.Fprintf(&b, "| privacy hazard critical | %d |\n", report.Summary.PrivacyCritical)
+	fmt.Fprintf(&b, "| privacy hazard high | %d |\n", report.Summary.PrivacyHigh)
+	fmt.Fprintf(&b, "| privacy hazard medium | %d |\n", report.Summary.PrivacyMedium)
+	fmt.Fprintf(&b, "| privacy hazard low | %d |\n", report.Summary.PrivacyLow)
 	fmt.Fprintf(&b, "| intervention loops | %d |\n", report.Summary.InterventionLoops)
 	fmt.Fprintf(&b, "| intervention accepted | %d |\n", report.Summary.InterventionAccepted)
 	fmt.Fprintf(&b, "| intervention rejected | %d |\n\n", report.Summary.InterventionRejected)
@@ -1068,6 +1125,13 @@ func renderCompareMarkdown(report CompareReport) string {
 	if len(report.LockHazards) > 0 {
 		fmt.Fprintf(&b, "## Generated lock and concurrency hazards\n\n| severity | path | operation | markers | mitigations |\n| --- | --- | --- | --- | --- |\n")
 		for _, item := range report.LockHazards {
+			fmt.Fprintf(&b, "| %s | %s | %s | %s | %s |\n", item.Severity, item.Path, item.Operation, strings.Join(item.Markers, ", "), strings.Join(item.Mitigations, ", "))
+		}
+		fmt.Fprintf(&b, "\n")
+	}
+	if len(report.PrivacyHazards) > 0 {
+		fmt.Fprintf(&b, "## Generated data-retention and privacy hazards\n\n| severity | path | operation | markers | mitigations |\n| --- | --- | --- | --- | --- |\n")
+		for _, item := range report.PrivacyHazards {
 			fmt.Fprintf(&b, "| %s | %s | %s | %s | %s |\n", item.Severity, item.Path, item.Operation, strings.Join(item.Markers, ", "), strings.Join(item.Mitigations, ", "))
 		}
 		fmt.Fprintf(&b, "\n")

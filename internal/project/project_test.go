@@ -1029,6 +1029,68 @@ func TestCompareClassifiesGeneratedLockHazards(t *testing.T) {
 	}
 }
 
+func TestBaselineClassifiesDataRetentionPrivacyHazards(t *testing.T) {
+	root := t.TempDir()
+	writeFile(t, root, "db/migrate/001_privacy.sql", "DELETE FROM users;\nUPDATE customer_profiles SET email = NULL, phone = NULL;\n")
+	writeFile(t, root, "scripts/export_users.py", "import pandas as pd\nusers.to_csv('users.csv')\n")
+	writeFile(t, root, "docs/privacy-runbook.md", "GDPR erasure runbook: dry-run first, snapshot backup, then delete users older than retention_days.")
+	inv, err := InventoryPath(InventoryOptions{Path: root})
+	if err != nil {
+		t.Fatal(err)
+	}
+	intakeReport, err := intake.Run(context.Background(), intake.Options{Path: root})
+	if err != nil {
+		t.Fatal(err)
+	}
+	baseline := Baseline(inv, inv.Facts, intakeReport)
+	if baseline.Summary.PrivacyHazards == 0 || baseline.Summary.PrivacyHigh == 0 {
+		t.Fatalf("expected privacy hazards: summary=%#v hazards=%#v", baseline.Summary, baseline.PrivacyHazards)
+	}
+	if !hasPrivacyHazardMarker(baseline.PrivacyHazards, "broad-delete") || !hasPrivacyHazardMarker(baseline.PrivacyHazards, "export-script") {
+		t.Fatalf("expected delete and export markers: %#v", baseline.PrivacyHazards)
+	}
+	if !strings.Contains(baseline.Markdown, "Data-retention and privacy hazards") {
+		t.Fatalf("expected privacy hazards in markdown:\n%s", baseline.Markdown)
+	}
+}
+
+func TestCompareClassifiesGeneratedPrivacyHazards(t *testing.T) {
+	baseline := BaselineReport{
+		Version: BaselineVersion,
+		Hash:    "baseline-hash",
+		Risks: []BaselineRisk{{
+			ID:       "risk:users",
+			Path:     "db/migrate/001.sql",
+			Kind:     "delete",
+			Table:    "users",
+			Severity: "high",
+			Score:    130,
+		}},
+	}
+	proposal := ProposalReport{
+		OutputHash:    "proposal-hash",
+		TargetRiskIDs: []string{"risk:users"},
+		GeneratedFiles: []GeneratedFile{{
+			Path:    "patchline-proposals/repair/privacy.sql",
+			Kind:    "repair",
+			RiskIDs: []string{"risk:users"},
+		}},
+		Generated: []GeneratedArtifact{{
+			Path:    "patchline-proposals/repair/privacy.sql",
+			Kind:    "repair",
+			RiskIDs: []string{"risk:users"},
+			Content: "DELETE FROM users;\nCOPY (SELECT * FROM users) TO 'users.csv' CSV;\n-- no rollback available\n",
+		}},
+	}
+	compare := Compare(baseline, proposal)
+	if compare.Summary.PrivacyHazards != 1 || compare.Summary.PrivacyCritical != 1 {
+		t.Fatalf("expected generated privacy hazard: summary=%#v hazards=%#v", compare.Summary, compare.PrivacyHazards)
+	}
+	if !strings.Contains(compare.Markdown, "Generated data-retention and privacy hazards") {
+		t.Fatalf("expected generated privacy hazards in markdown:\n%s", compare.Markdown)
+	}
+}
+
 func TestCompareRejectsMutatedGeneratedGuards(t *testing.T) {
 	good := GeneratedArtifact{
 		Path: "patchline-proposals/guards/risk.sql",
@@ -1463,6 +1525,17 @@ func hasCommand(commands []Command, command string) bool {
 }
 
 func hasLockHazardMarker(hazards []LockHazard, marker string) bool {
+	for _, hazard := range hazards {
+		for _, item := range hazard.Markers {
+			if item == marker {
+				return true
+			}
+		}
+	}
+	return false
+}
+
+func hasPrivacyHazardMarker(hazards []PrivacyHazard, marker string) bool {
 	for _, hazard := range hazards {
 		for _, item := range hazard.Markers {
 			if item == marker {

@@ -37,6 +37,7 @@ type BaselineReport struct {
 	Transactions    []TransactionBoundary     `json:"transaction_boundaries,omitempty"`
 	Idempotency     []IdempotencyClass        `json:"idempotency_classifications,omitempty"`
 	LockHazards     []LockHazard              `json:"lock_concurrency_hazards,omitempty"`
+	PrivacyHazards  []PrivacyHazard           `json:"data_retention_privacy_hazards,omitempty"`
 	PolicyChecks    []PolicyCheck             `json:"policy_checks,omitempty"`
 	RepairProofs    []RepairProofSummary      `json:"repair_proof_summaries,omitempty"`
 	NativeChecks    []Command                 `json:"native_checks,omitempty"`
@@ -81,6 +82,11 @@ type BaselineSummary struct {
 	LockHazardHigh      int `json:"lock_hazard_high"`
 	LockHazardMedium    int `json:"lock_hazard_medium"`
 	LockHazardLow       int `json:"lock_hazard_low"`
+	PrivacyHazards      int `json:"data_retention_privacy_hazards"`
+	PrivacyCritical     int `json:"privacy_hazard_critical"`
+	PrivacyHigh         int `json:"privacy_hazard_high"`
+	PrivacyMedium       int `json:"privacy_hazard_medium"`
+	PrivacyLow          int `json:"privacy_hazard_low"`
 	PolicyChecks        int `json:"policy_checks"`
 	PolicyPassed        int `json:"policy_passed"`
 	PolicyWarnings      int `json:"policy_warnings"`
@@ -145,6 +151,23 @@ type IdempotencyClass struct {
 }
 
 type LockHazard struct {
+	ID          string       `json:"id"`
+	RiskID      string       `json:"risk_id,omitempty"`
+	Path        string       `json:"path"`
+	Line        int          `json:"line,omitempty"`
+	Table       string       `json:"table,omitempty"`
+	Surface     string       `json:"surface"`
+	Operation   string       `json:"operation,omitempty"`
+	Severity    string       `json:"severity"`
+	Confidence  string       `json:"confidence"`
+	Markers     []string     `json:"markers,omitempty"`
+	Mitigations []string     `json:"mitigations,omitempty"`
+	Evidence    []string     `json:"evidence,omitempty"`
+	Identifiers []Identifier `json:"identifiers,omitempty"`
+	Rationale   string       `json:"rationale"`
+}
+
+type PrivacyHazard struct {
 	ID          string       `json:"id"`
 	RiskID      string       `json:"risk_id,omitempty"`
 	Path        string       `json:"path"`
@@ -337,6 +360,7 @@ func Baseline(inv Inventory, facts []Fact, intakeReport intake.Report) BaselineR
 	report.Transactions = buildTransactionBoundaries(report.Risks, report.Provenance, intakeReport)
 	report.Idempotency = buildIdempotencyClasses(report.Risks, report.Provenance, report.SymbolicChecks, facts, intakeReport)
 	report.LockHazards = buildLockHazards(report.Risks, report.Provenance, facts, intakeReport)
+	report.PrivacyHazards = buildPrivacyHazards(report.Risks, report.Provenance, facts, intakeReport)
 	report.PolicyChecks = buildPolicyChecks(report.Risks, report.Provenance, report.SymbolicChecks)
 	report.RepairProofs = buildRepairProofSummaries(report.Risks, report.Provenance, report.AbstractEffects, report.SymbolicChecks)
 	report.Summary = BaselineSummary{
@@ -376,6 +400,11 @@ func Baseline(inv Inventory, facts []Fact, intakeReport intake.Report) BaselineR
 		LockHazardHigh:      countLockHazardSeverity(report.LockHazards, "high"),
 		LockHazardMedium:    countLockHazardSeverity(report.LockHazards, "medium"),
 		LockHazardLow:       countLockHazardSeverity(report.LockHazards, "low"),
+		PrivacyHazards:      len(report.PrivacyHazards),
+		PrivacyCritical:     countPrivacyHazardSeverity(report.PrivacyHazards, "critical"),
+		PrivacyHigh:         countPrivacyHazardSeverity(report.PrivacyHazards, "high"),
+		PrivacyMedium:       countPrivacyHazardSeverity(report.PrivacyHazards, "medium"),
+		PrivacyLow:          countPrivacyHazardSeverity(report.PrivacyHazards, "low"),
 		PolicyChecks:        len(report.PolicyChecks),
 		PolicyPassed:        countPolicyStatus(report.PolicyChecks, "pass"),
 		PolicyWarnings:      countPolicyStatus(report.PolicyChecks, "warn"),
@@ -2981,6 +3010,345 @@ func countLockHazardSeverity(hazards []LockHazard, severity string) int {
 	return count
 }
 
+func buildPrivacyHazards(risks []BaselineRisk, slices []ProvenanceSlice, facts []Fact, intakeReport intake.Report) []PrivacyHazard {
+	root := firstNonEmpty(intakeReport.Source.ScannedRoot, intakeReport.Source.Input)
+	sliceByRisk := map[string]ProvenanceSlice{}
+	for _, slice := range slices {
+		sliceByRisk[slice.RiskID] = slice
+	}
+	seen := map[string]bool{}
+	var out []PrivacyHazard
+	for _, risk := range risks {
+		if !riskNeedsPrivacyHazardAnalysis(risk) {
+			continue
+		}
+		text := textForBoundary(root, risk.Path)
+		window := text
+		if risk.Statement > 0 {
+			window = lineWindow(text, risk.Statement, 10)
+		}
+		severity, markers, mitigations := classifyPrivacyHazard(window, risk, sliceByRisk[risk.ID])
+		if severity == "low" && window != text {
+			fullSeverity, fullMarkers, fullMitigations := classifyPrivacyHazard(text, risk, sliceByRisk[risk.ID])
+			if privacyHazardSeverityRank(fullSeverity) > privacyHazardSeverityRank(severity) {
+				severity, markers, mitigations = fullSeverity, fullMarkers, fullMitigations
+			}
+		}
+		addPrivacyHazard(&out, seen, PrivacyHazard{
+			ID:          "privacy:" + canonical.Hash(fmt.Sprintf("risk\x00%s\x00%s\x00%d", risk.ID, risk.Path, risk.Statement))[:16],
+			RiskID:      risk.ID,
+			Path:        risk.Path,
+			Line:        risk.Statement,
+			Table:       risk.Table,
+			Surface:     privacyHazardSurface(risk.Kind, risk.Path),
+			Operation:   transactionOperation(risk.Kind),
+			Severity:    severity,
+			Confidence:  privacyHazardConfidence(severity, text),
+			Markers:     markers,
+			Mitigations: mitigations,
+			Evidence:    privacyHazardEvidence(risk, sliceByRisk[risk.ID], markers, mitigations),
+			Identifiers: risk.Identifiers,
+			Rationale:   privacyHazardRationale(severity, privacyHazardSurface(risk.Kind, risk.Path)),
+		})
+	}
+	for _, fact := range facts {
+		if !isPrivacySupportFact(fact) {
+			continue
+		}
+		text := textForBoundary(root, fact.Path)
+		severity, markers, mitigations := classifyPrivacyHazard(text, BaselineRisk{Kind: fact.Kind, Path: fact.Path, Table: firstIdentifierValue(fact.Identifiers, "table")}, ProvenanceSlice{})
+		addPrivacyHazard(&out, seen, PrivacyHazard{
+			ID:          "privacy:" + canonical.Hash(fmt.Sprintf("fact\x00%s\x00%s", fact.ID, fact.Path))[:16],
+			Path:        fact.Path,
+			Table:       firstIdentifierValue(fact.Identifiers, "table"),
+			Surface:     privacyHazardSurface(fact.Kind, fact.Path),
+			Operation:   "support",
+			Severity:    severity,
+			Confidence:  privacyHazardConfidence(severity, text),
+			Markers:     markers,
+			Mitigations: mitigations,
+			Evidence:    []string{"privacy, retention, export, anonymization, or rollback-related file discovered by inventory"},
+			Identifiers: fact.Identifiers,
+			Rationale:   privacyHazardRationale(severity, privacyHazardSurface(fact.Kind, fact.Path)),
+		})
+	}
+	for _, slice := range slices {
+		for _, path := range append(append([]string{}, slice.RepairPaths...), slice.SourcePaths...) {
+			if !isPrivacySupportPath(path) {
+				continue
+			}
+			text := textForBoundary(root, path)
+			severity, markers, mitigations := classifyPrivacyHazard(text, BaselineRisk{Kind: "support", Path: path, Table: slice.Table}, slice)
+			addPrivacyHazard(&out, seen, PrivacyHazard{
+				ID:          "privacy:" + canonical.Hash(fmt.Sprintf("support\x00%s\x00%s", slice.RiskID, path))[:16],
+				RiskID:      slice.RiskID,
+				Path:        path,
+				Table:       slice.Table,
+				Surface:     privacyHazardSurface("support", path),
+				Operation:   "support",
+				Severity:    severity,
+				Confidence:  privacyHazardConfidence(severity, text),
+				Markers:     markers,
+				Mitigations: mitigations,
+				Evidence:    []string{"privacy-relevant support path linked by provenance slice"},
+				Identifiers: slice.Identifiers,
+				Rationale:   privacyHazardRationale(severity, privacyHazardSurface("support", path)),
+			})
+		}
+	}
+	sort.Slice(out, func(i, j int) bool {
+		if out[i].Severity != out[j].Severity {
+			return privacyHazardSeverityRank(out[i].Severity) > privacyHazardSeverityRank(out[j].Severity)
+		}
+		if out[i].Path != out[j].Path {
+			return out[i].Path < out[j].Path
+		}
+		return out[i].ID < out[j].ID
+	})
+	return out
+}
+
+func addPrivacyHazard(out *[]PrivacyHazard, seen map[string]bool, item PrivacyHazard) bool {
+	key := item.RiskID + "\x00" + item.Path + "\x00" + item.Surface + "\x00" + item.Operation
+	if seen[key] {
+		return false
+	}
+	seen[key] = true
+	*out = append(*out, item)
+	return true
+}
+
+func riskNeedsPrivacyHazardAnalysis(risk BaselineRisk) bool {
+	kind := strings.ToLower(risk.Kind)
+	if containsAny(kind, "delete", "drop", "truncate", "update", "export", "anonym", "privacy", "retention", "backfill", "repair", "code-path") {
+		return true
+	}
+	if privacyTableOrIdentifierSignal(risk.Table, risk.Identifiers) {
+		return true
+	}
+	for _, factor := range risk.Factors {
+		if containsAny(strings.ToLower(factor.Name+" "+factor.Reason), "broad-write", "destructive", "rollback", "privacy", "retention", "delete") {
+			return true
+		}
+	}
+	return false
+}
+
+func classifyPrivacyHazard(text string, risk BaselineRisk, slice ProvenanceSlice) (string, []string, []string) {
+	lower := strings.ToLower(text)
+	kind := strings.ToLower(risk.Kind)
+	var markers []string
+	var mitigations []string
+	markerChecks := []struct {
+		Name   string
+		Tokens []string
+	}{
+		{"broad-delete", []string{"delete from", "truncate ", "drop table", "destroy_all", "delete_all", "remove_all"}},
+		{"anonymization-change", []string{"anonym", "pseudonym", "mask", "redact", "scrub", "sanitize", "hashed_email", "email_hash"}},
+		{"export-script", []string{"copy ", "select *", "dump", "export", "csv", "parquet", "s3://", "gs://", "write.csv", "to_csv", "bulk insert"}},
+		{"sensitive-identifier", []string{"email", "phone", "address", "ssn", "social_security", "dob", "birth", "token", "secret", "password", "api_key", "ip_address", "user_agent"}},
+		{"retention-policy", []string{"retention", "ttl", "expires_at", "purge", "prune", "cleanup", "right to be forgotten", "gdpr", "ccpa"}},
+		{"rollback-gap", []string{"irreversible", "no rollback", "cannot rollback", "disable_ddl_transaction", "raise activerecord::irreversiblemigration"}},
+		{"broad-update", []string{"update ", "update_all", "bulk_update"}},
+	}
+	for _, check := range markerChecks {
+		for _, token := range check.Tokens {
+			if strings.Contains(lower, token) {
+				markers = append(markers, check.Name)
+				break
+			}
+		}
+	}
+	if privacyTableOrIdentifierSignal(risk.Table, risk.Identifiers) {
+		markers = append(markers, "sensitive-table-or-identifier")
+	}
+	mitigationChecks := []struct {
+		Name   string
+		Tokens []string
+	}{
+		{"scoped-predicate", []string{" where ", "where id", ".where", "find_by", "limit ", "tenant_id", "account_id", "user_id"}},
+		{"snapshot-backup", []string{"backup", "snapshot", "restore", "archive", "copy before", "create table backup"}},
+		{"dry-run", []string{"dry_run", "dry-run", "dryrun", "preview", "explain"}},
+		{"anonymized-output", []string{"anonymized", "pseudonymized", "redacted", "masked", "hashed", "digest("}},
+		{"retention-window", []string{"older than", "created_at <", "expires_at", "ttl", "retention_days", "interval"}},
+		{"approval-or-audit", []string{"approved", "audit", "review", "ticket", "compliance"}},
+		{"rollback-evidence", []string{"rollback", "revert", "restore", "down do", "def down"}},
+	}
+	for _, check := range mitigationChecks {
+		for _, token := range check.Tokens {
+			if strings.Contains(lower, token) {
+				mitigations = append(mitigations, check.Name)
+				break
+			}
+		}
+	}
+	if len(slice.RepairPaths) > 0 {
+		mitigations = append(mitigations, "linked-repair-evidence")
+	}
+	if containsAny(lower, "irreversible", "no rollback", "cannot rollback", "raise activerecord::irreversiblemigration") {
+		mitigations = removeString(mitigations, "rollback-evidence")
+	}
+	markers = uniqueStrings(markers)
+	mitigations = uniqueStrings(mitigations)
+	rollbackGap := len(slice.RepairPaths) == 0 && (riskHasFactor(risk, "weak-rollback-signal") || containsAny(lower, "irreversible", "no rollback", "cannot rollback"))
+	broadDestructive := containsAny(kind, "delete", "drop", "truncate") || riskHasFactor(risk, "destructive-code-path") || riskHasFactor(risk, "destructive-schema-change") || containsAny(lower, "delete from", "truncate ", "drop table", "destroy_all", "delete_all")
+	broadWrite := riskHasFactor(risk, "broad-write") || riskHasFactor(risk, "write-breadth-unknown") || containsAny(lower, "update_all", "delete_all", "select *")
+	sensitive := containsAny(strings.Join(markers, " "), "sensitive", "anonymization", "export", "retention")
+	hasScope := containsAny(strings.Join(mitigations, " "), "scoped-predicate", "retention-window")
+	hasRollback := containsAny(strings.Join(mitigations, " "), "rollback-evidence", "snapshot-backup", "linked-repair-evidence")
+	hasPrivacyMitigation := containsAny(strings.Join(mitigations, " "), "anonymized-output", "approval-or-audit")
+	switch {
+	case broadDestructive && sensitive && rollbackGap:
+		return "critical", markers, mitigations
+	case broadDestructive && (sensitive || !hasScope):
+		if hasRollback && (hasScope || hasPrivacyMitigation) {
+			return "medium", markers, mitigations
+		}
+		return "high", markers, mitigations
+	case containsAny(strings.Join(markers, " "), "export-script") && !hasPrivacyMitigation:
+		if hasScope {
+			return "medium", markers, mitigations
+		}
+		return "high", markers, mitigations
+	case containsAny(strings.Join(markers, " "), "anonymization-change") && !hasRollback:
+		return "high", markers, mitigations
+	case rollbackGap && (broadWrite || sensitive):
+		return "high", markers, mitigations
+	case broadWrite || sensitive || len(markers) > 0:
+		if hasScope || hasRollback || hasPrivacyMitigation {
+			return "medium", markers, mitigations
+		}
+		return "high", markers, mitigations
+	default:
+		return "low", markers, mitigations
+	}
+}
+
+func privacyTableOrIdentifierSignal(table string, ids []Identifier) bool {
+	lower := strings.ToLower(table)
+	if containsAny(lower, "user", "account", "customer", "person", "profile", "email", "address", "phone", "session", "token", "credential", "privacy", "consent") {
+		return true
+	}
+	for _, id := range ids {
+		value := strings.ToLower(id.Kind + " " + id.Value)
+		if containsAny(value, "user", "account", "customer", "person", "profile", "email", "address", "phone", "session", "token", "credential", "privacy", "consent") {
+			return true
+		}
+	}
+	return false
+}
+
+func privacyHazardSurface(kind, path string) string {
+	lower := strings.ToLower(kind + " " + path)
+	switch {
+	case isGeneratedPath(path):
+		return "generated_script"
+	case containsAny(lower, "export", "dump", ".csv", ".parquet"):
+		return "export_script"
+	case containsAny(lower, "runbook", "rollback", "repair", "backfill", "reconcile", "fix"):
+		return "repair_or_runbook"
+	case strings.Contains(lower, "code-path"):
+		return "app_code"
+	case strings.Contains(lower, "schema"):
+		return "migration_dsl"
+	case strings.HasSuffix(lower, ".sql") || strings.Contains(lower, "sql"):
+		return "migration_sql"
+	default:
+		return "project_file"
+	}
+}
+
+func isPrivacySupportFact(fact Fact) bool {
+	lower := strings.ToLower(fact.Kind + " " + fact.Path + " " + fact.Rationale)
+	return containsAny(lower, "privacy", "retention", "gdpr", "ccpa", "anonym", "redact", "export", "dump", "delete", "purge", "cleanup", "rollback", "repair", "backfill")
+}
+
+func isPrivacySupportPath(path string) bool {
+	lower := strings.ToLower(path)
+	return containsAny(lower, "privacy", "retention", "gdpr", "ccpa", "anonym", "redact", "export", "dump", "delete", "purge", "cleanup", "rollback", "repair", "backfill", ".sql", ".rb", ".py", ".go", ".js", ".ts", ".sh")
+}
+
+func privacyHazardConfidence(severity, text string) string {
+	if text == "" {
+		return "low"
+	}
+	switch severity {
+	case "critical", "high":
+		return "high"
+	case "medium":
+		return "medium"
+	default:
+		return "derived"
+	}
+}
+
+func privacyHazardEvidence(risk BaselineRisk, slice ProvenanceSlice, markers, mitigations []string) []string {
+	var evidence []string
+	if len(markers) > 0 {
+		evidence = append(evidence, "privacy/retention markers: "+strings.Join(markers, ", "))
+	}
+	if len(mitigations) > 0 {
+		evidence = append(evidence, "mitigations: "+strings.Join(mitigations, ", "))
+	}
+	for _, factor := range risk.Factors {
+		if containsAny(strings.ToLower(factor.Name+" "+factor.Reason), "broad-write", "destructive", "rollback", "delete", "privacy", "retention") {
+			evidence = append(evidence, factor.Name+": "+factor.Reason)
+		}
+	}
+	if len(slice.StagesPresent) > 0 {
+		evidence = append(evidence, "provenance stages: "+strings.Join(slice.StagesPresent, ", "))
+	}
+	return uniqueStrings(evidence)
+}
+
+func privacyHazardRationale(severity, surface string) string {
+	switch severity {
+	case "critical":
+		return surface + " combines broad/destructive data change, sensitive or retention-related data, and a rollback gap"
+	case "high":
+		return surface + " contains privacy, retention, export, anonymization, or broad-delete risk without enough scope, audit, anonymization, or rollback evidence"
+	case "medium":
+		return surface + " contains privacy/retention risk with partial mitigation such as scope predicates, anonymized output, snapshots, audits, or rollback evidence"
+	default:
+		return surface + " has no strong privacy or retention hazard in the scanned context"
+	}
+}
+
+func privacyHazardSeverityRank(severity string) int {
+	switch severity {
+	case "critical":
+		return 4
+	case "high":
+		return 3
+	case "medium":
+		return 2
+	case "low":
+		return 1
+	default:
+		return 0
+	}
+}
+
+func countPrivacyHazardSeverity(hazards []PrivacyHazard, severity string) int {
+	var count int
+	for _, hazard := range hazards {
+		if hazard.Severity == severity {
+			count++
+		}
+	}
+	return count
+}
+
+func removeString(values []string, target string) []string {
+	var out []string
+	for _, value := range values {
+		if value != target {
+			out = append(out, value)
+		}
+	}
+	return out
+}
+
 func buildPolicyChecks(risks []BaselineRisk, slices []ProvenanceSlice, symbolic []SymbolicCheck) []PolicyCheck {
 	sliceByRisk := map[string]ProvenanceSlice{}
 	for _, slice := range slices {
@@ -3473,6 +3841,11 @@ func renderBaselineMarkdown(report BaselineReport) string {
 	fmt.Fprintf(&b, "| lock hazard high | %d |\n", report.Summary.LockHazardHigh)
 	fmt.Fprintf(&b, "| lock hazard medium | %d |\n", report.Summary.LockHazardMedium)
 	fmt.Fprintf(&b, "| lock hazard low | %d |\n", report.Summary.LockHazardLow)
+	fmt.Fprintf(&b, "| data-retention/privacy hazards | %d |\n", report.Summary.PrivacyHazards)
+	fmt.Fprintf(&b, "| privacy hazard critical | %d |\n", report.Summary.PrivacyCritical)
+	fmt.Fprintf(&b, "| privacy hazard high | %d |\n", report.Summary.PrivacyHigh)
+	fmt.Fprintf(&b, "| privacy hazard medium | %d |\n", report.Summary.PrivacyMedium)
+	fmt.Fprintf(&b, "| privacy hazard low | %d |\n", report.Summary.PrivacyLow)
 	fmt.Fprintf(&b, "| policy checks | %d |\n", report.Summary.PolicyChecks)
 	fmt.Fprintf(&b, "| policy passed | %d |\n", report.Summary.PolicyPassed)
 	fmt.Fprintf(&b, "| policy warnings | %d |\n", report.Summary.PolicyWarnings)
@@ -3569,6 +3942,14 @@ func renderBaselineMarkdown(report BaselineReport) string {
 		fmt.Fprintf(&b, "## Lock and concurrency hazards\n\n| severity | surface | risk | table | path | markers | mitigations |\n| --- | --- | --- | --- | --- | --- | --- |\n")
 		limit := minInt(len(report.LockHazards), 25)
 		for _, item := range report.LockHazards[:limit] {
+			fmt.Fprintf(&b, "| %s | %s | `%s` | %s | %s | %s | %s |\n", item.Severity, item.Surface, item.RiskID, item.Table, item.Path, strings.Join(item.Markers, ", "), strings.Join(item.Mitigations, ", "))
+		}
+		fmt.Fprintf(&b, "\n")
+	}
+	if len(report.PrivacyHazards) > 0 {
+		fmt.Fprintf(&b, "## Data-retention and privacy hazards\n\n| severity | surface | risk | table | path | markers | mitigations |\n| --- | --- | --- | --- | --- | --- | --- |\n")
+		limit := minInt(len(report.PrivacyHazards), 25)
+		for _, item := range report.PrivacyHazards[:limit] {
 			fmt.Fprintf(&b, "| %s | %s | `%s` | %s | %s | %s | %s |\n", item.Severity, item.Surface, item.RiskID, item.Table, item.Path, strings.Join(item.Markers, ", "), strings.Join(item.Mitigations, ", "))
 		}
 		fmt.Fprintf(&b, "\n")
