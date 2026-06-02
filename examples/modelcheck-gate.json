@@ -1,0 +1,22 @@
+{
+  "version": "patchline.modelcheck-gate/v1",
+  "claim": "Patchline model-checks a migration rollout as a finite state machine, exhaustively exploring every reachable state from the initial state and verifying a safety property holds on all of them, and when the property can be violated it returns a concrete counterexample trace of transitions leading to the bad state rather than merely reporting a boolean. The worker performs a reachability search over the transition relation, evaluates the 'never reach data_loss' invariant on every reachable state, and emits the shortest offending trace for a model that can reach the bad state. The gate proves the safe rollout model satisfies the invariant with no counterexample while a buggy model yields a counterexample trace ending in data_loss.",
+  "real_repo": "patchline (self): model checking of migration rollout",
+  "bad_state": "data_loss",
+  "safe_model": {
+    "initial": "pending",
+    "transitions": [
+      {"from": "pending", "to": "migrating"},
+      {"from": "migrating", "to": "live"},
+      {"from": "migrating", "to": "rolled_back"}
+    ]
+  },
+  "buggy_model": {
+    "initial": "pending",
+    "transitions": [
+      {"from": "pending", "to": "migrating"},
+      {"from": "migrating", "to": "live"},
+      {"from": "migrating", "to": "data_loss"}
+    ]
+  }
+}

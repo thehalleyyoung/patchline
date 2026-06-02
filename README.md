@@ -375,6 +375,8 @@ Run `make invariant-extract-gate` to perform formal **invariant extraction** fro
 
 Run `make symexec-gate` to run bounded **symbolic execution** of a migration guard — it explores every symbolic input, returns a **witness** for any reachable unsafe path, and confirms a hardened guard exposes none; see [docs/symexec.md](docs/symexec.md).
 
+Run `make modelcheck-gate` to **model check** a migration rollout state machine — a safe model satisfies the *never reach data_loss* invariant while a buggy model yields the shortest **counterexample** trace; see [docs/modelcheck.md](docs/modelcheck.md).
+
 Add `--redact` to write `analysis-bundle/` copies with stable redaction tokens for identifiers, literals, customer-like strings, and secret-like values while preserving joins and existing artifact hashes.
 
 Add `--ci` to write `ci/summary.md` plus upload snippets and code-quality artifacts for GitHub Actions, GitLab CI, and Bitbucket Pipelines: SARIF under `analysis-bundle/summary.sarif`, GitLab `ci/gl-code-quality-report.json`, and Bitbucket `ci/bitbucket-code-insights.json`.
