@@ -1,0 +1,27 @@
+{
+  "version": "patchline.conference-demos-gate/v1",
+  "claim": "Patchline ships audience-tailored conference demo scripts for Datadog, Microsoft RISE, database, and programming-languages audiences, each built entirely from reproducible gate commands so a presenter can run the demo live with zero risk of a broken slide. Every demo declares an audience, a focus, and an ordered list of steps where each runnable step is a real make gate target; the worker renders a presenter script with timing and talking points per step. The gate proves all four mandated audiences are present and that every runnable demo step maps to a real gate target.",
+  "real_repo": "patchline (self): demo steps validated against scripts/*-gate.sh",
+  "demos": [
+    {
+      "audience": "Datadog",
+      "focus": "Static data-change risk corroborated by real observability exports.",
+      "steps": ["otel-trace-gen-gate", "datadog-timeline-gate", "prom-grafana-gate", "runtime-confidence-gate"]
+    },
+    {
+      "audience": "Microsoft RISE",
+      "focus": "Deterministic, provenance-carrying analysis with bounded, quarantined generation.",
+      "steps": ["nosql-change-gate", "schema-compat-gate", "rejected-generated-gate"]
+    },
+    {
+      "audience": "database",
+      "focus": "Destructive migrations across nine ecosystems plus NoSQL and pipelines.",
+      "steps": ["multi-ecosystem-migration-gate", "nosql-change-gate", "data-pipeline-gate", "infra-ordering-gate"]
+    },
+    {
+      "audience": "programming-languages",
+      "focus": "A uniform fact layer, delta-debugging minimizers, and gate-backed reproducibility.",
+      "steps": ["fixture-minimizer-gate", "parser-dashboard-gate", "schema-compat-gate"]
+    }
+  ]
+}
