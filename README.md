@@ -253,6 +253,8 @@ Run `make intervention-contracts-gate` to attach an explicit contract to every g
 
 Run `make diff-minimization-gate` to minimize a redundant intervention bundle (tests, guards, instrumentation, repair candidates) by set-cover over a finding's required evidence, proving the result still covers everything and is 1-minimal so no generated line is redundant; see [docs/diff-minimization.md](docs/diff-minimization.md).
 
+Run `make quarantine-attestation-gate` to issue a quarantine attestation for every real repair candidate — explicit non-execution, manual-review requirement (escalating with open proof holes), and a stable fingerprint — so no generated repair is ever auto-applied; see [docs/quarantine-attestation.md](docs/quarantine-attestation.md).
+
 Add `--redact` to write `analysis-bundle/` copies with stable redaction tokens for identifiers, literals, customer-like strings, and secret-like values while preserving joins and existing artifact hashes.
 
 Add `--ci` to write `ci/summary.md` plus upload snippets and code-quality artifacts for GitHub Actions, GitLab CI, and Bitbucket Pipelines: SARIF under `analysis-bundle/summary.sarif`, GitLab `ci/gl-code-quality-report.json`, and Bitbucket `ci/bitbucket-code-insights.json`.

@@ -1,0 +1,11 @@
+{
+  "version": "patchline.quarantine-attestation-gate/v1",
+  "claim": "Every generated repair candidate is quarantined with an explicit attestation: it was never executed, it is held for manual review, and it carries a stable content fingerprint. Attestations are built from real repair-proof summaries, no candidate is auto-applied (no 'proven' status is treated as executable), the required reviewer count escalates with risk, and the attestation fingerprint is deterministic across reruns.",
+  "real_repo": {
+    "repo": "lobsters/lobsters",
+    "ref": "3b80b47aa5aaba37ec44413e7d1dc96fcf1585b6",
+    "subpath": "db/migrate"
+  },
+  "minimum_candidates": 20,
+  "required_attestations": ["executed", "quarantined", "manual_review_required", "fingerprint"]
+}
