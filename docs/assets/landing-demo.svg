@@ -1,0 +1,20 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="980" height="430" viewBox="0 0 980 430" role="img" aria-label="Patchline landing demo output for lobsters migrations">
+  <rect width="980" height="430" rx="18" fill="#0b1020"/>
+  <rect x="18" y="18" width="944" height="394" rx="14" fill="#111827" stroke="#374151"/>
+  <circle cx="45" cy="45" r="7" fill="#ef4444"/>
+  <circle cx="68" cy="45" r="7" fill="#f59e0b"/>
+  <circle cx="91" cy="45" r="7" fill="#22c55e"/>
+  <text x="120" y="51" fill="#d1d5db" font-family="Menlo, Consolas, monospace" font-size="14">60-second Patchline demo on lobsters/lobsters db/migrate</text>
+  <text x="42" y="92" fill="#93c5fd" font-family="Menlo, Consolas, monospace" font-size="15">$ go run ./cmd/patchline repo analyze --github lobsters/lobsters --subpath db/migrate --no-llm --json</text>
+  <text x="42" y="135" fill="#e5e7eb" font-family="Menlo, Consolas, monospace" font-size="18">files scanned</text>
+  <text x="300" y="135" fill="#f9fafb" font-family="Menlo, Consolas, monospace" font-size="24" font-weight="700">158</text>
+  <text x="42" y="180" fill="#e5e7eb" font-family="Menlo, Consolas, monospace" font-size="18">ranked data-change risks</text>
+  <text x="300" y="180" fill="#f9fafb" font-family="Menlo, Consolas, monospace" font-size="24" font-weight="700">328</text>
+  <text x="42" y="225" fill="#e5e7eb" font-family="Menlo, Consolas, monospace" font-size="18">provenance slices</text>
+  <text x="300" y="225" fill="#f9fafb" font-family="Menlo, Consolas, monospace" font-size="24" font-weight="700">100</text>
+  <text x="42" y="270" fill="#e5e7eb" font-family="Menlo, Consolas, monospace" font-size="18">generated review artifacts</text>
+  <text x="300" y="270" fill="#f9fafb" font-family="Menlo, Consolas, monospace" font-size="24" font-weight="700">8</text>
+  <text x="42" y="315" fill="#e5e7eb" font-family="Menlo, Consolas, monospace" font-size="18">deterministic checks failed</text>
+  <text x="300" y="315" fill="#22c55e" font-family="Menlo, Consolas, monospace" font-size="24" font-weight="700">0</text>
+  <text x="42" y="365" fill="#a7f3d0" font-family="Menlo, Consolas, monospace" font-size="16">Writes inventory, baseline, proposal, compare, figures, and reviewer artifacts.</text>
+</svg>

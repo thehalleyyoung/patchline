@@ -4,6 +4,46 @@ Patchline is a deterministic checker for the data-change material teams already 
 
 It is not an AI tool, and it does not require you to label data or adopt a Patchline-specific format first. Point it at existing files; it inventories what is there, finds risky SQL and operational clues, and prints the next commands that can run immediately.
 
+[![deterministic](https://img.shields.io/badge/deterministic-data--repair-2563eb)](#60-second-demo)
+[![not-ai](https://img.shields.io/badge/not--ai-static--analysis-16a34a)](#why-this-is-useful)
+[![public-repos](https://img.shields.io/badge/proven_on-public_repos-7c3aed)](#real-public-repo-output)
+[![artifact-review](https://img.shields.io/badge/artifact-reviewer_walkthrough-f97316)](docs/reviewer-walkthrough.md)
+
+## 60-second demo
+
+Install:
+
+```bash
+go install github.com/thehalleyyoung/patchline/cmd/patchline@latest
+# or from a checkout:
+go build -o bin/patchline ./cmd/patchline
+```
+
+Run Patchline on a real public migration directory, report ranked data-change risks, and keep generated code quarantined:
+
+```bash
+go run ./cmd/patchline repo analyze \
+  --github lobsters/lobsters \
+  --ref 3b80b47aa5aaba37ec44413e7d1dc96fcf1585b6 \
+  --subpath db/migrate \
+  --stages inventory,baseline,propose,compare \
+  --proposal-kind all \
+  --budget files=8,lines=100,tokens=12000,changes=2 \
+  --no-llm \
+  --out results/generated/landing-demo \
+  --json
+```
+
+![Patchline landing demo screenshot](docs/assets/landing-demo.svg)
+
+### Real public-repo output
+
+`make landing-readme-gate` regenerates this from pinned `lobsters/lobsters` code.
+
+| Public slice | Files scanned | Ranked data-change risks | Provenance slices | Generated review artifacts | Deterministic checks failed |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| `lobsters/lobsters` `db/migrate` | 158 | 328 | 100 | 8 | 0 |
+
 ```bash
 go run ./cmd/patchline intake . --out results/generated/intake
 go run ./cmd/patchline intake --github owner/repo --subpath path/to/migrations --out results/generated/intake
@@ -124,6 +164,8 @@ Run `make claims-evidence-gate` to map future abstract, introduction, and evalua
 Run `make paper-figures-gate` to regenerate SVG/JSON figures for the repair-analysis loop, architecture, corpus composition, ablations, and before/after intervention outcomes; see [docs/paper-figures.md](docs/paper-figures.md).
 
 Run `make reviewer-walkthrough-gate` to simulate a fresh-machine artifact review that regenerates public-repo analyses, evaluation tables, figures, reports, and a case-study bundle; see [docs/reviewer-walkthrough.md](docs/reviewer-walkthrough.md).
+
+Run `make landing-readme-gate` to prove the top-level README badges, 60-second demo, screenshot, install commands, and real public-repo output stay reproducible; see [scripts/generate-landing-demo.sh](scripts/generate-landing-demo.sh).
 
 Add `--redact` to write `analysis-bundle/` copies with stable redaction tokens for identifiers, literals, customer-like strings, and secret-like values while preserving joins and existing artifact hashes.
 

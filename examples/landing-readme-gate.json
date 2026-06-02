@@ -1,0 +1,24 @@
+{
+  "version": "patchline.landing-readme-gate/v1",
+  "claim": "Patchline's landing README has a polished 60-second demo with badges, install commands, a screenshot asset, and real public-repository output that can be regenerated from pinned public code.",
+  "repo": "lobsters/lobsters",
+  "ref": "3b80b47aa5aaba37ec44413e7d1dc96fcf1585b6",
+  "subpath": "db/migrate",
+  "required_readme_phrases": [
+    "60-second demo",
+    "Install",
+    "docs/assets/landing-demo.svg",
+    "lobsters/lobsters",
+    "ranked data-change risks",
+    "make landing-readme-gate"
+  ],
+  "required_badges": [
+    "deterministic",
+    "not-ai",
+    "public-repos",
+    "artifact-review"
+  ],
+  "minimum_files_scanned": 100,
+  "minimum_ranked_risks": 100,
+  "minimum_generated_files": 1
+}
