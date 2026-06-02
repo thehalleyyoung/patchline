@@ -198,7 +198,7 @@ func checkGeneratedArtifacts(artifacts []GeneratedArtifact) []GeneratedCheck {
 		}
 		switch artifact.Kind {
 		case "guards":
-			if !strings.Contains(lower, "select 1 from") || !strings.Contains(lower, "count(*)") || !strings.Contains(lower, "rollback") {
+			if !strings.Contains(lower, "select 1 from") || !strings.Contains(lower, "count(*)") || !guardHasRollbackStatement(artifact.Content) {
 				check.Status = "fail"
 				check.Findings = append(check.Findings, "guard does not fail closed with table existence, row count, and rollback checks")
 			}
@@ -236,6 +236,19 @@ func checkGeneratedArtifacts(artifacts []GeneratedArtifact) []GeneratedCheck {
 	}
 	sort.Slice(checks, func(i, j int) bool { return checks[i].Path < checks[j].Path })
 	return checks
+}
+
+func guardHasRollbackStatement(content string) bool {
+	for _, line := range strings.Split(content, "\n") {
+		line = strings.TrimSpace(strings.ToLower(line))
+		if line == "" || strings.HasPrefix(line, "--") {
+			continue
+		}
+		if line == "rollback" || strings.HasPrefix(line, "rollback;") {
+			return true
+		}
+	}
+	return false
 }
 
 func riskDeltas(risks []BaselineRisk, artifacts []GeneratedArtifact) []RiskDelta {

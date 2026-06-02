@@ -169,6 +169,7 @@ make reviewer-mode-gate
 make artifact-consistency-gate
 make disposable-worktree-gate
 make language-test-placement-gate
+make guard-mutation-gate
 ```
 
 The demo downloads real GitHub project subpaths and writes:
@@ -266,6 +267,8 @@ The real-repo slice matrix is backed by `examples/real-repo-slices.json` and `ex
 `make disposable-worktree-gate` applies generated proposal files into throwaway Git worktrees for the four pinned public slices and verifies the real diffs match deterministic compare outputs.
 
 `make language-test-placement-gate` verifies generated test proposals land in ecosystem-native test locations for Rails, Django/Python, Go, Java, Node, and Python public slices.
+
+`make guard-mutation-gate` deletes required generated-guard checks across four public slices and proves deterministic compare rejects each weakened artifact.
 
 Current default projects:
 

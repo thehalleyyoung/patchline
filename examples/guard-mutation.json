@@ -1,0 +1,10 @@
+{
+  "version": "patchline.guard-mutation/v1",
+  "minimum_public_slices": 4,
+  "mutations": [
+    {"id": "delete-table-existence", "remove": "SELECT 1 FROM"},
+    {"id": "delete-row-count", "remove": "count(*)"},
+    {"id": "delete-rollback", "remove": "ROLLBACK"}
+  ],
+  "claim": "Generated guards must fail deterministic compare when required table-existence, row-count, or rollback checks are deleted."
+}

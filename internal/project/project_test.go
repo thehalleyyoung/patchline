@@ -796,6 +796,40 @@ func TestCompareChecksGeneratedProposalCoverage(t *testing.T) {
 	}
 }
 
+func TestCompareRejectsMutatedGeneratedGuards(t *testing.T) {
+	good := GeneratedArtifact{
+		Path: "patchline-proposals/guards/risk.sql",
+		Kind: "guards",
+		Content: `-- untrusted generated guard
+BEGIN;
+SELECT 1 FROM accounts LIMIT 1;
+SELECT count(*) AS patchline_candidate_rows FROM accounts;
+ROLLBACK;
+`,
+	}
+	for _, tc := range []struct {
+		name    string
+		content string
+	}{
+		{name: "missing-table-existence", content: strings.ReplaceAll(good.Content, "SELECT 1 FROM", "MUTATED_REQUIRED_CHECK")},
+		{name: "missing-row-count", content: strings.ReplaceAll(good.Content, "count(*)", "MUTATED_REQUIRED_CHECK")},
+		{name: "missing-rollback-statement", content: strings.ReplaceAll(good.Content, "ROLLBACK;", "-- rollback note only")},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			mutated := good
+			mutated.Content = tc.content
+			checks := checkGeneratedArtifacts([]GeneratedArtifact{mutated})
+			if len(checks) != 1 || checks[0].Status != "fail" {
+				t.Fatalf("expected mutated guard to fail, got %#v", checks)
+			}
+		})
+	}
+	checks := checkGeneratedArtifacts([]GeneratedArtifact{good})
+	if len(checks) != 1 || checks[0].Status != "pass" {
+		t.Fatalf("expected complete guard to pass, got %#v", checks)
+	}
+}
+
 func TestCompareRunsSafeNativeChecks(t *testing.T) {
 	root := t.TempDir()
 	writeFile(t, root, "go.mod", "module example.com/nativecheck\n\ngo 1.22\n")
