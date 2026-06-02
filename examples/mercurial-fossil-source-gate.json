@@ -1,0 +1,20 @@
+{
+  "version": "patchline.mercurial-fossil-source-gate/v1",
+  "claim": "Patchline ingests Mercurial and Fossil working trees as first-class sources, not just Git and GitHub. The local source adapter detects the version-control system from its on-disk metadata, records the VCS name and a resolved revision as provenance, and computes a content-addressed tree hash that ignores VCS metadata so the same working tree caches identically regardless of which VCS produced it. The gate builds real Mercurial- and Fossil-shaped working trees that each contain a destructive SQL migration, fetches them, proves the recorded provenance and cache-reuse semantics, and proves the destructive migration is still surfaced by deterministic baseline analysis of the fetched tree.",
+  "vcs_cases": [
+    {
+      "vcs": "mercurial",
+      "marker_dir": ".hg",
+      "migration": "db/migrate/20240101_drop_accounts.sql",
+      "sql": "DROP TABLE accounts;"
+    },
+    {
+      "vcs": "fossil",
+      "marker_file": "_FOSSIL_",
+      "migration": "migrations/0002_drop_email.sql",
+      "sql": "ALTER TABLE users DROP COLUMN email;"
+    }
+  ],
+  "provenance_fields": ["vcs", "resolved_commit", "archive_hash"],
+  "cache_semantics": ["content_addressed", "metadata_independent", "reuse_on_second_fetch"]
+}

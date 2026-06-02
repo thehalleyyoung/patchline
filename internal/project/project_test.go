@@ -177,6 +177,68 @@ func TestProposalPromptContextMinimizesUnselectedEvidence(t *testing.T) {
 	}
 }
 
+func TestFetchLocalMercurialRecordsVCSAndCaches(t *testing.T) {
+	src := t.TempDir()
+	writeFile(t, src, "db/migrate/001.sql", "drop table accounts;")
+	// A faithful Mercurial dirstate header: 20-byte parent node id followed by data.
+	node := make([]byte, 40)
+	for i := range node {
+		node[i] = byte(i + 1)
+	}
+	writeFile(t, src, ".hg/dirstate", string(node))
+	writeFile(t, src, ".hg/requires", "revlogv1\n")
+
+	cacheDir := filepath.Join(t.TempDir(), "cache")
+	first, err := Fetch(context.Background(), FetchOptions{Input: src, OutDir: filepath.Join(t.TempDir(), "a"), DownloadDir: cacheDir})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if first.Source.VCS != "mercurial" {
+		t.Fatalf("expected mercurial vcs, got %#v", first.Source)
+	}
+	if first.Source.ResolvedCommit == "" || first.Source.ArchiveHash == "" {
+		t.Fatalf("expected provenance revision and tree hash, got %#v", first.Source)
+	}
+	if first.Source.CacheHit {
+		t.Fatalf("first fetch must be a cache miss")
+	}
+	second, err := Fetch(context.Background(), FetchOptions{Input: src, OutDir: filepath.Join(t.TempDir(), "b"), DownloadDir: cacheDir})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !second.Source.CacheHit || second.Source.ArchiveHash != first.Source.ArchiveHash {
+		t.Fatalf("expected content-addressed cache hit, got first=%#v second=%#v", first.Source, second.Source)
+	}
+	// .hg metadata must not leak into the scanned tree hash basis.
+	if _, err := os.Stat(filepath.Join(filepath.FromSlash(second.Source.ScannedRoot), ".hg", "dirstate")); err == nil {
+		// copyDir may copy it, but the hash must ignore it: mutate metadata and confirm stable hash.
+		writeFile(t, src, ".hg/dirstate", string(node)+"changed-metadata")
+		third, err := Fetch(context.Background(), FetchOptions{Input: src, OutDir: filepath.Join(t.TempDir(), "c"), DownloadDir: cacheDir})
+		if err != nil {
+			t.Fatal(err)
+		}
+		if third.Source.ArchiveHash != first.Source.ArchiveHash {
+			t.Fatalf("tree hash must ignore VCS metadata: %s vs %s", third.Source.ArchiveHash, first.Source.ArchiveHash)
+		}
+	}
+}
+
+func TestFetchLocalFossilRecordsVCS(t *testing.T) {
+	src := t.TempDir()
+	writeFile(t, src, "migrations/002.sql", "alter table users drop column email;")
+	writeFile(t, src, "_FOSSIL_", "fossil checkout database stub bytes for revision derivation")
+	result, err := Fetch(context.Background(), FetchOptions{Input: src, OutDir: filepath.Join(t.TempDir(), "f"), DownloadDir: filepath.Join(t.TempDir(), "cache")})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if result.Source.VCS != "fossil" {
+		t.Fatalf("expected fossil vcs, got %#v", result.Source)
+	}
+	if result.Source.ResolvedCommit == "" {
+		t.Fatalf("expected fossil revision provenance, got %#v", result.Source)
+	}
+}
+
 func TestFetchLocalGitRecordsResolvedCommit(t *testing.T) {
 	src := t.TempDir()
 	writeFile(t, src, "db/migrate/001.sql", "create table accounts(id int);")
@@ -187,7 +249,7 @@ func TestFetchLocalGitRecordsResolvedCommit(t *testing.T) {
 	runGit(t, src, "commit", "--quiet", "-m", "initial")
 	expected := strings.TrimSpace(runGitOutput(t, src, "rev-parse", "HEAD"))
 
-	result, err := Fetch(context.Background(), FetchOptions{Input: src, OutDir: filepath.Join(t.TempDir(), "fetched")})
+	result, err := Fetch(context.Background(), FetchOptions{Input: src, OutDir: filepath.Join(t.TempDir(), "fetched"), DownloadDir: filepath.Join(t.TempDir(), "cache")})
 	if err != nil {
 		t.Fatal(err)
 	}

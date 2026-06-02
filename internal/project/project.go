@@ -43,6 +43,7 @@ type Source struct {
 	Version        string   `json:"version"`
 	ToolVersion    string   `json:"tool_version"`
 	Mode           string   `json:"mode"`
+	VCS            string   `json:"vcs,omitempty"`
 	Input          string   `json:"input"`
 	Owner          string   `json:"owner,omitempty"`
 	Repo           string   `json:"repo,omitempty"`
@@ -279,7 +280,24 @@ func Fetch(ctx context.Context, opts FetchOptions) (FetchResult, error) {
 		if err := copyDir(root, outDir, skipped); err != nil {
 			return FetchResult{}, err
 		}
-		source.ResolvedCommit = localGitCommit(root)
+		vcs, revision := detectLocalVCS(root)
+		source.VCS = vcs
+		if revision != "" {
+			source.ResolvedCommit = revision
+		} else {
+			source.ResolvedCommit = localGitCommit(root)
+		}
+		if treeHash, err := hashTree(outDir); err == nil {
+			source.ArchiveHash = treeHash
+			source.CacheKey = "tree:" + strings.TrimPrefix(treeHash, "sha256:")
+			cachePath := filepath.Join(downloadDir, "trees", "sha256-"+strings.TrimPrefix(treeHash, "sha256:"))
+			if _, statErr := os.Stat(cachePath); statErr == nil {
+				source.CacheHit = true
+			} else if mkErr := os.MkdirAll(filepath.Dir(cachePath), 0o755); mkErr == nil {
+				_ = os.WriteFile(cachePath, []byte(treeHash+"\n"), 0o644)
+			}
+			source.CachePath = filepath.ToSlash(cachePath)
+		}
 		source.ScannedRoot = filepath.ToSlash(outDir)
 		source.Ref = ""
 	}
@@ -2194,6 +2212,116 @@ func isFullSHA(value string) bool {
 		}
 	}
 	return true
+}
+
+func detectLocalVCS(root string) (string, string) {
+	if fi, err := os.Stat(filepath.Join(root, ".git")); err == nil && fi.IsDir() {
+		return "git", localGitCommit(root)
+	}
+	if _, err := os.Stat(filepath.Join(root, ".hg")); err == nil {
+		return "mercurial", localHgRevision(root)
+	}
+	for _, marker := range []string{"_FOSSIL_", ".fslckout", ".fos"} {
+		if _, err := os.Stat(filepath.Join(root, marker)); err == nil {
+			return "fossil", localFossilRevision(root)
+		}
+	}
+	return "", ""
+}
+
+func localHgRevision(root string) string {
+	if path, err := exec.LookPath("hg"); err == nil {
+		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer cancel()
+		if out, err := exec.CommandContext(ctx, path, "-R", root, "id", "-i", "--debug").Output(); err == nil {
+			rev := strings.TrimSuffix(strings.TrimSpace(string(out)), "+")
+			if len(rev) >= 12 {
+				return strings.ToLower(rev)
+			}
+		}
+	}
+	// Fall back to the dirstate parent hash recorded by Mercurial itself.
+	data, err := os.ReadFile(filepath.Join(root, ".hg", "dirstate"))
+	if err == nil && len(data) >= 20 {
+		return hex.EncodeToString(data[:20])
+	}
+	if data, err := os.ReadFile(filepath.Join(root, ".hg", "cache", "branch2")); err == nil {
+		fields := strings.Fields(string(data))
+		if len(fields) > 0 && len(fields[0]) >= 12 {
+			return strings.ToLower(fields[0])
+		}
+	}
+	return ""
+}
+
+func localFossilRevision(root string) string {
+	if path, err := exec.LookPath("fossil"); err == nil {
+		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer cancel()
+		if out, err := exec.CommandContext(ctx, path, "info").Output(); err == nil {
+			for _, line := range strings.Split(string(out), "\n") {
+				if strings.HasPrefix(line, "checkout:") {
+					fields := strings.Fields(strings.TrimPrefix(line, "checkout:"))
+					if len(fields) > 0 && len(fields[0]) >= 12 {
+						return strings.ToLower(fields[0])
+					}
+				}
+			}
+		}
+	}
+	for _, marker := range []string{".fslckout", "_FOSSIL_"} {
+		if data, err := os.ReadFile(filepath.Join(root, marker)); err == nil {
+			sum := sha256.Sum256(data)
+			return hex.EncodeToString(sum[:])[:40]
+		}
+	}
+	return ""
+}
+
+// hashTree computes a deterministic content hash over a directory tree, ignoring
+// VCS metadata directories so the same working tree hashes identically regardless
+// of which VCS produced it.
+func hashTree(root string) (string, error) {
+	type entry struct {
+		rel  string
+		hash string
+	}
+	var entries []entry
+	err := filepath.WalkDir(root, func(path string, d os.DirEntry, err error) error {
+		if err != nil {
+			return err
+		}
+		if d.IsDir() {
+			switch d.Name() {
+			case ".git", ".hg", ".fossil-settings":
+				return filepath.SkipDir
+			}
+			return nil
+		}
+		switch d.Name() {
+		case "_FOSSIL_", ".fslckout":
+			return nil
+		}
+		rel, err := filepath.Rel(root, path)
+		if err != nil {
+			return err
+		}
+		h, err := hashFile(path)
+		if err != nil {
+			return err
+		}
+		entries = append(entries, entry{rel: filepath.ToSlash(rel), hash: h})
+		return nil
+	})
+	if err != nil {
+		return "", err
+	}
+	sort.Slice(entries, func(i, j int) bool { return entries[i].rel < entries[j].rel })
+	hasher := sha256.New()
+	for _, e := range entries {
+		fmt.Fprintf(hasher, "%s\x00%s\n", e.rel, e.hash)
+	}
+	return "sha256:" + hex.EncodeToString(hasher.Sum(nil)), nil
 }
 
 func localGitCommit(root string) string {
