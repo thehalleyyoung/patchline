@@ -337,6 +337,8 @@ Run `make rollback-check-gate` to run **rollback** semantic checks — each migr
 
 Run `make lock-duration-gate` to estimate **lock-duration** from table size hints, op kind, dialect rules, and **concurrent**-index config — a blocking large-table index is predicted while a concurrent or metadata-only op collapses to short/instant; see [docs/lock-duration.md](docs/lock-duration.md).
 
+Run `make tenant-risk-gate` to infer **tenant-boundary** and **sharding** risks in multi-tenant schemas — an unscoped backfill on a tenant table or a shard-key rewrite is flagged high while scoped and global-table ops stay low; see [docs/tenant-risk.md](docs/tenant-risk.md).
+
 Add `--redact` to write `analysis-bundle/` copies with stable redaction tokens for identifiers, literals, customer-like strings, and secret-like values while preserving joins and existing artifact hashes.
 
 Add `--ci` to write `ci/summary.md` plus upload snippets and code-quality artifacts for GitHub Actions, GitLab CI, and Bitbucket Pipelines: SARIF under `analysis-bundle/summary.sarif`, GitLab `ci/gl-code-quality-report.json`, and Bitbucket `ci/bitbucket-code-insights.json`.

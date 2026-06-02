@@ -1,0 +1,16 @@
+{
+  "version": "patchline.tenant-risk-gate/v1",
+  "claim": "Patchline infers tenant-boundary and sharding risks for multi-tenant schemas so that a migration which backfills a tenant-scoped table without a tenant filter, or which rewrites a shard key, is flagged before it leaks or reshuffles data across tenants. The worker classifies each operation against the table's tenant scoping and shard key, raising a tenant_boundary risk for unscoped writes to tenant tables and a sharding risk for shard-key changes, while leaving correctly-scoped writes and global-table operations low risk. The gate proves an unscoped backfill on a tenant table is high tenant_boundary risk, a shard-key rewrite is high sharding risk, a tenant-scoped backfill is low risk, and an operation on a global table is low risk.",
+  "real_repo": "synthetic-from-real patterns: multi-tenant SaaS schemas with tenant_id and shard keys",
+  "tables": [
+    {"name": "invoices", "tenant_scoped": true, "shard_key": "tenant_id"},
+    {"name": "users", "tenant_scoped": true, "shard_key": "tenant_id"},
+    {"name": "feature_flags", "tenant_scoped": false, "shard_key": null}
+  ],
+  "operations": [
+    {"id": "backfill_unscoped", "table": "invoices", "type": "backfill", "scoped_by_tenant": false, "column": "status"},
+    {"id": "shard_rewrite", "table": "users", "type": "alter_column", "scoped_by_tenant": true, "column": "tenant_id"},
+    {"id": "backfill_scoped", "table": "invoices", "type": "backfill", "scoped_by_tenant": true, "column": "status"},
+    {"id": "global_change", "table": "feature_flags", "type": "backfill", "scoped_by_tenant": false, "column": "enabled"}
+  ]
+}
