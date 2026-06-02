@@ -1,0 +1,9 @@
+{
+  "version": "patchline.drift-monitor-gate/v1",
+  "claim": "Patchline monitors the input distribution of its corpus over migration-pattern categories and flags drift when an incoming distribution diverges from the established baseline, so a silent shift in what repositories are being analyzed cannot quietly invalidate calibrated thresholds. The worker computes the total-variation distance between the baseline and a candidate distribution and raises a drift alarm when that distance exceeds the configured threshold. The gate proves an identical distribution yields zero distance and no alarm, while a materially shifted distribution exceeds the threshold and trips the alarm.",
+  "real_repo": "patchline (self): corpus drift monitor",
+  "threshold": 0.15,
+  "baseline": {"add_not_null": 0.4, "drop_column": 0.3, "type_change": 0.2, "add_index": 0.1},
+  "same": {"add_not_null": 0.4, "drop_column": 0.3, "type_change": 0.2, "add_index": 0.1},
+  "shifted": {"add_not_null": 0.1, "drop_column": 0.2, "type_change": 0.2, "add_index": 0.5}
+}

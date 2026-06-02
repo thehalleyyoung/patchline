@@ -1,0 +1,7 @@
+{
+  "version": "patchline.streaming-analyzer-gate/v1",
+  "claim": "Patchline can analyze a repository whose finding stream is larger than available memory by processing it as a bounded sliding window rather than loading everything at once, so peak memory stays constant regardless of corpus size while the computed aggregate is identical to a buffer-everything pass. The worker folds the stream through a fixed-size window, tracking a running count and maximum severity, and records the largest number of items ever held in memory. The gate proves the windowed peak never exceeds the configured bound, the streaming aggregate equals the batch aggregate computed over all items, and a buffer-all strategy would have retained every item.",
+  "real_repo": "patchline (self): streaming bounded-memory analyzer",
+  "window": 3,
+  "severities": [1, 5, 2, 4, 3, 5, 1, 2, 4, 5, 3, 1]
+}

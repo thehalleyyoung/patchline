@@ -1,0 +1,10 @@
+{
+  "version": "patchline.benchmark-release-gate/v1",
+  "claim": "Patchline publishes a versioned benchmark with a frozen train/test split and a strict leaderboard submission format, so independent results are comparable, the test set cannot drift between runs, and submissions are validated before scoring. The worker computes a deterministic checksum over the sorted split, verifies the train and test partitions are disjoint and jointly cover the corpus, and validates a candidate submission against the required format. The gate proves the split checksum is stable across two computations, train and test are disjoint and complete, a conforming submission is accepted, and a malformed submission missing its predictions is rejected.",
+  "real_repo": "patchline (self): versioned benchmark release",
+  "benchmark_version": "patchline-bench-1.0",
+  "train": ["r01","r02","r03","r04","r05","r06"],
+  "test": ["r07","r08","r09","r10"],
+  "good_submission": {"benchmark_version": "patchline-bench-1.0", "predictions": [{"id":"r07","label":"hazard"},{"id":"r08","label":"safe"}]},
+  "bad_submission": {"benchmark_version": "patchline-bench-1.0"}
+}

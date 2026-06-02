@@ -1,0 +1,13 @@
+{
+  "version": "patchline.stratified-sampler-gate/v1",
+  "claim": "Patchline draws an evaluation sample stratified by migration-pattern type so that rare but high-impact patterns are guaranteed representation, instead of being washed out by a naive uniform draw dominated by common cases. The worker groups the population by stratum and deterministically selects at least one item from every stratum, then verifies that each stratum — including the singleton rare pattern — appears in the sample. The gate proves the stratified sample covers all strata while a provided uniform sample misses the rare stratum entirely.",
+  "real_repo": "patchline (self): stratified sampler",
+  "population": [
+    {"id": "c1", "stratum": "common"}, {"id": "c2", "stratum": "common"},
+    {"id": "c3", "stratum": "common"}, {"id": "c4", "stratum": "common"},
+    {"id": "c5", "stratum": "common"}, {"id": "c6", "stratum": "common"},
+    {"id": "m1", "stratum": "medium"}, {"id": "m2", "stratum": "medium"},
+    {"id": "r1", "stratum": "rare"}
+  ],
+  "uniform_sample": ["c1", "c2", "c3", "m1"]
+}

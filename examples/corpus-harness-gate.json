@@ -1,0 +1,8 @@
+{
+  "version": "patchline.corpus-harness-gate/v1",
+  "claim": "Patchline sweeps a large public migration corpus with deterministic sharding and resumable progress so a thousand-repository run can be split across machines and restarted after interruption without reprocessing or dropping work. The worker assigns each repository to a shard with a pure content-derived hash so the assignment is identical on every run, and computes the remaining work as the corpus minus an already-completed checkpoint set. The gate proves the shard assignment is byte-identical across two independent runs, that every repository lands in exactly one of the requested shards, and that resuming from a checkpoint yields strictly fewer repositories that exclude the completed ones.",
+  "real_repo": "patchline (self): corpus sweep harness",
+  "repos": ["django/django", "rails/rails", "sqlalchemy/alembic", "prisma/prisma", "gorm/gorm", "sequelize/sequelize", "knex/knex", "flyway/flyway", "liquibase/liquibase", "bytebase/bytebase"],
+  "shards": 4,
+  "completed": ["django/django", "rails/rails", "gorm/gorm"]
+}

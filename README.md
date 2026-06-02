@@ -409,6 +409,26 @@ Run `make type-narrowing-gate` for a **type-narrowing safety checker** — widen
 
 Run `make dead-column-gate` to prove **no live code reads a column** before it may be dropped — a column with zero live reads is safe to drop while a still-read column is retained; see [docs/dead-column.md](docs/dead-column.md).
 
+Run `make corpus-harness-gate` for a **1000-repository** corpus harness with **deterministic sharding** and **resumable** sweeps — the same repository always lands in the same shard across runs and resuming from a checkpoint skips already-analyzed repositories; see [docs/corpus-harness.md](docs/corpus-harness.md).
+
+Run `make language-extractors-gate` to prove **per-language extractors** (Python, Ruby, Go, TypeScript, Java) emit findings against **one shared schema** — every language's findings validate while a finding missing a required field is rejected; see [docs/language-extractors.md](docs/language-extractors.md).
+
+Run `make streaming-analyzer-gate` for a **streaming analyzer** that bounds memory on repositories larger than RAM — its windowed pass never retains more than the bound yet returns the same aggregate as a buffer-everything pass; see [docs/streaming-analyzer.md](docs/streaming-analyzer.md).
+
+Run `make work-queue-gate` for a **distributed work queue** that scales the sweep across workers reproducibly — task assignment is deterministic, complete, and non-overlapping while a duplicated assignment is detected; see [docs/work-queue.md](docs/work-queue.md).
+
+Run `make incremental-reanalysis-gate` to reprocess **only repositories whose inputs changed** — the incremental set matches exactly the changed repositories and is strictly smaller than a full re-run; see [docs/incremental-reanalysis.md](docs/incremental-reanalysis.md).
+
+Run `make gold-subset-gate` to build a **gold-label subset** with adjudicated ground truth — items where two adjudicators agree form the gold set while a disagreed item is excluded; see [docs/gold-subset.md](docs/gold-subset.md).
+
+Run `make confusion-matrix-gate` for a **confusion-matrix** report with per-category **precision, recall, and F1** over the gold subset, validated against a hand-computed expectation; see [docs/confusion-matrix.md](docs/confusion-matrix.md).
+
+Run `make stratified-sampler-gate` for a **stratified sampler** guaranteeing every stratum — including rare migration patterns — is represented, where a naive uniform sample would miss the rare one; see [docs/stratified-sampler.md](docs/stratified-sampler.md).
+
+Run `make drift-monitor-gate` for a **corpus drift monitor** computing total-variation distance between input distributions — an identical distribution shows no drift while a shifted one trips the threshold; see [docs/drift-monitor.md](docs/drift-monitor.md).
+
+Run `make benchmark-release-gate` to publish a **versioned benchmark** with a **frozen split** and a leaderboard submission format — the split checksum is stable and train/test are disjoint, a conforming submission is accepted, and a malformed one is rejected; see [docs/benchmark-release.md](docs/benchmark-release.md).
+
 Add `--redact` to write `analysis-bundle/` copies with stable redaction tokens for identifiers, literals, customer-like strings, and secret-like values while preserving joins and existing artifact hashes.
 
 Add `--ci` to write `ci/summary.md` plus upload snippets and code-quality artifacts for GitHub Actions, GitLab CI, and Bitbucket Pipelines: SARIF under `analysis-bundle/summary.sarif`, GitLab `ci/gl-code-quality-report.json`, and Bitbucket `ci/bitbucket-code-insights.json`.

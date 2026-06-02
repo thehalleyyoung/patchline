@@ -1,0 +1,14 @@
+{
+  "version": "patchline.language-extractors-gate/v1",
+  "claim": "Patchline runs a separate migration extractor for each ecosystem language — Python, Ruby, Go, TypeScript, and Java — but every extractor emits findings against one shared schema, so a single downstream pipeline consumes results from all languages without per-language special-casing. The worker validates each finding against the required-field contract of the shared schema, reports per-language conformance, and rejects any finding missing a required field. The gate proves all five language extractors produce schema-valid findings and that a deliberately malformed finding lacking the hazard field is rejected.",
+  "real_repo": "patchline (self): per-language finding schema",
+  "required_fields": ["id", "language", "table", "column", "hazard", "severity"],
+  "findings": [
+    {"id": "py-1", "language": "python", "table": "users", "column": "email", "hazard": "not_null_without_backfill", "severity": "high"},
+    {"id": "rb-1", "language": "ruby", "table": "orders", "column": "total", "hazard": "type_narrowing", "severity": "medium"},
+    {"id": "go-1", "language": "go", "table": "events", "column": "ts", "hazard": "drop_index", "severity": "medium"},
+    {"id": "ts-1", "language": "typescript", "table": "sessions", "column": "token", "hazard": "drop_column", "severity": "high"},
+    {"id": "java-1", "language": "java", "table": "ledger", "column": "amount", "hazard": "fk_violation", "severity": "high"}
+  ],
+  "malformed_finding": {"id": "bad-1", "language": "python", "table": "users", "column": "email", "severity": "high"}
+}

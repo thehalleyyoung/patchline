@@ -1,0 +1,12 @@
+{
+  "version": "patchline.gold-subset-gate/v1",
+  "claim": "Patchline builds a gold-label evaluation subset from items that two independent adjudicators both labeled, keeping only the cases where they agree so that precision and recall are measured against trustworthy ground truth rather than noisy single-rater labels. The worker compares the two adjudicators' labels item by item, retains the agreed items as the gold set with their consensus label, excludes disagreements, and reports the observed agreement rate. The gate proves the gold set contains exactly the agreed items with correct consensus labels, that a disagreed item is excluded, and that the agreement rate matches the hand-computed value.",
+  "real_repo": "patchline (self): adjudicated gold subset",
+  "items": [
+    {"id": "m1", "rater_a": "hazard", "rater_b": "hazard"},
+    {"id": "m2", "rater_a": "safe", "rater_b": "safe"},
+    {"id": "m3", "rater_a": "hazard", "rater_b": "safe"},
+    {"id": "m4", "rater_a": "safe", "rater_b": "safe"},
+    {"id": "m5", "rater_a": "hazard", "rater_b": "hazard"}
+  ]
+}

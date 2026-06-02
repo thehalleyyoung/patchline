@@ -1,0 +1,7 @@
+{
+  "version": "patchline.incremental-reanalysis-gate/v1",
+  "claim": "Patchline re-analyzes only the repositories whose inputs actually changed since the last sweep by comparing a content hash against a cached hash, so an incremental run touches a small fraction of the corpus instead of recomputing everything. The worker diffs the current repository hashes against the cached manifest, classifies each repository as changed, new, or unchanged, and emits the exact set to reprocess. The gate proves the reprocess set equals precisely the changed and new repositories, that unchanged repositories are skipped, and that the incremental set is strictly smaller than a full re-run.",
+  "real_repo": "patchline (self): incremental re-analysis cache",
+  "cached": {"django/django": "h1", "rails/rails": "h2", "gorm/gorm": "h3", "prisma/prisma": "h4"},
+  "current": {"django/django": "h1", "rails/rails": "h2-NEW", "gorm/gorm": "h3", "prisma/prisma": "h4", "alembic/alembic": "h5"}
+}
