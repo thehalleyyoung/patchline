@@ -208,6 +208,96 @@ func TestInventoryPreservesUnknownStructuredFields(t *testing.T) {
 	}
 }
 
+func TestInventoryScansKubernetesAndTerraformInfrastructure(t *testing.T) {
+	root := t.TempDir()
+	writeFile(t, root, "k8s/jobs/migrate.yaml", `apiVersion: batch/v1
+kind: Job
+metadata:
+  name: billing-migrate
+spec:
+  template:
+    spec:
+      initContainers:
+      - name: wait-db
+        image: postgres:16
+      containers:
+      - name: migrate
+        image: app
+        command: ["bundle", "exec", "rails", "db:migrate"]
+        env:
+        - name: DATABASE_URL
+          valueFrom:
+            secretKeyRef:
+              name: billing-db
+              key: url
+`)
+	writeFile(t, root, "k8s/jobs/repair-cron.yaml", `apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: account-repair
+spec:
+  schedule: "*/15 * * * *"
+  jobTemplate:
+    spec:
+      template:
+        spec:
+          containers:
+          - name: repair
+            args: ["python", "manage.py", "reconcile_accounts", "--rollback-window=1h"]
+`)
+	writeFile(t, root, "infra/main.tf", `resource "helm_release" "app" {
+  name       = "billing"
+  wait       = true
+  atomic     = true
+  depends_on = [kubernetes_job.billing_migrate]
+  set_sensitive {
+    name  = "database.password"
+    value = var.database_password
+  }
+}
+
+resource "kubernetes_job" "billing_migrate" {
+  metadata { name = "billing-migrate" }
+  spec {
+    template {
+      spec {
+        container {
+          name    = "migrate"
+          command = ["alembic", "upgrade", "head"]
+        }
+      }
+    }
+  }
+}
+`)
+
+	inv, err := InventoryPath(InventoryOptions{Path: root})
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, kind := range []string{
+		"kubernetes_migration_job",
+		"kubernetes_database_job",
+		"kubernetes_secret_reference",
+		"kubernetes_deploy_ordering",
+		"kubernetes_cron_repair",
+		"terraform_migration_job",
+		"terraform_secret_reference",
+		"terraform_deploy_ordering",
+	} {
+		if !hasFindingKind(inv.Infrastructure, kind) {
+			t.Fatalf("missing infrastructure finding %s in %#v", kind, inv.Infrastructure)
+		}
+	}
+	if inv.SummaryByCategory["infrastructure"] != len(inv.Infrastructure) {
+		t.Fatalf("expected infrastructure summary count, got %#v", inv.SummaryByCategory)
+	}
+	baseline := Baseline(inv, inv.Facts, intake.Report{Source: intake.Source{Input: root, ScannedRoot: root}})
+	if baseline.Summary.InfraFindings < 8 || baseline.Summary.InfraMigrationJobs == 0 || baseline.Summary.InfraSecretRefs == 0 || baseline.Summary.InfraDeployOrdering == 0 || baseline.Summary.InfraCronRepairs == 0 {
+		t.Fatalf("expected baseline infrastructure summary, got %#v findings=%#v", baseline.Summary, baseline.Infrastructure)
+	}
+}
+
 func TestWriteInventoryEmitsFactsAndProjectMap(t *testing.T) {
 	root := t.TempDir()
 	writeFile(t, root, "db/migrate/2025-01-01_fix_accounts.sql", "update accounts set disabled = false;")
@@ -1643,6 +1733,15 @@ func hasIdentifier(ids []Identifier, kind, value string) bool {
 func hasCommand(commands []Command, command string) bool {
 	for _, item := range commands {
 		if item.Command == command {
+			return true
+		}
+	}
+	return false
+}
+
+func hasFindingKind(findings []Finding, kind string) bool {
+	for _, finding := range findings {
+		if finding.Kind == kind {
 			return true
 		}
 	}

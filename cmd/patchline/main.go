@@ -571,6 +571,7 @@ type repoAnalyzeSummary struct {
 	ProvenanceSlices     int    `json:"provenance_slices"`
 	PolicyChecks         int    `json:"policy_checks"`
 	RepairProofSummaries int    `json:"repair_proof_summaries"`
+	Infrastructure       int    `json:"infrastructure_findings"`
 	GeneratedFiles       int    `json:"generated_files"`
 	ProposalGenerator    string `json:"proposal_generator,omitempty"`
 	DeterministicOnly    bool   `json:"deterministic_only"`
@@ -1128,6 +1129,7 @@ func repoAnalyze(args []string) error {
 		report.Summary.ProvenanceSlices = baseline.Summary.ProvenanceSlices
 		report.Summary.PolicyChecks = baseline.Summary.PolicyChecks
 		report.Summary.RepairProofSummaries = baseline.Summary.RepairProofs
+		report.Summary.Infrastructure = baseline.Summary.InfraFindings
 		report.Summary.BaselineHash = baseline.Hash
 		report.DeepAnalysis = repoAnalyzeDeepSummary{
 			AbstractEffects:        baseline.Summary.AbstractEffects,

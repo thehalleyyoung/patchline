@@ -46,6 +46,7 @@ type BaselineReport struct {
 	Idempotency     []IdempotencyClass        `json:"idempotency_classifications,omitempty"`
 	LockHazards     []LockHazard              `json:"lock_concurrency_hazards,omitempty"`
 	PrivacyHazards  []PrivacyHazard           `json:"data_retention_privacy_hazards,omitempty"`
+	Infrastructure  []InfrastructureFinding   `json:"infrastructure_findings,omitempty"`
 	Invariants      []InvariantCandidate      `json:"invariant_candidates,omitempty"`
 	TraceLinks      []TraceCodeLink           `json:"trace_code_links,omitempty"`
 	BlastRadius     []BlastRadiusEstimate     `json:"blast_radius_estimates,omitempty"`
@@ -99,6 +100,12 @@ type BaselineSummary struct {
 	PrivacyHigh         int `json:"privacy_hazard_high"`
 	PrivacyMedium       int `json:"privacy_hazard_medium"`
 	PrivacyLow          int `json:"privacy_hazard_low"`
+	InfraFindings       int `json:"infrastructure_findings"`
+	InfraDatabaseJobs   int `json:"infrastructure_database_jobs"`
+	InfraMigrationJobs  int `json:"infrastructure_migration_jobs"`
+	InfraCronRepairs    int `json:"infrastructure_cron_repairs"`
+	InfraSecretRefs     int `json:"infrastructure_secret_references"`
+	InfraDeployOrdering int `json:"infrastructure_deploy_ordering"`
 	Invariants          int `json:"invariant_candidates"`
 	InvariantSchema     int `json:"invariants_from_schema"`
 	InvariantTests      int `json:"invariants_from_tests"`
@@ -213,6 +220,23 @@ type PrivacyHazard struct {
 	Evidence    []string     `json:"evidence,omitempty"`
 	Identifiers []Identifier `json:"identifiers,omitempty"`
 	Rationale   string       `json:"rationale"`
+}
+
+type InfrastructureFinding struct {
+	ID           string       `json:"id"`
+	Kind         string       `json:"kind"`
+	Source       string       `json:"source"`
+	Path         string       `json:"path"`
+	Line         int          `json:"line,omitempty"`
+	ResourceKind string       `json:"resource_kind,omitempty"`
+	ResourceName string       `json:"resource_name,omitempty"`
+	Schedule     string       `json:"schedule,omitempty"`
+	SecretRefs   []string     `json:"secret_refs,omitempty"`
+	Markers      []string     `json:"markers,omitempty"`
+	Confidence   string       `json:"confidence"`
+	Evidence     []string     `json:"evidence,omitempty"`
+	Identifiers  []Identifier `json:"identifiers,omitempty"`
+	Rationale    string       `json:"rationale"`
 }
 
 type InvariantCandidate struct {
@@ -458,6 +482,7 @@ func Baseline(inv Inventory, facts []Fact, intakeReport intake.Report) BaselineR
 	report.Idempotency = buildIdempotencyClasses(report.Risks, report.Provenance, report.SymbolicChecks, facts, intakeReport)
 	report.LockHazards = buildLockHazards(report.Risks, report.Provenance, facts, intakeReport)
 	report.PrivacyHazards = buildPrivacyHazards(report.Risks, report.Provenance, facts, intakeReport)
+	report.Infrastructure = buildInfrastructureFindings(facts)
 	report.Invariants = buildInvariantCandidates(inv.Root, facts, intakeReport)
 	report.TraceLinks = buildTraceCodeLinks(inv.Root, report.Risks, report.Provenance, facts, intakeReport)
 	report.BlastRadius = buildBlastRadiusEstimates(inv.Root, report.Risks, report.Provenance, facts, intakeReport)
@@ -506,6 +531,12 @@ func Baseline(inv Inventory, facts []Fact, intakeReport intake.Report) BaselineR
 		PrivacyHigh:         countPrivacyHazardSeverity(report.PrivacyHazards, "high"),
 		PrivacyMedium:       countPrivacyHazardSeverity(report.PrivacyHazards, "medium"),
 		PrivacyLow:          countPrivacyHazardSeverity(report.PrivacyHazards, "low"),
+		InfraFindings:       len(report.Infrastructure),
+		InfraDatabaseJobs:   countInfrastructureKind(report.Infrastructure, "database_job"),
+		InfraMigrationJobs:  countInfrastructureKind(report.Infrastructure, "migration_job"),
+		InfraCronRepairs:    countInfrastructureKind(report.Infrastructure, "cron_repair"),
+		InfraSecretRefs:     countInfrastructureKind(report.Infrastructure, "secret_reference"),
+		InfraDeployOrdering: countInfrastructureKind(report.Infrastructure, "deploy_ordering"),
 		Invariants:          len(report.Invariants),
 		InvariantSchema:     countInvariantSource(report.Invariants, "schema"),
 		InvariantTests:      countInvariantSource(report.Invariants, "test"),
@@ -1052,6 +1083,9 @@ func addEvidenceFactors(risk *BaselineRisk, facts factIndex) {
 		case "operational_doc", "evidence_export":
 			addFactor(risk, "operational-context", 10, "operational evidence shares identifiers with this risk")
 			return
+		case "infrastructure":
+			addFactor(risk, "infrastructure-context", 10, "Kubernetes or Terraform infrastructure evidence shares identifiers with this risk")
+			return
 		case "test_command":
 			addFactor(risk, "native-check-available", 5, "native project check is available")
 			return
@@ -1210,7 +1244,7 @@ func factKindPriority(kind string) int {
 		return 0
 	case "repair_candidate", "cause":
 		return 1
-	case "migration_root", "migration_system", "source_sql_hint":
+	case "migration_root", "migration_system", "source_sql_hint", "infrastructure":
 		return 2
 	case "file":
 		return 3
@@ -3459,6 +3493,99 @@ func countPrivacyHazardSeverity(hazards []PrivacyHazard, severity string) int {
 	return count
 }
 
+func buildInfrastructureFindings(facts []Fact) []InfrastructureFinding {
+	var findings []InfrastructureFinding
+	for _, fact := range facts {
+		if fact.Kind != "infrastructure" {
+			continue
+		}
+		kind := fact.Properties["kind"]
+		source := "kubernetes"
+		if strings.HasPrefix(kind, "terraform_") {
+			source = "terraform"
+		}
+		item := InfrastructureFinding{
+			ID:           "infra:" + canonical.Hash(fact.ID)[:16],
+			Kind:         kind,
+			Source:       source,
+			Path:         fact.Path,
+			Line:         atoiDefault(fact.Properties["line"], 0),
+			ResourceKind: fact.Properties["resource_kind"],
+			ResourceName: fact.Properties["resource_name"],
+			Schedule:     fact.Properties["schedule"],
+			SecretRefs:   splitCSV(fact.Properties["secret_refs"]),
+			Markers:      splitCSV(fact.Properties["markers"]),
+			Confidence:   fact.Confidence,
+			Evidence:     infrastructureEvidence(fact),
+			Identifiers:  fact.Identifiers,
+			Rationale:    fact.Rationale,
+		}
+		findings = append(findings, item)
+	}
+	sort.Slice(findings, func(i, j int) bool {
+		if findings[i].Source != findings[j].Source {
+			return findings[i].Source < findings[j].Source
+		}
+		if findings[i].Kind != findings[j].Kind {
+			return findings[i].Kind < findings[j].Kind
+		}
+		if findings[i].Path != findings[j].Path {
+			return findings[i].Path < findings[j].Path
+		}
+		return findings[i].ID < findings[j].ID
+	})
+	if len(findings) > 200 {
+		findings = findings[:200]
+	}
+	return findings
+}
+
+func infrastructureEvidence(fact Fact) []string {
+	var evidence []string
+	for _, key := range []string{"resource_kind", "resource_name", "schedule", "secret_refs", "markers"} {
+		if value := strings.TrimSpace(fact.Properties[key]); value != "" {
+			evidence = append(evidence, key+": "+value)
+		}
+	}
+	if len(evidence) == 0 && fact.Rationale != "" {
+		evidence = append(evidence, fact.Rationale)
+	}
+	return evidence
+}
+
+func countInfrastructureKind(findings []InfrastructureFinding, suffix string) int {
+	count := 0
+	for _, finding := range findings {
+		if strings.HasSuffix(finding.Kind, suffix) {
+			count++
+		}
+	}
+	return count
+}
+
+func splitCSV(value string) []string {
+	if strings.TrimSpace(value) == "" {
+		return nil
+	}
+	parts := strings.Split(value, ",")
+	var out []string
+	for _, part := range parts {
+		part = strings.TrimSpace(part)
+		if part != "" {
+			out = append(out, part)
+		}
+	}
+	return uniqueSortedStrings(out)
+}
+
+func atoiDefault(value string, fallback int) int {
+	var out int
+	if _, err := fmt.Sscanf(strings.TrimSpace(value), "%d", &out); err != nil {
+		return fallback
+	}
+	return out
+}
+
 func removeString(values []string, target string) []string {
 	var out []string
 	for _, value := range values {
@@ -5352,6 +5479,12 @@ func renderBaselineMarkdown(report BaselineReport) string {
 	fmt.Fprintf(&b, "| privacy hazard high | %d |\n", report.Summary.PrivacyHigh)
 	fmt.Fprintf(&b, "| privacy hazard medium | %d |\n", report.Summary.PrivacyMedium)
 	fmt.Fprintf(&b, "| privacy hazard low | %d |\n", report.Summary.PrivacyLow)
+	fmt.Fprintf(&b, "| infrastructure findings | %d |\n", report.Summary.InfraFindings)
+	fmt.Fprintf(&b, "| infrastructure database jobs | %d |\n", report.Summary.InfraDatabaseJobs)
+	fmt.Fprintf(&b, "| infrastructure migration jobs | %d |\n", report.Summary.InfraMigrationJobs)
+	fmt.Fprintf(&b, "| infrastructure cron repairs | %d |\n", report.Summary.InfraCronRepairs)
+	fmt.Fprintf(&b, "| infrastructure secret references | %d |\n", report.Summary.InfraSecretRefs)
+	fmt.Fprintf(&b, "| infrastructure deploy ordering | %d |\n", report.Summary.InfraDeployOrdering)
 	fmt.Fprintf(&b, "| invariant candidates | %d |\n", report.Summary.Invariants)
 	fmt.Fprintf(&b, "| invariants from schema | %d |\n", report.Summary.InvariantSchema)
 	fmt.Fprintf(&b, "| invariants from tests | %d |\n", report.Summary.InvariantTests)
@@ -5476,6 +5609,15 @@ func renderBaselineMarkdown(report BaselineReport) string {
 		limit := minInt(len(report.PrivacyHazards), 25)
 		for _, item := range report.PrivacyHazards[:limit] {
 			fmt.Fprintf(&b, "| %s | %s | `%s` | %s | %s | %s | %s |\n", item.Severity, item.Surface, item.RiskID, item.Table, item.Path, strings.Join(item.Markers, ", "), strings.Join(item.Mitigations, ", "))
+		}
+		fmt.Fprintf(&b, "\n")
+	}
+	if len(report.Infrastructure) > 0 {
+		fmt.Fprintf(&b, "## Infrastructure findings\n\n| source | kind | resource | schedule | path | markers |\n| --- | --- | --- | --- | --- | --- |\n")
+		limit := minInt(len(report.Infrastructure), 25)
+		for _, item := range report.Infrastructure[:limit] {
+			resource := strings.TrimSpace(strings.Join([]string{item.ResourceKind, item.ResourceName}, "/"))
+			fmt.Fprintf(&b, "| %s | %s | %s | %s | %s | %s |\n", item.Source, item.Kind, resource, item.Schedule, item.Path, strings.Join(item.Markers, ", "))
 		}
 		fmt.Fprintf(&b, "\n")
 	}

@@ -383,6 +383,7 @@ go run ./cmd/patchline dry-run repair.json --store store.json --json
 
 The Datadog-style adapter recognizes deploy events, incidents, traces, logs, monitors, SLOs, and notebooks from exported JSON or exported IaC-shaped JSON without requiring Datadog API access. The OTLP adapter ingests OpenTelemetry collector `resourceSpans` and `resourceLogs` exports so traces and logs can join the same deterministic evidence graph.
 The Jira and Linear adapters normalize issue exports into incident evidence while preserving issue IDs, created/updated/resolved timestamps, owners, labels, URLs, and repair links when present.
+Repo inventory and baseline reports also scan Kubernetes and Terraform files for database jobs, migration jobs, cron repairs, secret references, and deploy-ordering gates that can change the safety envelope of a data repair.
 
 ## What deeper checks add
 

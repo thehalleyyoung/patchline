@@ -87,6 +87,7 @@ type Inventory struct {
 	FieldEvidence     []Finding      `json:"field_evidence,omitempty"`
 	OperationalDocs   []Finding      `json:"operational_docs,omitempty"`
 	EvidenceExports   []Finding      `json:"evidence_exports,omitempty"`
+	Infrastructure    []Finding      `json:"infrastructure_scans,omitempty"`
 	NextCommands      []Command      `json:"next_commands,omitempty"`
 	SkippedDirs       []string       `json:"skipped_dirs,omitempty"`
 	SummaryByCategory map[string]int `json:"summary_by_category,omitempty"`
@@ -1135,6 +1136,7 @@ func (inv *Inventory) addFileFact(file scanFile, language string) {
 	if prefix != "" {
 		inv.inferSchemaEvolution(file, prefix, language)
 		inv.preserveFieldEvidence(file, prefix)
+		inv.scanInfrastructure(file, prefix)
 	}
 }
 
@@ -1376,6 +1378,224 @@ func (inv *Inventory) addFieldEvidenceFact(path, format, key, value string, line
 	})
 }
 
+func (inv *Inventory) scanInfrastructure(file scanFile, text string) {
+	lower := strings.ToLower(file.Rel)
+	switch {
+	case isKubernetesConfigPath(lower, text):
+		inv.scanKubernetesConfig(file.Rel, text)
+	case strings.HasSuffix(lower, ".tf") || strings.HasSuffix(lower, ".tfvars"):
+		inv.scanTerraformConfig(file.Rel, text)
+	}
+}
+
+func isKubernetesConfigPath(path, text string) bool {
+	if !(strings.HasSuffix(path, ".yaml") || strings.HasSuffix(path, ".yml") || strings.HasSuffix(path, ".tpl")) {
+		return false
+	}
+	lowerText := strings.ToLower(text)
+	return containsAny(path, "k8s/", "kubernetes/", "helm/", "chart/", "charts/", "deploy/") ||
+		(containsAny(lowerText, "apiversion:", "kind:") && containsAny(lowerText, "deployment", "statefulset", "job", "cronjob", "secretkeyref", "initcontainers"))
+}
+
+func (inv *Inventory) scanKubernetesConfig(path, text string) {
+	lower := strings.ToLower(text)
+	resourceKind := firstKubernetesValue(text, "kind")
+	resourceName := firstKubernetesNestedName(text)
+	schedule := firstKubernetesValue(text, "schedule")
+	if resourceName == "" {
+		resourceName = strings.TrimSuffix(filepath.Base(path), filepath.Ext(path))
+	}
+	if containsAny(lower, "secretkeyref", "secretref", "secretname:", "envfrom:", "volumes:") && containsAny(lower, "secret", "password", "token", "credential") {
+		inv.addInfrastructureFact(path, "kubernetes_secret_reference", 0, resourceKind, resourceName, schedule, secretNamesFromText(text), []string{"secretKeyRef", "secretName"}, "Kubernetes workload references secrets or secret-derived environment/configuration")
+	}
+	if containsAny(lower, "initcontainers:", "helm.sh/hook", "argocd.argoproj.io/sync-wave", "depends-on", "post-install", "pre-install", "pre-upgrade", "post-upgrade") {
+		inv.addInfrastructureFact(path, "kubernetes_deploy_ordering", 0, resourceKind, resourceName, schedule, nil, deployOrderMarkers(lower), "Kubernetes or Helm manifest encodes deploy ordering that can affect data-change safety")
+	}
+	if isKubernetesJobKind(resourceKind) || containsAny(lower, "kind: job", "kind: cronjob") {
+		if containsAny(lower, "migrate", "migration", "db:migrate", "alembic", "prisma migrate", "flyway", "liquibase") {
+			inv.addInfrastructureFact(path, "kubernetes_migration_job", 0, resourceKind, resourceName, schedule, nil, commandMarkers(lower), "Kubernetes job or cron job appears to run database migrations")
+		}
+		if containsAny(lower, "postgres", "mysql", "mariadb", "mongodb", "redis", "database", "db_") {
+			inv.addInfrastructureFact(path, "kubernetes_database_job", 0, resourceKind, resourceName, schedule, nil, commandMarkers(lower), "Kubernetes job or cron job is coupled to database services or credentials")
+		}
+		if strings.EqualFold(resourceKind, "CronJob") && containsAny(lower, "repair", "rollback", "reconcile", "backfill", "fix") {
+			inv.addInfrastructureFact(path, "kubernetes_cron_repair", 0, resourceKind, resourceName, schedule, nil, commandMarkers(lower), "Kubernetes CronJob appears to run recurring repair, rollback, reconcile, or backfill work")
+		}
+	}
+}
+
+func (inv *Inventory) scanTerraformConfig(path, text string) {
+	lower := strings.ToLower(text)
+	resourceKind, resourceName := firstTerraformResource(text)
+	if containsAny(lower, "kubernetes_secret", "secret_name", "secret_key_ref", "password", "token", "credential", "sensitive = true") {
+		inv.addInfrastructureFact(path, "terraform_secret_reference", 0, resourceKind, resourceName, "", secretNamesFromText(text), terraformMarkers(lower, "secret"), "Terraform configuration references secrets or secret-valued inputs near deployment resources")
+	}
+	if containsAny(lower, "depends_on", "wait = true", "atomic = true", "helm_release", "kubernetes_job", "kubernetes_cron_job") {
+		inv.addInfrastructureFact(path, "terraform_deploy_ordering", 0, resourceKind, resourceName, "", nil, terraformMarkers(lower, "ordering"), "Terraform configuration encodes deploy ordering or waits that can gate database-affecting rollout")
+	}
+	if containsAny(lower, "kubernetes_job", "kubernetes_cron_job", "helm_release", "null_resource") && containsAny(lower, "migrate", "migration", "db:migrate", "alembic", "prisma migrate", "flyway", "liquibase") {
+		inv.addInfrastructureFact(path, "terraform_migration_job", 0, resourceKind, resourceName, "", nil, commandMarkers(lower), "Terraform-managed resource appears to run database migrations")
+	}
+	if containsAny(lower, "kubernetes_job", "kubernetes_cron_job", "postgres", "mysql", "database_url", "db_") {
+		inv.addInfrastructureFact(path, "terraform_database_job", 0, resourceKind, resourceName, "", nil, commandMarkers(lower), "Terraform-managed resource is coupled to database jobs or database credentials")
+	}
+	if containsAny(lower, "kubernetes_cron_job", "schedule", "cron") && containsAny(lower, "repair", "rollback", "reconcile", "backfill", "fix") {
+		inv.addInfrastructureFact(path, "terraform_cron_repair", 0, resourceKind, resourceName, "", nil, commandMarkers(lower), "Terraform-managed cron resource appears to run recurring repair, rollback, reconcile, or backfill work")
+	}
+}
+
+func (inv *Inventory) addInfrastructureFact(path, kind string, line int, resourceKind, resourceName, schedule string, secretRefs, markers []string, rationale string) {
+	props := map[string]string{"kind": kind}
+	if resourceKind != "" {
+		props["resource_kind"] = resourceKind
+	}
+	if resourceName != "" {
+		props["resource_name"] = resourceName
+	}
+	if schedule != "" {
+		props["schedule"] = schedule
+	}
+	if line > 0 {
+		props["line"] = fmt.Sprintf("%d", line)
+	}
+	if len(secretRefs) > 0 {
+		props["secret_refs"] = strings.Join(uniqueSortedStrings(secretRefs), ",")
+	}
+	if len(markers) > 0 {
+		props["markers"] = strings.Join(uniqueSortedStrings(markers), ",")
+	}
+	confidence := "derived"
+	inv.Infrastructure = append(inv.Infrastructure, Finding{Kind: kind, Path: path, Confidence: confidence, Rationale: rationale})
+	ids := identifiersFromText(strings.Join([]string{path, kind, resourceKind, resourceName, schedule, strings.Join(secretRefs, " "), strings.Join(markers, " ")}, "\n"))
+	if resourceName != "" {
+		ids = append(ids, Identifier{Kind: "job", Value: normalizeProjectIdentifierValue("job", resourceName)})
+	}
+	inv.addFact(Fact{
+		Version:     Version,
+		Kind:        "infrastructure",
+		Path:        path,
+		Confidence:  confidence,
+		Rationale:   rationale,
+		Identifiers: ids,
+		Properties:  props,
+	})
+}
+
+func firstKubernetesValue(text, key string) string {
+	pattern := regexp.MustCompile(`(?im)^\s*` + regexp.QuoteMeta(key) + `\s*:\s*["']?([^"'\n#]+)`)
+	match := pattern.FindStringSubmatch(text)
+	if len(match) < 2 {
+		return ""
+	}
+	return strings.TrimSpace(match[1])
+}
+
+func firstKubernetesNestedName(text string) string {
+	lines := strings.Split(text, "\n")
+	inMetadata := false
+	metadataIndent := -1
+	for _, line := range lines {
+		indent := leadingSpaces(line)
+		trimmed := strings.TrimSpace(line)
+		if trimmed == "metadata:" {
+			inMetadata = true
+			metadataIndent = indent
+			continue
+		}
+		if inMetadata && indent <= metadataIndent && trimmed != "" {
+			inMetadata = false
+		}
+		if inMetadata && strings.HasPrefix(trimmed, "name:") {
+			return strings.Trim(strings.TrimSpace(strings.TrimPrefix(trimmed, "name:")), `"'`)
+		}
+	}
+	return ""
+}
+
+func firstTerraformResource(text string) (string, string) {
+	pattern := regexp.MustCompile(`(?m)^\s*resource\s+"([^"]+)"\s+"([^"]+)"`)
+	match := pattern.FindStringSubmatch(text)
+	if len(match) < 3 {
+		return "", ""
+	}
+	return match[1], match[2]
+}
+
+func leadingSpaces(line string) int {
+	count := 0
+	for _, r := range line {
+		if r != ' ' {
+			break
+		}
+		count++
+	}
+	return count
+}
+
+func isKubernetesJobKind(kind string) bool {
+	switch strings.ToLower(strings.TrimSpace(kind)) {
+	case "job", "cronjob":
+		return true
+	default:
+		return false
+	}
+}
+
+func secretNamesFromText(text string) []string {
+	pattern := regexp.MustCompile(`(?im)\b(?:secretName|name|secret_name)\s*[:=]\s*["']?([A-Za-z0-9_.:/-]+)`)
+	matches := pattern.FindAllStringSubmatch(text, -1)
+	var names []string
+	for _, match := range matches {
+		if len(match) > 1 && containsAny(strings.ToLower(match[0]), "secret") {
+			names = append(names, strings.Trim(match[1], `"',`))
+		}
+	}
+	blockPattern := regexp.MustCompile(`(?is)(?:secretKeyRef|secretRef|secret)\s*:\s*(?:\n\s+[A-Za-z0-9_.-]+\s*:\s*[^\n#]+)*?\n\s+name\s*:\s*["']?([A-Za-z0-9_.:/-]+)`)
+	for _, match := range blockPattern.FindAllStringSubmatch(text, -1) {
+		if len(match) > 1 {
+			names = append(names, strings.Trim(match[1], `"',`))
+		}
+	}
+	return capStrings(uniqueSortedStrings(names), 8)
+}
+
+func deployOrderMarkers(lower string) []string {
+	markers := []string{}
+	for _, marker := range []string{"initcontainers", "helm.sh/hook", "argocd.argoproj.io/sync-wave", "depends-on", "pre-install", "post-install", "pre-upgrade", "post-upgrade"} {
+		if strings.Contains(lower, marker) {
+			markers = append(markers, marker)
+		}
+	}
+	return markers
+}
+
+func terraformMarkers(lower, category string) []string {
+	var candidates []string
+	switch category {
+	case "secret":
+		candidates = []string{"kubernetes_secret", "secret_name", "secret_key_ref", "set_sensitive", "password", "token", "credential", "sensitive = true"}
+	default:
+		candidates = []string{"depends_on", "wait = true", "atomic = true", "helm_release", "kubernetes_job", "kubernetes_cron_job"}
+	}
+	var markers []string
+	for _, marker := range candidates {
+		if strings.Contains(lower, marker) {
+			markers = append(markers, marker)
+		}
+	}
+	return markers
+}
+
+func commandMarkers(lower string) []string {
+	var markers []string
+	for _, marker := range []string{"migrate", "migration", "db:migrate", "alembic", "prisma migrate", "flyway", "liquibase", "postgres", "mysql", "database", "repair", "rollback", "reconcile", "backfill", "fix"} {
+		if strings.Contains(lower, marker) {
+			markers = append(markers, marker)
+		}
+	}
+	return markers
+}
+
 func normalizeFieldKey(value string) string {
 	value = strings.TrimSpace(strings.ToLower(value))
 	value = strings.Trim(value, `"'[](),;`)
@@ -1591,6 +1811,7 @@ func (inv *Inventory) finalize() {
 	inv.SchemaEvolution = capFindings(uniqueFindings(inv.SchemaEvolution), 50)
 	inv.OperationalDocs = capFindings(uniqueFindings(inv.OperationalDocs), 50)
 	inv.EvidenceExports = capFindings(uniqueFindings(inv.EvidenceExports), 50)
+	inv.Infrastructure = capFindings(uniqueFindings(inv.Infrastructure), 100)
 	inv.TestCommands = uniqueCommands(inv.TestCommands)
 	inv.NativeCommands = uniqueCommands(inv.NativeCommands)
 	inv.FieldEvidence = capFindings(uniqueFindings(inv.FieldEvidence), 100)
@@ -1626,6 +1847,7 @@ func (inv *Inventory) finalize() {
 		"evidence_exports":  len(inv.EvidenceExports),
 		"field_evidence":    len(inv.FieldEvidence),
 		"frameworks":        len(inv.Frameworks),
+		"infrastructure":    len(inv.Infrastructure),
 		"migration_roots":   len(inv.MigrationRoots),
 		"migration_systems": len(inv.MigrationSystems),
 		"native_commands":   len(inv.NativeCommands),
@@ -1668,6 +1890,7 @@ func renderMarkdown(inv Inventory) string {
 	writeFindings("Field evidence", inv.FieldEvidence)
 	writeFindings("CI", inv.CI)
 	writeFindings("Deploy config", inv.DeployConfig)
+	writeFindings("Infrastructure scans", inv.Infrastructure)
 	writeFindings("Operational docs", inv.OperationalDocs)
 	writeFindings("Evidence exports", inv.EvidenceExports)
 	if len(inv.NativeCommands) > 0 {
@@ -1701,6 +1924,7 @@ func renderProjectMap(inv Inventory) string {
 	fmt.Fprintf(&b, "| source SQL hints | %d |\n", len(inv.SourceSQLHints))
 	fmt.Fprintf(&b, "| operational docs | %d |\n", len(inv.OperationalDocs))
 	fmt.Fprintf(&b, "| field evidence | %d |\n", len(inv.FieldEvidence))
+	fmt.Fprintf(&b, "| infrastructure scans | %d |\n", len(inv.Infrastructure))
 	fmt.Fprintf(&b, "| evidence exports | %d |\n\n", len(inv.EvidenceExports))
 	writePaths := func(title string, findings []Finding) {
 		if len(findings) == 0 {
@@ -1716,6 +1940,7 @@ func renderProjectMap(inv Inventory) string {
 	writePaths("Migration systems", inv.MigrationSystems)
 	writePaths("Schema evolution", inv.SchemaEvolution)
 	writePaths("Field evidence", inv.FieldEvidence)
+	writePaths("Infrastructure scans", inv.Infrastructure)
 	writePaths("Source SQL candidates", inv.SourceSQLHints)
 	writePaths("Operational docs", inv.OperationalDocs)
 	writePaths("Evidence exports", inv.EvidenceExports)

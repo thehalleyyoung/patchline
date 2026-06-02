@@ -1,0 +1,38 @@
+{
+  "version": "patchline.infrastructure-scan-gate/v1",
+  "claim": "Kubernetes and Terraform scanners detect database jobs, migration jobs, cron repairs, secrets references, and deploy ordering in public infrastructure code not designed for Patchline.",
+  "minimum_public_repos": 4,
+  "required_categories": [
+    "database_job",
+    "migration_job",
+    "cron_repair",
+    "secret_reference",
+    "deploy_ordering"
+  ],
+  "slices": [
+    {
+      "id": "mapwarper-kubernetes-db-migrate",
+      "repo": "kartta-labs/mapwarper",
+      "ref": "9121861f53dc408b64b801be7c9335c5b094a6a9",
+      "path": "k8s/db-migrate-job.yaml"
+    },
+    {
+      "id": "dataset-viewer-kubernetes-backfill",
+      "repo": "huggingface/dataset-viewer",
+      "ref": "60ce6685ab407f8ba1f2b22744823905e211519c",
+      "path": "chart/templates/cron-jobs/backfill/job.yaml"
+    },
+    {
+      "id": "trading-bot-terraform-migrations",
+      "repo": "ViktorBarzin/infra",
+      "ref": "800f9ce8363f3f4feeb7535a73e38369270f887c",
+      "path": "stacks/trading-bot/main.tf"
+    },
+    {
+      "id": "zenml-terraform-sensitive-helm",
+      "repo": "zenml-io/mlstacks",
+      "ref": "59b7ce6f6270a9bde8c006da70f959073ab96811",
+      "path": "modules/zenml-module/zen_server.tf"
+    }
+  ]
+}
