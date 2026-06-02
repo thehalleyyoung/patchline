@@ -1,0 +1,18 @@
+{
+  "version": "patchline.reviewer-mode/v1",
+  "inputs": [
+    "effect-size",
+    "ablation-dashboard",
+    "negative-control"
+  ],
+  "outputs": [
+    "tables/effect-sizes.md",
+    "tables/ablation-ecosystems.md",
+    "tables/negative-controls.md",
+    "figures/ablation-ecosystems.svg",
+    "claims/claims.json",
+    "claims/claims.md",
+    "manifest.json"
+  ],
+  "claim": "Reviewer-mode artifacts are regenerated from raw JSON outputs only."
+}
