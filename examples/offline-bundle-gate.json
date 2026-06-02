@@ -1,0 +1,12 @@
+{
+  "version": "patchline.offline-bundle-gate/v1",
+  "claim": "Runtime evidence can be packaged into a self-contained offline bundle that a reviewer verifies with no external services: the bundle carries the baseline findings, the runtime evidence, and a MANIFEST with a sha256 for every file. Checksums verify offline, the bundle references no network endpoints, finding linkage is preserved, and rebuilding the bundle yields identical checksums.",
+  "real_repo": {
+    "repo": "lobsters/lobsters",
+    "ref": "3b80b47aa5aaba37ec44413e7d1dc96fcf1585b6",
+    "subpath": "db/migrate"
+  },
+  "max_findings": 12,
+  "minimum_findings": 4,
+  "required_members": ["findings.json", "runtime-evidence.jsonl", "MANIFEST.json", "INDEX.md"]
+}

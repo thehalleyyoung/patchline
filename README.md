@@ -243,6 +243,8 @@ Run `make causality-limits-gate` to enforce the causality limitations of trace-t
 
 Run `make runtime-redaction-gate` to prove the deterministic `[redacted:<kind>:<hash>]` token policy is stable on runtime evidence — trace attributes, log lines, metric labels, and incident text — with byte-identical reruns, deterministic tokens, and zero raw-value leaks; see [docs/runtime-redaction.md](docs/runtime-redaction.md).
 
+Run `make offline-bundle-gate` to package real findings and runtime evidence into a self-contained, checksummed offline bundle a reviewer can verify air-gapped (`shasum -c MANIFEST.checks`), with no network endpoints and deterministic rebuilds; see [docs/offline-bundle.md](docs/offline-bundle.md).
+
 Add `--redact` to write `analysis-bundle/` copies with stable redaction tokens for identifiers, literals, customer-like strings, and secret-like values while preserving joins and existing artifact hashes.
 
 Add `--ci` to write `ci/summary.md` plus upload snippets and code-quality artifacts for GitHub Actions, GitLab CI, and Bitbucket Pipelines: SARIF under `analysis-bundle/summary.sarif`, GitLab `ci/gl-code-quality-report.json`, and Bitbucket `ci/bitbucket-code-insights.json`.
