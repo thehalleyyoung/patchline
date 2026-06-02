@@ -1,0 +1,17 @@
+{
+  "version": "patchline.release-smoke-gate/v1",
+  "claim": "Patchline gates every release behind a minimal smoke-test suite so that a release is blocked the moment any critical check fails, independent of how many non-critical checks pass. The worker evaluates a smoke suite in which each check is marked critical or advisory, computes release readiness as the conjunction of all critical checks, and reports the blocking checks by name. The gate proves a suite whose critical checks all pass is release-ready even with a failing advisory check, and that a negative-control suite with a single failing critical check is blocked and names that check as the blocker.",
+  "real_repo": "patchline (self): release-blocking smoke suite",
+  "ready_suite": [
+    {"name": "build", "critical": true, "passed": true},
+    {"name": "core-gate", "critical": true, "passed": true},
+    {"name": "determinism", "critical": true, "passed": true},
+    {"name": "docs-spellcheck", "critical": false, "passed": false}
+  ],
+  "blocked_suite": [
+    {"name": "build", "critical": true, "passed": true},
+    {"name": "core-gate", "critical": true, "passed": false},
+    {"name": "determinism", "critical": true, "passed": true},
+    {"name": "docs-spellcheck", "critical": false, "passed": true}
+  ]
+}

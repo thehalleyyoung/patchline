@@ -327,6 +327,8 @@ Run `make shell-portability-gate` to lint gate scripts for **portability** hazar
 
 Run `make artifact-gc-gate` to prune the artifact cache by **LRU** under a fixed budget while never evicting a **pinned** entry — disk stays bounded but open-proof artifacts are never collected; see [docs/artifact-gc.md](docs/artifact-gc.md).
 
+Run `make release-smoke-gate` to gate releases behind a minimal **smoke** suite — a **release-blocking** critical failure stops the release and is named, while advisory failures never block; see [docs/release-smoke.md](docs/release-smoke.md).
+
 Add `--redact` to write `analysis-bundle/` copies with stable redaction tokens for identifiers, literals, customer-like strings, and secret-like values while preserving joins and existing artifact hashes.
 
 Add `--ci` to write `ci/summary.md` plus upload snippets and code-quality artifacts for GitHub Actions, GitLab CI, and Bitbucket Pipelines: SARIF under `analysis-bundle/summary.sarif`, GitLab `ci/gl-code-quality-report.json`, and Bitbucket `ci/bitbucket-code-insights.json`.
