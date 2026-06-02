@@ -1,0 +1,8 @@
+{
+  "version": "patchline.canonical-json-gate/v1",
+  "claim": "Patchline canonicalizes JSON before hashing so that two documents that are semantically equal but differ only in key order or insignificant whitespace produce identical canonical bytes and identical checksums, while any document that differs in content produces a different checksum. The worker canonicalizes each input by recursively sorting object keys and emitting compact separators, then computes a SHA-256 checksum over the canonical bytes. The gate proves that a reordered-but-equal document collides with its twin under both canonical form and checksum, and that a content-changed document does not, eliminating spurious diffs and making proof checksums order-independent.",
+  "real_repo": "patchline (self): canonical JSON + checksum utility",
+  "doc_a": {"b": 2, "a": 1, "nested": {"y": 20, "x": 10}, "list": [3, 1, 2]},
+  "doc_b": {"nested": {"x": 10, "y": 20}, "a": 1, "list": [3, 1, 2], "b": 2},
+  "doc_c": {"a": 1, "b": 3, "nested": {"x": 10, "y": 20}, "list": [3, 1, 2]}
+}
