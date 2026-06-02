@@ -1,0 +1,30 @@
+{
+  "version": "patchline.uncertainty-calibration-gate/v1",
+  "claim": "Patchline calibrates the confidence it attaches to every ranked risk and generated intervention so that a stated confidence of 0.8 means the prediction is right about 80 percent of the time, measured by expected calibration error over confidence bins. The worker bins predictions by stated confidence, compares the average confidence in each bin to the observed accuracy in that bin, and reports the expected calibration error. The gate proves a well-calibrated predictor has near-zero expected calibration error while an overconfident negative-control predictor, which claims high confidence but is right only half the time, exceeds the calibration-error threshold and is rejected.",
+  "real_repo": "patchline (self): calibration measurement over ranked-risk confidences",
+  "threshold": 0.1,
+  "calibrated": [
+    {"confidence": 0.8, "correct": true},
+    {"confidence": 0.8, "correct": true},
+    {"confidence": 0.8, "correct": true},
+    {"confidence": 0.8, "correct": true},
+    {"confidence": 0.8, "correct": false},
+    {"confidence": 0.6, "correct": true},
+    {"confidence": 0.6, "correct": true},
+    {"confidence": 0.6, "correct": true},
+    {"confidence": 0.6, "correct": false},
+    {"confidence": 0.6, "correct": false}
+  ],
+  "overconfident": [
+    {"confidence": 0.9, "correct": true},
+    {"confidence": 0.9, "correct": true},
+    {"confidence": 0.9, "correct": true},
+    {"confidence": 0.9, "correct": true},
+    {"confidence": 0.9, "correct": true},
+    {"confidence": 0.9, "correct": false},
+    {"confidence": 0.9, "correct": false},
+    {"confidence": 0.9, "correct": false},
+    {"confidence": 0.9, "correct": false},
+    {"confidence": 0.9, "correct": false}
+  ]
+}

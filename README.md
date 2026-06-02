@@ -341,6 +341,8 @@ Run `make tenant-risk-gate` to infer **tenant-boundary** and **sharding** risks 
 
 Run `make privacy-impact-gate` to infer **privacy impact** for deletes, exports, **anonymization**, and retention changes — PII exports flag high and PII deletes erasure-relevant while non-PII ops carry none; see [docs/privacy-impact.md](docs/privacy-impact.md).
 
+Run `make uncertainty-calibration-gate` to check **calibration** of ranked-risk confidences via **expected calibration error** — a calibrated predictor passes while an overconfident one (right half the time at 0.9 confidence) is rejected; see [docs/uncertainty-calibration.md](docs/uncertainty-calibration.md).
+
 Add `--redact` to write `analysis-bundle/` copies with stable redaction tokens for identifiers, literals, customer-like strings, and secret-like values while preserving joins and existing artifact hashes.
 
 Add `--ci` to write `ci/summary.md` plus upload snippets and code-quality artifacts for GitHub Actions, GitLab CI, and Bitbucket Pipelines: SARIF under `analysis-bundle/summary.sarif`, GitLab `ci/gl-code-quality-report.json`, and Bitbucket `ci/bitbucket-code-insights.json`.
