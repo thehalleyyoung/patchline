@@ -19,7 +19,7 @@
   },
   "signature": {
     "algorithm": "ed25519",
-    "public_key": "6823b6dcdbe7e8929a450ea9e830318781dc752d960ecb630d901ef0b3aab6eb",
-    "value": "5afba7b6fce906dc1aa6102c714c98a647a1f924592021d33076d4f9e4e828fcf51a4230706e07806a62e2c2a08932e2cfef66c631e416f93731c62ef0c70007"
+    "public_key": "8a875fff1eb38451577acd5afee405456568dd7c89e090863a0557bc7af49f17",
+    "value": "72566fae2b6eff8e08f40d7c960a96395deaf6e8e3ac9d853dcc85ce9adfedbbf3d06edf0e9a3adbde7bdbea46a808bc8eba2b264a4eabe5739673979b9b6e0b"
   }
 }

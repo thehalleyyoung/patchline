@@ -1912,6 +1912,22 @@ certificate-interop-dashboard-gate:
 conformance-failure-minimizer-gate:
 	bash scripts/conformance-failure-minimizer-gate.sh
 
+.PHONY: certificate-semantic-diff-gate
+certificate-semantic-diff-gate:
+	bash scripts/certificate-semantic-diff-gate.sh
+
+.PHONY: certificate-normalizer-gate
+certificate-normalizer-gate:
+	bash scripts/certificate-normalizer-gate.sh
+
+.PHONY: certificate-revocation-gate
+certificate-revocation-gate:
+	bash scripts/certificate-revocation-gate.sh
+
+.PHONY: certificate-plugfest-gate
+certificate-plugfest-gate:
+	bash scripts/certificate-plugfest-gate.sh
+
 .PHONY: cross-tool-verdict-exchange-gate
 cross-tool-verdict-exchange-gate:
 	bash scripts/cross-tool-verdict-exchange-gate.sh

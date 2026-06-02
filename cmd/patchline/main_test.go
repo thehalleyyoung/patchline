@@ -2,6 +2,8 @@ package main
 
 import (
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -52,6 +54,31 @@ func TestPluginsListAndProbeCommands(t *testing.T) {
 		if stat, err := os.Stat(filepath.Join(out, rel)); err != nil || stat.Size() == 0 {
 			t.Fatalf("expected %s to be written, stat=%#v err=%v", rel, stat, err)
 		}
+	}
+}
+
+func TestCertCommandsNormalizeAndDiffRealFixtures(t *testing.T) {
+	root := mainTestRepoRoot(t)
+	certPath := filepath.Join(root, "specs/certificate-interchange/v1/vectors/valid/patchline-proof-frame.plci")
+	outPath := filepath.Join(t.TempDir(), "normalized.plci")
+	if err := run([]string{"cert", "normalize", certPath, "--root", root, "--out", outPath, "--json"}); err != nil {
+		t.Fatalf("cert normalize failed: %v", err)
+	}
+	if stat, err := os.Stat(outPath); err != nil || stat.Size() == 0 {
+		t.Fatalf("expected normalized certificate output, stat=%#v err=%v", stat, err)
+	}
+	weakenedData, err := os.ReadFile(certPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	weakened := strings.Replace(string(weakenedData), "obl.frame kind=frame status=checked", "obl.frame kind=frame status=assumed", 1)
+	weakened = recomputeMainTestCanonicalHash(weakened)
+	weakenedPath := filepath.Join(t.TempDir(), "weakened.plci")
+	if err := os.WriteFile(weakenedPath, []byte(weakened), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := run([]string{"cert", "diff", certPath, weakenedPath, "--root", root, "--json"}); err != nil {
+		t.Fatalf("cert diff failed: %v", err)
 	}
 }
 
@@ -1480,6 +1507,37 @@ func writeAnalysisSnapshotForTest(t *testing.T, root, factID, stableID, generate
 
 func itoaForTest(value int) string {
 	return fmt.Sprintf("%d", value)
+}
+
+func mainTestRepoRoot(t *testing.T) string {
+	t.Helper()
+	dir, err := os.Getwd()
+	if err != nil {
+		t.Fatal(err)
+	}
+	for {
+		if _, err := os.Stat(filepath.Join(dir, "go.mod")); err == nil {
+			return dir
+		}
+		next := filepath.Dir(dir)
+		if next == dir {
+			t.Fatal("could not find repo root")
+		}
+		dir = next
+	}
+}
+
+func recomputeMainTestCanonicalHash(s string) string {
+	lines := strings.Split(strings.TrimSuffix(s, "\n"), "\n")
+	for i, line := range lines {
+		if strings.HasPrefix(line, "canonical-sha256: ") {
+			canonicalText := strings.Join(lines[:i], "\n") + "\n"
+			sum := sha256.Sum256([]byte(canonicalText))
+			lines[i] = "canonical-sha256: " + hex.EncodeToString(sum[:])
+			return strings.Join(lines, "\n") + "\n"
+		}
+	}
+	return s
 }
 
 func TestPhaseCheckInputKindResolvesImplicitInputs(t *testing.T) {

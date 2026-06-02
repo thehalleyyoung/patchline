@@ -940,6 +940,18 @@ classes and rejects two legacy negatives (an unregistered risk class and a \code
 assumed obligation), proving old verdicts remain checkable across schema revisions rather than being
 grandfathered by policy.
 
+The new lifecycle gates make PLCI useful after issuance. \gate{certificate-normalizer-gate}
+canonicalizes order-insensitive witness sections before signing or comparison, re-parses the normalized
+bytes, and proves equivalent shuffled witnesses converge to the same identity. \gate{certificate-semantic-diff-gate}
+compares current or migrated certificates at the obligation level, reporting \code{strengthened},
+\code{weakened}, \code{unchanged}, and conservative \code{changed} transitions while treating
+\code{refuted} as a counterexample state rather than a point on a confidence scale.
+\gate{certificate-revocation-gate} signs revocation and supersession records, binds each payload into
+the Merkle-style ledger, and rejects terminal-state rewrites. \gate{certificate-plugfest-gate} packages
+that lifecycle for external tools: submissions are validated offline by recomputing conformance,
+normalization, semantic diff, revocation replay, and reproducible log hashes in process, without
+executing the submitted checker.
+
 %======================================================================
 \section{Developer and Contributor Experience}
 %======================================================================
@@ -1303,7 +1315,9 @@ Decision science & \code{risk-economics-gate}, \code{uncertainty-calibration-gat
 Release \& interop & \code{rc-rehearsal-gate}, \code{leaderboard-gate}, \code{dossier-gate},
 \code{interop-gate}, \code{standards-body-conformance-corpus-gate},
 \code{certificate-interop-dashboard-gate}, \code{conformance-failure-minimizer-gate},
-\code{certificate-migration-gate} \\
+\code{certificate-migration-gate}, \code{certificate-normalizer-gate},
+\code{certificate-semantic-diff-gate}, \code{certificate-revocation-gate},
+\code{certificate-plugfest-gate} \\
 Generalization & \code{framework-holdout-gate}, \code{perturbation-robustness-gate},
 \code{historical-replay-study-gate}, \code{external-replication-kit-gate} \\
 Trust stack & \code{signed-provenance-chain-gate}, \code{reproducible-build-attestation-gate},
@@ -1354,7 +1368,8 @@ make infra-ordering-gate \hspace{2.0em}\# Kong/Anchore sequencing on helm/charts
 make fixture-minimizer-gate \hspace{0.7em}\# 1-minimal reproductions per ecosystem\\
 make parser-dashboard-gate \hspace{1.1em}\# coverage + fuzz robustness dashboard\\
 make certificate-interop-dashboard-gate \quad\# PLCI checker drift dashboard\\
-make certificate-migration-gate \hspace{0.1em}\# PLCI/0 verdicts recheck as PLCI/1
+make certificate-migration-gate \hspace{0.1em}\# PLCI/0 verdicts recheck as PLCI/1\\
+make certificate-plugfest-gate \hspace{0.25em}\# offline PLCI lifecycle submission replay
 \end{quote}
 
 \noindent

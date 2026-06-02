@@ -3,12 +3,12 @@ certificate-id: patchline.bad.date.v1
 subject-repo: thehalleyyoung/patchline
 subject-ref: 8e6e3fe
 subject-path: cmd/patchline/main.go
-subject-sha256: 782130c1648f4da094396744349510a192fc1c21c9adf032eeb9fa42d9e5910b
+subject-sha256: 9fd059ba3a280e31ebaba3c8fe63c6fb782d294af7776ae216b267dc00f68931
 issued-at: 2026-99-99T99:99:99Z
 producer: patchline-certlang/1
 verdict: safe
 risk-bps: 40
-evidence: ev.cli type=source uri=file:cmd/patchline/main.go sha256=782130c1648f4da094396744349510a192fc1c21c9adf032eeb9fa42d9e5910b
+evidence: ev.cli type=source uri=file:cmd/patchline/main.go sha256=9fd059ba3a280e31ebaba3c8fe63c6fb782d294af7776ae216b267dc00f68931
 obligation: obl.dispatch kind=interchange status=checked evidence=ev.cli formula="command dispatch preserves explicit proof and certificate entry points"
-canonical-sha256: bb1e3b78ea1bfa28e9eaaad88930f8e3bb52f83314fba37ab05082e06c9ba1b0
+canonical-sha256: b5e59dc06f0c8591e4f9175b730b859919cb9d8816a8474b1b85b70159d964c1
 END

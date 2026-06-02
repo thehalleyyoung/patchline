@@ -358,7 +358,7 @@ func renderCurrentCertificate(cert Certificate) ([]byte, Certificate, error) {
 		lines = append(lines, "evidence: "+evidence.ID+" type="+evidence.Type+" uri="+evidence.URI+" sha256="+evidence.SHA256)
 	}
 	for _, obligation := range cert.Obligations {
-		lines = append(lines, fmt.Sprintf("obligation: %s kind=%s status=%s evidence=%s formula=%q",
+		lines = append(lines, fmt.Sprintf("obligation: %s kind=%s status=%s evidence=%s formula=\"%s\"",
 			obligation.ID,
 			obligation.Kind,
 			obligation.Status,

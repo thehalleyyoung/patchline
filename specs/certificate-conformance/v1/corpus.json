@@ -6,7 +6,7 @@
     "track": "standards-body conformance corpus",
     "ratification": "PLCI-WG-2026-06-02"
   },
-  "public_key": "6823b6dcdbe7e8929a450ea9e830318781dc752d960ecb630d901ef0b3aab6eb",
+  "public_key": "8a875fff1eb38451577acd5afee405456568dd7c89e090863a0557bc7af49f17",
   "cases": [
     {
       "id": "safe-cli-dispatch",

@@ -26,6 +26,10 @@ import (
 	"github.com/thehalleyyoung/patchline/internal/bench"
 	"github.com/thehalleyyoung/patchline/internal/bundle"
 	"github.com/thehalleyyoung/patchline/internal/canonical"
+	"github.com/thehalleyyoung/patchline/internal/certdiff"
+	"github.com/thehalleyyoung/patchline/internal/certlang"
+	"github.com/thehalleyyoung/patchline/internal/certplugfest"
+	"github.com/thehalleyyoung/patchline/internal/certrevocation"
 	"github.com/thehalleyyoung/patchline/internal/dbdryrun"
 	"github.com/thehalleyyoung/patchline/internal/demo"
 	"github.com/thehalleyyoung/patchline/internal/diagnostics"
@@ -104,6 +108,8 @@ func run(args []string) error {
 		return pluginsCommand(args[1:])
 	case "golden-fixture":
 		return goldenFixtureCommand(args[1:])
+	case "cert":
+		return certCommand(args[1:])
 	case "contributor":
 		return contributorCommand(args[1:])
 	case "semantics-contract":
@@ -433,6 +439,10 @@ Usage:
   patchline plugins list [--json]
   patchline plugins probe [<path>|--github owner/repo] [--ref ref] [--subpath path] [--out dir] [--download-dir dir] [--json]
   patchline golden-fixture generate [<path>|--github owner/repo] [--ref ref] [--subpath path] --out dir [--max-files n] [--json]
+  patchline cert normalize <certificate.plci> [--root repo] [--out normalized.plci] [--json]
+  patchline cert diff <old.plci> <new.plci> [--root repo] [--json]
+  patchline cert revoke-verify <bundle.json> [--json]
+  patchline cert plugfest --submission submission.json [--root repo] [--json]
   patchline contributor check [--root path] [--out dir] [--packages pkg[,pkg...]] [--gates target[,target...]] [--plan-only] [--json]
   patchline repo doctor [<path>|--github owner/repo] [--ref ref] [--subpath path] [--out dir] [--download-dir dir] [--json]
   patchline repo fetch <owner/repo|github-url|path|archive> [--ref ref] [--subpath path] [--out dir] [--download-dir dir] [--json]
@@ -547,6 +557,157 @@ Examples:
   patchline provenance certificate record:invoices/inv_1002 --evidence examples/incidents/bad-migration.jsonl
   patchline analyze-migration demos/billing/migrations/002_bad_backfill.sql
   patchline reproduce examples/reproduce/bad-migration-billing.json --json`)
+}
+
+func certCommand(args []string) error {
+	if len(args) == 0 {
+		return errors.New("usage: patchline cert <normalize|diff|revoke-verify|plugfest> ...")
+	}
+	switch args[0] {
+	case "normalize":
+		return certNormalize(args[1:])
+	case "diff":
+		return certDiff(args[1:])
+	case "revoke-verify", "revocation-replay":
+		return certRevokeVerify(args[1:])
+	case "plugfest":
+		return certPlugfest(args[1:])
+	default:
+		return fmt.Errorf("unknown cert subcommand %q", args[0])
+	}
+}
+
+func certNormalize(args []string) error {
+	root := "."
+	if value, ok := flagValue(args, "--root"); ok {
+		root = value
+	}
+	out, _ := flagValue(args, "--out")
+	jsonOut := hasFlag(args, "--json")
+	positionals := positionalArgs(args)
+	if len(positionals) != 1 {
+		return errors.New("usage: patchline cert normalize <certificate.plci> [--root repo] [--out normalized.plci] [--json]")
+	}
+	data, err := os.ReadFile(positionals[0])
+	if err != nil {
+		return err
+	}
+	result, err := certlang.Normalize(data, certlang.Options{Root: root, VerifyFiles: true})
+	if err != nil {
+		return err
+	}
+	if out != "" {
+		if err := os.WriteFile(out, result.Normalized, 0o644); err != nil {
+			return err
+		}
+	}
+	if jsonOut {
+		return writeJSON(os.Stdout, result)
+	}
+	fmt.Printf("certificate normalized id=%s changed=%t canonical=%s bytes=%s\n",
+		result.CertificateID, result.Changed, result.NormalizedCanonicalSHA256, result.NormalizedSHA256)
+	return nil
+}
+
+func certDiff(args []string) error {
+	root := "."
+	if value, ok := flagValue(args, "--root"); ok {
+		root = value
+	}
+	jsonOut := hasFlag(args, "--json")
+	positionals := positionalArgs(args)
+	if len(positionals) != 2 {
+		return errors.New("usage: patchline cert diff <old.plci> <new.plci> [--root repo] [--json]")
+	}
+	oldData, err := os.ReadFile(positionals[0])
+	if err != nil {
+		return err
+	}
+	newData, err := os.ReadFile(positionals[1])
+	if err != nil {
+		return err
+	}
+	report, err := certdiff.CompareBytes(oldData, newData, certlang.Options{Root: root, VerifyFiles: true})
+	if err != nil {
+		return err
+	}
+	if jsonOut {
+		return writeJSON(os.Stdout, report)
+	}
+	fmt.Printf("certificate diff old=%s new=%s strengthened=%d weakened=%d unchanged=%d changed=%d refuted=%d repaired=%d\n",
+		report.OldCertificateID,
+		report.NewCertificateID,
+		report.Summary["strengthened"],
+		report.Summary["weakened"],
+		report.Summary["unchanged"],
+		report.Summary["changed"],
+		report.Summary["refuted"],
+		report.Summary["repaired"],
+	)
+	return nil
+}
+
+func certRevokeVerify(args []string) error {
+	jsonOut := hasFlag(args, "--json")
+	positionals := positionalArgs(args)
+	if len(positionals) != 1 {
+		return errors.New("usage: patchline cert revoke-verify <bundle.json> [--json]")
+	}
+	bundle, err := readRevocationBundle(positionals[0])
+	if err != nil {
+		return err
+	}
+	report, replayErr := certrevocation.ReplayBundle(bundle)
+	if jsonOut {
+		if err := writeJSON(os.Stdout, report); err != nil {
+			return err
+		}
+	}
+	if replayErr != nil {
+		return replayErr
+	}
+	if !jsonOut {
+		fmt.Printf("certificate revocation replay records=%d active=%d revoked=%d superseded=%d tip=%s\n",
+			report.Records, report.Active, report.Revoked, report.Superseded, report.Checkpoint.TipHash)
+	}
+	return nil
+}
+
+func certPlugfest(args []string) error {
+	root := "."
+	if value, ok := flagValue(args, "--root"); ok {
+		root = value
+	}
+	submission, _ := flagValue(args, "--submission")
+	positionals := positionalArgs(args)
+	if submission == "" && len(positionals) == 1 {
+		submission = positionals[0]
+	}
+	jsonOut := hasFlag(args, "--json")
+	if submission == "" {
+		return errors.New("usage: patchline cert plugfest --submission submission.json [--root repo] [--json]")
+	}
+	report, validateErr := certplugfest.ValidateFile(submission, root)
+	if jsonOut {
+		if err := writeJSON(os.Stdout, report); err != nil {
+			return err
+		}
+	}
+	if validateErr != nil {
+		return validateErr
+	}
+	if !jsonOut {
+		fmt.Printf("certificate plugfest tool=%s offline=%t conformance=%t normalization=%t diff=%t revocation=%t logs=%t\n",
+			report.ToolName,
+			report.Offline,
+			report.ConformanceVerified,
+			report.NormalizationVerified,
+			report.DiffVerified,
+			report.RevocationVerified,
+			report.LogsVerified,
+		)
+	}
+	return nil
 }
 
 func repoCommand(args []string) error {
@@ -14753,6 +14914,21 @@ func stringSet(values map[string]struct{}) []string {
 	}
 	sort.Strings(out)
 	return out
+}
+
+func readRevocationBundle(path string) (certrevocation.Bundle, error) {
+	file, err := os.Open(path)
+	if err != nil {
+		return certrevocation.Bundle{}, err
+	}
+	defer file.Close()
+	decoder := json.NewDecoder(file)
+	decoder.DisallowUnknownFields()
+	var bundle certrevocation.Bundle
+	if err := decoder.Decode(&bundle); err != nil {
+		return certrevocation.Bundle{}, err
+	}
+	return bundle, nil
 }
 
 func writeJSON(file *os.File, value any) error {

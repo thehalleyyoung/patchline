@@ -3,12 +3,12 @@ certificate-id: patchline.bad.whitespace.v1
 subject-repo: thehalleyyoung/patchline
 subject-ref: 8e6e3fe
 subject-path: cmd/patchline/main.go
-subject-sha256: 782130c1648f4da094396744349510a192fc1c21c9adf032eeb9fa42d9e5910b
+subject-sha256: 9fd059ba3a280e31ebaba3c8fe63c6fb782d294af7776ae216b267dc00f68931
 issued-at: 2026-06-02T00:00:00Z
 producer: patchline-certlang/1
 verdict: safe
 risk-bps: 40
-evidence: ev.cli type=source  uri=file:cmd/patchline/main.go sha256=782130c1648f4da094396744349510a192fc1c21c9adf032eeb9fa42d9e5910b
+evidence: ev.cli type=source  uri=file:cmd/patchline/main.go sha256=9fd059ba3a280e31ebaba3c8fe63c6fb782d294af7776ae216b267dc00f68931
 obligation: obl.dispatch kind=interchange status=checked evidence=ev.cli formula="structured lines must use exact single-space separators"
-canonical-sha256: 1cb15db1615b0e1cd88eece9ca595382fc20f627f5cf95cff64cd33512b36195
+canonical-sha256: 1c7b955875afc4d3f84c429fc7481409e791881fdc4d1f325242388720bd4fbb
 END
