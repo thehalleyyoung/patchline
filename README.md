@@ -508,6 +508,16 @@ Run `make demo-video-script-gate` for a video script of the **end-to-end workflo
 Run `make artifact-badge-audit-gate` to self-audit each artifact **badge** criterion against evidence, rejecting an unearned badge; see [docs/artifact-badge-audit.md](docs/artifact-badge-audit.md).
 Run `make evaluation-preregistration-gate` for a public **pre-registration** of the evaluation protocol, detecting a post-hoc altered protocol; see [docs/evaluation-preregistration.md](docs/evaluation-preregistration.md).
 Run `make rebuttal-evidence-pack-gate` for a rebuttal pack pairing each anticipated reviewer question with a **reproducible answer** command, rejecting an unanswered one; see [docs/rebuttal-evidence-pack.md](docs/rebuttal-evidence-pack.md).
+Run `make ci-integrations-marketplace-gate` for a marketplace listing with a **verified**, reproducible setup per CI system, rejecting an unverified listing; see [docs/ci-integrations-marketplace.md](docs/ci-integrations-marketplace.md).
+Run `make five-minute-landing-gate` for a five-minute landing flow whose **completion rate** clears a threshold within budget, flagging a high-friction flow; see [docs/five-minute-landing.md](docs/five-minute-landing.md).
+Run `make localized-quickstarts-gate` for **localized** quickstarts parity-checked against the canonical steps, flagging an incomplete locale; see [docs/localized-quickstarts.md](docs/localized-quickstarts.md).
+Run `make incident-prevention-scoreboard-gate` for a public scoreboard of **anonymized** adopter outcomes with consistent totals, flagging an identity-leaking entry; see [docs/incident-prevention-scoreboard.md](docs/incident-prevention-scoreboard.md).
+Run `make conference-talk-kit-gate` for a talk kit whose every **live demo** is gate-backed, rejecting an unbacked segment; see [docs/conference-talk-kit.md](docs/conference-talk-kit.md).
+Run `make partner-case-study-gate` for a partner case-study program with **signed**, reproducible result bundles, rejecting an unsigned bundle; see [docs/partner-case-study.md](docs/partner-case-study.md).
+Run `make ecosystem-certification-gate` for an extension certification mark backed by an automated **conformance** gate, denying a non-conforming extension; see [docs/ecosystem-certification.md](docs/ecosystem-certification.md).
+Run `make reproducibility-vault-gate` for a vault that **snapshot**s toolchain, corpus, and results per release, rejecting an incomplete snapshot; see [docs/reproducibility-vault.md](docs/reproducibility-vault.md).
+Run `make community-impact-report-gate` for an impact report tying stars, adopters, and prevented incidents to **gate-backed evidence**, rejecting an unbacked metric; see [docs/community-impact-report.md](docs/community-impact-report.md).
+Run `make vision-dossier-gate` for a 2.0 vision dossier proving sustained **novelty**, rigor, adoption, and reproducibility, each gate-backed, rejecting an incomplete dossier; see [docs/vision-dossier.md](docs/vision-dossier.md).
 
 Add `--redact` to write `analysis-bundle/` copies with stable redaction tokens for identifiers, literals, customer-like strings, and secret-like values while preserving joins and existing artifact hashes.
 

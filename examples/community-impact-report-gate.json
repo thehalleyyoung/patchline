@@ -1,0 +1,27 @@
+{
+  "version": "patchline.community-impact-report-gate/v1",
+  "claim": "Patchline publishes a community-impact report tying stars, adopters, and prevented incidents to gate-backed evidence, so each impact metric links to a verifiable artifact rather than a bare number. The worker checks every reported metric references a backing gate that resolves. The gate proves every impact metric is backed by gate evidence and that a metric with no backing evidence is rejected.",
+  "real_repo": "patchline (self): community-impact-report",
+  "metrics": [
+    {
+      "name": "prevented_incidents",
+      "value": 40,
+      "backing": "incident-prevention-scoreboard-gate"
+    },
+    {
+      "name": "adopters",
+      "value": 15,
+      "backing": "partner-case-study-gate"
+    },
+    {
+      "name": "showcase_repos",
+      "value": 8,
+      "backing": "showcase-gallery-gate"
+    }
+  ],
+  "unbacked_metric": {
+    "name": "stars",
+    "value": 1000,
+    "backing": ""
+  }
+}

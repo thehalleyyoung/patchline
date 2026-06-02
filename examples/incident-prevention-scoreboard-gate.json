@@ -1,0 +1,28 @@
+{
+  "version": "patchline.incident-prevention-scoreboard-gate/v1",
+  "claim": "Patchline maintains a public incident-prevention scoreboard aggregating anonymized adopter outcomes, where each entry is privacy-safe and the totals are internally consistent. The worker sums the per-adopter prevented-incident counts, checks the published total matches, and confirms no entry carries identifying information. The gate proves the aggregate total is consistent and privacy-safe and that an entry leaking an adopter identity is flagged.",
+  "real_repo": "patchline (self): incident-prevention-scoreboard",
+  "entries": [
+    {
+      "adopter_id": "anon-1",
+      "prevented": 12,
+      "identifying": false
+    },
+    {
+      "adopter_id": "anon-2",
+      "prevented": 7,
+      "identifying": false
+    },
+    {
+      "adopter_id": "anon-3",
+      "prevented": 21,
+      "identifying": false
+    }
+  ],
+  "published_total": 40,
+  "leaky_entry": {
+    "adopter_id": "acme-corp-real-name",
+    "prevented": 5,
+    "identifying": true
+  }
+}

@@ -1,0 +1,23 @@
+{
+  "version": "patchline.conference-talk-kit-gate/v1",
+  "claim": "Patchline provides a conference-talk and tutorial kit with runnable, gate-backed live demos, so every slide claim is reproducible on stage. The worker checks each demo segment maps to a gate command and that all segments are backed. The gate proves every live demo is gate-backed and runnable and that a segment with no backing gate is rejected.",
+  "real_repo": "patchline (self): conference-talk-kit",
+  "segments": [
+    {
+      "title": "detect a hazard",
+      "gate": "red-team-adversarial-gate"
+    },
+    {
+      "title": "prove a fix",
+      "gate": "fix-suggestion-engine-gate"
+    },
+    {
+      "title": "reproduce a result",
+      "gate": "external-replication-kit-gate"
+    }
+  ],
+  "unbacked_segment": {
+    "title": "trust me",
+    "gate": ""
+  }
+}

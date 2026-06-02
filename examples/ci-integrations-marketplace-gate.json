@@ -1,0 +1,31 @@
+{
+  "version": "patchline.ci-integrations-marketplace-gate/v1",
+  "claim": "Patchline publishes an integrations marketplace listing with a verified, reproducible setup recipe for each popular CI system, so adopters wire it in without guesswork. The worker checks every listed CI integration has a setup recipe and a verification command that resolves. The gate proves every integration is verified with a reproducible recipe and that an unverified listing with no recipe is rejected.",
+  "real_repo": "patchline (self): ci-integrations-marketplace",
+  "integrations": [
+    {
+      "ci": "github-actions",
+      "recipe": "uses: patchline/action",
+      "verify": "make ci-pr-bot-gate",
+      "verified": true
+    },
+    {
+      "ci": "gitlab-ci",
+      "recipe": "include: patchline.yml",
+      "verify": "make ci-pr-bot-gate",
+      "verified": true
+    },
+    {
+      "ci": "circleci",
+      "recipe": "orb: patchline",
+      "verify": "make ci-pr-bot-gate",
+      "verified": true
+    }
+  ],
+  "unverified_listing": {
+    "ci": "jenkins",
+    "recipe": "",
+    "verify": "",
+    "verified": false
+  }
+}

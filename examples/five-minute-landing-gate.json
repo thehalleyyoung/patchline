@@ -1,0 +1,14 @@
+{
+  "version": "patchline.five-minute-landing-gate/v1",
+  "claim": "Patchline offers a 'protect your migration in 5 minutes' landing flow whose completion rate is measured, so onboarding friction is a tracked metric rather than an assumption. The worker computes the funnel completion rate from recorded starts and finishes and checks it clears a healthy threshold within the time budget. The gate proves the measured completion rate clears the threshold within five minutes and that a high-friction flow below the threshold is flagged.",
+  "real_repo": "patchline (self): five-minute-landing",
+  "starts": 100,
+  "completions": 82,
+  "median_minutes": 4,
+  "max_minutes": 5,
+  "min_completion": 0.6,
+  "friction_flow": {
+    "starts": 100,
+    "completions": 20
+  }
+}

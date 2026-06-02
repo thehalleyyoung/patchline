@@ -1,0 +1,43 @@
+{
+  "version": "patchline.vision-dossier-gate/v1",
+  "claim": "Patchline assembles a 2.0 vision dossier proving sustained novelty, rigor, adoption, and reproducibility, where each of the four pillars is backed by a resolving gate so the vision is evidenced end to end. The worker checks every pillar has a backing gate and that all four pillars are covered. The gate proves all four pillars are gate-backed and that a dossier missing the reproducibility pillar is rejected.",
+  "real_repo": "patchline (self): vision-dossier",
+  "required_pillars": [
+    "novelty",
+    "rigor",
+    "adoption",
+    "reproducibility"
+  ],
+  "pillars": [
+    {
+      "name": "novelty",
+      "backing": "neuro-symbolic-verdict-gate"
+    },
+    {
+      "name": "rigor",
+      "backing": "theorem-prover-backend-gate"
+    },
+    {
+      "name": "adoption",
+      "backing": "community-impact-report-gate"
+    },
+    {
+      "name": "reproducibility",
+      "backing": "reproducibility-vault-gate"
+    }
+  ],
+  "incomplete_dossier": [
+    {
+      "name": "novelty",
+      "backing": "neuro-symbolic-verdict-gate"
+    },
+    {
+      "name": "rigor",
+      "backing": "theorem-prover-backend-gate"
+    },
+    {
+      "name": "adoption",
+      "backing": "community-impact-report-gate"
+    }
+  ]
+}

@@ -1,0 +1,22 @@
+{
+  "version": "patchline.partner-case-study-gate/v1",
+  "claim": "Patchline runs a partner-adoption case-study program where each result bundle is signed and reproducible, so a published case study can be verified rather than taken on faith. The worker checks each case study carries a signature and a reproduce command and that both resolve. The gate proves every case study is signed and reproducible and that an unsigned bundle is rejected.",
+  "real_repo": "patchline (self): partner-case-study",
+  "case_studies": [
+    {
+      "partner": "anon-a",
+      "signed": true,
+      "reproduce": "make showcase-gallery-gate"
+    },
+    {
+      "partner": "anon-b",
+      "signed": true,
+      "reproduce": "make historical-replay-study-gate"
+    }
+  ],
+  "unsigned_bundle": {
+    "partner": "anon-c",
+    "signed": false,
+    "reproduce": "make x"
+  }
+}

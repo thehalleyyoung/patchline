@@ -1,0 +1,43 @@
+{
+  "version": "patchline.localized-quickstarts-gate/v1",
+  "claim": "Patchline ships localized quickstarts for the top non-English developer communities, where each localization is complete and parity-checked against the canonical English steps so no instruction is lost in translation. The worker checks each locale covers every canonical step and reports the parity. The gate proves every shipped locale has full step parity with the canonical guide and that a locale missing a step is flagged as incomplete.",
+  "real_repo": "patchline (self): localized-quickstarts",
+  "canonical_steps": [
+    "clone",
+    "build",
+    "analyze"
+  ],
+  "locales": [
+    {
+      "lang": "zh",
+      "steps": [
+        "clone",
+        "build",
+        "analyze"
+      ]
+    },
+    {
+      "lang": "es",
+      "steps": [
+        "clone",
+        "build",
+        "analyze"
+      ]
+    },
+    {
+      "lang": "ja",
+      "steps": [
+        "clone",
+        "build",
+        "analyze"
+      ]
+    }
+  ],
+  "incomplete_locale": {
+    "lang": "de",
+    "steps": [
+      "clone",
+      "build"
+    ]
+  }
+}

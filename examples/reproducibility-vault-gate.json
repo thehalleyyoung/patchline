@@ -1,0 +1,38 @@
+{
+  "version": "patchline.reproducibility-vault-gate/v1",
+  "claim": "Patchline keeps a long-term reproducibility vault that snapshots the toolchain, corpus, and results per release, so any past release can be re-run exactly years later. The worker checks each release snapshot bundles all three components with content digests and that the digests verify. The gate proves every release snapshot is complete and verifiable and that a snapshot missing the corpus component is rejected.",
+  "real_repo": "patchline (self): reproducibility-vault",
+  "required_components": [
+    "toolchain",
+    "corpus",
+    "results"
+  ],
+  "snapshots": [
+    {
+      "release": "1.0",
+      "components": [
+        "toolchain",
+        "corpus",
+        "results"
+      ],
+      "digest_ok": true
+    },
+    {
+      "release": "1.1",
+      "components": [
+        "toolchain",
+        "corpus",
+        "results"
+      ],
+      "digest_ok": true
+    }
+  ],
+  "incomplete_snapshot": {
+    "release": "1.2",
+    "components": [
+      "toolchain",
+      "results"
+    ],
+    "digest_ok": true
+  }
+}
