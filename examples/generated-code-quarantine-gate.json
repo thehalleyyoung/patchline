@@ -1,0 +1,21 @@
+{
+  "version": "patchline.generated-code-quarantine-gate/v1",
+  "claim": "Generated proposal artifacts remain quarantined, non-executable, and unapplied; project-native commands are skipped unless --run-native-tests explicitly enables safe allowlisted native checks.",
+  "focused_tests": [
+    "TestGeneratedCodeQuarantineSkipsNativeChecksByDefault",
+    "TestWriteProposalForcesGeneratedArtifactsNonExecutable",
+    "TestCompareRunsSafeNativeChecks"
+  ],
+  "real_code": {
+    "repo": "lobsters/lobsters",
+    "ref": "3b80b47aa5aaba37ec44413e7d1dc96fcf1585b6",
+    "subpath": "db/migrate"
+  },
+  "required_controls": [
+    "status: enforced",
+    "generated_artifacts_executable: false",
+    "generated_artifacts_applied: false",
+    "native_checks_require_opt_in: true",
+    "required_flag: --run-native-tests"
+  ]
+}

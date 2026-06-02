@@ -25,6 +25,7 @@ type CompareReport struct {
 	Summary         CompareSummary        `json:"summary"`
 	Intervention    InterventionLoop      `json:"intervention_loop"`
 	ReviewBadge     ReviewBadge           `json:"review_badge"`
+	Quarantine      GeneratedQuarantine   `json:"quarantine"`
 	RiskDeltas      []RiskDelta           `json:"risk_deltas,omitempty"`
 	GeneratedChecks []GeneratedCheck      `json:"generated_checks,omitempty"`
 	Transactions    []TransactionBoundary `json:"transaction_boundaries,omitempty"`
@@ -181,6 +182,7 @@ func CompareWithOptions(baseline BaselineReport, proposal ProposalReport, opts C
 	report.Idempotency = generatedIdempotencyClasses(proposal.Generated)
 	report.LockHazards = generatedLockHazards(proposal.Generated)
 	report.PrivacyHazards = generatedPrivacyHazards(proposal.Generated)
+	report.Quarantine = buildGeneratedQuarantine(proposal.Generated, opts.RunNativeTests)
 	report.NativeResults = runNativeChecks(baseline.InventoryRoot, baseline.NativeChecks, opts)
 	report.Summary = summarizeCompare(baseline, proposal, checks, report.RiskDeltas, report.NativeResults)
 	report.Summary.TransactionBoundaries = len(report.Transactions)
@@ -1010,6 +1012,9 @@ func reviewCompare(report CompareReport) []ReviewItem {
 	if report.Summary.NativeChecksFailed > 0 {
 		review = append(review, ReviewItem{Severity: "error", Message: "project-native tests failed or timed out"})
 	}
+	if report.Quarantine.Status == "enforced" && !report.Quarantine.SafeNativeChecksEnabled {
+		review = append(review, ReviewItem{Severity: "info", Message: "generated code remains quarantined; project-native commands require explicit --run-native-tests opt-in"})
+	}
 	if report.Summary.RisksWithCoverage < report.Summary.TargetedRisks {
 		review = append(review, ReviewItem{Severity: "warning", Message: "not every targeted risk has generated artifact coverage"})
 	}
@@ -1089,6 +1094,16 @@ func renderCompareMarkdown(report CompareReport) string {
 		fmt.Fprintf(&b, "- status: `%s`\n", report.Intervention.Status)
 		fmt.Fprintf(&b, "- stage: `%s`\n", report.Intervention.ProposalStage)
 		fmt.Fprintf(&b, "- rationale: %s\n\n", report.Intervention.Rationale)
+	}
+	if report.Quarantine.Status != "" {
+		fmt.Fprintf(&b, "## Generated-code quarantine\n\n")
+		fmt.Fprintf(&b, "- status: `%s`\n", report.Quarantine.Status)
+		fmt.Fprintf(&b, "- trust: `%s`\n", report.Quarantine.Trust)
+		fmt.Fprintf(&b, "- generated artifacts executable: `%t`\n", report.Quarantine.GeneratedArtifactsExecutable)
+		fmt.Fprintf(&b, "- generated artifacts applied: `%t`\n", report.Quarantine.GeneratedArtifactsApplied)
+		fmt.Fprintf(&b, "- safe native checks enabled: `%t`\n", report.Quarantine.SafeNativeChecksEnabled)
+		fmt.Fprintf(&b, "- native execution mode: `%s`\n", report.Quarantine.NativeExecutionMode)
+		fmt.Fprintf(&b, "- required flag: `%s`\n\n", report.Quarantine.RequiredFlag)
 	}
 	if len(report.Review) > 0 {
 		fmt.Fprintf(&b, "## Review\n\n")

@@ -17,7 +17,7 @@ Patchline assumes every repository, archive, generated artifact, native command,
 | Repository source | GitHub archives and local repo trees | malicious files, huge projects, misleading metadata, sensitive literals | pinned refs, `source.json` archive hash/cache path, content-addressed cache, inventory before interpretation, redaction for shared outputs |
 | Archive handling | zip/tar/archive downloads | path traversal, symlink escape, archive bombs, cache poisoning | extraction through archive helpers, scanned subpath roots, recorded archive hash, offline cache validation |
 | Adapter inputs | Datadog/OpenTelemetry/Jira/Linear/Postgres/GitHub exports | malformed JSON, spoofed IDs, secret leakage, event-count mismatch | adapter result version, input hash, event count consistency, offline adapter validation, redaction before sharing |
-| Generated code | proposal files, repair manifests, SQL, CI hints, generator output | plausible but unsafe fixes, prompt injection, generated secrets, overbroad changes | generated artifacts are labeled `untrusted-generated-proposal`, budgets, prompt-context minimization, deterministic compare re-analysis |
+| Generated code | proposal files, repair manifests, SQL, CI hints, generator output | plausible but unsafe fixes, prompt injection, generated secrets, overbroad changes | generated artifacts are labeled `untrusted-generated-proposal`, written non-executable, kept unapplied, budgeted, prompt-context minimized, quarantined in proposal/compare artifacts, and deterministically re-analyzed |
 | Native tests | project-discovered test commands | arbitrary command execution, shell injection, network/credential use | skipped by default, explicit `--run-native-tests`, allowlisted command execution without a shell, logs and hashes recorded |
 | Database hooks | dry-run scripts and DSNs | accidental production access or destructive mutations | local-only DSN checks, schema-only scripts, explicit user execution, no production credentials |
 | Sharing/release | bundles, SARIF, release archives, checksums | leaking sensitive context, tampered artifacts | stable redaction, signed checksums, supply-chain provenance, reproducible build instructions |
@@ -29,7 +29,7 @@ Patchline does not sandbox arbitrary third-party build systems, prove generated 
 ## Safe operating rules
 
 1. Prefer pinned refs for remote analysis and keep `source.json`.
-2. Treat every generated file as a proposal until `repo compare` has re-analyzed it.
+2. Treat every generated file as a quarantined proposal until `repo compare` has re-analyzed it; generated files are non-executable and are not applied by Patchline.
 3. Do not pass `--run-native-tests` in CI unless the commands are reviewed for the runner environment.
 4. Use `--redact` before sharing bundles outside the team that owns the source.
 5. Validate cached analyses with `repo offline` in restricted environments.

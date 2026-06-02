@@ -1819,6 +1819,102 @@ func TestNative(t *testing.T) {
 	if compare.NativeResults[0].Sandbox == nil || compare.NativeResults[0].Sandbox.Name != "go-offline-tests" || compare.NativeResults[0].Sandbox.NetworkEnabled {
 		t.Fatalf("expected offline go sandbox profile: %#v", compare.NativeResults[0].Sandbox)
 	}
+	if compare.Quarantine.Status != "enforced" || !compare.Quarantine.SafeNativeChecksEnabled || compare.Quarantine.GeneratedArtifactsExecutable || compare.Quarantine.GeneratedArtifactsApplied {
+		t.Fatalf("expected explicit safe-native quarantine state, got %#v", compare.Quarantine)
+	}
+}
+
+func TestGeneratedCodeQuarantineSkipsNativeChecksByDefault(t *testing.T) {
+	root := t.TempDir()
+	writeFile(t, root, "go.mod", "module example.com/quarantine\n\ngo 1.22\n")
+	baseline := BaselineReport{
+		Version:       BaselineVersion,
+		InventoryRoot: root,
+		Hash:          "baseline-hash",
+		Risks: []BaselineRisk{{
+			ID:        "risk:accounts",
+			Path:      "db/migrate/001.sql",
+			Kind:      "update",
+			Table:     "accounts",
+			Severity:  "high",
+			Score:     120,
+			Rationale: "unbounded update",
+		}},
+		NativeChecks: []Command{{Command: "go test ./...", Reason: "Go checks"}},
+	}
+	baseline.Hash = baselineHash(baseline)
+	proposal := ProposalReport{
+		Version:       ProposalVersion,
+		BaselineHash:  baseline.Hash,
+		OutputHash:    "proposal-hash",
+		TargetRiskIDs: []string{"risk:accounts"},
+		Generated: []GeneratedArtifact{{
+			Path:    "patchline-proposals/tests/accounts_test.go",
+			Kind:    "tests",
+			Content: "// Untrusted generated test proposal\n// Suggested assertions: account repairs preserve row counts.\n",
+			RiskIDs: []string{"risk:accounts"},
+		}},
+	}
+	compare := Compare(baseline, proposal)
+	if compare.Summary.NativeChecksRun != 0 || compare.Summary.NativeChecksSkipped != 1 || len(compare.NativeResults) != 1 {
+		t.Fatalf("expected native checks skipped by default: summary=%#v results=%#v", compare.Summary, compare.NativeResults)
+	}
+	if !strings.Contains(compare.NativeResults[0].SkippedReason, "--run-native-tests") {
+		t.Fatalf("expected explicit opt-in skip reason, got %#v", compare.NativeResults[0])
+	}
+	if compare.Quarantine.Status != "enforced" || compare.Quarantine.SafeNativeChecksEnabled || compare.Quarantine.GeneratedArtifactsExecutable || compare.Quarantine.GeneratedArtifactsApplied {
+		t.Fatalf("expected enforced default quarantine, got %#v", compare.Quarantine)
+	}
+	if compare.Quarantine.RequiredFlag != "--run-native-tests" || len(compare.Quarantine.QuarantinedPaths) != 1 {
+		t.Fatalf("expected quarantined generated path and opt-in flag, got %#v", compare.Quarantine)
+	}
+	if !strings.Contains(compare.Markdown, "Generated-code quarantine") || !strings.Contains(compare.Markdown, "safe native checks enabled: `false`") {
+		t.Fatalf("expected quarantine markdown, got %s", compare.Markdown)
+	}
+}
+
+func TestWriteProposalForcesGeneratedArtifactsNonExecutable(t *testing.T) {
+	out := t.TempDir()
+	artifactPath := filepath.Join(out, "patchline-proposals", "tests", "generated_test.sh")
+	if err := os.MkdirAll(filepath.Dir(artifactPath), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(artifactPath, []byte("#!/bin/sh\nexit 1\n"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	report := ProposalReport{
+		Version:       ProposalVersion,
+		BaselineHash:  "baseline-hash",
+		OutputHash:    "proposal-hash",
+		TargetRiskIDs: []string{"risk:accounts"},
+		Generated: []GeneratedArtifact{{
+			Path:    "patchline-proposals/tests/generated_test.sh",
+			Kind:    "tests",
+			Content: "# Untrusted generated test proposal\n# Suggested assertions: never executable by default.\n",
+			RiskIDs: []string{"risk:accounts"},
+		}},
+	}
+	report.Quarantine = buildGeneratedQuarantine(report.Generated, false)
+	report.GeneratedFiles = generatedFilesForArtifacts(report.Generated)
+	report.Intervention = buildRepairIntervention(report.BaselineHash, report.OutputHash, report.TargetRiskIDs, report.Generated)
+	report.Markdown = renderProposalMarkdown(report)
+	if err := WriteProposal(out, report); err != nil {
+		t.Fatal(err)
+	}
+	info, err := os.Stat(artifactPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if info.Mode().Perm()&0o111 != 0 {
+		t.Fatalf("expected generated artifact to be non-executable, got mode %v", info.Mode().Perm())
+	}
+	loaded, err := LoadProposal(out)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if loaded.Quarantine.Status != "enforced" || loaded.Quarantine.GeneratedArtifactsExecutable {
+		t.Fatalf("expected persisted quarantine metadata, got %#v", loaded.Quarantine)
+	}
 }
 
 func TestStableRiskIDIgnoresPathAndLineDrift(t *testing.T) {

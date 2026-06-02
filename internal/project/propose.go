@@ -45,6 +45,7 @@ type ProposalReport struct {
 	PromptHash     string               `json:"prompt_hash"`
 	OutputHash     string               `json:"output_hash"`
 	Intervention   RepairIntervention   `json:"intervention"`
+	Quarantine     GeneratedQuarantine  `json:"quarantine"`
 	Minimization   ProposalMinimization `json:"minimization,omitempty"`
 	ContextMin     PromptContextMin     `json:"prompt_context_minimization,omitempty"`
 	GeneratedFiles []GeneratedFile      `json:"generated_files,omitempty"`
@@ -94,11 +95,57 @@ type GeneratedFile struct {
 	Reviewers   []string `json:"reviewers,omitempty"`
 }
 
+type GeneratedQuarantine struct {
+	Status                       string   `json:"status"`
+	Trust                        string   `json:"trust"`
+	GeneratedArtifactsExecutable bool     `json:"generated_artifacts_executable"`
+	GeneratedArtifactsApplied    bool     `json:"generated_artifacts_applied"`
+	NativeChecksRequireOptIn     bool     `json:"native_checks_require_opt_in"`
+	SafeNativeChecksEnabled      bool     `json:"safe_native_checks_enabled"`
+	NativeExecutionMode          string   `json:"native_execution_mode"`
+	RequiredFlag                 string   `json:"required_flag"`
+	WriteMode                    string   `json:"write_mode"`
+	Rules                        []string `json:"rules"`
+	QuarantinedPaths             []string `json:"quarantined_paths,omitempty"`
+}
+
 type GeneratedArtifact struct {
 	Path    string
 	Kind    string
 	Content string
 	RiskIDs []string
+}
+
+func buildGeneratedQuarantine(artifacts []GeneratedArtifact, safeNativeChecksEnabled bool) GeneratedQuarantine {
+	paths := make([]string, 0, len(artifacts))
+	for _, artifact := range artifacts {
+		if strings.TrimSpace(artifact.Path) != "" {
+			paths = append(paths, artifact.Path)
+		}
+	}
+	sort.Strings(paths)
+	mode := "skipped-by-default"
+	if safeNativeChecksEnabled {
+		mode = "safe-native-checks-enabled"
+	}
+	return GeneratedQuarantine{
+		Status:                       "enforced",
+		Trust:                        "untrusted-generated-proposal",
+		GeneratedArtifactsExecutable: false,
+		GeneratedArtifactsApplied:    false,
+		NativeChecksRequireOptIn:     true,
+		SafeNativeChecksEnabled:      safeNativeChecksEnabled,
+		NativeExecutionMode:          mode,
+		RequiredFlag:                 "--run-native-tests",
+		WriteMode:                    "0644",
+		Rules: []string{
+			"generated artifacts are written as non-executable proposal files",
+			"generated artifacts are not applied to the scanned repository by propose or compare",
+			"project-native commands are skipped unless --run-native-tests is explicitly passed",
+			"native commands must match the safe allowlist and run without a shell in an offline sandbox",
+		},
+		QuarantinedPaths: paths,
+	}
 }
 
 type ProposalMinimization struct {
@@ -252,6 +299,7 @@ func Propose(opts ProposalOptions) (ProposalReport, error) {
 	}
 	sort.Slice(report.GeneratedFiles, func(i, j int) bool { return report.GeneratedFiles[i].Path < report.GeneratedFiles[j].Path })
 	report.OwnerRoutes = ownerRoutesForGeneratedFiles(baseline, report.GeneratedFiles)
+	report.Quarantine = buildGeneratedQuarantine(report.Generated, false)
 	report.Markdown = renderProposalMarkdown(report)
 	return report, nil
 }
@@ -283,6 +331,9 @@ func WriteProposal(outDir string, report ProposalReport) error {
 			return err
 		}
 		if err := os.WriteFile(path, []byte(artifact.Content), 0o644); err != nil {
+			return err
+		}
+		if err := os.Chmod(path, 0o644); err != nil {
 			return err
 		}
 	}
@@ -1084,6 +1135,7 @@ func MinimizeGeneratedProposal(baseline BaselineReport, proposal ProposalReport)
 	proposal.Patch = renderProposalPatch(kept)
 	proposal.OutputHash = canonical.Hash(proposal.Patch)
 	proposal.Intervention = buildRepairIntervention(proposal.BaselineHash, proposal.OutputHash, proposal.TargetRiskIDs, kept)
+	proposal.Quarantine = buildGeneratedQuarantine(kept, false)
 	proposal.Minimization = ProposalMinimization{
 		Applied:                    true,
 		BeforeFiles:                len(before),
@@ -1161,6 +1213,14 @@ func renderProposalMarkdown(report ProposalReport) string {
 	fmt.Fprintf(&b, "- stage: `%s`\n", report.Intervention.Stage)
 	fmt.Fprintf(&b, "- trust: `%s`\n", report.Intervention.Trust)
 	fmt.Fprintf(&b, "- hypothesis: %s\n\n", report.Intervention.Hypothesis)
+	if report.Quarantine.Status != "" {
+		fmt.Fprintf(&b, "## Generated-code quarantine\n\n")
+		fmt.Fprintf(&b, "- status: `%s`\n", report.Quarantine.Status)
+		fmt.Fprintf(&b, "- generated artifacts executable: `%t`\n", report.Quarantine.GeneratedArtifactsExecutable)
+		fmt.Fprintf(&b, "- generated artifacts applied: `%t`\n", report.Quarantine.GeneratedArtifactsApplied)
+		fmt.Fprintf(&b, "- native execution mode: `%s`\n", report.Quarantine.NativeExecutionMode)
+		fmt.Fprintf(&b, "- required flag: `%s`\n\n", report.Quarantine.RequiredFlag)
+	}
 	fmt.Fprintf(&b, "## Generated files\n\n| path | kind | risks | likely reviewers |\n| --- | --- | --- | --- |\n")
 	for _, file := range report.GeneratedFiles {
 		fmt.Fprintf(&b, "| %s | %s | %s | %s |\n", file.Path, file.Kind, strings.Join(file.RiskIDs, ", "), strings.Join(file.Reviewers, ", "))

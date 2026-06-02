@@ -99,6 +99,8 @@ Run `make threat-model-gate` to verify the documented threat model for untrusted
 
 Run `make archive-security-gate` to prove archive traversal, symlink escape, malformed archive, and archive-bomb regressions fail while pinned public GitHub archives still extract through the content-addressed cache; see [docs/archive-security.md](docs/archive-security.md).
 
+Run `make generated-code-quarantine-gate` to prove generated proposal files stay non-executable, unapplied, and skipped from native execution unless `--run-native-tests` explicitly enables safe allowlisted checks; see [docs/generated-code-quarantine.md](docs/generated-code-quarantine.md).
+
 Add `--redact` to write `analysis-bundle/` copies with stable redaction tokens for identifiers, literals, customer-like strings, and secret-like values while preserving joins and existing artifact hashes.
 
 Add `--ci` to write `ci/summary.md` plus upload snippets and code-quality artifacts for GitHub Actions, GitLab CI, and Bitbucket Pipelines: SARIF under `analysis-bundle/summary.sarif`, GitLab `ci/gl-code-quality-report.json`, and Bitbucket `ci/bitbucket-code-insights.json`.
