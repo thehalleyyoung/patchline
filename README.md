@@ -339,6 +339,8 @@ Run `make lock-duration-gate` to estimate **lock-duration** from table size hint
 
 Run `make tenant-risk-gate` to infer **tenant-boundary** and **sharding** risks in multi-tenant schemas — an unscoped backfill on a tenant table or a shard-key rewrite is flagged high while scoped and global-table ops stay low; see [docs/tenant-risk.md](docs/tenant-risk.md).
 
+Run `make privacy-impact-gate` to infer **privacy impact** for deletes, exports, **anonymization**, and retention changes — PII exports flag high and PII deletes erasure-relevant while non-PII ops carry none; see [docs/privacy-impact.md](docs/privacy-impact.md).
+
 Add `--redact` to write `analysis-bundle/` copies with stable redaction tokens for identifiers, literals, customer-like strings, and secret-like values while preserving joins and existing artifact hashes.
 
 Add `--ci` to write `ci/summary.md` plus upload snippets and code-quality artifacts for GitHub Actions, GitLab CI, and Bitbucket Pipelines: SARIF under `analysis-bundle/summary.sarif`, GitLab `ci/gl-code-quality-report.json`, and Bitbucket `ci/bitbucket-code-insights.json`.

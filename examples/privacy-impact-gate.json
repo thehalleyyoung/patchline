@@ -1,0 +1,17 @@
+{
+  "version": "patchline.privacy-impact-gate/v1",
+  "claim": "Patchline infers the privacy impact of migrations that delete, export, anonymize, or change the retention of personal data, so that a change touching PII is labeled with its data-protection consequence rather than treated as an ordinary schema edit. The worker joins each operation against a PII classification of the affected column and assigns a privacy impact: exports of PII are high, deletes are erasure-relevant, anonymization is mitigating, retention-policy changes are relevant, and operations on non-PII columns carry no privacy impact. The gate proves a PII export is high impact, a PII delete is erasure-relevant, a PII anonymization is mitigating, a PII retention change is relevant, and a non-PII operation has no privacy impact.",
+  "real_repo": "synthetic-from-real patterns: GDPR/CCPA-style deletes, exports, anonymization, retention",
+  "columns": [
+    {"table": "users", "column": "email", "pii": true},
+    {"table": "users", "column": "ssn", "pii": true},
+    {"table": "events", "column": "event_type", "pii": false}
+  ],
+  "operations": [
+    {"id": "export_pii", "type": "export", "table": "users", "column": "email"},
+    {"id": "delete_pii", "type": "delete", "table": "users", "column": "ssn"},
+    {"id": "anonymize_pii", "type": "anonymize", "table": "users", "column": "email"},
+    {"id": "retention_pii", "type": "retention_change", "table": "users", "column": "ssn"},
+    {"id": "nonpii_op", "type": "export", "table": "events", "column": "event_type"}
+  ]
+}
