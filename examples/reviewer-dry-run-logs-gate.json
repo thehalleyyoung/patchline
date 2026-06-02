@@ -1,0 +1,103 @@
+{
+  "version": "patchline.reviewer-dry-run-logs-gate/v1",
+  "claim": "Patchline publishes anonymized reviewer dry-run logs that show fresh-machine setup failures, the fixes applied, and final regenerated public-code results without exposing reviewer identities, host paths, or credentials.",
+  "minimum_reviewers": 3,
+  "minimum_failures": 4,
+  "minimum_fixes": 4,
+  "minimum_public_repos": 4,
+  "minimum_ranked_risks": 100,
+  "evidence_profile_spec": "examples/artifact-container-profile-gate.json",
+  "redaction_rules": {
+    "forbidden_patterns": [
+      "[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+",
+      "/Users/[^ ]+",
+      "/home/[^ ]+",
+      "ghp_[A-Za-z0-9_]+",
+      "github_pat_[A-Za-z0-9_]+",
+      "BEGIN [A-Z ]*PRIVATE KEY"
+    ],
+    "required_tokens": ["reviewer-001", "reviewer-002", "reviewer-003", "<workspace>", "<redacted-user>"]
+  },
+  "dry_runs": [
+    {
+      "reviewer": "reviewer-001",
+      "machine": "fresh-linux-container",
+      "time_budget_minutes": 45,
+      "events": [
+        {
+          "step": "clone",
+          "status": "passed",
+          "command": "git clone <public-repo> <workspace>",
+          "observation": "Fresh checkout completed with no private credentials."
+        },
+        {
+          "step": "tool-check",
+          "status": "failed",
+          "command": "make artifact-container-profile-gate",
+          "failure": "jq was not available on PATH in the minimal image.",
+          "fix": "Use the documented artifact container profile, which installs jq as a required package."
+        },
+        {
+          "step": "rebuild",
+          "status": "passed",
+          "command": "bash scripts/artifact-container-rebuild.sh examples/artifact-container-profile-gate.json results/generated/reviewer-dry-run/reviewer-001",
+          "observation": "Public capstone evidence regenerated after switching to the artifact profile."
+        }
+      ]
+    },
+    {
+      "reviewer": "reviewer-002",
+      "machine": "fresh-macos-laptop",
+      "time_budget_minutes": 60,
+      "events": [
+        {
+          "step": "container",
+          "status": "failed",
+          "command": "docker run --rm patchline-artifact-rebuild:local",
+          "failure": "Docker daemon was unavailable on the review machine.",
+          "fix": "Run the same rebuild script directly on the host; the gate records container status as recipe-verified."
+        },
+        {
+          "step": "download",
+          "status": "failed",
+          "command": "bash scripts/artifact-container-rebuild.sh",
+          "failure": "First download attempt hit a transient archive fetch failure.",
+          "fix": "Re-run with the same pinned refs and content-addressed cache directory."
+        },
+        {
+          "step": "rebuild",
+          "status": "passed",
+          "command": "bash scripts/artifact-container-rebuild.sh examples/artifact-container-profile-gate.json results/generated/reviewer-dry-run/reviewer-002",
+          "observation": "Pinned public repositories rebuilt with deterministic-only generation."
+        }
+      ]
+    },
+    {
+      "reviewer": "reviewer-003",
+      "machine": "fresh-devcontainer",
+      "time_budget_minutes": 50,
+      "events": [
+        {
+          "step": "setup",
+          "status": "failed",
+          "command": "make paper-appendix-gate",
+          "failure": "Reviewer started from the appendix command before the artifact profile had populated public evidence.",
+          "fix": "Run the artifact container rebuild command first, then rerun appendix generation."
+        },
+        {
+          "step": "output-check",
+          "status": "failed",
+          "command": "test -s results/generated/reviewer-dry-run/reviewer-003/public-results/capstone/checksums.txt",
+          "failure": "Expected output directory was mistyped during manual inspection.",
+          "fix": "Use the generated reviewer index and stable output paths instead of hand-entered paths."
+        },
+        {
+          "step": "rebuild",
+          "status": "passed",
+          "command": "bash scripts/artifact-container-rebuild.sh examples/artifact-container-profile-gate.json results/generated/reviewer-dry-run/reviewer-003",
+          "observation": "Final regenerated results matched the required public-code evidence thresholds."
+        }
+      ]
+    }
+  ]
+}
