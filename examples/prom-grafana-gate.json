@@ -1,0 +1,15 @@
+{
+  "version": "patchline.prom-grafana-gate/v1",
+  "claim": "Prometheus/Grafana dashboard export ingestion turns SLO burn, error-rate, and latency evidence into first-class runtime signals linked to real Patchline findings. A synthetic-but-valid Prometheus range export and Grafana dashboard are generated from a real baseline (burning metrics on high-severity tables, healthy on the rest), then re-ingested to extract which tables breach SLOs and correlated back to findings so static severity and observed burn can be compared.",
+  "real_repo": {
+    "repo": "lobsters/lobsters",
+    "ref": "3b80b47aa5aaba37ec44413e7d1dc96fcf1585b6",
+    "subpath": "db/migrate"
+  },
+  "service_name": "lobsters-web",
+  "max_tables": 12,
+  "minimum_tables": 5,
+  "slo_burn_threshold": 1.0,
+  "latency_breach_seconds": 0.5,
+  "minimum_precision": 0.8
+}
