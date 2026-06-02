@@ -2,7 +2,7 @@
 
 Patchline is a deterministic checker for the data-change material teams already have: GitHub repos, migration directories, service source trees, telemetry exports, JSON logs, incident notes, and repair scripts.
 
-It is not an AI tool, and it does not require you to label data or adopt a Patchline-specific format first. Point it at existing files; it inventories what is there, finds risky SQL and operational clues, and prints the next commands that can run immediately.
+It is not an AI tool, and it does not require you to label data or adopt a Patchline-specific format first. Point it at existing files; it inventories what is there, finds risky changes across SQL migrations, NoSQL stores, data pipelines, protobuf/Avro schemas, and infrastructure ordering, and prints the next commands that can run immediately.
 
 [![deterministic](https://img.shields.io/badge/deterministic-data--repair-2563eb)](#60-second-demo)
 [![not-ai](https://img.shields.io/badge/not--ai-static--analysis-16a34a)](#why-this-is-useful)
