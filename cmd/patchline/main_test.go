@@ -292,6 +292,44 @@ func TestRepoQualitativeNotesWriteCodingNotesFromAnalyses(t *testing.T) {
 	}
 }
 
+func TestRepoCrossFileExamplesShowBaselinesMissRepairClues(t *testing.T) {
+	root := t.TempDir()
+	writeMainTestFile(t, root, "db/migrate/001_update_accounts.sql", "UPDATE accounts SET status = 'active';\n")
+	writeMainTestFile(t, root, "scripts/repair_accounts.sql", "UPDATE accounts SET status = 'active' WHERE status IS NULL;\n")
+	outAnalysis := filepath.Join(t.TempDir(), "analysis")
+	if err := run([]string{"repo", "analyze", root, "--stages", "inventory,baseline", "--budget", "files=5,lines=80,tokens=4000,changes=2", "--no-llm", "--out", outAnalysis, "--json"}); err != nil {
+		t.Fatalf("analysis failed: %v", err)
+	}
+	out := filepath.Join(t.TempDir(), "cross-file")
+	if err := run([]string{"repo", "cross-file-examples", "--analyses", outAnalysis, "--out", out, "--json"}); err != nil {
+		t.Fatalf("cross-file examples failed: %v", err)
+	}
+	var report repoCrossFileExamplesReport
+	readMainTestJSON(t, filepath.Join(out, "cross-file-examples.json"), &report)
+	if report.Version != "patchline.repo-cross-file-examples/v1" || report.Summary.Examples == 0 || report.Summary.RepairClues == 0 || report.Summary.GrepOnlyMisses == 0 || report.Summary.SQLOnlyMisses == 0 || report.Hash == "" {
+		t.Fatalf("unexpected cross-file examples report: %#v", report)
+	}
+	foundRepair := false
+	for _, example := range report.Examples {
+		if example.ClueKind == "repair" {
+			foundRepair = true
+		}
+		if example.PatchlineClue == "" || example.GrepOnlyResult == "" || example.SQLOnlyResult == "" || example.WhyGrepOnlyMissed == "" || example.WhySQLOnlyMissed == "" || example.MaintainerAction == "" || len(example.CluePaths) == 0 || len(example.Evidence) == 0 {
+			t.Fatalf("example missing side-by-side fields: %#v", example)
+		}
+	}
+	if !foundRepair {
+		t.Fatalf("expected at least one repair clue: %#v", report.Examples)
+	}
+	markdown, err := os.ReadFile(filepath.Join(out, "cross-file-examples.md"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(string(markdown), "cross-file repair clue examples") || !strings.Contains(string(markdown), "grep-only") || !strings.Contains(string(markdown), "SQL-only") {
+		t.Fatalf("expected side-by-side markdown, got:\n%s", string(markdown))
+	}
+}
+
 func TestGoldenFixtureGenerateCommand(t *testing.T) {
 	root := t.TempDir()
 	writeMainTestFile(t, root, "db/migrate/001_delete_events.sql", "DELETE FROM account_events;\n")

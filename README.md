@@ -111,6 +111,8 @@ Run `make failure-taxonomy-gate` to derive a public-corpus taxonomy of real data
 
 Run `make qualitative-notes-gate` to emit qualitative coding notes for false-positive candidates, false-negative candidates, proof holes, and maintainer decisions across pinned public repos; see [docs/qualitative-coding-notes.md](docs/qualitative-coding-notes.md).
 
+Run `make cross-file-examples-gate` to generate side-by-side examples where Patchline links cross-file repair clues that grep-only and SQL-only baselines miss; see [docs/cross-file-examples.md](docs/cross-file-examples.md).
+
 Add `--redact` to write `analysis-bundle/` copies with stable redaction tokens for identifiers, literals, customer-like strings, and secret-like values while preserving joins and existing artifact hashes.
 
 Add `--ci` to write `ci/summary.md` plus upload snippets and code-quality artifacts for GitHub Actions, GitLab CI, and Bitbucket Pipelines: SARIF under `analysis-bundle/summary.sarif`, GitLab `ci/gl-code-quality-report.json`, and Bitbucket `ci/bitbucket-code-insights.json`.

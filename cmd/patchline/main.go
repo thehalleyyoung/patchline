@@ -456,6 +456,7 @@ Usage:
   patchline repo case-studies --analyses analysis-dir[,analysis-dir...] [--out dir] [--json]
   patchline repo taxonomy --analyses analysis-dir[,analysis-dir...] [--out dir] [--json]
   patchline repo qualitative-notes --analyses analysis-dir[,analysis-dir...] [--out dir] [--json]
+  patchline repo cross-file-examples --analyses analysis-dir[,analysis-dir...] [--out dir] [--json]
   patchline intake <path> [--out results/generated/intake] [--json]
   patchline intake --github owner/repo [--ref ref] [--subpath path] [--out results/generated/intake] [--json]
   patchline semantics-contract [--json]
@@ -594,6 +595,8 @@ func repoCommand(args []string) error {
 		return repoTaxonomy(args[1:])
 	case "qualitative-notes":
 		return repoQualitativeNotes(args[1:])
+	case "cross-file-examples":
+		return repoCrossFileExamples(args[1:])
 	default:
 		return fmt.Errorf("unknown repo subcommand %q", args[0])
 	}
@@ -831,6 +834,56 @@ type repoQualitativeNote struct {
 	CoderInstruction    string   `json:"coder_instruction"`
 	MaintainerQuestion  string   `json:"maintainer_question"`
 	RecommendedDecision string   `json:"recommended_decision"`
+}
+
+type repoCrossFileExamplesReport struct {
+	Version  string                 `json:"version"`
+	Summary  repoCrossFileSummary   `json:"summary"`
+	Examples []repoCrossFileExample `json:"examples"`
+	Corpus   []repoTaxonomyRepo     `json:"corpus"`
+	Hash     string                 `json:"hash"`
+	Markdown string                 `json:"markdown,omitempty"`
+}
+
+type repoCrossFileSummary struct {
+	Analyses        int `json:"analyses"`
+	PublicRepos     int `json:"public_repos"`
+	Examples        int `json:"examples"`
+	RepairClues     int `json:"repair_clues"`
+	IncidentClues   int `json:"incident_clues"`
+	SourceClues     int `json:"source_clues"`
+	GrepOnlyMisses  int `json:"grep_only_misses"`
+	SQLOnlyMisses   int `json:"sql_only_misses"`
+	PatchlineLinks  int `json:"patchline_evidence_links"`
+	GrepOnlyMatches int `json:"grep_only_matches"`
+	SQLOnlyRisks    int `json:"sql_only_ranked_risks"`
+}
+
+type repoCrossFileExample struct {
+	ID                 string                  `json:"id"`
+	Repo               string                  `json:"repo"`
+	Ref                string                  `json:"ref,omitempty"`
+	Subpath            string                  `json:"subpath,omitempty"`
+	RiskID             string                  `json:"risk_id"`
+	Table              string                  `json:"table,omitempty"`
+	ClueKind           string                  `json:"clue_kind"`
+	RiskPath           string                  `json:"risk_path,omitempty"`
+	CluePaths          []string                `json:"clue_paths"`
+	Identifiers        []string                `json:"identifiers"`
+	PatchlineClue      string                  `json:"patchline_clue"`
+	GrepOnlyResult     string                  `json:"grep_only_result"`
+	SQLOnlyResult      string                  `json:"sql_only_result"`
+	WhyGrepOnlyMissed  string                  `json:"why_grep_only_missed"`
+	WhySQLOnlyMissed   string                  `json:"why_sql_only_missed"`
+	MaintainerAction   string                  `json:"maintainer_action"`
+	BaselineComparison repoCrossFileComparison `json:"baseline_comparison"`
+	Evidence           []string                `json:"evidence"`
+}
+
+type repoCrossFileComparison struct {
+	PatchlineEvidenceLinks int `json:"patchline_evidence_links"`
+	GrepOnlyMatches        int `json:"grep_only_matches"`
+	SQLOnlyRankedRisks     int `json:"sql_only_ranked_risks"`
 }
 
 type repoAnalyzeCIArtifacts struct {
@@ -7477,6 +7530,288 @@ func renderRepoQualitativeNotesMarkdown(report repoQualitativeNotesReport) strin
 }
 
 func repoQualitativeNotesHash(report repoQualitativeNotesReport) string {
+	copy := report
+	copy.Hash = ""
+	copy.Markdown = ""
+	return canonical.Hash(copy)
+}
+
+func repoCrossFileExamples(args []string) error {
+	fs := flag.NewFlagSet("repo cross-file-examples", flag.ContinueOnError)
+	fs.SetOutput(ioDiscard{})
+	analysesValue := fs.String("analyses", "", "comma-separated repo analyze output directories")
+	outPath := fs.String("out", filepath.Join("results", "generated", "repo-cross-file-examples"), "output directory")
+	jsonOut := fs.Bool("json", false, "emit JSON")
+	if err := fs.Parse(args); err != nil {
+		return err
+	}
+	if *analysesValue == "" || fs.NArg() != 0 {
+		return errors.New("usage: patchline repo cross-file-examples --analyses analysis-dir[,analysis-dir...] [--out dir] [--json]")
+	}
+	report, err := buildRepoCrossFileExamplesReport(splitNonEmpty(*analysesValue, ","))
+	if err != nil {
+		return err
+	}
+	if err := writeRepoCrossFileExamplesReport(*outPath, report); err != nil {
+		return err
+	}
+	if *jsonOut {
+		return writeJSON(os.Stdout, report)
+	}
+	fmt.Printf("repo cross-file-examples examples=%d repair_clues=%d repos=%d hash=%s\n", report.Summary.Examples, report.Summary.RepairClues, report.Summary.PublicRepos, report.Hash)
+	fmt.Printf("  out=%s\n", *outPath)
+	return nil
+}
+
+func buildRepoCrossFileExamplesReport(analyses []string) (repoCrossFileExamplesReport, error) {
+	if len(analyses) == 0 {
+		return repoCrossFileExamplesReport{}, errors.New("at least one analysis directory is required")
+	}
+	report := repoCrossFileExamplesReport{Version: "patchline.repo-cross-file-examples/v1"}
+	repos := map[string]bool{}
+	for _, analysis := range analyses {
+		analyze, err := loadRepoAnalyzeReport(filepath.Join(analysis, "analyze.json"))
+		if err != nil {
+			return repoCrossFileExamplesReport{}, err
+		}
+		baseline, err := project.LoadBaseline(filepath.Join(analysis, "baseline"))
+		if err != nil {
+			return repoCrossFileExamplesReport{}, err
+		}
+		repo := firstNonEmpty(analyze.Input, analyze.Source.Input)
+		repos[repo] = true
+		report.Corpus = append(report.Corpus, repoTaxonomyRepo{Repo: repo, Ref: analyze.Source.ResolvedCommit, Subpath: analyze.Subpath})
+		report.Summary.PatchlineLinks += baseline.Summary.EvidenceLinks
+		report.Summary.GrepOnlyMatches += baseline.Summary.GrepOnlyMatches
+		report.Summary.SQLOnlyRisks += baseline.Summary.SQLOnlyRankedRisks
+		report.Examples = append(report.Examples, crossFileExamplesForAnalysis(repo, analyze, baseline)...)
+	}
+	sort.Slice(report.Examples, func(i, j int) bool {
+		if report.Examples[i].ClueKind != report.Examples[j].ClueKind {
+			return crossFileKindRank(report.Examples[i].ClueKind) < crossFileKindRank(report.Examples[j].ClueKind)
+		}
+		if report.Examples[i].Repo != report.Examples[j].Repo {
+			return report.Examples[i].Repo < report.Examples[j].Repo
+		}
+		return report.Examples[i].ID < report.Examples[j].ID
+	})
+	report.Summary.Analyses = len(analyses)
+	report.Summary.PublicRepos = len(repos)
+	report.Summary.Examples = len(report.Examples)
+	for _, example := range report.Examples {
+		report.Summary.GrepOnlyMisses++
+		report.Summary.SQLOnlyMisses++
+		switch example.ClueKind {
+		case "repair":
+			report.Summary.RepairClues++
+		case "incident":
+			report.Summary.IncidentClues++
+		case "source":
+			report.Summary.SourceClues++
+		}
+	}
+	report.Hash = repoCrossFileExamplesHash(report)
+	report.Markdown = renderRepoCrossFileExamplesMarkdown(report)
+	return report, nil
+}
+
+func crossFileExamplesForAnalysis(repo string, analyze repoAnalyzeReport, baseline project.BaselineReport) []repoCrossFileExample {
+	risks := map[string]project.BaselineRisk{}
+	for _, risk := range baseline.Risks {
+		risks[risk.ID] = risk
+		if risk.StableID != "" {
+			risks[risk.StableID] = risk
+		}
+	}
+	var examples []repoCrossFileExample
+	seen := map[string]bool{}
+	for _, slice := range baseline.Provenance {
+		risk := risks[slice.RiskID]
+		kind, paths := crossFileCluePaths(slice)
+		if kind == "" || len(paths) == 0 {
+			continue
+		}
+		key := slice.RiskID + "\x00" + kind + "\x00" + strings.Join(paths, "\x00")
+		if seen[key] {
+			continue
+		}
+		seen[key] = true
+		example := repoCrossFileExample{
+			Repo:        repo,
+			Ref:         analyze.Source.ResolvedCommit,
+			Subpath:     analyze.Subpath,
+			RiskID:      firstNonEmpty(risk.StableID, slice.RiskID),
+			Table:       firstNonEmpty(slice.Table, risk.Table),
+			ClueKind:    kind,
+			RiskPath:    firstNonEmpty(slice.MigrationPath, risk.Path),
+			CluePaths:   paths,
+			Identifiers: crossFileIdentifierStrings(slice.Identifiers),
+			BaselineComparison: repoCrossFileComparison{
+				PatchlineEvidenceLinks: baseline.Summary.EvidenceLinks,
+				GrepOnlyMatches:        baseline.Summary.GrepOnlyMatches,
+				SQLOnlyRankedRisks:     baseline.Summary.SQLOnlyRankedRisks,
+			},
+			Evidence: crossFileEvidence(slice, risk),
+		}
+		example.PatchlineClue = fmt.Sprintf("Patchline links %s risk `%s` to %d %s path(s) through %s.", firstNonEmpty(example.Table, "the data-change"), example.RiskID, len(example.CluePaths), kind, strings.Join(example.Identifiers, ", "))
+		example.GrepOnlyResult = fmt.Sprintf("grep-only sees %d textual risk matches but does not build evidence links or classify repair/source/incident paths.", baseline.Summary.GrepOnlyMatches)
+		example.SQLOnlyResult = fmt.Sprintf("SQL-only ranks %d SQL risks but ignores non-SQL and cross-file provenance paths.", baseline.Summary.SQLOnlyRankedRisks)
+		example.WhyGrepOnlyMissed = "grep-only matches suspicious statements in isolation and has no table-identifier graph for linking separate migrations, docs, repairs, tests, or source files."
+		example.WhySQLOnlyMissed = "SQL-only parses statements but drops repository-native file roles, temporal hints, repair wording, native commands, and non-SQL evidence paths."
+		example.MaintainerAction = crossFileMaintainerAction(kind)
+		example.ID = "cross-file:" + canonical.Hash(strings.Join([]string{repo, example.Ref, example.Subpath, example.RiskID, kind, strings.Join(paths, "\x00")}, "\x00"))[:16]
+		examples = append(examples, example)
+	}
+	return examples
+}
+
+func crossFileCluePaths(slice project.ProvenanceSlice) (string, []string) {
+	if paths := uniqueNonEmptyPaths(slice.RepairPaths, slice.MigrationPath); len(paths) > 0 {
+		return "repair", paths
+	}
+	if paths := uniqueNonEmptyPaths(slice.IncidentPaths, slice.MigrationPath); len(paths) > 0 {
+		return "incident", paths
+	}
+	if paths := uniqueNonEmptyPaths(slice.SourcePaths, slice.MigrationPath); len(paths) > 1 || (len(paths) == 1 && paths[0] != slice.MigrationPath) {
+		return "source", paths
+	}
+	return "", nil
+}
+
+func uniqueNonEmptyPaths(paths []string, exclude string) []string {
+	var out []string
+	seen := map[string]bool{}
+	for _, path := range paths {
+		path = strings.TrimSpace(path)
+		if path == "" || path == exclude || seen[path] {
+			continue
+		}
+		seen[path] = true
+		out = append(out, path)
+		if len(out) >= 5 {
+			break
+		}
+	}
+	return out
+}
+
+func crossFileIdentifierStrings(ids []project.Identifier) []string {
+	var out []string
+	seen := map[string]bool{}
+	for _, id := range ids {
+		value := strings.TrimSpace(id.Kind + ":" + id.Value)
+		if value == ":" || seen[value] {
+			continue
+		}
+		seen[value] = true
+		out = append(out, value)
+	}
+	sort.Strings(out)
+	if len(out) > 6 {
+		return out[:6]
+	}
+	return out
+}
+
+func crossFileEvidence(slice project.ProvenanceSlice, risk project.BaselineRisk) []string {
+	evidence := []string{
+		slice.Rationale,
+		"stages: " + strings.Join(slice.StagesPresent, ", "),
+	}
+	if risk.Rationale != "" {
+		evidence = append(evidence, "risk: "+risk.Rationale)
+	}
+	if len(slice.Links) > 0 {
+		evidence = append(evidence, fmt.Sprintf("%d cross-file evidence links share identifiers", len(slice.Links)))
+	}
+	return compactEvidence(evidence, 5)
+}
+
+func crossFileMaintainerAction(kind string) string {
+	switch kind {
+	case "repair":
+		return "Review the linked repair path before editing the risky migration; it may contain rollback, backfill, or reconciliation context that text-only baselines miss."
+	case "incident":
+		return "Review the linked incident path before suppressing the finding; it may explain why the data-change is operationally risky."
+	default:
+		return "Review the linked source/test paths before accepting or suppressing the data-change finding."
+	}
+}
+
+func crossFileKindRank(kind string) int {
+	switch kind {
+	case "repair":
+		return 0
+	case "incident":
+		return 1
+	case "source":
+		return 2
+	default:
+		return 3
+	}
+}
+
+func writeRepoCrossFileExamplesReport(outDir string, report repoCrossFileExamplesReport) error {
+	if err := os.MkdirAll(outDir, 0o755); err != nil {
+		return err
+	}
+	copy := report
+	copy.Markdown = ""
+	data, err := json.MarshalIndent(copy, "", "  ")
+	if err != nil {
+		return err
+	}
+	if err := os.WriteFile(filepath.Join(outDir, "cross-file-examples.json"), append(data, '\n'), 0o644); err != nil {
+		return err
+	}
+	return os.WriteFile(filepath.Join(outDir, "cross-file-examples.md"), []byte(report.Markdown), 0o644)
+}
+
+func renderRepoCrossFileExamplesMarkdown(report repoCrossFileExamplesReport) string {
+	var b strings.Builder
+	fmt.Fprintf(&b, "# Patchline cross-file repair clue examples\n\n")
+	fmt.Fprintf(&b, "- analyses: `%d`\n", report.Summary.Analyses)
+	fmt.Fprintf(&b, "- public repos: `%d`\n", report.Summary.PublicRepos)
+	fmt.Fprintf(&b, "- examples: `%d`\n", report.Summary.Examples)
+	fmt.Fprintf(&b, "- repair clues: `%d`\n", report.Summary.RepairClues)
+	fmt.Fprintf(&b, "- grep-only misses: `%d`\n", report.Summary.GrepOnlyMisses)
+	fmt.Fprintf(&b, "- SQL-only misses: `%d`\n", report.Summary.SQLOnlyMisses)
+	fmt.Fprintf(&b, "- hash: `%s`\n\n", report.Hash)
+	fmt.Fprintf(&b, "## Corpus coverage\n\n")
+	for _, repo := range report.Corpus {
+		fmt.Fprintf(&b, "- `%s` `%s` `%s`\n", repo.Repo, repo.Subpath, repo.Ref)
+	}
+	fmt.Fprintf(&b, "\n## Side-by-side examples\n\n")
+	for _, example := range report.Examples {
+		fmt.Fprintf(&b, "### %s `%s`\n\n", example.Repo, example.ID)
+		fmt.Fprintf(&b, "- risk: `%s` on `%s`\n", example.RiskID, example.Table)
+		fmt.Fprintf(&b, "- clue kind: `%s`\n", example.ClueKind)
+		fmt.Fprintf(&b, "- risk path: `%s`\n", example.RiskPath)
+		fmt.Fprintf(&b, "- clue paths: `%s`\n", strings.Join(example.CluePaths, "`, `"))
+		fmt.Fprintf(&b, "- identifiers: `%s`\n\n", strings.Join(example.Identifiers, "`, `"))
+		fmt.Fprintf(&b, "| method | result |\n| --- | --- |\n")
+		fmt.Fprintf(&b, "| Patchline | %s |\n", markdownEscapePipes(example.PatchlineClue))
+		fmt.Fprintf(&b, "| grep-only | %s |\n", markdownEscapePipes(example.GrepOnlyResult))
+		fmt.Fprintf(&b, "| SQL-only | %s |\n\n", markdownEscapePipes(example.SQLOnlyResult))
+		fmt.Fprintf(&b, "- why grep-only missed it: %s\n", example.WhyGrepOnlyMissed)
+		fmt.Fprintf(&b, "- why SQL-only missed it: %s\n", example.WhySQLOnlyMissed)
+		fmt.Fprintf(&b, "- maintainer action: %s\n", example.MaintainerAction)
+		if len(example.Evidence) > 0 {
+			fmt.Fprintf(&b, "- evidence:\n")
+			for _, evidence := range example.Evidence {
+				fmt.Fprintf(&b, "  - %s\n", evidence)
+			}
+		}
+		fmt.Fprintf(&b, "\n")
+	}
+	return b.String()
+}
+
+func markdownEscapePipes(value string) string {
+	return strings.ReplaceAll(value, "|", "\\|")
+}
+
+func repoCrossFileExamplesHash(report repoCrossFileExamplesReport) string {
 	copy := report
 	copy.Hash = ""
 	copy.Markdown = ""
