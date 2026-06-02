@@ -1908,6 +1908,10 @@ standards-body-conformance-corpus-gate:
 certificate-interop-dashboard-gate:
 	bash scripts/certificate-interop-dashboard-gate.sh
 
+.PHONY: conformance-failure-minimizer-gate
+conformance-failure-minimizer-gate:
+	bash scripts/conformance-failure-minimizer-gate.sh
+
 .PHONY: cross-tool-verdict-exchange-gate
 cross-tool-verdict-exchange-gate:
 	bash scripts/cross-tool-verdict-exchange-gate.sh

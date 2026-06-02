@@ -66,6 +66,113 @@ func TestDashboardFlagsCanonicalDrift(t *testing.T) {
 	}
 }
 
+func TestMinimizerWritesSinglePositiveCertificateWitness(t *testing.T) {
+	root := repoRoot(t)
+	reportPath := writeGoCheckerReport(t, root)
+
+	var report checkerReport
+	if err := readJSON(reportPath, &report); err != nil {
+		t.Fatal(err)
+	}
+	for i := range report.Vectors {
+		if report.Vectors[i].Path == "valid/safe-cli-dispatch.plci" {
+			report.Vectors[i].CanonicalSHA256 = "0000000000000000000000000000000000000000000000000000000000000000"
+			break
+		}
+	}
+	tamperedPath := filepath.Join(filepath.Dir(reportPath), "go-canonical-drift.json")
+	writeJSON(t, tamperedPath, report)
+
+	corpus := filepath.Join(root, "specs/certificate-conformance/v1/corpus.json")
+	dashboard, err := buildDashboard(corpus, root, []checkerInput{{Name: "go", Path: tamperedPath}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	outDir := filepath.Join(t.TempDir(), "witness")
+	witness, err := minimizeFailure(corpus, dashboard, []checkerInput{{Name: "go", Path: tamperedPath}}, outDir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if witness.Status != "minimized" || witness.CaseID != "safe-cli-dispatch" || witness.DriftKind != "canonical_sha256" || witness.VectorKind != "positive" {
+		t.Fatalf("unexpected witness: %#v", witness)
+	}
+	if witness.WitnessPath != "witness.plci" || witness.WitnessSHA256 == "" {
+		t.Fatalf("expected a single copied certificate witness: %#v", witness)
+	}
+	got, err := os.ReadFile(filepath.Join(outDir, witness.WitnessPath))
+	if err != nil {
+		t.Fatal(err)
+	}
+	want, err := os.ReadFile(filepath.Join(report.SpecDir, "vectors/valid/safe-cli-dispatch.plci"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if string(got) != string(want) {
+		t.Fatalf("witness.plci does not equal the checker vector")
+	}
+	if witness.Reference.CanonicalSHA256 == witness.Observed.CanonicalSHA256 {
+		t.Fatalf("expected witness to preserve canonical delta: %#v", witness)
+	}
+}
+
+func TestMinimizerReportsCleanDashboardWithoutWitness(t *testing.T) {
+	root := repoRoot(t)
+	reportPath := writeGoCheckerReport(t, root)
+	corpus := filepath.Join(root, "specs/certificate-conformance/v1/corpus.json")
+	dashboard, err := buildDashboard(corpus, root, []checkerInput{{Name: "go", Path: reportPath}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	witness, err := minimizeFailure(corpus, dashboard, []checkerInput{{Name: "go", Path: reportPath}}, t.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if witness.Status != "no_failure" || !witness.AllOK || witness.WitnessPath != "" {
+		t.Fatalf("expected clean no_failure witness, got %#v", witness)
+	}
+}
+
+func TestMinimizerCanWitnessExtraVectorFromRawReport(t *testing.T) {
+	root := repoRoot(t)
+	reportPath := writeGoCheckerReport(t, root)
+
+	var report checkerReport
+	if err := readJSON(reportPath, &report); err != nil {
+		t.Fatal(err)
+	}
+	extraPath := filepath.Join(report.SpecDir, "vectors/valid/zzz-extra.plci")
+	copyFile(t, filepath.Join(report.SpecDir, "vectors/valid/safe-cli-dispatch.plci"), extraPath)
+	report.Vectors = append(report.Vectors, checkerVector{
+		Path:            "valid/zzz-extra.plci",
+		Expected:        "valid",
+		Accepted:        true,
+		OK:              true,
+		CertificateID:   "safe-cli-dispatch",
+		Verdict:         "safe",
+		RiskBPS:         intPtr(25),
+		CanonicalSHA256: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+	})
+	extraReportPath := filepath.Join(filepath.Dir(reportPath), "go-extra.json")
+	writeJSON(t, extraReportPath, report)
+
+	corpus := filepath.Join(root, "specs/certificate-conformance/v1/corpus.json")
+	dashboard, err := buildDashboard(corpus, root, []checkerInput{{Name: "go", Path: extraReportPath}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if dashboard.DriftTotals.ExtraVector != 1 {
+		t.Fatalf("expected extra vector drift, got %#v", dashboard.DriftTotals)
+	}
+	outDir := filepath.Join(t.TempDir(), "witness")
+	witness, err := minimizeFailure(corpus, dashboard, []checkerInput{{Name: "go", Path: extraReportPath}}, outDir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if witness.DriftKind != "extra_vector" || witness.VectorPath != "valid/zzz-extra.plci" || witness.WitnessPath != "witness.plci" {
+		t.Fatalf("expected minimized extra-vector certificate witness, got %#v", witness)
+	}
+}
+
 func writeGoCheckerReport(t *testing.T, root string) string {
 	t.Helper()
 	tmp := t.TempDir()
@@ -111,6 +218,21 @@ func copyCorpusCert(t *testing.T, corpusDir string, rel string, dst string) {
 	if err := os.WriteFile(dst, data, 0o644); err != nil {
 		t.Fatal(err)
 	}
+}
+
+func copyFile(t *testing.T, src string, dst string) {
+	t.Helper()
+	data, err := os.ReadFile(src)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(dst, data, 0o644); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func intPtr(value int) *int {
+	return &value
 }
 
 func writeJSON(t *testing.T, filePath string, value any) {

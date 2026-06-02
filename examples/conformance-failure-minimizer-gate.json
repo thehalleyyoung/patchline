@@ -1,0 +1,9 @@
+{
+  "version": "patchline.conformance-failure-minimizer-gate/v1",
+  "claim": "Patchline includes a conformance failure minimizer for PLCI/1 certificate interoperability. The gate rebuilds the frozen standards-body corpus as checker vectors, reruns independent Go and Python checkers against real Patchline source/spec/doc evidence, injects one canonical-hash disagreement into the Python checker report, requires the certificate interop dashboard to fail, and then proves the minimizer reduces the cross-implementation disagreement to exactly one checker, one corpus case, one positive vector, and one copied certificate witness while a clean pair of checker reports produces an explicit no_failure witness via `make conformance-failure-minimizer-gate`.",
+  "real_repo": "patchline (self): PLCI/1 conformance corpus and multi-implementation checker reports over real source, spec, and documentation evidence",
+  "corpus": "specs/certificate-conformance/v1/corpus.json",
+  "checkers": ["go", "python"],
+  "primary_drift": "canonical_sha256",
+  "minimum_cases": 4
+}

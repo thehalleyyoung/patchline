@@ -18,6 +18,7 @@ import (
 )
 
 const dashboardVersion = "patchline.certificate-interop-dashboard/v1"
+const minimizedWitnessVersion = "patchline.conformance-failure-minimizer/v1"
 
 type checkerInput struct {
 	Name string
@@ -205,12 +206,63 @@ type checkerCaseVectors struct {
 	negative *checkerVector
 }
 
+type indexedCheckerVectors struct {
+	byCase    map[string]checkerCaseVectors
+	extras    []checkerVector
+	malformed []checkerVector
+}
+
+type minimizedWitness struct {
+	Version             string           `json:"version"`
+	Status              string           `json:"status"`
+	Corpus              string           `json:"corpus"`
+	Standard            string           `json:"standard,omitempty"`
+	Checker             string           `json:"checker,omitempty"`
+	CaseID              string           `json:"case_id,omitempty"`
+	DriftKind           string           `json:"drift_kind,omitempty"`
+	VectorKind          string           `json:"vector_kind,omitempty"`
+	VectorPath          string           `json:"vector_path,omitempty"`
+	WitnessPath         string           `json:"witness_path,omitempty"`
+	WitnessSHA256       string           `json:"witness_sha256,omitempty"`
+	WitnessSource       string           `json:"witness_source,omitempty"`
+	Reference           witnessReference `json:"reference,omitempty"`
+	Observed            witnessObserved  `json:"observed,omitempty"`
+	MinimizedUnits      []string         `json:"minimized_units,omitempty"`
+	ReproductionCommand string           `json:"reproduction_command,omitempty"`
+	SelectionOrder      []string         `json:"selection_order,omitempty"`
+	AllOK               bool             `json:"all_ok"`
+}
+
+type witnessReference struct {
+	CertificateID       string `json:"certificate_id,omitempty"`
+	Verdict             string `json:"verdict,omitempty"`
+	RiskBPS             int    `json:"risk_bps,omitempty"`
+	CanonicalSHA256     string `json:"canonical_sha256,omitempty"`
+	PositiveSHA256      string `json:"positive_sha256,omitempty"`
+	NegativeSHA256      string `json:"negative_sha256,omitempty"`
+	NegativeErrorSubstr string `json:"negative_error_substr,omitempty"`
+	Accepted            *bool  `json:"accepted,omitempty"`
+	Rejected            *bool  `json:"rejected,omitempty"`
+}
+
+type witnessObserved struct {
+	CertificateID   string `json:"certificate_id,omitempty"`
+	Verdict         string `json:"verdict,omitempty"`
+	RiskBPS         *int   `json:"risk_bps,omitempty"`
+	CanonicalSHA256 string `json:"canonical_sha256,omitempty"`
+	VectorSHA256    string `json:"vector_sha256,omitempty"`
+	Accepted        *bool  `json:"accepted,omitempty"`
+	Rejected        *bool  `json:"rejected,omitempty"`
+	Error           string `json:"error,omitempty"`
+}
+
 func main() {
 	var inputs checkerInputs
 	corpus := flag.String("corpus", "specs/certificate-conformance/v1/corpus.json", "frozen certificate conformance corpus")
 	root := flag.String("root", ".", "repository root for file evidence verification")
 	outJSON := flag.String("out-json", "", "write dashboard JSON to this path")
 	outMD := flag.String("out-md", "", "write dashboard Markdown to this path")
+	minimizeDir := flag.String("minimize-dir", "", "write the smallest certificate witness for the first checker disagreement")
 	jsonStdout := flag.Bool("json", false, "write dashboard JSON to stdout")
 	flag.Var(&inputs, "checker", "checker report as name=report.json; repeat for every checker")
 	flag.Parse()
@@ -233,6 +285,17 @@ func main() {
 	}
 	if *outMD != "" {
 		if err := writeMarkdownFile(*outMD, dashboard); err != nil {
+			fmt.Fprintln(os.Stderr, err)
+			os.Exit(1)
+		}
+	}
+	if *minimizeDir != "" {
+		witness, err := minimizeFailure(*corpus, dashboard, inputs, *minimizeDir)
+		if err != nil {
+			fmt.Fprintln(os.Stderr, err)
+			os.Exit(1)
+		}
+		if err := writeWitness(*minimizeDir, witness); err != nil {
 			fmt.Fprintln(os.Stderr, err)
 			os.Exit(1)
 		}
@@ -293,8 +356,8 @@ func buildDashboard(corpusPath string, root string, inputs []checkerInput) (Dash
 			name = report.Checker
 		}
 		checkerReports[name] = report
-		caseVectors, malformed, extra := indexVectors(report, knownCases)
-		checkerVectors[name] = caseVectors
+		indexed := indexVectors(report, knownCases)
+		checkerVectors[name] = indexed.byCase
 
 		summary := CheckerSummary{
 			Name:       name,
@@ -305,10 +368,10 @@ func buildDashboard(corpusPath string, root string, inputs []checkerInput) (Dash
 			ReportOK:   report.AllOK,
 			TotalCases: len(corpus.Cases),
 		}
-		for i := 0; i < malformed; i++ {
+		for i := 0; i < len(indexed.malformed); i++ {
 			summary.Drift.add("malformed_vector")
 		}
-		for i := 0; i < extra; i++ {
+		for i := 0; i < len(indexed.extras); i++ {
 			summary.Drift.add("extra_vector")
 		}
 		dashboard.Checkers = append(dashboard.Checkers, summary)
@@ -352,6 +415,280 @@ func buildDashboard(corpusPath string, root string, inputs []checkerInput) (Dash
 	return dashboard, nil
 }
 
+type driftCandidate struct {
+	checker    string
+	reportPath string
+	report     checkerReport
+	caseID     string
+	driftKind  string
+	vectorKind string
+	vector     *checkerVector
+	reference  certconformance.ReferenceOutput
+	corpusCase certconformance.Case
+}
+
+func minimizeFailure(corpusPath string, dashboard Dashboard, inputs []checkerInput, outDir string) (minimizedWitness, error) {
+	witness := minimizedWitness{
+		Version:        minimizedWitnessVersion,
+		Status:         "no_failure",
+		Corpus:         filepath.ToSlash(corpusPath),
+		Standard:       dashboard.Standard,
+		AllOK:          true,
+		SelectionOrder: []string{"case_id", "checker", "drift_kind", "vector_kind", "vector_path"},
+	}
+	if dashboard.AllOK {
+		return witness, nil
+	}
+
+	var corpus certconformance.Corpus
+	if err := readJSON(corpusPath, &corpus); err != nil {
+		return witness, err
+	}
+	references, err := loadReferences(corpusPath, corpus)
+	if err != nil {
+		return witness, err
+	}
+	knownCases := map[string]bool{}
+	for _, tc := range corpus.Cases {
+		knownCases[tc.ID] = true
+	}
+
+	var candidates []driftCandidate
+	for _, input := range inputs {
+		report, err := loadCheckerReport(input.Path)
+		if err != nil {
+			return witness, fmt.Errorf("%s: %w", input.Path, err)
+		}
+		name := input.Name
+		if name == "" {
+			name = report.Checker
+		}
+		indexed := indexVectors(report, knownCases)
+
+		for i := range indexed.extras {
+			vector := &indexed.extras[i]
+			_, caseID, ok := parseVectorPath(vector.Path)
+			if !ok {
+				caseID = "unknown"
+			}
+			candidates = append(candidates, driftCandidate{
+				checker:    name,
+				reportPath: input.Path,
+				report:     report,
+				caseID:     caseID,
+				driftKind:  "extra_vector",
+				vectorKind: vectorKindFromPath(vector.Path),
+				vector:     vector,
+			})
+		}
+		for i := range indexed.malformed {
+			vector := &indexed.malformed[i]
+			candidates = append(candidates, driftCandidate{
+				checker:    name,
+				reportPath: input.Path,
+				report:     report,
+				caseID:     "malformed",
+				driftKind:  "malformed_vector",
+				vectorKind: "report",
+				vector:     vector,
+			})
+		}
+
+		for _, tc := range corpus.Cases {
+			reference := references[tc.ID]
+			vectors := indexed.byCase[tc.ID]
+			result := compareCase(name, report, vectors, reference)
+			for _, drift := range result.Drift {
+				vectorKind := vectorKindForDrift(drift)
+				var vector *checkerVector
+				switch vectorKind {
+				case "positive":
+					vector = vectors.positive
+				case "negative":
+					vector = vectors.negative
+				}
+				candidates = append(candidates, driftCandidate{
+					checker:    name,
+					reportPath: input.Path,
+					report:     report,
+					caseID:     tc.ID,
+					driftKind:  drift,
+					vectorKind: vectorKind,
+					vector:     vector,
+					reference:  reference,
+					corpusCase: tc,
+				})
+			}
+		}
+	}
+	if len(candidates) == 0 {
+		return witness, nil
+	}
+	sort.Slice(candidates, func(i, j int) bool {
+		return candidateKey(candidates[i]) < candidateKey(candidates[j])
+	})
+	return materializeWitness(corpusPath, candidates[0], outDir, dashboard.Standard)
+}
+
+func candidateKey(candidate driftCandidate) string {
+	vectorPath := ""
+	if candidate.vector != nil {
+		vectorPath = candidate.vector.Path
+	}
+	return strings.Join([]string{
+		candidate.caseID,
+		candidate.checker,
+		candidate.driftKind,
+		candidate.vectorKind,
+		vectorPath,
+	}, "\x00")
+}
+
+func materializeWitness(corpusPath string, candidate driftCandidate, outDir string, standard string) (minimizedWitness, error) {
+	witness := minimizedWitness{
+		Version:       minimizedWitnessVersion,
+		Status:        "minimized",
+		Corpus:        filepath.ToSlash(corpusPath),
+		Standard:      standard,
+		Checker:       candidate.checker,
+		CaseID:        candidate.caseID,
+		DriftKind:     candidate.driftKind,
+		VectorKind:    candidate.vectorKind,
+		WitnessSource: "checker-vector",
+		AllOK:         false,
+		MinimizedUnits: []string{
+			"checker",
+			"case",
+			"vector",
+			"certificate",
+		},
+		SelectionOrder:      []string{"case_id", "checker", "drift_kind", "vector_kind", "vector_path"},
+		ReproductionCommand: fmt.Sprintf("go run ./tools/certinteropdashboard --corpus %s --checker %s=%s --minimize-dir %s", filepath.ToSlash(corpusPath), candidate.checker, filepath.ToSlash(candidate.reportPath), filepath.ToSlash(outDir)),
+	}
+	if candidate.vector != nil {
+		witness.VectorPath = candidate.vector.Path
+		witness.Observed = observedFromVector(candidate.report, *candidate.vector, candidate.vectorKind)
+	}
+	if candidate.reference.Version != "" {
+		witness.Reference = referenceForVectorKind(candidate.reference, candidate.vectorKind)
+	}
+
+	sourcePath := ""
+	switch {
+	case candidate.vector != nil && candidate.vectorKind != "report":
+		path, err := vectorFilePath(candidate.report.SpecDir, candidate.vector.Path)
+		if err == nil {
+			sourcePath = path
+		}
+	case candidate.vector == nil && (candidate.vectorKind == "positive" || candidate.vectorKind == "negative"):
+		path, err := referenceCertificatePath(corpusPath, candidate.corpusCase, candidate.vectorKind)
+		if err != nil {
+			return witness, err
+		}
+		sourcePath = path
+		witness.WitnessSource = "reference-corpus"
+	}
+	if sourcePath != "" {
+		if err := os.MkdirAll(outDir, 0o755); err != nil {
+			return witness, err
+		}
+		data, err := os.ReadFile(sourcePath)
+		if err != nil {
+			return witness, err
+		}
+		witnessPath := filepath.Join(outDir, "witness.plci")
+		if err := os.WriteFile(witnessPath, data, 0o644); err != nil {
+			return witness, err
+		}
+		sum := sha256.Sum256(data)
+		witness.WitnessPath = "witness.plci"
+		witness.WitnessSHA256 = hex.EncodeToString(sum[:])
+	} else if candidate.vectorKind == "report" {
+		witness.WitnessSource = "checker-report-row"
+		witness.MinimizedUnits = []string{"checker", "report-vector"}
+	}
+	return witness, nil
+}
+
+func observedFromVector(report checkerReport, vector checkerVector, vectorKind string) witnessObserved {
+	observed := witnessObserved{
+		CertificateID:   vector.CertificateID,
+		Verdict:         vector.Verdict,
+		RiskBPS:         vector.RiskBPS,
+		CanonicalSHA256: vector.CanonicalSHA256,
+		Error:           vector.Error,
+	}
+	accepted := vector.Accepted
+	rejected := !vector.Accepted
+	switch vectorKind {
+	case "positive":
+		observed.Accepted = &accepted
+	case "negative":
+		observed.Rejected = &rejected
+	}
+	if vectorKind != "report" {
+		if got, err := vectorSHA256(report.SpecDir, vector.Path); err == nil {
+			observed.VectorSHA256 = got
+		}
+	}
+	return observed
+}
+
+func referenceForVectorKind(reference certconformance.ReferenceOutput, vectorKind string) witnessReference {
+	out := witnessReference{
+		CertificateID:       reference.Payload.CertificateID,
+		Verdict:             reference.Payload.Verdict,
+		RiskBPS:             reference.Payload.RiskBPS,
+		CanonicalSHA256:     reference.Payload.CanonicalSHA256,
+		PositiveSHA256:      reference.Payload.PositiveSHA256,
+		NegativeSHA256:      reference.Payload.NegativeSHA256,
+		NegativeErrorSubstr: reference.Payload.NegativeErrorContains,
+	}
+	accepted := true
+	rejected := true
+	switch vectorKind {
+	case "positive":
+		out.Accepted = &accepted
+	case "negative":
+		out.Rejected = &rejected
+	}
+	return out
+}
+
+func vectorKindForDrift(drift string) string {
+	switch drift {
+	case "missing_positive_vector", "positive_acceptance", "certificate_id", "verdict", "risk_bps", "canonical_sha256", "positive_sha256":
+		return "positive"
+	case "missing_negative_vector", "negative_rejection", "negative_error", "negative_sha256":
+		return "negative"
+	default:
+		return "report"
+	}
+}
+
+func vectorKindFromPath(vectorPath string) string {
+	group, _, ok := parseVectorPath(vectorPath)
+	if !ok {
+		return "report"
+	}
+	switch group {
+	case "valid":
+		return "positive"
+	case "invalid":
+		return "negative"
+	default:
+		return "report"
+	}
+}
+
+func referenceCertificatePath(corpusPath string, tc certconformance.Case, vectorKind string) (string, error) {
+	rel := tc.Positive
+	if vectorKind == "negative" {
+		rel = tc.NegativeControl
+	}
+	return resolveCorpusPath(filepath.Dir(corpusPath), rel)
+}
+
 func loadReferences(corpusPath string, corpus certconformance.Corpus) (map[string]certconformance.ReferenceOutput, error) {
 	corpusDir := filepath.Dir(corpusPath)
 	references := map[string]certconformance.ReferenceOutput{}
@@ -389,34 +726,36 @@ func loadCheckerReport(reportPath string) (checkerReport, error) {
 	return report, nil
 }
 
-func indexVectors(report checkerReport, knownCases map[string]bool) (map[string]checkerCaseVectors, int, int) {
-	byCase := map[string]checkerCaseVectors{}
-	malformed := 0
-	extra := 0
+func indexVectors(report checkerReport, knownCases map[string]bool) indexedCheckerVectors {
+	indexed := indexedCheckerVectors{
+		byCase: map[string]checkerCaseVectors{},
+	}
 	for i := range report.Vectors {
 		vector := &report.Vectors[i]
 		group, caseID, ok := parseVectorPath(vector.Path)
 		if !ok {
-			malformed++
+			indexed.malformed = append(indexed.malformed, *vector)
 			continue
 		}
 		if !knownCases[caseID] {
-			extra++
+			indexed.extras = append(indexed.extras, *vector)
 			continue
 		}
-		row := byCase[caseID]
+		row := indexed.byCase[caseID]
 		switch group {
 		case "valid":
 			row.positive = vector
 		case "invalid":
 			row.negative = vector
 		default:
-			malformed++
+			indexed.malformed = append(indexed.malformed, *vector)
 			continue
 		}
-		byCase[caseID] = row
+		indexed.byCase[caseID] = row
 	}
-	return byCase, malformed, extra
+	sort.Slice(indexed.extras, func(i, j int) bool { return indexed.extras[i].Path < indexed.extras[j].Path })
+	sort.Slice(indexed.malformed, func(i, j int) bool { return indexed.malformed[i].Path < indexed.malformed[j].Path })
+	return indexed
 }
 
 func compareCase(checker string, report checkerReport, vectors checkerCaseVectors, reference certconformance.ReferenceOutput) CheckerCaseResult {
@@ -498,12 +837,19 @@ func parseVectorPath(value string) (group string, caseID string, ok bool) {
 }
 
 func vectorSHA256(specDir string, vectorPath string) (string, error) {
+	filePath, err := vectorFilePath(specDir, vectorPath)
+	if err != nil {
+		return "", err
+	}
+	return sha256File(filePath)
+}
+
+func vectorFilePath(specDir string, vectorPath string) (string, error) {
 	group, caseID, ok := parseVectorPath(vectorPath)
 	if !ok {
 		return "", fmt.Errorf("invalid vector path %q", vectorPath)
 	}
-	filePath := filepath.Join(specDir, "vectors", filepath.FromSlash(group+"/"+caseID+".plci"))
-	return sha256File(filePath)
+	return filepath.Join(specDir, "vectors", filepath.FromSlash(group+"/"+caseID+".plci")), nil
 }
 
 func resolveCorpusPath(corpusDir string, rel string) (string, error) {
@@ -546,6 +892,95 @@ func writeJSONFile(filePath string, dashboard Dashboard) error {
 	}
 	data = append(data, '\n')
 	return os.WriteFile(filePath, data, 0o644)
+}
+
+func writeWitness(outDir string, witness minimizedWitness) error {
+	if err := os.MkdirAll(outDir, 0o755); err != nil {
+		return err
+	}
+	data, err := json.MarshalIndent(witness, "", "  ")
+	if err != nil {
+		return err
+	}
+	data = append(data, '\n')
+	if err := os.WriteFile(filepath.Join(outDir, "witness.json"), data, 0o644); err != nil {
+		return err
+	}
+	file, err := os.Create(filepath.Join(outDir, "witness.md"))
+	if err != nil {
+		return err
+	}
+	defer file.Close()
+	return writeWitnessMarkdown(file, witness)
+}
+
+func writeWitnessMarkdown(w io.Writer, witness minimizedWitness) error {
+	if _, err := fmt.Fprintln(w, "# Conformance failure witness"); err != nil {
+		return err
+	}
+	fmt.Fprintln(w)
+	fmt.Fprintf(w, "Status: **%s**  \n", mdEscape(witness.Status))
+	fmt.Fprintf(w, "Corpus: `%s`  \n", mdEscape(witness.Corpus))
+	if witness.Status == "no_failure" {
+		_, err := fmt.Fprintln(w, "No cross-implementation certificate disagreement was found.")
+		return err
+	}
+	fmt.Fprintf(w, "Checker: `%s`  \n", mdEscape(witness.Checker))
+	fmt.Fprintf(w, "Case: `%s`  \n", mdEscape(witness.CaseID))
+	fmt.Fprintf(w, "Primary drift: `%s`  \n", mdEscape(witness.DriftKind))
+	fmt.Fprintf(w, "Vector: `%s` `%s`  \n", mdEscape(witness.VectorKind), mdEscape(witness.VectorPath))
+	fmt.Fprintf(w, "Witness: `%s` (`%s`)  \n\n", mdEscape(witness.WitnessPath), mdEscape(witness.WitnessSHA256))
+	fmt.Fprintln(w, "## Delta")
+	fmt.Fprintln(w)
+	fmt.Fprintln(w, "| Field | Reference | Observed |")
+	fmt.Fprintln(w, "| --- | --- | --- |")
+	for _, row := range witnessRows(witness) {
+		fmt.Fprintf(w, "| `%s` | `%s` | `%s` |\n", mdEscape(row[0]), mdEscape(row[1]), mdEscape(row[2]))
+	}
+	if witness.ReproductionCommand != "" {
+		fmt.Fprintln(w)
+		fmt.Fprintln(w, "## Reproduce")
+		fmt.Fprintln(w)
+		fmt.Fprintf(w, "```bash\n%s\n```\n", witness.ReproductionCommand)
+	}
+	return nil
+}
+
+func witnessRows(witness minimizedWitness) [][3]string {
+	rows := [][3]string{
+		{"certificate_id", witness.Reference.CertificateID, witness.Observed.CertificateID},
+		{"verdict", witness.Reference.Verdict, witness.Observed.Verdict},
+		{"risk_bps", referenceRiskString(witness.Reference), intPointerString(witness.Observed.RiskBPS)},
+		{"canonical_sha256", witness.Reference.CanonicalSHA256, witness.Observed.CanonicalSHA256},
+		{"negative_error", witness.Reference.NegativeErrorSubstr, witness.Observed.Error},
+	}
+	switch witness.VectorKind {
+	case "positive":
+		rows = append(rows, [3]string{"positive_sha256", witness.Reference.PositiveSHA256, witness.Observed.VectorSHA256})
+	case "negative":
+		rows = append(rows, [3]string{"negative_sha256", witness.Reference.NegativeSHA256, witness.Observed.VectorSHA256})
+	}
+	filtered := rows[:0]
+	for _, row := range rows {
+		if row[1] != "" || row[2] != "" {
+			filtered = append(filtered, row)
+		}
+	}
+	return filtered
+}
+
+func referenceRiskString(reference witnessReference) string {
+	if reference.CertificateID == "" && reference.Verdict == "" && reference.CanonicalSHA256 == "" {
+		return ""
+	}
+	return fmt.Sprint(reference.RiskBPS)
+}
+
+func intPointerString(value *int) string {
+	if value == nil {
+		return ""
+	}
+	return fmt.Sprint(*value)
 }
 
 func writeMarkdownFile(filePath string, dashboard Dashboard) error {

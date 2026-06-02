@@ -925,6 +925,11 @@ negative-control error text against the signed reference payload. It publishes b
 \code{dashboard.json} and \code{dashboard.md}; a tampered checker report must produce a
 \code{canonical\_sha256} drift and a failing dashboard. This changes interoperability from ``the
 implementations agreed once'' to a release-time, reviewer-readable drift surface.
+\gate{conformance-failure-minimizer-gate} then turns the first disagreement back into a minimal
+debugging artifact: one checker, one corpus case, one vector kind, and one copied
+\code{witness.plci} certificate with reference-versus-observed deltas. The gate proves this on a
+tampered Python checker report and proves the clean-control path emits \code{no\_failure} without a
+certificate witness.
 
 The latest compatibility gate adds schema evolution to that story. Legacy PLCI/0 certificates use a
 coarser \code{risk-class} field; \gate{certificate-migration-gate} verifies their legacy canonical
@@ -1297,7 +1302,8 @@ Decision science & \code{risk-economics-gate}, \code{uncertainty-calibration-gat
 \code{active-learning-gate}, \code{reviewer-sim-gate}, \code{explainable-ranking-gate} \\
 Release \& interop & \code{rc-rehearsal-gate}, \code{leaderboard-gate}, \code{dossier-gate},
 \code{interop-gate}, \code{standards-body-conformance-corpus-gate},
-\code{certificate-interop-dashboard-gate}, \code{certificate-migration-gate} \\
+\code{certificate-interop-dashboard-gate}, \code{conformance-failure-minimizer-gate},
+\code{certificate-migration-gate} \\
 Generalization & \code{framework-holdout-gate}, \code{perturbation-robustness-gate},
 \code{historical-replay-study-gate}, \code{external-replication-kit-gate} \\
 Trust stack & \code{signed-provenance-chain-gate}, \code{reproducible-build-attestation-gate},
