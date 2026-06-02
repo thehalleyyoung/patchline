@@ -1054,6 +1054,34 @@ func TestBaselineClassifiesDataRetentionPrivacyHazards(t *testing.T) {
 	}
 }
 
+func TestBaselineMinesInvariantCandidates(t *testing.T) {
+	root := t.TempDir()
+	writeFile(t, root, "db/migrate/001_users.sql", "CREATE TABLE users (id int PRIMARY KEY, email text NOT NULL UNIQUE, status text CHECK (status in ('active','disabled')));")
+	writeFile(t, root, "app/models/user.rb", "class User < ApplicationRecord\n  validates :email, presence: true, uniqueness: true\nend\n")
+	writeFile(t, root, "spec/models/user_spec.rb", "RSpec.describe User do\n  it 'requires email' do\n    expect(user.email).not_to be_nil\n  end\nend\n")
+	writeFile(t, root, "test/fixtures/users.yml", "alice:\n  id: 1\n  email: alice@example.com\n  status: active\n")
+	inv, err := InventoryPath(InventoryOptions{Path: root})
+	if err != nil {
+		t.Fatal(err)
+	}
+	intakeReport, err := intake.Run(context.Background(), intake.Options{Path: root})
+	if err != nil {
+		t.Fatal(err)
+	}
+	baseline := Baseline(inv, inv.Facts, intakeReport)
+	if baseline.Summary.Invariants == 0 || baseline.Summary.InvariantSchema == 0 || baseline.Summary.InvariantValidation == 0 || baseline.Summary.InvariantTests == 0 || baseline.Summary.InvariantFixtures == 0 {
+		t.Fatalf("expected invariant candidates from schema, validation, tests, and fixtures: summary=%#v invariants=%#v", baseline.Summary, baseline.Invariants)
+	}
+	for _, want := range []string{"not-null", "unique", "check-constraint", "example-non-null"} {
+		if !hasInvariantKind(baseline.Invariants, want) {
+			t.Fatalf("missing invariant kind %q in %#v", want, baseline.Invariants)
+		}
+	}
+	if !strings.Contains(baseline.Markdown, "Invariant candidates") {
+		t.Fatalf("expected invariant candidates in markdown:\n%s", baseline.Markdown)
+	}
+}
+
 func TestCompareClassifiesGeneratedPrivacyHazards(t *testing.T) {
 	baseline := BaselineReport{
 		Version: BaselineVersion,
@@ -1541,6 +1569,15 @@ func hasPrivacyHazardMarker(hazards []PrivacyHazard, marker string) bool {
 			if item == marker {
 				return true
 			}
+		}
+	}
+	return false
+}
+
+func hasInvariantKind(items []InvariantCandidate, kind string) bool {
+	for _, item := range items {
+		if item.Kind == kind {
+			return true
 		}
 	}
 	return false

@@ -1,0 +1,32 @@
+{
+  "version": "patchline.invariant-mining/v1",
+  "claim": "Invariant mining is validated on public schema, validation, test, fixture, and production-like example data slices from repositories not designed for Patchline.",
+  "minimum_public_repos": 4,
+  "required_sources": ["schema", "validation", "test", "fixture"],
+  "slices": [
+    {
+      "id": "bytebase-schema-migrations",
+      "repo": "bytebase/bytebase",
+      "ref": "0765652ea2dbdf8e93ae44bff5acafc1b97a92cc",
+      "subpath": "backend/migrator/migration"
+    },
+    {
+      "id": "forem-model-validations",
+      "repo": "forem/forem",
+      "ref": "9c5509c3aeecd4a86a8950206fa937ebcbc2f8d1",
+      "subpath": "app/models"
+    },
+    {
+      "id": "mastodon-model-specs",
+      "repo": "mastodon/mastodon",
+      "ref": "facb552c9cdbe8a2ebff0b94ebf2c9e9ec385347",
+      "subpath": "spec/models"
+    },
+    {
+      "id": "lobsters-test-fixtures",
+      "repo": "lobsters/lobsters",
+      "ref": "3b80b47aa5aaba37ec44413e7d1dc96fcf1585b6",
+      "subpath": "spec/factories"
+    }
+  ]
+}

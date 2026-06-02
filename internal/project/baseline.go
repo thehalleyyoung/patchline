@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"regexp"
 	"sort"
 	"strings"
 	"time"
@@ -38,6 +39,7 @@ type BaselineReport struct {
 	Idempotency     []IdempotencyClass        `json:"idempotency_classifications,omitempty"`
 	LockHazards     []LockHazard              `json:"lock_concurrency_hazards,omitempty"`
 	PrivacyHazards  []PrivacyHazard           `json:"data_retention_privacy_hazards,omitempty"`
+	Invariants      []InvariantCandidate      `json:"invariant_candidates,omitempty"`
 	PolicyChecks    []PolicyCheck             `json:"policy_checks,omitempty"`
 	RepairProofs    []RepairProofSummary      `json:"repair_proof_summaries,omitempty"`
 	NativeChecks    []Command                 `json:"native_checks,omitempty"`
@@ -87,6 +89,11 @@ type BaselineSummary struct {
 	PrivacyHigh         int `json:"privacy_hazard_high"`
 	PrivacyMedium       int `json:"privacy_hazard_medium"`
 	PrivacyLow          int `json:"privacy_hazard_low"`
+	Invariants          int `json:"invariant_candidates"`
+	InvariantSchema     int `json:"invariants_from_schema"`
+	InvariantTests      int `json:"invariants_from_tests"`
+	InvariantValidation int `json:"invariants_from_validations"`
+	InvariantFixtures   int `json:"invariants_from_fixtures"`
 	PolicyChecks        int `json:"policy_checks"`
 	PolicyPassed        int `json:"policy_passed"`
 	PolicyWarnings      int `json:"policy_warnings"`
@@ -179,6 +186,21 @@ type PrivacyHazard struct {
 	Confidence  string       `json:"confidence"`
 	Markers     []string     `json:"markers,omitempty"`
 	Mitigations []string     `json:"mitigations,omitempty"`
+	Evidence    []string     `json:"evidence,omitempty"`
+	Identifiers []Identifier `json:"identifiers,omitempty"`
+	Rationale   string       `json:"rationale"`
+}
+
+type InvariantCandidate struct {
+	ID          string       `json:"id"`
+	Source      string       `json:"source"`
+	Kind        string       `json:"kind"`
+	Path        string       `json:"path"`
+	Line        int          `json:"line,omitempty"`
+	Table       string       `json:"table,omitempty"`
+	Column      string       `json:"column,omitempty"`
+	Expression  string       `json:"expression"`
+	Confidence  string       `json:"confidence"`
 	Evidence    []string     `json:"evidence,omitempty"`
 	Identifiers []Identifier `json:"identifiers,omitempty"`
 	Rationale   string       `json:"rationale"`
@@ -361,6 +383,7 @@ func Baseline(inv Inventory, facts []Fact, intakeReport intake.Report) BaselineR
 	report.Idempotency = buildIdempotencyClasses(report.Risks, report.Provenance, report.SymbolicChecks, facts, intakeReport)
 	report.LockHazards = buildLockHazards(report.Risks, report.Provenance, facts, intakeReport)
 	report.PrivacyHazards = buildPrivacyHazards(report.Risks, report.Provenance, facts, intakeReport)
+	report.Invariants = buildInvariantCandidates(inv.Root, facts, intakeReport)
 	report.PolicyChecks = buildPolicyChecks(report.Risks, report.Provenance, report.SymbolicChecks)
 	report.RepairProofs = buildRepairProofSummaries(report.Risks, report.Provenance, report.AbstractEffects, report.SymbolicChecks)
 	report.Summary = BaselineSummary{
@@ -405,6 +428,11 @@ func Baseline(inv Inventory, facts []Fact, intakeReport intake.Report) BaselineR
 		PrivacyHigh:         countPrivacyHazardSeverity(report.PrivacyHazards, "high"),
 		PrivacyMedium:       countPrivacyHazardSeverity(report.PrivacyHazards, "medium"),
 		PrivacyLow:          countPrivacyHazardSeverity(report.PrivacyHazards, "low"),
+		Invariants:          len(report.Invariants),
+		InvariantSchema:     countInvariantSource(report.Invariants, "schema"),
+		InvariantTests:      countInvariantSource(report.Invariants, "test"),
+		InvariantValidation: countInvariantSource(report.Invariants, "validation"),
+		InvariantFixtures:   countInvariantSource(report.Invariants, "fixture"),
 		PolicyChecks:        len(report.PolicyChecks),
 		PolicyPassed:        countPolicyStatus(report.PolicyChecks, "pass"),
 		PolicyWarnings:      countPolicyStatus(report.PolicyChecks, "warn"),
@@ -3349,6 +3377,469 @@ func removeString(values []string, target string) []string {
 	return out
 }
 
+func buildInvariantCandidates(inventoryRoot string, facts []Fact, intakeReport intake.Report) []InvariantCandidate {
+	root := firstNonEmpty(inventoryRoot, intakeReport.Source.ScannedRoot, intakeReport.Source.Input)
+	seen := map[string]bool{}
+	var out []InvariantCandidate
+	for _, fact := range facts {
+		if fact.Kind == "schema_evolution" {
+			text := textForBoundary(root, fact.Path)
+			for _, inv := range schemaInvariantsFromFact(fact, text) {
+				addInvariantCandidate(&out, seen, inv)
+			}
+		}
+		if !isInvariantMiningPath(fact.Path, fact.Kind) {
+			continue
+		}
+		text := textForBoundary(root, fact.Path)
+		if text == "" {
+			continue
+		}
+		for _, inv := range invariantsFromTextPath(fact, text) {
+			addInvariantCandidate(&out, seen, inv)
+		}
+	}
+	sort.Slice(out, func(i, j int) bool {
+		if out[i].Confidence != out[j].Confidence {
+			return invariantConfidenceRank(out[i].Confidence) > invariantConfidenceRank(out[j].Confidence)
+		}
+		if out[i].Source != out[j].Source {
+			return out[i].Source < out[j].Source
+		}
+		if out[i].Path != out[j].Path {
+			return out[i].Path < out[j].Path
+		}
+		return out[i].ID < out[j].ID
+	})
+	if len(out) > 500 {
+		out = out[:500]
+	}
+	return out
+}
+
+func schemaInvariantsFromFact(fact Fact, text string) []InvariantCandidate {
+	table := firstNonEmpty(fact.Properties["table"], firstIdentifierValue(fact.Identifiers, "table"), firstIdentifierValue(fact.Identifiers, "model"))
+	column := firstNonEmpty(fact.Properties["column"], firstIdentifierValue(fact.Identifiers, "column"))
+	columnType := fact.Properties["column_type"]
+	line, context := invariantLineForColumn(text, column)
+	base := InvariantCandidate{
+		Source:      "schema",
+		Path:        fact.Path,
+		Line:        line,
+		Table:       table,
+		Column:      column,
+		Confidence:  "derived",
+		Evidence:    []string{"schema_evolution fact: " + fact.ID},
+		Identifiers: fact.Identifiers,
+		Rationale:   "candidate invariant mined from schema evolution or ORM schema declarations",
+	}
+	var out []InvariantCandidate
+	if table != "" {
+		item := base
+		item.Kind = "table-exists"
+		item.Expression = "table(" + table + ") exists"
+		out = append(out, finalizeInvariant(item))
+	}
+	if column != "" {
+		item := base
+		item.Kind = "column-exists"
+		item.Expression = invariantColumnExpr(table, column, "exists")
+		out = append(out, finalizeInvariant(item))
+	}
+	if columnType != "" {
+		item := base
+		item.Kind = "column-type"
+		item.Expression = invariantColumnExpr(table, column, "type="+columnType)
+		out = append(out, finalizeInvariant(item))
+	}
+	lower := strings.ToLower(context)
+	if containsAny(lower, "not null", "null: false", "nullable=false", "nullable: false", "blank=false", "blank: false", "@notnull", "required") {
+		item := base
+		item.Kind = "not-null"
+		item.Expression = invariantColumnExpr(table, column, "not_null")
+		item.Confidence = "high"
+		item.Evidence = append(item.Evidence, strings.TrimSpace(context))
+		out = append(out, finalizeInvariant(item))
+	}
+	if containsAny(lower, "primary key", "primary_key", "@id", "primarykey") {
+		item := base
+		item.Kind = "primary-key"
+		item.Expression = invariantColumnExpr(table, column, "primary_key")
+		item.Confidence = "high"
+		item.Evidence = append(item.Evidence, strings.TrimSpace(context))
+		out = append(out, finalizeInvariant(item))
+	}
+	if containsAny(lower, "unique", "@unique", "uniqueindex", "unique_together") {
+		item := base
+		item.Kind = "unique"
+		item.Expression = invariantColumnExpr(table, column, "unique")
+		item.Confidence = "high"
+		item.Evidence = append(item.Evidence, strings.TrimSpace(context))
+		out = append(out, finalizeInvariant(item))
+	}
+	if containsAny(lower, "check ", "check(", "constraint", "validate") {
+		item := base
+		item.Kind = "check-constraint"
+		item.Expression = "check(" + compactInvariantExpression(context) + ")"
+		item.Confidence = "high"
+		item.Evidence = append(item.Evidence, strings.TrimSpace(context))
+		out = append(out, finalizeInvariant(item))
+	}
+	return out
+}
+
+func invariantsFromTextPath(fact Fact, text string) []InvariantCandidate {
+	lowerPath := strings.ToLower(filepath.ToSlash(fact.Path))
+	switch {
+	case isTestPath(lowerPath):
+		return testInvariantsFromText(fact, text)
+	case isValidationPath(lowerPath, text):
+		return validationInvariantsFromText(fact, text)
+	case isFixturePath(lowerPath) || isLikelyFixtureText(lowerPath, text) || isFactoryExampleText(text):
+		return fixtureInvariantsFromText(fact, text)
+	default:
+		return nil
+	}
+}
+
+func testInvariantsFromText(fact Fact, text string) []InvariantCandidate {
+	var out []InvariantCandidate
+	for lineNo, line := range strings.Split(text, "\n") {
+		lower := strings.ToLower(line)
+		if !containsAny(lower, "assert", "expect(", "expect ", "should", "require.", "equal", "not_to", "to be", "to eq", "not_nil", "not nil", "valid") {
+			continue
+		}
+		table, column := invariantTableColumnFromText(line, fact)
+		kind := "assertion"
+		if containsAny(lower, "not_nil", "not nil", "not_to be_nil", "not null", "present", "presence") {
+			kind = "not-null"
+		} else if containsAny(lower, "unique", "duplicate") {
+			kind = "unique"
+		} else if containsAny(lower, "valid", "invalid", "error") {
+			kind = "validation-behavior"
+		}
+		out = append(out, finalizeInvariant(InvariantCandidate{
+			Source:      "test",
+			Kind:        kind,
+			Path:        fact.Path,
+			Line:        lineNo + 1,
+			Table:       table,
+			Column:      column,
+			Expression:  compactInvariantExpression(line),
+			Confidence:  "medium",
+			Evidence:    []string{strings.TrimSpace(line)},
+			Identifiers: uniqueIdentifiers(append(append([]Identifier{}, fact.Identifiers...), identifiersFromText(line)...)),
+			Rationale:   "candidate invariant mined from test assertion text",
+		}))
+		if len(out) >= 40 {
+			break
+		}
+	}
+	return out
+}
+
+func validationInvariantsFromText(fact Fact, text string) []InvariantCandidate {
+	var out []InvariantCandidate
+	for lineNo, line := range strings.Split(text, "\n") {
+		lower := strings.ToLower(line)
+		if !containsAny(lower, "validates", "presence:", "uniqueness:", "length:", "format:", "nullable=false", "null=false", "null: false", "blank=false", "blank: false", "@notnull", "@size", "@pattern", "required", "joi.", "z.string", "constraint") {
+			continue
+		}
+		table, column := invariantTableColumnFromText(line, fact)
+		kind := "validation"
+		switch {
+		case containsAny(lower, "presence:", "required", "@notnull", "nullable=false", "null=false", "null: false", "blank=false", "blank: false"):
+			kind = "not-null"
+		case containsAny(lower, "uniqueness:", "unique"):
+			kind = "unique"
+		case containsAny(lower, "length:", "@size", "max_length", "min_length"):
+			kind = "length"
+		case containsAny(lower, "format:", "@pattern", "regex", "email"):
+			kind = "format"
+		}
+		out = append(out, finalizeInvariant(InvariantCandidate{
+			Source:      "validation",
+			Kind:        kind,
+			Path:        fact.Path,
+			Line:        lineNo + 1,
+			Table:       table,
+			Column:      column,
+			Expression:  compactInvariantExpression(line),
+			Confidence:  "high",
+			Evidence:    []string{strings.TrimSpace(line)},
+			Identifiers: uniqueIdentifiers(append(append([]Identifier{}, fact.Identifiers...), identifiersFromText(line)...)),
+			Rationale:   "candidate invariant mined from application validation declarations",
+		}))
+		if len(out) >= 40 {
+			break
+		}
+	}
+	return out
+}
+
+func fixtureInvariantsFromText(fact Fact, text string) []InvariantCandidate {
+	columns := fixtureColumns(text)
+	if len(columns) == 0 {
+		return nil
+	}
+	table := firstNonEmpty(firstIdentifierValue(fact.Identifiers, "table"), tableFromFixturePath(fact.Path))
+	var out []InvariantCandidate
+	for _, column := range capStrings(columns, 12) {
+		out = append(out, finalizeInvariant(InvariantCandidate{
+			Source:      "fixture",
+			Kind:        "example-non-null",
+			Path:        fact.Path,
+			Table:       table,
+			Column:      column,
+			Expression:  invariantColumnExpr(table, column, "observed_non_null_in_example_data"),
+			Confidence:  "example",
+			Evidence:    []string{"field observed in fixture or production-like example data"},
+			Identifiers: uniqueIdentifiers(append(append([]Identifier{}, fact.Identifiers...), Identifier{Kind: "column", Value: column})),
+			Rationale:   "candidate invariant mined from fixtures, factories, seeds, or production-like example data",
+		}))
+	}
+	return out
+}
+
+func addInvariantCandidate(out *[]InvariantCandidate, seen map[string]bool, item InvariantCandidate) bool {
+	if item.Expression == "" {
+		return false
+	}
+	key := item.Source + "\x00" + item.Kind + "\x00" + item.Path + "\x00" + item.Table + "\x00" + item.Column + "\x00" + item.Expression
+	if seen[key] {
+		return false
+	}
+	seen[key] = true
+	*out = append(*out, finalizeInvariant(item))
+	return true
+}
+
+func finalizeInvariant(item InvariantCandidate) InvariantCandidate {
+	item.Table = normalizeIdentifierValue(item.Table)
+	item.Column = normalizeIdentifierValue(item.Column)
+	item.Identifiers = uniqueIdentifiers(item.Identifiers)
+	item.Evidence = capStrings(uniqueSortedStrings(item.Evidence), 8)
+	if item.ID == "" {
+		item.ID = "invariant:" + canonical.Hash(strings.Join([]string{item.Source, item.Kind, item.Path, item.Table, item.Column, item.Expression}, "\x00"))[:16]
+	}
+	return item
+}
+
+func isInvariantMiningPath(path, kind string) bool {
+	lowerPath := strings.ToLower(filepath.ToSlash(path))
+	lower := lowerPath + " " + strings.ToLower(kind)
+	return isTestPath(lower) || isValidationPath(lower, "") || isFixturePath(lower) || strings.Contains(lower, "schema_evolution") || hasInvariantMiningExtension(lowerPath)
+}
+
+func isTestPath(lowerPath string) bool {
+	return containsAny(lowerPath, "/test/", "/tests/", "/spec/", "__tests__", "_test.", ".test.", "_spec.", ".spec.")
+}
+
+func isValidationPath(lowerPath, text string) bool {
+	lower := strings.ToLower(lowerPath + " " + text)
+	return containsAny(lower, "models/", "model/", "validators", "validation", "schema", "serializer", "forms.py", "validates", "nullable=false", "null: false", "presence:", "uniqueness:", "@notnull")
+}
+
+func isFixturePath(lowerPath string) bool {
+	return containsAny(lowerPath, "fixture", "fixtures", "factory", "factories", "seed", "seeds", "sample", "example", "examples", "testdata", "golden")
+}
+
+func hasInvariantMiningExtension(lowerPath string) bool {
+	for _, suffix := range []string{".rb", ".py", ".go", ".java", ".kt", ".js", ".ts", ".tsx", ".jsx", ".php", ".cs", ".sql", ".prisma", ".yml", ".yaml", ".json", ".jsonl", ".csv", ".toml"} {
+		if strings.HasSuffix(lowerPath, suffix) {
+			return true
+		}
+	}
+	return false
+}
+
+func isLikelyFixtureText(lowerPath, text string) bool {
+	if !containsAny(lowerPath, ".yml", ".yaml", ".json", ".jsonl", ".csv", ".toml") {
+		return false
+	}
+	lower := strings.ToLower(text)
+	return containsAny(lower, "email", "user", "account", "id:", "\"id\"", "created_at", "updated_at") || strings.Contains(firstNonEmpty(firstCSVLine(text), ""), ",")
+}
+
+func isFactoryExampleText(text string) bool {
+	lower := strings.ToLower(text)
+	return strings.Contains(lower, "factorybot.define") || strings.Contains(lower, "factory :") || strings.Contains(lower, "factory(")
+}
+
+func invariantLineForColumn(text, column string) (int, string) {
+	if text == "" {
+		return 0, ""
+	}
+	lines := strings.Split(text, "\n")
+	for i, line := range lines {
+		if column == "" || strings.Contains(strings.ToLower(line), strings.ToLower(column)) {
+			return i + 1, strings.TrimSpace(line)
+		}
+	}
+	return 0, ""
+}
+
+func invariantTableColumnFromText(line string, fact Fact) (string, string) {
+	ids := uniqueIdentifiers(append(append([]Identifier{}, fact.Identifiers...), identifiersFromText(line)...))
+	table := firstNonEmpty(firstIdentifierValue(ids, "table"), firstIdentifierValue(ids, "model"), tableFromFixturePath(fact.Path))
+	column := firstIdentifierValue(ids, "column")
+	if column == "" {
+		column = firstColumnLikeToken(line)
+	}
+	return table, column
+}
+
+func fixtureColumns(text string) []string {
+	factoryColumns := factoryBotColumns(text)
+	if len(factoryColumns) > 0 {
+		return factoryColumns
+	}
+	lines := strings.Split(text, "\n")
+	for _, line := range lines {
+		trimmed := strings.TrimSpace(line)
+		if trimmed == "" || strings.HasPrefix(trimmed, "#") || strings.HasPrefix(trimmed, "//") {
+			continue
+		}
+		if strings.Contains(trimmed, ",") && !strings.Contains(trimmed, "{") {
+			return normalizeColumnList(strings.Split(trimmed, ","))
+		}
+		break
+	}
+	keyPattern := regexp.MustCompile(`(?m)["']?([A-Za-z_][A-Za-z0-9_]*)["']?\s*[:=]`)
+	var columns []string
+	for _, match := range keyPattern.FindAllStringSubmatch(text, 60) {
+		key := normalizeIdentifierValue(match[1])
+		if key == "" || isInvariantStopword(key) {
+			continue
+		}
+		columns = append(columns, key)
+	}
+	return uniqueSortedStrings(columns)
+}
+
+func factoryBotColumns(text string) []string {
+	var columns []string
+	patterns := []*regexp.Regexp{
+		regexp.MustCompile(`(?m)^\s*([A-Za-z_][A-Za-z0-9_!?]*)\s*\{`),
+		regexp.MustCompile(`(?m)^\s*sequence\(:([A-Za-z_][A-Za-z0-9_]*)\)`),
+		regexp.MustCompile(`(?m)^\s*association\(:([A-Za-z_][A-Za-z0-9_]*)\)`),
+	}
+	for _, pattern := range patterns {
+		for _, match := range pattern.FindAllStringSubmatch(text, -1) {
+			column := normalizeIdentifierValue(strings.TrimSuffix(match[1], "!"))
+			if column == "" || isInvariantStopword(column) || column == "factory" || column == "trait" || column == "transient" {
+				continue
+			}
+			columns = append(columns, column)
+		}
+	}
+	return uniqueSortedStrings(columns)
+}
+
+func firstCSVLine(text string) string {
+	for _, line := range strings.Split(text, "\n") {
+		line = strings.TrimSpace(line)
+		if line != "" && !strings.HasPrefix(line, "#") && strings.Contains(line, ",") {
+			return line
+		}
+	}
+	return ""
+}
+
+func normalizeColumnList(values []string) []string {
+	var columns []string
+	for _, value := range values {
+		value = normalizeIdentifierValue(strings.Trim(value, " \t\"'`"))
+		if value == "" || isInvariantStopword(value) {
+			continue
+		}
+		columns = append(columns, value)
+	}
+	return uniqueSortedStrings(columns)
+}
+
+func tableFromFixturePath(path string) string {
+	base := strings.TrimSuffix(strings.ToLower(filepath.Base(path)), filepath.Ext(path))
+	base = strings.TrimSuffix(base, "_fixture")
+	base = strings.TrimSuffix(base, "_fixtures")
+	base = strings.TrimSuffix(base, "_factory")
+	base = strings.TrimSuffix(base, "_factories")
+	base = strings.TrimSuffix(base, "_seed")
+	base = strings.TrimSuffix(base, "_seeds")
+	return normalizeIdentifierValue(base)
+}
+
+func firstColumnLikeToken(line string) string {
+	patterns := []*regexp.Regexp{
+		regexp.MustCompile(`(?i)validates\s+:([A-Za-z_][A-Za-z0-9_]*)`),
+		regexp.MustCompile(`(?i)["']([A-Za-z_][A-Za-z0-9_]*)["']\s*(?:=>|:)`),
+		regexp.MustCompile(`(?i)\.([A-Za-z_][A-Za-z0-9_]*)\s*(?:=|==|to|not_to)`),
+	}
+	for _, pattern := range patterns {
+		if match := pattern.FindStringSubmatch(line); len(match) > 1 {
+			if value := normalizeIdentifierValue(match[1]); value != "" && !isInvariantStopword(value) {
+				return value
+			}
+		}
+	}
+	return ""
+}
+
+func invariantColumnExpr(table, column, predicate string) string {
+	if table != "" && column != "" {
+		return table + "." + column + " " + predicate
+	}
+	if column != "" {
+		return column + " " + predicate
+	}
+	if table != "" {
+		return table + " " + predicate
+	}
+	return predicate
+}
+
+func compactInvariantExpression(value string) string {
+	value = strings.Join(strings.Fields(strings.TrimSpace(value)), " ")
+	if len(value) > 180 {
+		value = value[:180]
+	}
+	return value
+}
+
+func isInvariantStopword(value string) bool {
+	switch value {
+	case "true", "false", "null", "nil", "none", "type", "class", "def", "end", "do", "if", "else", "return", "let", "var", "const", "expect", "assert", "should", "describe", "context", "it":
+		return true
+	default:
+		return false
+	}
+}
+
+func invariantConfidenceRank(confidence string) int {
+	switch confidence {
+	case "high":
+		return 4
+	case "medium":
+		return 3
+	case "derived":
+		return 2
+	case "example":
+		return 1
+	default:
+		return 0
+	}
+}
+
+func countInvariantSource(items []InvariantCandidate, source string) int {
+	var count int
+	for _, item := range items {
+		if item.Source == source {
+			count++
+		}
+	}
+	return count
+}
+
 func buildPolicyChecks(risks []BaselineRisk, slices []ProvenanceSlice, symbolic []SymbolicCheck) []PolicyCheck {
 	sliceByRisk := map[string]ProvenanceSlice{}
 	for _, slice := range slices {
@@ -3846,6 +4337,11 @@ func renderBaselineMarkdown(report BaselineReport) string {
 	fmt.Fprintf(&b, "| privacy hazard high | %d |\n", report.Summary.PrivacyHigh)
 	fmt.Fprintf(&b, "| privacy hazard medium | %d |\n", report.Summary.PrivacyMedium)
 	fmt.Fprintf(&b, "| privacy hazard low | %d |\n", report.Summary.PrivacyLow)
+	fmt.Fprintf(&b, "| invariant candidates | %d |\n", report.Summary.Invariants)
+	fmt.Fprintf(&b, "| invariants from schema | %d |\n", report.Summary.InvariantSchema)
+	fmt.Fprintf(&b, "| invariants from tests | %d |\n", report.Summary.InvariantTests)
+	fmt.Fprintf(&b, "| invariants from validations | %d |\n", report.Summary.InvariantValidation)
+	fmt.Fprintf(&b, "| invariants from fixtures | %d |\n", report.Summary.InvariantFixtures)
 	fmt.Fprintf(&b, "| policy checks | %d |\n", report.Summary.PolicyChecks)
 	fmt.Fprintf(&b, "| policy passed | %d |\n", report.Summary.PolicyPassed)
 	fmt.Fprintf(&b, "| policy warnings | %d |\n", report.Summary.PolicyWarnings)
@@ -3951,6 +4447,14 @@ func renderBaselineMarkdown(report BaselineReport) string {
 		limit := minInt(len(report.PrivacyHazards), 25)
 		for _, item := range report.PrivacyHazards[:limit] {
 			fmt.Fprintf(&b, "| %s | %s | `%s` | %s | %s | %s | %s |\n", item.Severity, item.Surface, item.RiskID, item.Table, item.Path, strings.Join(item.Markers, ", "), strings.Join(item.Mitigations, ", "))
+		}
+		fmt.Fprintf(&b, "\n")
+	}
+	if len(report.Invariants) > 0 {
+		fmt.Fprintf(&b, "## Invariant candidates\n\n| source | kind | table | column | path | expression |\n| --- | --- | --- | --- | --- | --- |\n")
+		limit := minInt(len(report.Invariants), 25)
+		for _, item := range report.Invariants[:limit] {
+			fmt.Fprintf(&b, "| %s | %s | %s | %s | %s | `%s` |\n", item.Source, item.Kind, item.Table, item.Column, item.Path, item.Expression)
 		}
 		fmt.Fprintf(&b, "\n")
 	}
