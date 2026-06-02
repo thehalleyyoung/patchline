@@ -1,0 +1,31 @@
+{
+  "version": "patchline.compatibility-gate/v1",
+  "claim": "Patchline compatibility is checked with minimal tool assumptions across macOS builds, Linux builds, and the documented container recipe.",
+  "minimal_tools": ["go", "git", "bash", "jq", "make"],
+  "profiles": [
+    {
+      "id": "macos-arm64",
+      "goos": "darwin",
+      "goarch": "arm64",
+      "kind": "macos"
+    },
+    {
+      "id": "linux-amd64",
+      "goos": "linux",
+      "goarch": "amd64",
+      "kind": "linux"
+    }
+  ],
+  "real_code": {
+    "id": "lobsters-migrations",
+    "repo": "lobsters/lobsters",
+    "ref": "3b80b47aa5aaba37ec44413e7d1dc96fcf1585b6",
+    "subpath": "db/migrate"
+  },
+  "container": {
+    "dockerfile": "Dockerfile",
+    "devcontainer": ".devcontainer/devcontainer.json",
+    "required_packages": ["ca-certificates", "curl", "git", "jq", "make"],
+    "smoke_command": "make artifact-smoke"
+  }
+}

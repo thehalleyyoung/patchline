@@ -81,6 +81,8 @@ Add `--trace` to `repo analyze` to write structured JSONL spans and logs for lon
 
 Run `patchline contributor check` before a PR to execute formatting checks, focused Go tests, fast gates, ignored-roadmap hygiene, and forbidden-reference scans in one report; see [docs/contributor-check.md](docs/contributor-check.md).
 
+Run `make compatibility-gate` to cross-build macOS/Linux binaries, validate the container recipe, and prove the current host can analyze a pinned public repo slice with minimal tools; see [docs/compatibility.md](docs/compatibility.md).
+
 Add `--redact` to write `analysis-bundle/` copies with stable redaction tokens for identifiers, literals, customer-like strings, and secret-like values while preserving joins and existing artifact hashes.
 
 Add `--ci` to write `ci/summary.md` plus upload snippets and code-quality artifacts for GitHub Actions, GitLab CI, and Bitbucket Pipelines: SARIF under `analysis-bundle/summary.sarif`, GitLab `ci/gl-code-quality-report.json`, and Bitbucket `ci/bitbucket-code-insights.json`.
@@ -178,6 +180,7 @@ make corpus-fairness-gate
 make stratified-benchmark-gate
 make stale-ref-gate
 make issue-template-gate
+make compatibility-gate
 make minimizer-gate
 make recurrence-gate
 make corpus-release-gate
@@ -268,6 +271,8 @@ The real-repo slice matrix is backed by `examples/real-repo-slices.json` and `ex
 `make stale-ref-gate` checks pinned public refs still resolve and downloaded archive hashes match expected values.
 
 `make issue-template-gate` validates issue labels and triage forms for real-repo nominations, ecosystem support, parser requests, false positives, false negatives, and artifact regressions, then generates sample payloads from a pinned public Bytebase analysis.
+
+`make compatibility-gate` cross-builds the CLI for macOS and Linux, validates Dockerfile/devcontainer assumptions, and analyzes a pinned public Lobsters migration slice using only the minimal local tool profile.
 
 `make minimizer-gate` runs `repo minimize` on four public slices and proves minimized source copies preserve findings, evidence links, and generated intervention metadata.
 
