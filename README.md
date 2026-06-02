@@ -387,6 +387,8 @@ Run `make reviewer-sim-gate` to simulate a multi-agent **reviewer panel** — st
 
 Run `make interop-gate` to prove **cross-tool interop** — Patchline findings export to a **SARIF**-style document and round-trip back field-for-field, while a malformed interchange document is rejected; see [docs/interop.md](docs/interop.md).
 
+Run `make dossier-gate` to certify the 1.0 **release-readiness dossier** — it audits the six-artifact **evidence chain** (example, worker, gate, doc, Makefile target, README mention) for every sampled capability and rejects any incomplete one; see [docs/dossier.md](docs/dossier.md).
+
 Add `--redact` to write `analysis-bundle/` copies with stable redaction tokens for identifiers, literals, customer-like strings, and secret-like values while preserving joins and existing artifact hashes.
 
 Add `--ci` to write `ci/summary.md` plus upload snippets and code-quality artifacts for GitHub Actions, GitLab CI, and Bitbucket Pipelines: SARIF under `analysis-bundle/summary.sarif`, GitLab `ci/gl-code-quality-report.json`, and Bitbucket `ci/bitbucket-code-insights.json`.

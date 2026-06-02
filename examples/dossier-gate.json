@@ -1,0 +1,7 @@
+{
+  "version": "patchline.dossier-gate/v1",
+  "claim": "Patchline's 1.0 release dossier is a capstone that certifies release-readiness by checking, for a representative set of named capabilities, that the full evidence chain exists on disk — an example specification, a worker script, a gate validator, a documentation page, a Makefile target, and a README mention that invokes the gate — so the 1.0 claim is backed by a mechanical audit of every artifact rather than a hand-written changelog. The worker resolves each capability to its six expected artifacts, marks a capability certified only when all are present and wired, and reports any gap, while a phantom capability with none of its artifacts is reported uncertified. The gate proves every sampled real capability is fully certified and the phantom capability is rejected.",
+  "real_repo": "patchline (self): 1.0 release-readiness dossier",
+  "capabilities": ["counterfactual", "invariant-extract", "symexec", "modelcheck", "causal-graph", "active-learning", "risk-economics", "reviewer-sim", "interop"],
+  "phantom_capability": "phantom-onepoint-oh"
+}
