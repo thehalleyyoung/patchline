@@ -1149,6 +1149,36 @@ UPDATE accounts SET status = 'disabled';
 	}
 }
 
+func TestBaselineRanksProofHoleMinimizations(t *testing.T) {
+	root := t.TempDir()
+	writeFile(t, root, "db/migrate/001_unbounded_accounts.sql", "UPDATE accounts SET status = 'disabled';")
+	writeFile(t, root, "docs/incident-7.md", "Incident 7: accounts backfill needs maintainer approval and a dry-run before retry.")
+	inv, err := InventoryPath(InventoryOptions{Path: root})
+	if err != nil {
+		t.Fatal(err)
+	}
+	intakeReport, err := intake.Run(context.Background(), intake.Options{Path: root})
+	if err != nil {
+		t.Fatal(err)
+	}
+	baseline := Baseline(inv, inv.Facts, intakeReport)
+	if baseline.Summary.ProofMinimizations == 0 || baseline.Summary.ProofMinCritical == 0 {
+		t.Fatalf("expected critical proof-hole minimizations: summary=%#v minimizers=%#v", baseline.Summary, baseline.ProofMinimizers)
+	}
+	for _, want := range []string{"approval-record", "scope-bound", "rollback-witness"} {
+		if !hasProofMinimizationEvidence(baseline.ProofMinimizers, want) {
+			t.Fatalf("missing proof minimization evidence %q in %#v", want, baseline.ProofMinimizers)
+		}
+	}
+	first := baseline.ProofMinimizers[0]
+	if first.Effort > 2 {
+		t.Fatalf("expected smallest evidence first, got %#v", first)
+	}
+	if !strings.Contains(baseline.Markdown, "Proof-hole minimizations") {
+		t.Fatalf("expected proof-hole minimization section in markdown:\n%s", baseline.Markdown)
+	}
+}
+
 func TestCompareClassifiesGeneratedPrivacyHazards(t *testing.T) {
 	baseline := BaselineReport{
 		Version: BaselineVersion,
@@ -1666,6 +1696,15 @@ func blastEstimateForTable(items []BlastRadiusEstimate, table string) (BlastRadi
 		}
 	}
 	return BlastRadiusEstimate{}, false
+}
+
+func hasProofMinimizationEvidence(items []ProofHoleMinimization, missingEvidence string) bool {
+	for _, item := range items {
+		if item.MissingEvidence == missingEvidence {
+			return true
+		}
+	}
+	return false
 }
 
 func hasFieldEvidence(facts []Fact, field, preview string) bool {

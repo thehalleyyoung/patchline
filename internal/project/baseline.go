@@ -49,6 +49,7 @@ type BaselineReport struct {
 	Invariants      []InvariantCandidate      `json:"invariant_candidates,omitempty"`
 	TraceLinks      []TraceCodeLink           `json:"trace_code_links,omitempty"`
 	BlastRadius     []BlastRadiusEstimate     `json:"blast_radius_estimates,omitempty"`
+	ProofMinimizers []ProofHoleMinimization   `json:"proof_hole_minimizations,omitempty"`
 	PolicyChecks    []PolicyCheck             `json:"policy_checks,omitempty"`
 	RepairProofs    []RepairProofSummary      `json:"repair_proof_summaries,omitempty"`
 	NativeChecks    []Command                 `json:"native_checks,omitempty"`
@@ -112,6 +113,11 @@ type BaselineSummary struct {
 	BlastRadiusHigh     int `json:"blast_radius_high"`
 	BlastRadiusMedium   int `json:"blast_radius_medium"`
 	BlastRadiusLow      int `json:"blast_radius_low"`
+	ProofMinimizations  int `json:"proof_hole_minimizations"`
+	ProofMinCritical    int `json:"proof_hole_min_critical"`
+	ProofMinHigh        int `json:"proof_hole_min_high"`
+	ProofMinMedium      int `json:"proof_hole_min_medium"`
+	ProofMinLow         int `json:"proof_hole_min_low"`
 	PolicyChecks        int `json:"policy_checks"`
 	PolicyPassed        int `json:"policy_passed"`
 	PolicyWarnings      int `json:"policy_warnings"`
@@ -255,6 +261,24 @@ type BlastRadiusEstimate struct {
 	Evidence        []string     `json:"evidence,omitempty"`
 	Identifiers     []Identifier `json:"identifiers,omitempty"`
 	Rationale       string       `json:"rationale"`
+}
+
+type ProofHoleMinimization struct {
+	ID               string       `json:"id"`
+	RiskID           string       `json:"risk_id"`
+	Table            string       `json:"table,omitempty"`
+	Source           string       `json:"source"`
+	Hole             string       `json:"hole"`
+	MissingEvidence  string       `json:"missing_evidence"`
+	UpgradeFrom      string       `json:"upgrade_from"`
+	UpgradeTo        string       `json:"upgrade_to"`
+	MinimalArtifacts []string     `json:"minimal_artifacts"`
+	CandidatePaths   []string     `json:"candidate_paths,omitempty"`
+	Effort           int          `json:"effort"`
+	Priority         string       `json:"priority"`
+	Evidence         []string     `json:"evidence,omitempty"`
+	Identifiers      []Identifier `json:"identifiers,omitempty"`
+	Rationale        string       `json:"rationale"`
 }
 
 type ScoreFactor struct {
@@ -439,6 +463,7 @@ func Baseline(inv Inventory, facts []Fact, intakeReport intake.Report) BaselineR
 	report.BlastRadius = buildBlastRadiusEstimates(inv.Root, report.Risks, report.Provenance, facts, intakeReport)
 	report.PolicyChecks = buildPolicyChecks(report.Risks, report.Provenance, report.SymbolicChecks)
 	report.RepairProofs = buildRepairProofSummaries(report.Risks, report.Provenance, report.AbstractEffects, report.SymbolicChecks)
+	report.ProofMinimizers = buildProofHoleMinimizations(inv.Root, report.Risks, report.Provenance, report.SymbolicChecks, report.PolicyChecks, report.RepairProofs, report.AbstractEffects, facts, intakeReport)
 	report.Summary = BaselineSummary{
 		RankedRisks:         len(report.Risks),
 		CodePathRankedRisks: countCodePathRisks(report.Risks),
@@ -495,6 +520,11 @@ func Baseline(inv Inventory, facts []Fact, intakeReport intake.Report) BaselineR
 		BlastRadiusHigh:     countBlastRadiusLevel(report.BlastRadius, "high"),
 		BlastRadiusMedium:   countBlastRadiusLevel(report.BlastRadius, "medium"),
 		BlastRadiusLow:      countBlastRadiusLevel(report.BlastRadius, "low"),
+		ProofMinimizations:  len(report.ProofMinimizers),
+		ProofMinCritical:    countProofMinimizationPriority(report.ProofMinimizers, "critical"),
+		ProofMinHigh:        countProofMinimizationPriority(report.ProofMinimizers, "high"),
+		ProofMinMedium:      countProofMinimizationPriority(report.ProofMinimizers, "medium"),
+		ProofMinLow:         countProofMinimizationPriority(report.ProofMinimizers, "low"),
 		PolicyChecks:        len(report.PolicyChecks),
 		PolicyPassed:        countPolicyStatus(report.PolicyChecks, "pass"),
 		PolicyWarnings:      countPolicyStatus(report.PolicyChecks, "warn"),
@@ -4815,6 +4845,321 @@ func countRepairProofStatus(proofs []RepairProofSummary, status string) int {
 	return count
 }
 
+func buildProofHoleMinimizations(inventoryRoot string, risks []BaselineRisk, slices []ProvenanceSlice, symbolic []SymbolicCheck, policies []PolicyCheck, proofs []RepairProofSummary, summaries []effects.AbstractSummary, facts []Fact, intakeReport intake.Report) []ProofHoleMinimization {
+	root := firstNonEmpty(inventoryRoot, intakeReport.Source.ScannedRoot, intakeReport.Source.Input)
+	riskByID := map[string]BaselineRisk{}
+	for _, risk := range risks {
+		riskByID[risk.ID] = risk
+	}
+	sliceByRisk := map[string]ProvenanceSlice{}
+	for _, slice := range slices {
+		sliceByRisk[slice.RiskID] = slice
+	}
+	factPaths := proofCandidatePathsByKind(root, facts)
+	seen := map[string]bool{}
+	var out []ProofHoleMinimization
+	add := func(item ProofHoleMinimization) {
+		if item.RiskID == "" || item.Hole == "" || item.MissingEvidence == "" {
+			return
+		}
+		key := item.RiskID + "\x00" + item.Source + "\x00" + item.Hole + "\x00" + item.MissingEvidence
+		if seen[key] {
+			return
+		}
+		seen[key] = true
+		item.ID = "proof-min:" + canonical.Hash(key)[:16]
+		item.Priority = proofMinimizationPriority(item, riskByID[item.RiskID])
+		if item.UpgradeTo == "" {
+			item.UpgradeTo = "checked"
+		}
+		if item.Rationale == "" {
+			item.Rationale = "ranks the smallest concrete evidence artifact likely to upgrade an open proof obligation into a checked claim without treating absent evidence as proof"
+		}
+		out = append(out, item)
+	}
+	for _, check := range policies {
+		if check.Status == "pass" {
+			continue
+		}
+		risk := riskByID[check.RiskID]
+		slice := sliceByRisk[check.RiskID]
+		for _, missing := range check.Missing {
+			spec := proofEvidenceSpec(missing)
+			add(ProofHoleMinimization{
+				RiskID:           check.RiskID,
+				Table:            firstNonEmpty(risk.Table, slice.Table),
+				Source:           "policy",
+				Hole:             "policy missing: " + missing,
+				MissingEvidence:  spec.Kind,
+				UpgradeFrom:      check.Status,
+				UpgradeTo:        "pass",
+				MinimalArtifacts: spec.Artifacts,
+				CandidatePaths:   proofCandidatePaths(spec.Kind, slice, factPaths),
+				Effort:           spec.Effort,
+				Evidence:         capStrings(uniqueSortedStrings(append(check.Evidence, "review:"+check.ReviewLevel)), 10),
+				Identifiers:      proofMinimizationIdentifiers(risk, slice),
+			})
+		}
+	}
+	for _, check := range symbolic {
+		if check.Status == "pass" {
+			continue
+		}
+		risk := riskByID[check.RiskID]
+		slice := sliceByRisk[check.RiskID]
+		spec := proofEvidenceSpec(check.Property + ":" + check.Status + ":" + check.Reason)
+		add(ProofHoleMinimization{
+			RiskID:           check.RiskID,
+			Table:            firstNonEmpty(check.Table, risk.Table, slice.Table),
+			Source:           "symbolic",
+			Hole:             check.Property + ": " + check.Reason,
+			MissingEvidence:  spec.Kind,
+			UpgradeFrom:      check.Status,
+			UpgradeTo:        "pass",
+			MinimalArtifacts: spec.Artifacts,
+			CandidatePaths:   proofCandidatePaths(spec.Kind, slice, factPaths),
+			Effort:           spec.Effort,
+			Evidence:         capStrings(uniqueSortedStrings(check.Evidence), 10),
+			Identifiers:      proofMinimizationIdentifiers(risk, slice),
+		})
+	}
+	for _, proof := range proofs {
+		if proof.Status == "checked" {
+			continue
+		}
+		risk := riskByID[proof.RiskID]
+		slice := sliceByRisk[proof.RiskID]
+		if len(proof.ProofHoles) == 0 {
+			spec := proofEvidenceSpec(proof.Status)
+			add(ProofHoleMinimization{
+				RiskID:           proof.RiskID,
+				Table:            firstNonEmpty(proof.Table, risk.Table, slice.Table),
+				Source:           "repair_proof",
+				Hole:             "repair proof status: " + proof.Status,
+				MissingEvidence:  spec.Kind,
+				UpgradeFrom:      proof.Status,
+				UpgradeTo:        "checked",
+				MinimalArtifacts: spec.Artifacts,
+				CandidatePaths:   proofCandidatePaths(spec.Kind, slice, factPaths),
+				Effort:           spec.Effort,
+				Evidence:         proof.Evidence,
+				Identifiers:      proofMinimizationIdentifiers(risk, slice),
+			})
+			continue
+		}
+		for _, hole := range proof.ProofHoles {
+			spec := proofEvidenceSpec(hole)
+			add(ProofHoleMinimization{
+				RiskID:           proof.RiskID,
+				Table:            firstNonEmpty(proof.Table, risk.Table, slice.Table),
+				Source:           "repair_proof",
+				Hole:             hole,
+				MissingEvidence:  spec.Kind,
+				UpgradeFrom:      proof.Status,
+				UpgradeTo:        "checked",
+				MinimalArtifacts: spec.Artifacts,
+				CandidatePaths:   proofCandidatePaths(spec.Kind, slice, factPaths),
+				Effort:           spec.Effort,
+				Evidence:         proof.Evidence,
+				Identifiers:      proofMinimizationIdentifiers(risk, slice),
+			})
+		}
+	}
+	for _, summary := range summaries {
+		for _, hole := range summary.Concretization.UnsupportedFacts {
+			riskID := proofRiskIDFromHole(hole, risks)
+			if riskID == "" {
+				continue
+			}
+			risk := riskByID[riskID]
+			slice := sliceByRisk[riskID]
+			spec := proofEvidenceSpec(hole)
+			add(ProofHoleMinimization{
+				RiskID:           riskID,
+				Table:            firstNonEmpty(risk.Table, slice.Table),
+				Source:           "abstract_effect",
+				Hole:             hole,
+				MissingEvidence:  spec.Kind,
+				UpgradeFrom:      "unsupported",
+				UpgradeTo:        "checked",
+				MinimalArtifacts: spec.Artifacts,
+				CandidatePaths:   proofCandidatePaths(spec.Kind, slice, factPaths),
+				Effort:           spec.Effort,
+				Evidence:         []string{"abstract summary: " + summary.Hash, "join: " + string(summary.Join)},
+				Identifiers:      proofMinimizationIdentifiers(risk, slice),
+			})
+		}
+	}
+	sort.Slice(out, func(i, j int) bool {
+		if out[i].Effort != out[j].Effort {
+			return out[i].Effort < out[j].Effort
+		}
+		if out[i].Priority != out[j].Priority {
+			return proofMinPriorityRank(out[i].Priority) > proofMinPriorityRank(out[j].Priority)
+		}
+		if out[i].RiskID != out[j].RiskID {
+			return out[i].RiskID < out[j].RiskID
+		}
+		return out[i].Hole < out[j].Hole
+	})
+	if len(out) > 250 {
+		out = out[:250]
+	}
+	return out
+}
+
+type proofEvidenceRequirement struct {
+	Kind      string
+	Artifacts []string
+	Effort    int
+}
+
+func proofEvidenceSpec(hole string) proofEvidenceRequirement {
+	lower := strings.ToLower(hole)
+	switch {
+	case containsAny(lower, "approval"):
+		return proofEvidenceRequirement{"approval-record", []string{"approval comment or change ticket referencing the risk/table"}, 1}
+	case containsAny(lower, "dry-run", "dry run"):
+		return proofEvidenceRequirement{"dry-run-result", []string{"captured dry-run command", "row-count or generated SQL preview output"}, 1}
+	case containsAny(lower, "test", "frame_condition", "changed-column", "changed column", "frame"):
+		return proofEvidenceRequirement{"focused-test-or-frame-witness", []string{"focused test command covering the changed table/path", "changed-column list or frame assertion"}, 2}
+	case containsAny(lower, "guard", "scope", "bounded", "row bound", "row count", "concrete row count", "scope_preservation"):
+		return proofEvidenceRequirement{"scope-bound", []string{"WHERE predicate or tenant/key guard", "SELECT COUNT(*) dry-run bound for affected rows"}, 2}
+	case containsAny(lower, "rollback", "reversibility", "inverse", "snapshot", "repair"):
+		return proofEvidenceRequirement{"rollback-witness", []string{"rollback SQL or compensating repair path", "snapshot/backup evidence before mutation"}, 3}
+	case containsAny(lower, "compensating", "append-only"):
+		return proofEvidenceRequirement{"compensating-action", []string{"operator-supplied compensating action for appended event/log/queue records"}, 3}
+	case containsAny(lower, "transfer function", "external operation", "system-specific", "unknown"):
+		return proofEvidenceRequirement{"transfer-function-witness", []string{"project-specific transfer description", "replay/rebuild invariant or contract test"}, 4}
+	default:
+		return proofEvidenceRequirement{"supporting-evidence", []string{"smallest repo-local artifact that proves the missing obligation"}, 3}
+	}
+}
+
+func proofCandidatePathsByKind(root string, facts []Fact) map[string][]string {
+	out := map[string][]string{}
+	for _, fact := range facts {
+		if fact.Path == "" {
+			continue
+		}
+		text := strings.ToLower(fact.Kind + " " + fact.Path + " " + fact.Rationale + " " + fact.Properties["kind"] + " " + fact.Properties["field"] + " " + fact.Properties["value_preview"])
+		if fact.Kind == "file" || fact.Kind == "source_sql_hint" || fact.Kind == "schema_evolution" || fact.Kind == "field_evidence" {
+			text += "\n" + strings.ToLower(textForBoundary(root, fact.Path))
+		}
+		addPath := func(kind string) {
+			out[kind] = append(out[kind], fact.Path)
+		}
+		if containsAny(text, "approval", "approved", "reviewed", "ticket", "jira", "linear", "issue") {
+			addPath("approval-record")
+		}
+		if containsAny(text, "dry-run", "dry run", "explain", "select count", "count(*)", "candidate_rows") {
+			addPath("dry-run-result")
+		}
+		if containsAny(text, "where ", "tenant", "account_id", "user_id", "limit ", "scope", "bounded") {
+			addPath("scope-bound")
+		}
+		if containsAny(text, "rollback", "restore", "snapshot", "backup", "revert", "down do", "def down") {
+			addPath("rollback-witness")
+		}
+		if containsAny(text, "test", "spec", "assert", "expect(", "pytest", "go test") || isTestPath(strings.ToLower(fact.Path)) {
+			addPath("focused-test-or-frame-witness")
+		}
+		if containsAny(text, "compensat", "dead letter", "dlq", "replay", "queue", "event") {
+			addPath("compensating-action")
+		}
+		if containsAny(text, "transfer", "rebuild", "reconcile", "replay", "invariant", "contract") {
+			addPath("transfer-function-witness")
+		}
+	}
+	for kind, paths := range out {
+		out[kind] = capStrings(uniqueSortedStrings(paths), 20)
+	}
+	return out
+}
+
+func proofCandidatePaths(kind string, slice ProvenanceSlice, factPaths map[string][]string) []string {
+	var paths []string
+	paths = append(paths, factPaths[kind]...)
+	switch kind {
+	case "rollback-witness", "compensating-action":
+		paths = append(paths, slice.RepairPaths...)
+	case "focused-test-or-frame-witness":
+		for _, command := range append(slice.TestCommands, slice.NativeCommands...) {
+			if command.Command != "" {
+				paths = append(paths, "command:"+command.Command)
+			}
+		}
+		paths = append(paths, slice.SourcePaths...)
+	case "scope-bound", "dry-run-result", "transfer-function-witness":
+		paths = append(paths, slice.MigrationPath)
+		paths = append(paths, slice.SourcePaths...)
+	case "approval-record":
+		paths = append(paths, slice.IncidentPaths...)
+	}
+	return capStrings(uniqueSortedStrings(paths), 12)
+}
+
+func proofRiskIDFromHole(hole string, risks []BaselineRisk) string {
+	lower := strings.ToLower(hole)
+	for _, risk := range risks {
+		if strings.Contains(hole, risk.ID) || (risk.Table != "" && strings.Contains(lower, strings.ToLower(risk.Table))) {
+			return risk.ID
+		}
+	}
+	return ""
+}
+
+func proofMinimizationIdentifiers(risk BaselineRisk, slice ProvenanceSlice) []Identifier {
+	ids := append([]Identifier{}, risk.Identifiers...)
+	ids = append(ids, slice.Identifiers...)
+	if risk.Table != "" {
+		ids = append(ids, Identifier{Kind: "table", Value: risk.Table})
+	}
+	if slice.Table != "" {
+		ids = append(ids, Identifier{Kind: "table", Value: slice.Table})
+	}
+	return uniqueIdentifiers(ids)
+}
+
+func proofMinimizationPriority(item ProofHoleMinimization, risk BaselineRisk) string {
+	lower := strings.ToLower(item.Hole + " " + item.MissingEvidence)
+	switch {
+	case risk.Severity == "high" && containsAny(lower, "rollback", "guard", "scope", "approval", "destructive"):
+		return "critical"
+	case risk.Severity == "high" || containsAny(lower, "rollback", "transfer", "unknown", "compensating"):
+		return "high"
+	case containsAny(lower, "test", "dry-run", "row count", "scope"):
+		return "medium"
+	default:
+		return "low"
+	}
+}
+
+func proofMinPriorityRank(priority string) int {
+	switch priority {
+	case "critical":
+		return 4
+	case "high":
+		return 3
+	case "medium":
+		return 2
+	case "low":
+		return 1
+	default:
+		return 0
+	}
+}
+
+func countProofMinimizationPriority(items []ProofHoleMinimization, priority string) int {
+	var count int
+	for _, item := range items {
+		if item.Priority == priority {
+			count++
+		}
+	}
+	return count
+}
+
 func sharedIdentifiers(left, right []Identifier) []Identifier {
 	rightSet := map[string]Identifier{}
 	for _, id := range right {
@@ -5021,6 +5366,11 @@ func renderBaselineMarkdown(report BaselineReport) string {
 	fmt.Fprintf(&b, "| blast radius high | %d |\n", report.Summary.BlastRadiusHigh)
 	fmt.Fprintf(&b, "| blast radius medium | %d |\n", report.Summary.BlastRadiusMedium)
 	fmt.Fprintf(&b, "| blast radius low | %d |\n", report.Summary.BlastRadiusLow)
+	fmt.Fprintf(&b, "| proof-hole minimizations | %d |\n", report.Summary.ProofMinimizations)
+	fmt.Fprintf(&b, "| proof minimizations critical | %d |\n", report.Summary.ProofMinCritical)
+	fmt.Fprintf(&b, "| proof minimizations high | %d |\n", report.Summary.ProofMinHigh)
+	fmt.Fprintf(&b, "| proof minimizations medium | %d |\n", report.Summary.ProofMinMedium)
+	fmt.Fprintf(&b, "| proof minimizations low | %d |\n", report.Summary.ProofMinLow)
 	fmt.Fprintf(&b, "| policy checks | %d |\n", report.Summary.PolicyChecks)
 	fmt.Fprintf(&b, "| policy passed | %d |\n", report.Summary.PolicyPassed)
 	fmt.Fprintf(&b, "| policy warnings | %d |\n", report.Summary.PolicyWarnings)
@@ -5150,6 +5500,14 @@ func renderBaselineMarkdown(report BaselineReport) string {
 		limit := minInt(len(report.BlastRadius), 25)
 		for _, item := range report.BlastRadius[:limit] {
 			fmt.Fprintf(&b, "| %s | %d | `%s` | %s | %d | %d | %d | %d |\n", item.Level, item.Score, item.RiskID, item.Table, item.TableCentrality, item.FKReachability, item.CodePathFanout, item.QueryUsage)
+		}
+		fmt.Fprintf(&b, "\n")
+	}
+	if len(report.ProofMinimizers) > 0 {
+		fmt.Fprintf(&b, "## Proof-hole minimizations\n\n| priority | effort | risk | source | missing evidence | upgrade | candidate paths |\n| --- | ---: | --- | --- | --- | --- | ---: |\n")
+		limit := minInt(len(report.ProofMinimizers), 25)
+		for _, item := range report.ProofMinimizers[:limit] {
+			fmt.Fprintf(&b, "| %s | %d | `%s` | %s | %s | %s -> %s | %d |\n", item.Priority, item.Effort, item.RiskID, item.Source, item.MissingEvidence, item.UpgradeFrom, item.UpgradeTo, len(item.CandidatePaths))
 		}
 		fmt.Fprintf(&b, "\n")
 	}
