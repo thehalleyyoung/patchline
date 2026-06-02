@@ -1,0 +1,5 @@
+{
+  "version": "patchline.generated-provenance/v1",
+  "minimum_public_slices": 4,
+  "claim": "Generated proposal artifacts cite risk IDs, fact hashes, and sanitized evidence paths without exposing secret-like path components."
+}

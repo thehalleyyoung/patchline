@@ -733,6 +733,63 @@ func TestProposeWritesIsolatedPatchAndMetadata(t *testing.T) {
 	}
 }
 
+func TestProposeAddsSanitizedProvenanceComments(t *testing.T) {
+	baseline := BaselineReport{
+		Version: BaselineVersion,
+		Hash:    "baseline-hash",
+		Risks: []BaselineRisk{{
+			ID:        "risk:top",
+			Path:      "db/migrate/001_update_accounts.sql",
+			Kind:      "update",
+			Table:     "accounts",
+			Severity:  "high",
+			Score:     120,
+			Rationale: "unbounded update",
+		}},
+		EvidenceLinks: []EvidenceLink{{
+			RiskID:   "risk:top",
+			FactID:   "fact:accounts-source",
+			FactKind: "source",
+			Path:     "app/services/customer_secret_token_repair.go",
+		}},
+		Provenance: []ProvenanceSlice{{
+			ID:            "slice:top",
+			RiskID:        "risk:top",
+			MigrationPath: "db/migrate/001_update_accounts.sql",
+			SourcePaths:   []string{"app/jobs/account_backfill.go"},
+			Links: []EvidenceLink{{
+				RiskID:   "risk:top",
+				FactID:   "fact:accounts-migration",
+				FactKind: "migration",
+				Path:     "config/private_key/accounts.sql",
+			}},
+		}},
+	}
+	baseline.Hash = baselineHash(baseline)
+	baselineDir := filepath.Join(t.TempDir(), "baseline")
+	if err := WriteBaseline(baselineDir, baseline); err != nil {
+		t.Fatal(err)
+	}
+	proposal, err := Propose(ProposalOptions{BaselinePath: baselineDir, Kind: "guards", BudgetRisks: 1})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(proposal.Generated) != 1 {
+		t.Fatalf("expected one guard proposal, got %#v", proposal.Generated)
+	}
+	content := proposal.Generated[0].Content
+	for _, want := range []string{"-- risk: risk:top", "-- fact-hashes: sha256:", "-- evidence-paths:", "redacted-"} {
+		if !strings.Contains(content, want) {
+			t.Fatalf("expected generated guard to contain %q:\n%s", want, content)
+		}
+	}
+	for _, leaked := range []string{"customer_secret_token_repair", "private_key"} {
+		if strings.Contains(content, leaked) || strings.Contains(proposal.Prompt, leaked) {
+			t.Fatalf("generated provenance leaked secret-like path component %q\ncontent:\n%s\nprompt:\n%s", leaked, content, proposal.Prompt)
+		}
+	}
+}
+
 func TestProposeLLMCommandCapturesOutputAsUntrustedArtifact(t *testing.T) {
 	baseline := BaselineReport{Version: BaselineVersion, Hash: "baseline-hash", Risks: []BaselineRisk{{ID: "risk:1", Path: "db/migrate/001.sql", Table: "accounts", Severity: "high", Score: 100, Rationale: "risk"}}}
 	baseline.Hash = baselineHash(baseline)

@@ -67,16 +67,18 @@ type ProposalContext struct {
 }
 
 type ProposalRiskContext struct {
-	ID        string        `json:"id"`
-	Path      string        `json:"path"`
-	Statement int           `json:"statement,omitempty"`
-	Kind      string        `json:"kind"`
-	Table     string        `json:"table,omitempty"`
-	Severity  string        `json:"severity"`
-	Score     int           `json:"score"`
-	Rationale string        `json:"rationale"`
-	Factors   []ScoreFactor `json:"factors,omitempty"`
-	Excerpt   string        `json:"excerpt,omitempty"`
+	ID            string        `json:"id"`
+	Path          string        `json:"path"`
+	Statement     int           `json:"statement,omitempty"`
+	Kind          string        `json:"kind"`
+	Table         string        `json:"table,omitempty"`
+	Severity      string        `json:"severity"`
+	Score         int           `json:"score"`
+	Rationale     string        `json:"rationale"`
+	Factors       []ScoreFactor `json:"factors,omitempty"`
+	FactHashes    []string      `json:"fact_hashes,omitempty"`
+	EvidencePaths []string      `json:"evidence_paths,omitempty"`
+	Excerpt       string        `json:"excerpt,omitempty"`
 }
 
 type GeneratedFile struct {
@@ -283,20 +285,85 @@ func buildProposalContext(baseline BaselineReport, kind string, budget int) Prop
 	}
 	limit := minInt(len(baseline.Risks), budget)
 	for _, risk := range baseline.Risks[:limit] {
+		factHashes, evidencePaths := proposalProvenance(baseline, risk)
 		context.Risks = append(context.Risks, ProposalRiskContext{
-			ID:        risk.ID,
-			Path:      risk.Path,
-			Statement: risk.Statement,
-			Kind:      risk.Kind,
-			Table:     risk.Table,
-			Severity:  risk.Severity,
-			Score:     risk.Score,
-			Rationale: risk.Rationale,
-			Factors:   append([]ScoreFactor(nil), risk.Factors...),
-			Excerpt:   excerptForRisk(baseline.InventoryRoot, risk.Path),
+			ID:            risk.ID,
+			Path:          risk.Path,
+			Statement:     risk.Statement,
+			Kind:          risk.Kind,
+			Table:         risk.Table,
+			Severity:      risk.Severity,
+			Score:         risk.Score,
+			Rationale:     risk.Rationale,
+			Factors:       append([]ScoreFactor(nil), risk.Factors...),
+			FactHashes:    factHashes,
+			EvidencePaths: evidencePaths,
+			Excerpt:       excerptForRisk(baseline.InventoryRoot, risk.Path),
 		})
 	}
 	return context
+}
+
+func proposalProvenance(baseline BaselineReport, risk BaselineRisk) ([]string, []string) {
+	var factHashes []string
+	var paths []string
+	addFact := func(factID string) {
+		if strings.TrimSpace(factID) != "" {
+			factHashes = append(factHashes, "sha256:"+canonical.Hash(factID)[:16])
+		}
+	}
+	addPath := func(path string) {
+		if strings.TrimSpace(path) != "" {
+			paths = append(paths, sanitizedEvidencePath(path))
+		}
+	}
+	addPath(risk.Path)
+	for _, link := range baseline.EvidenceLinks {
+		if link.RiskID != risk.ID {
+			continue
+		}
+		addFact(link.FactID)
+		addPath(link.Path)
+	}
+	for _, slice := range baseline.Provenance {
+		if slice.RiskID != risk.ID {
+			continue
+		}
+		addPath(slice.MigrationPath)
+		for _, path := range slice.SourcePaths {
+			addPath(path)
+		}
+		for _, path := range slice.IncidentPaths {
+			addPath(path)
+		}
+		for _, path := range slice.RepairPaths {
+			addPath(path)
+		}
+		for _, link := range slice.Links {
+			addFact(link.FactID)
+			addPath(link.Path)
+		}
+	}
+	factHashes = capStrings(uniqueStrings(factHashes), 8)
+	paths = capStrings(uniqueStrings(paths), 8)
+	sort.Strings(factHashes)
+	sort.Strings(paths)
+	return factHashes, paths
+}
+
+func sanitizedEvidencePath(path string) string {
+	path = filepath.ToSlash(strings.TrimSpace(path))
+	if path == "" {
+		return ""
+	}
+	parts := strings.Split(path, "/")
+	for i, part := range parts {
+		lower := strings.ToLower(part)
+		if containsAny(lower, "secret", "token", "password", "passwd", "credential", "apikey", "api_key", "private_key") {
+			parts[i] = "redacted-" + canonical.Hash(part)[:8]
+		}
+	}
+	return strings.Join(parts, "/")
 }
 
 func excerptForRisk(root, rel string) string {
@@ -327,6 +394,9 @@ func renderProposalPrompt(context ProposalContext) string {
 	fmt.Fprintf(&b, "\nRisks:\n")
 	for _, risk := range context.Risks {
 		fmt.Fprintf(&b, "- %s path=%s table=%s severity=%s score=%d rationale=%s\n", risk.ID, risk.Path, risk.Table, risk.Severity, risk.Score, risk.Rationale)
+		if len(risk.FactHashes) > 0 || len(risk.EvidencePaths) > 0 {
+			fmt.Fprintf(&b, "  provenance fact_hashes=%s evidence_paths=%s\n", provenanceValue(risk.FactHashes), provenanceValue(risk.EvidencePaths))
+		}
 		if risk.Excerpt != "" {
 			fmt.Fprintf(&b, "  excerpt:\n%s\n", indent(risk.Excerpt, "    "))
 		}
@@ -615,6 +685,8 @@ func renderTestProposal(risk ProposalRiskContext, language string) string {
 risk: %s
 path: %s
 table: %s
+fact_hashes: %s
+evidence_paths: %s
 rationale: %s
 
 Suggested assertions:
@@ -622,7 +694,7 @@ Suggested assertions:
 1. Build a fixture where table %q has both affected and unaffected rows.
 2. Run the project-native migration or repair path touching %q.
 3. Assert row counts, scoped predicates, and rollback behavior before accepting the change.
-`, risk.ID, risk.Path, risk.Table, risk.Rationale, risk.Table, risk.Table)
+`, risk.ID, risk.Path, risk.Table, provenanceValue(risk.FactHashes), provenanceValue(risk.EvidencePaths), risk.Rationale, risk.Table, risk.Table)
 	switch language {
 	case "ruby", "python":
 		return commentLines(body, "# ")
@@ -653,6 +725,8 @@ func renderGuardProposal(risk ProposalRiskContext) string {
 	return fmt.Sprintf(`-- Untrusted generated guard proposal
 -- risk: %s
 -- source: %s
+-- fact-hashes: %s
+-- evidence-paths: %s
 -- rationale: %s
 
 BEGIN;
@@ -664,7 +738,7 @@ SELECT 1 FROM %s LIMIT 1;
 SELECT count(*) AS patchline_candidate_rows FROM %s;
 
 ROLLBACK;
-`, risk.ID, risk.Path, risk.Rationale, table, table)
+`, risk.ID, risk.Path, provenanceValue(risk.FactHashes), provenanceValue(risk.EvidencePaths), risk.Rationale, table, table)
 }
 
 func renderInstrumentationProposal(risk ProposalRiskContext) string {
@@ -673,6 +747,8 @@ func renderInstrumentationProposal(risk ProposalRiskContext) string {
 - risk: %s
 - path: %s
 - table: %s
+- fact_hashes: %s
+- evidence_paths: %s
 
 Add a structured event or metric around this data-change path with:
 
@@ -682,7 +758,7 @@ Add a structured event or metric around this data-change path with:
 - affected_row_count
 - dry_run=true/false
 - rollback_available=true/false
-`, risk.ID, risk.Path, risk.Table, risk.ID, risk.Table, risk.Kind)
+`, risk.ID, risk.Path, risk.Table, provenanceValue(risk.FactHashes), provenanceValue(risk.EvidencePaths), risk.ID, risk.Table, risk.Kind)
 }
 
 func renderRepairProposal(risk ProposalRiskContext) string {
@@ -691,6 +767,11 @@ func renderRepairProposal(risk ProposalRiskContext) string {
 		"trust":   "untrusted-generated-proposal",
 		"risk_id": risk.ID,
 		"source":  risk.Path,
+		"provenance": map[string]any{
+			"risk_id":        risk.ID,
+			"fact_hashes":    risk.FactHashes,
+			"evidence_paths": risk.EvidencePaths,
+		},
 		"scope": map[string]any{
 			"table": risk.Table,
 			"where": "TODO: replace with bounded predicate before use",
@@ -718,10 +799,19 @@ func renderExplainProposal(risk ProposalRiskContext) string {
 	return fmt.Sprintf(`-- Untrusted generated explain/dry-run proposal
 -- risk: %s
 -- source: %s
+-- fact-hashes: %s
+-- evidence-paths: %s
 
 EXPLAIN SELECT * FROM %s LIMIT 1;
 SELECT count(*) AS patchline_candidate_rows FROM %s;
-`, risk.ID, risk.Path, table, table)
+`, risk.ID, risk.Path, provenanceValue(risk.FactHashes), provenanceValue(risk.EvidencePaths), table, table)
+}
+
+func provenanceValue(values []string) string {
+	if len(values) == 0 {
+		return "none"
+	}
+	return strings.Join(values, ",")
 }
 
 func renderProposalPatch(artifacts []GeneratedArtifact) string {
