@@ -1,0 +1,69 @@
+{
+  "version": "patchline.fuzz-coverage-gate/v1",
+  "claim": "Fuzz targets cover parsers, fact normalization, redaction, SQL analysis, archive extraction, and report loading, and their seeded boundaries are proven on real repository slices.",
+  "fuzztime": "1s",
+  "minimum_public_repos": 4,
+  "required_targets": [
+    {
+      "package": "./internal/migration",
+      "name": "FuzzAnalyzeBytesWithDialect",
+      "area": "SQL analysis"
+    },
+    {
+      "package": "./internal/migration",
+      "name": "FuzzExtractSourceSQL",
+      "area": "parser source extraction"
+    },
+    {
+      "package": "./internal/project",
+      "name": "FuzzFactNormalization",
+      "area": "fact normalization"
+    },
+    {
+      "package": "./internal/project",
+      "name": "FuzzArchiveExtraction",
+      "area": "archive extraction"
+    },
+    {
+      "package": "./internal/project",
+      "name": "FuzzReportLoading",
+      "area": "report loading"
+    },
+    {
+      "package": "./internal/project",
+      "name": "FuzzParserPipeline",
+      "area": "parser pipeline"
+    },
+    {
+      "package": "./cmd/patchline",
+      "name": "FuzzBundleRedactor",
+      "area": "redaction"
+    }
+  ],
+  "slices": [
+    {
+      "id": "forem-rails-migrations",
+      "repo": "forem/forem",
+      "ref": "9c5509c3aeecd4a86a8950206fa937ebcbc2f8d1",
+      "subpath": "db/migrate"
+    },
+    {
+      "id": "bytebase-go-migrator",
+      "repo": "bytebase/bytebase",
+      "ref": "0765652ea2dbdf8e93ae44bff5acafc1b97a92cc",
+      "subpath": "backend/migrator/migration"
+    },
+    {
+      "id": "mastodon-rails-migrations",
+      "repo": "mastodon/mastodon",
+      "ref": "facb552c9cdbe8a2ebff0b94ebf2c9e9ec385347",
+      "subpath": "db/migrate"
+    },
+    {
+      "id": "lobsters-rails-migrations",
+      "repo": "lobsters/lobsters",
+      "ref": "3b80b47aa5aaba37ec44413e7d1dc96fcf1585b6",
+      "subpath": "db/migrate"
+    }
+  ]
+}
