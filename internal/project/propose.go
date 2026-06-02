@@ -46,6 +46,7 @@ type ProposalReport struct {
 	OutputHash     string               `json:"output_hash"`
 	Intervention   RepairIntervention   `json:"intervention"`
 	Minimization   ProposalMinimization `json:"minimization,omitempty"`
+	ContextMin     PromptContextMin     `json:"prompt_context_minimization,omitempty"`
 	GeneratedFiles []GeneratedFile      `json:"generated_files,omitempty"`
 	OwnerRoutes    []OwnerRoute         `json:"owner_routes,omitempty"`
 	Constraints    []string             `json:"constraints,omitempty"`
@@ -66,6 +67,7 @@ type ProposalContext struct {
 	Constraints   []string              `json:"constraints"`
 	Risks         []ProposalRiskContext `json:"risks"`
 	NativeChecks  []Command             `json:"native_checks,omitempty"`
+	Minimization  PromptContextMin      `json:"minimization,omitempty"`
 }
 
 type ProposalRiskContext struct {
@@ -107,6 +109,23 @@ type ProposalMinimization struct {
 	PreservedRisksWithCoverage int                        `json:"preserved_risks_with_coverage,omitempty"`
 	PreservedCheckFailures     int                        `json:"preserved_check_failures,omitempty"`
 	Removed                    []RemovedGeneratedArtifact `json:"removed,omitempty"`
+}
+
+type PromptContextMin struct {
+	Applied                  bool   `json:"applied,omitempty"`
+	SelectedRisks            int    `json:"selected_risks"`
+	ExcludedRisks            int    `json:"excluded_risks"`
+	IncludedEvidenceLinks    int    `json:"included_evidence_links"`
+	ExcludedEvidenceLinks    int    `json:"excluded_evidence_links"`
+	IncludedProvenanceSlices int    `json:"included_provenance_slices"`
+	ExcludedProvenanceSlices int    `json:"excluded_provenance_slices"`
+	IncludedNativeChecks     int    `json:"included_native_checks"`
+	ExcludedNativeChecks     int    `json:"excluded_native_checks"`
+	IncludedExcerptLines     int    `json:"included_excerpt_lines"`
+	ExcludedExcerptLines     int    `json:"excluded_excerpt_lines"`
+	IncludedEvidencePaths    int    `json:"included_evidence_paths"`
+	ExcludedEvidencePaths    int    `json:"excluded_evidence_paths"`
+	Reason                   string `json:"reason,omitempty"`
 }
 
 type RemovedGeneratedArtifact struct {
@@ -168,7 +187,7 @@ func Propose(opts ProposalOptions) (ProposalReport, error) {
 	if err != nil {
 		return ProposalReport{}, err
 	}
-	context := buildProposalContext(baseline, opts.Kind, opts.BudgetRisks)
+	context, contextMin := buildProposalContext(baseline, opts.Kind, opts.BudgetRisks)
 	promptMode := "fact-grounded"
 	prompt := renderProposalPrompt(context)
 	if opts.PromptNoFacts {
@@ -209,6 +228,7 @@ func Propose(opts ProposalOptions) (ProposalReport, error) {
 		PromptHash:    canonical.Hash(prompt),
 		OutputHash:    canonical.Hash(patch),
 		Constraints:   context.Constraints,
+		ContextMin:    contextMin,
 		Artifacts: map[string]string{
 			"prompt_context": "prompt-context.json",
 			"prompt":         "prompt.txt",
@@ -297,7 +317,7 @@ func LoadBaseline(path string) (BaselineReport, error) {
 	return report, nil
 }
 
-func buildProposalContext(baseline BaselineReport, kind string, budget int) ProposalContext {
+func buildProposalContext(baseline BaselineReport, kind string, budget int) (ProposalContext, PromptContextMin) {
 	context := ProposalContext{
 		Version:       ProposalVersion,
 		BaselineHash:  baseline.Hash,
@@ -308,12 +328,26 @@ func buildProposalContext(baseline BaselineReport, kind string, budget int) Prop
 			"Do not assume production data access.",
 			"Keep changes bounded to the listed risk IDs.",
 			"Prefer fail-closed guards and explicit rollback/validation notes.",
+			"Prompt context is minimized to selected risks and linked evidence only.",
 		},
-		NativeChecks: baseline.NativeChecks,
 	}
 	limit := minInt(len(baseline.Risks), budget)
+	minimization := PromptContextMin{
+		Applied:       true,
+		SelectedRisks: limit,
+		ExcludedRisks: maxInt(0, len(baseline.Risks)-limit),
+		Reason:        "Only the highest-ranked budgeted risks and their linked evidence/provenance are included in prompt context.",
+	}
+	selectedRiskIDs := map[string]bool{}
 	for _, risk := range baseline.Risks[:limit] {
-		factHashes, evidencePaths := proposalProvenance(baseline, risk)
+		selectedRiskIDs[risk.ID] = true
+		factHashes, evidencePaths, includedEvidence, includedProvenance := proposalProvenance(baseline, risk)
+		excerpt, includedLines, excludedLines := excerptForRiskMinimized(baseline.InventoryRoot, risk)
+		minimization.IncludedEvidenceLinks += includedEvidence
+		minimization.IncludedProvenanceSlices += includedProvenance
+		minimization.IncludedEvidencePaths += len(evidencePaths)
+		minimization.IncludedExcerptLines += includedLines
+		minimization.ExcludedExcerptLines += excludedLines
 		context.Risks = append(context.Risks, ProposalRiskContext{
 			ID:            risk.ID,
 			Path:          risk.Path,
@@ -326,16 +360,36 @@ func buildProposalContext(baseline BaselineReport, kind string, budget int) Prop
 			Factors:       append([]ScoreFactor(nil), risk.Factors...),
 			FactHashes:    factHashes,
 			EvidencePaths: evidencePaths,
-			Excerpt:       excerptForRisk(baseline.InventoryRoot, risk.Path),
+			Excerpt:       excerpt,
 			Reviewers:     ownersForRiskIDs(baseline.OwnerRoutes, []string{risk.ID}),
 		})
 	}
-	return context
+	context.NativeChecks = nativeChecksForSelectedRisks(baseline, selectedRiskIDs)
+	minimization.IncludedNativeChecks = len(context.NativeChecks)
+	minimization.ExcludedNativeChecks = maxInt(0, len(uniqueCommands(baseline.NativeChecks))-minimization.IncludedNativeChecks)
+	for _, link := range baseline.EvidenceLinks {
+		if !selectedRiskIDs[link.RiskID] {
+			minimization.ExcludedEvidenceLinks++
+			if strings.TrimSpace(link.Path) != "" {
+				minimization.ExcludedEvidencePaths++
+			}
+		}
+	}
+	for _, slice := range baseline.Provenance {
+		if !selectedRiskIDs[slice.RiskID] {
+			minimization.ExcludedProvenanceSlices++
+			minimization.ExcludedEvidencePaths += countProvenancePaths(slice)
+		}
+	}
+	context.Minimization = minimization
+	return context, minimization
 }
 
-func proposalProvenance(baseline BaselineReport, risk BaselineRisk) ([]string, []string) {
+func proposalProvenance(baseline BaselineReport, risk BaselineRisk) ([]string, []string, int, int) {
 	var factHashes []string
 	var paths []string
+	includedEvidence := 0
+	includedProvenance := 0
 	addFact := func(factID string) {
 		if strings.TrimSpace(factID) != "" {
 			factHashes = append(factHashes, "sha256:"+canonical.Hash(factID)[:16])
@@ -351,6 +405,7 @@ func proposalProvenance(baseline BaselineReport, risk BaselineRisk) ([]string, [
 		if link.RiskID != risk.ID {
 			continue
 		}
+		includedEvidence++
 		addFact(link.FactID)
 		addPath(link.Path)
 	}
@@ -358,6 +413,7 @@ func proposalProvenance(baseline BaselineReport, risk BaselineRisk) ([]string, [
 		if slice.RiskID != risk.ID {
 			continue
 		}
+		includedProvenance++
 		addPath(slice.MigrationPath)
 		for _, path := range slice.SourcePaths {
 			addPath(path)
@@ -377,7 +433,7 @@ func proposalProvenance(baseline BaselineReport, risk BaselineRisk) ([]string, [
 	paths = capStrings(uniqueStrings(paths), 8)
 	sort.Strings(factHashes)
 	sort.Strings(paths)
-	return factHashes, paths
+	return factHashes, paths, includedEvidence, includedProvenance
 }
 
 func sanitizedEvidencePath(path string) string {
@@ -395,20 +451,101 @@ func sanitizedEvidencePath(path string) string {
 	return strings.Join(parts, "/")
 }
 
-func excerptForRisk(root, rel string) string {
-	if root == "" || rel == "" {
-		return ""
+func nativeChecksForSelectedRisks(baseline BaselineReport, selectedRiskIDs map[string]bool) []Command {
+	var commands []Command
+	for _, slice := range baseline.Provenance {
+		if !selectedRiskIDs[slice.RiskID] {
+			continue
+		}
+		commands = append(commands, slice.TestCommands...)
+		commands = append(commands, slice.NativeCommands...)
 	}
-	path := filepath.Join(root, filepath.FromSlash(rel))
+	if len(commands) == 0 {
+		for _, risk := range baseline.Risks {
+			if !selectedRiskIDs[risk.ID] {
+				continue
+			}
+			for _, command := range baseline.NativeChecks {
+				joined := strings.ToLower(command.Command)
+				if strings.Contains(joined, strings.ToLower(risk.Path)) || (risk.Table != "" && strings.Contains(joined, strings.ToLower(risk.Table))) {
+					commands = append(commands, command)
+				}
+			}
+		}
+	}
+	return uniqueCommands(commands)
+}
+
+func countProvenancePaths(slice ProvenanceSlice) int {
+	count := 0
+	if strings.TrimSpace(slice.MigrationPath) != "" {
+		count++
+	}
+	count += len(slice.SourcePaths)
+	count += len(slice.IncidentPaths)
+	count += len(slice.RepairPaths)
+	for _, link := range slice.Links {
+		if strings.TrimSpace(link.Path) != "" {
+			count++
+		}
+	}
+	return count
+}
+
+func excerptForRiskMinimized(root string, risk BaselineRisk) (string, int, int) {
+	if root == "" || risk.Path == "" {
+		return "", 0, 0
+	}
+	path := filepath.Join(root, filepath.FromSlash(risk.Path))
 	text, err := readTextPrefix(path, 8<<10)
 	if err != nil {
-		return ""
+		return "", 0, 0
 	}
 	lines := strings.Split(text, "\n")
-	if len(lines) > 20 {
-		lines = lines[:20]
+	kind := strings.ToLower(risk.Kind)
+	var keywords []string
+	for _, keyword := range []string{"update", "delete", "drop", "truncate", "alter", "insert"} {
+		if strings.Contains(kind, keyword) {
+			keywords = append(keywords, keyword)
+		}
 	}
-	return strings.Join(lines, "\n")
+	if len(keywords) == 0 && strings.TrimSpace(kind) != "" {
+		keywords = append(keywords, kind)
+	}
+	keep := map[int]bool{}
+	if risk.Statement > 0 && risk.Statement <= len(lines) {
+		keep[risk.Statement-1] = true
+	}
+	for idx, line := range lines {
+		lower := strings.ToLower(line)
+		for _, keyword := range keywords {
+			if strings.TrimSpace(keyword) != "" && strings.Contains(lower, keyword) {
+				keep[idx] = true
+				break
+			}
+		}
+	}
+	var selected []string
+	for idx, line := range lines {
+		if keep[idx] {
+			selected = append(selected, line)
+		}
+		if len(selected) >= 12 {
+			break
+		}
+	}
+	if len(selected) == 0 {
+		limit := minInt(len(lines), 3)
+		selected = append(selected, lines[:limit]...)
+	}
+	return strings.Join(selected, "\n"), len(selected), maxInt(0, len(lines)-len(selected))
+}
+
+func maxInt(a, b int) int {
+	if a > b {
+		return a
+	}
+	return b
 }
 
 func renderProposalPrompt(context ProposalContext) string {
@@ -420,6 +557,10 @@ func renderProposalPrompt(context ProposalContext) string {
 	for _, constraint := range context.Constraints {
 		fmt.Fprintf(&b, "- %s\n", constraint)
 	}
+	fmt.Fprintf(&b, "\nContext minimization:\n")
+	fmt.Fprintf(&b, "- risks selected=%d excluded=%d\n", context.Minimization.SelectedRisks, context.Minimization.ExcludedRisks)
+	fmt.Fprintf(&b, "- evidence_links included=%d excluded=%d provenance_slices included=%d excluded=%d\n", context.Minimization.IncludedEvidenceLinks, context.Minimization.ExcludedEvidenceLinks, context.Minimization.IncludedProvenanceSlices, context.Minimization.ExcludedProvenanceSlices)
+	fmt.Fprintf(&b, "- native_checks included=%d excluded=%d excerpt_lines included=%d excluded=%d evidence_paths included=%d excluded=%d\n", context.Minimization.IncludedNativeChecks, context.Minimization.ExcludedNativeChecks, context.Minimization.IncludedExcerptLines, context.Minimization.ExcludedExcerptLines, context.Minimization.IncludedEvidencePaths, context.Minimization.ExcludedEvidencePaths)
 	fmt.Fprintf(&b, "\nRisks:\n")
 	for _, risk := range context.Risks {
 		fmt.Fprintf(&b, "- %s path=%s table=%s severity=%s score=%d rationale=%s\n", risk.ID, risk.Path, risk.Table, risk.Severity, risk.Score, risk.Rationale)
@@ -440,6 +581,7 @@ func renderProposalPromptWithoutFacts(context ProposalContext) string {
 	fmt.Fprintf(&b, "Kind: %s\n", context.Kind)
 	fmt.Fprintf(&b, "Prompt mode: without-facts\n")
 	fmt.Fprintf(&b, "Risks: %d withheld for ablation\n", len(context.Risks))
+	fmt.Fprintf(&b, "Context minimization: selected_risks=%d excluded_risks=%d excluded_evidence_links=%d excluded_provenance_slices=%d excluded_native_checks=%d excluded_excerpt_lines=%d\n", context.Minimization.SelectedRisks, context.Minimization.ExcludedRisks, context.Minimization.ExcludedEvidenceLinks, context.Minimization.ExcludedProvenanceSlices, context.Minimization.ExcludedNativeChecks, context.Minimization.ExcludedExcerptLines)
 	fmt.Fprintf(&b, "Constraints:\n")
 	for _, constraint := range context.Constraints {
 		fmt.Fprintf(&b, "- %s\n", constraint)

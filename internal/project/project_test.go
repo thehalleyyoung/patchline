@@ -127,6 +127,56 @@ func TestProposalRoutesGeneratedInterventionsToRiskOwners(t *testing.T) {
 	}
 }
 
+func TestProposalPromptContextMinimizesUnselectedEvidence(t *testing.T) {
+	root := t.TempDir()
+	writeFile(t, root, "db/migrate/001_delete.sql", strings.Join([]string{
+		"CREATE TABLE accounts(id int);",
+		"DELETE FROM accounts;",
+		"INSERT INTO audit_log VALUES (1);",
+	}, "\n"))
+	writeFile(t, root, "db/migrate/002_drop.sql", "DROP TABLE invoices;\n")
+	baseline := BaselineReport{
+		Version:       BaselineVersion,
+		InventoryRoot: root,
+		Risks: []BaselineRisk{
+			{ID: "risk-delete", Path: "db/migrate/001_delete.sql", Statement: 2, Kind: "broad-delete", Table: "accounts", Severity: "high", Score: 90, Rationale: "delete all accounts"},
+			{ID: "risk-drop", Path: "db/migrate/002_drop.sql", Statement: 1, Kind: "drop-table", Table: "invoices", Severity: "high", Score: 80, Rationale: "drop invoices"},
+		},
+		EvidenceLinks: []EvidenceLink{
+			{RiskID: "risk-delete", FactID: "fact-delete", Path: "db/migrate/001_delete.sql", Confidence: "high"},
+			{RiskID: "risk-drop", FactID: "fact-drop", Path: "db/migrate/002_drop.sql", Confidence: "high"},
+		},
+		Provenance: []ProvenanceSlice{
+			{ID: "slice-delete", RiskID: "risk-delete", MigrationPath: "db/migrate/001_delete.sql", NativeCommands: []Command{{Command: "go test ./accounts", Reason: "accounts checks"}}, StagesPresent: []string{"migration"}, Confidence: "high"},
+			{ID: "slice-drop", RiskID: "risk-drop", MigrationPath: "db/migrate/002_drop.sql", NativeCommands: []Command{{Command: "go test ./invoices", Reason: "invoice checks"}}, StagesPresent: []string{"migration"}, Confidence: "high"},
+		},
+		NativeChecks: []Command{
+			{Command: "go test ./accounts", Reason: "accounts checks"},
+			{Command: "go test ./invoices", Reason: "invoice checks"},
+		},
+	}
+	baseline.Hash = baselineHash(baseline)
+	proposal, err := Propose(ProposalOptions{BaselinePath: writeBaselineForTest(t, baseline), Kind: "guards", BudgetRisks: 1})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := proposal.ContextMin; got.SelectedRisks != 1 || got.ExcludedRisks != 1 || got.IncludedEvidenceLinks != 1 || got.ExcludedEvidenceLinks != 1 || got.IncludedProvenanceSlices != 1 || got.ExcludedProvenanceSlices != 1 {
+		t.Fatalf("unexpected context minimization counts: %#v", got)
+	}
+	if len(proposal.Context.Risks) != 1 || proposal.Context.Risks[0].ID != "risk-delete" {
+		t.Fatalf("expected only selected risk in context: %#v", proposal.Context.Risks)
+	}
+	if strings.Contains(strings.Join(proposal.Context.Risks[0].EvidencePaths, ","), "002_drop") || strings.Contains(proposal.Prompt, "invoices") {
+		t.Fatalf("unselected evidence leaked into prompt context: paths=%v prompt=%s", proposal.Context.Risks[0].EvidencePaths, proposal.Prompt)
+	}
+	if !strings.Contains(proposal.Context.Risks[0].Excerpt, "DELETE FROM accounts") || strings.Contains(proposal.Context.Risks[0].Excerpt, "CREATE TABLE") {
+		t.Fatalf("expected risk-focused excerpt, got %q", proposal.Context.Risks[0].Excerpt)
+	}
+	if !strings.Contains(proposal.Prompt, "Context minimization") || !strings.Contains(proposal.Prompt, "excluded=1") {
+		t.Fatalf("expected prompt minimization counts, got %s", proposal.Prompt)
+	}
+}
+
 func TestFetchLocalGitRecordsResolvedCommit(t *testing.T) {
 	src := t.TempDir()
 	writeFile(t, src, "db/migrate/001.sql", "create table accounts(id int);")

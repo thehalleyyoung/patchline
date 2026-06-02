@@ -87,6 +87,8 @@ Run `make changelog-gate` before release notes change so each user-visible featu
 
 Run `make secret-scan-gate` to prove redacted reports, prompts, bundles, generated files, diagnostics logs, and CI artifacts do not leak deterministic canary values; see [docs/secret-scanning.md](docs/secret-scanning.md).
 
+Run `make prompt-context-gate` to prove proposal prompts include only selected-risk evidence while reporting excluded context counts; see [docs/prompt-context-minimization.md](docs/prompt-context-minimization.md).
+
 Add `--redact` to write `analysis-bundle/` copies with stable redaction tokens for identifiers, literals, customer-like strings, and secret-like values while preserving joins and existing artifact hashes.
 
 Add `--ci` to write `ci/summary.md` plus upload snippets and code-quality artifacts for GitHub Actions, GitLab CI, and Bitbucket Pipelines: SARIF under `analysis-bundle/summary.sarif`, GitLab `ci/gl-code-quality-report.json`, and Bitbucket `ci/bitbucket-code-insights.json`.
@@ -187,6 +189,7 @@ make issue-template-gate
 make compatibility-gate
 make changelog-gate
 make secret-scan-gate
+make prompt-context-gate
 make minimizer-gate
 make recurrence-gate
 make corpus-release-gate

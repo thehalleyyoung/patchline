@@ -1,0 +1,15 @@
+{
+  "version": "patchline.prompt-context-gate/v1",
+  "claim": "Proposal prompts include only selected-risk evidence and report excluded prompt-context counts for risks, evidence links, provenance slices, native checks, evidence paths, and excerpts.",
+  "real_code": {
+    "repo": "lobsters/lobsters",
+    "ref": "3b80b47aa5aaba37ec44413e7d1dc96fcf1585b6",
+    "subpath": "db/migrate"
+  },
+  "required_artifacts": [
+    "proposal/prompt-context.json",
+    "proposal/prompt.txt",
+    "proposal/proposal.json",
+    "baseline/baseline.json"
+  ]
+}
