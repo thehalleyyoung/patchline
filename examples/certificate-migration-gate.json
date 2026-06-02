@@ -1,0 +1,16 @@
+{
+  "version": "patchline.certificate-migration-gate/v1",
+  "claim": "Patchline provides backward-compatible certificate migration from PLCI/0 to PLCI/1. The gate loads real legacy certificate bytes whose evidence points at this repository, verifies legacy canonical hashes, maps the old risk-class field into PLCI/1 risk-bps, re-renders canonical PLCI/1 certificates, rechecks file digests and verdict semantics with the current parser, covers safe, guarded, blocked, and unsupported verdict classes, and rejects legacy negative controls. This proves old proof-carrying verdicts remain checkable across schema revisions through `make certificate-migration-gate` rather than being trusted by compatibility folklore.",
+  "source_version": "PLCI/0",
+  "target_version": "PLCI/1",
+  "spec_dir": "specs/certificate-interchange/v0",
+  "legacy_grammar": "specs/certificate-interchange/v0/grammar.abnf",
+  "legacy_valid_vectors": 4,
+  "legacy_invalid_vectors": 2,
+  "risk_class_mapping": {
+    "low": 40,
+    "medium": 180,
+    "high": 9000,
+    "unknown": 10000
+  }
+}

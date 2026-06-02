@@ -1,0 +1,14 @@
+PLCI/0
+certificate-id: patchline.cli.dispatch.legacy
+subject-repo: thehalleyyoung/patchline
+subject-ref: 8e6e3fe
+subject-path: cmd/patchline/main.go
+subject-sha256: 782130c1648f4da094396744349510a192fc1c21c9adf032eeb9fa42d9e5910b
+issued-at: 2026-06-02T00:00:00Z
+producer: patchline-certlang/0
+verdict: safe
+risk-class: low
+evidence: ev.cli type=source uri=file:cmd/patchline/main.go sha256=782130c1648f4da094396744349510a192fc1c21c9adf032eeb9fa42d9e5910b
+obligation: obl.dispatch kind=interchange status=checked evidence=ev.cli formula="command dispatch preserves explicit proof and certificate entry points"
+canonical-sha256: 84ba1716dfb198fb588af5b9b94ff067435deb2c127e3e6ae4073765fe3dcb03
+END

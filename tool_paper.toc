@@ -70,7 +70,7 @@
 \contentsline {paragraph}{Definitive artifact and lasting impact.}{17}{section.13}%
 \contentsline {paragraph}{From field-defining system to generational artifact (601--700).}{17}{table.caption.8}%
 \contentsline {paragraph}{Standard-scale certificate interchange.}{18}{table.caption.9}%
-\contentsline {section}{\numberline {14}Developer and Contributor Experience}{18}{section.14}%
+\contentsline {section}{\numberline {14}Developer and Contributor Experience}{19}{section.14}%
 \contentsline {section}{\numberline {15}Case Studies}{19}{section.15}%
 \contentsline {paragraph}{\texttt {lobsters/lobsters} (Rails, \texttt {db/migrate}).}{19}{section.15}%
 \contentsline {paragraph}{\texttt {apache/avro} (schema compatibility).}{19}{section.15}%
@@ -78,18 +78,18 @@
 \contentsline {paragraph}{\texttt {harrydevforlife/building-lakehouse} (pipelines).}{19}{section.15}%
 \contentsline {paragraph}{\texttt {laaksomavrick/twitter-go} (NoSQL + minimization).}{19}{section.15}%
 \contentsline {section}{\numberline {16}Related Work}{19}{section.16}%
-\contentsline {section}{\numberline {17}Threats to Validity}{19}{section.17}%
-\contentsline {paragraph}{Construct validity.}{19}{section.17}%
+\contentsline {section}{\numberline {17}Threats to Validity}{20}{section.17}%
+\contentsline {paragraph}{Construct validity.}{20}{section.17}%
 \contentsline {paragraph}{Internal validity.}{20}{section.17}%
 \contentsline {paragraph}{External validity.}{20}{section.17}%
 \contentsline {paragraph}{Known blind spots.}{20}{section.17}%
-\contentsline {section}{\numberline {18}Limitations}{20}{section.18}%
+\contentsline {section}{\numberline {18}Limitations}{21}{section.18}%
 \contentsline {section}{\numberline {19}Discussion}{21}{section.19}%
 \contentsline {paragraph}{Why a fact layer instead of a model.}{21}{section.19}%
 \contentsline {paragraph}{Why gates instead of unit tests.}{21}{section.19}%
 \contentsline {paragraph}{Generalization beyond data changes.}{21}{section.19}%
 \contentsline {paragraph}{On the cost of conservatism.}{21}{section.19}%
-\contentsline {section}{\numberline {20}Future Work}{21}{section.20}%
+\contentsline {section}{\numberline {20}Future Work}{22}{section.20}%
 \contentsline {section}{\numberline {21}Conclusion}{22}{section.21}%
 \contentsline {paragraph}{Availability.}{22}{section.21}%
 \contentsline {section}{\numberline {A}A Worked End-to-End Example}{22}{appendix.A}%

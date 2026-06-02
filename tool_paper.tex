@@ -112,7 +112,7 @@ ranks the risks, and prints the next commands that can run immediately.
   \item A \textbf{runtime and observability evidence} layer that scores findings on independent
   static-risk and observed-runtime axes using OpenTelemetry, Datadog-style, and Prometheus/Grafana
   exports (Section~\ref{sec:runtime}).
-  \item A \textbf{gate-backed reproducibility and evaluation methodology}---over 600 gates, blinded
+  \item A \textbf{gate-backed reproducibility and evaluation methodology}---over 610 gates, blinded
   false-positive adjudication, seeded false-negative recall, ablations, standardized effect sizes,
   and severity calibration---designed for artifact evaluation and best-paper-grade rigor
   (Sections~\ref{sec:repro}--\ref{sec:eval}).
@@ -203,7 +203,7 @@ A cross-cutting \emph{gate layer} sits beside the pipeline. Each gate is a self-
 (a) validates a versioned example specification, (b) checks that the relevant documentation and the
 README still describe the capability, (c) runs the capability against real pinned code, (d) asserts
 machine-checkable invariants on the output, and (e) writes a \code{gate-summary.json}. The repository
-currently ships \textbf{610 gates}, \textbf{566 capability documents}, and \textbf{542 example
+currently ships \textbf{more than 610 gates}, \textbf{more than 560 capability documents}, and \textbf{more than 600 example
 specifications}, with a single analyzer core of roughly 2{,}900 lines of Go.
 
 \paragraph{Resumability and offline operation.} \code{repo analyze --resume} reuses existing fetch,
@@ -917,6 +917,15 @@ checker output is Ed25519-signed and verified against a pinned public key. The g
 signed reference output and proves the tamper is rejected, making the corpus suitable for external
 implementers rather than merely internal regression tests.
 
+The latest compatibility gate adds schema evolution to that story. Legacy PLCI/0 certificates use a
+coarser \code{risk-class} field; \gate{certificate-migration-gate} verifies their legacy canonical
+hashes, maps \code{low}, \code{medium}, \code{high}, and \code{unknown} into PLCI/1 basis-point risk
+scores, re-renders canonical PLCI/1 bytes, and then rechecks the migrated certificates with real file
+digest verification. The compatibility corpus migrates four legacy positives covering all verdict
+classes and rejects two legacy negatives (an unregistered risk class and a \code{safe} verdict with an
+assumed obligation), proving old verdicts remain checkable across schema revisions rather than being
+grandfathered by policy.
+
 %======================================================================
 \section{Developer and Contributor Experience}
 %======================================================================
@@ -1278,7 +1287,7 @@ Formal methods & \code{invariant-extract-gate}, \code{symexec-gate}, \code{model
 Decision science & \code{risk-economics-gate}, \code{uncertainty-calibration-gate},
 \code{active-learning-gate}, \code{reviewer-sim-gate}, \code{explainable-ranking-gate} \\
 Release \& interop & \code{rc-rehearsal-gate}, \code{leaderboard-gate}, \code{dossier-gate},
-\code{interop-gate}, \code{standards-body-conformance-corpus-gate} \\
+\code{interop-gate}, \code{standards-body-conformance-corpus-gate}, \code{certificate-migration-gate} \\
 Generalization & \code{framework-holdout-gate}, \code{perturbation-robustness-gate},
 \code{historical-replay-study-gate}, \code{external-replication-kit-gate} \\
 Trust stack & \code{signed-provenance-chain-gate}, \code{reproducible-build-attestation-gate},
@@ -1327,7 +1336,8 @@ make data-pipeline-gate \hspace{2.4em}\# Airflow+dbt+Spark on building-lakehouse
 make schema-compat-gate \hspace{2.4em}\# Avro + protobuf on apache/avro\\
 make infra-ordering-gate \hspace{2.0em}\# Kong/Anchore sequencing on helm/charts\\
 make fixture-minimizer-gate \hspace{0.7em}\# 1-minimal reproductions per ecosystem\\
-make parser-dashboard-gate \hspace{1.1em}\# coverage + fuzz robustness dashboard
+make parser-dashboard-gate \hspace{1.1em}\# coverage + fuzz robustness dashboard\\
+make certificate-migration-gate \hspace{0.1em}\# PLCI/0 verdicts recheck as PLCI/1
 \end{quote}
 
 \noindent

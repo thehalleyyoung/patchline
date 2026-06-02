@@ -1,0 +1,15 @@
+PLCI/0
+certificate-id: patchline.proof.frame.legacy
+subject-repo: thehalleyyoung/patchline
+subject-ref: 8e6e3fe
+subject-path: internal/repair/proof.go
+subject-sha256: af95a00c193739a2042b983dba1f0930b76f80f08dbe6168d7739d09d7ccc303
+issued-at: 2026-06-02T00:00:00Z
+producer: patchline-certlang/0
+verdict: guarded
+risk-class: medium
+evidence: ev.proof type=source uri=file:internal/repair/proof.go sha256=af95a00c193739a2042b983dba1f0930b76f80f08dbe6168d7739d09d7ccc303
+obligation: obl.frame kind=frame status=checked evidence=ev.proof formula="frame conditions are emitted with bounded table and column effects"
+obligation: obl.external kind=evidence status=assumed evidence=ev.proof formula="database replay discharges external row existence obligations"
+canonical-sha256: a73b5f8ea080d64bbab5d24240cd7d46a36ee134d4c8676511093613fb026082
+END
