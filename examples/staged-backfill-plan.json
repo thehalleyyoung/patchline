@@ -1,0 +1,45 @@
+{
+  "version": "patchline.backfill-plan/v1",
+  "name": "invoice external id staged backfill",
+  "table": "invoices",
+  "primary_key": "id",
+  "source_column": "legacy_external_id",
+  "target_column": "external_id",
+  "expected_rows": 3,
+  "compatibility_code_refs": [
+    "examples/expand-contract/rails-billing/app/models/invoice.rb:dual_write_external_id"
+  ],
+  "stages": [
+    {
+      "id": "expand",
+      "kind": "expand",
+      "command": "add nullable invoices.external_id while legacy writers keep dual-writing"
+    },
+    {
+      "id": "backfill",
+      "kind": "backfill",
+      "depends_on": ["expand"],
+      "command": "copy legacy_external_id into external_id for every pre-existing invoice"
+    },
+    {
+      "id": "validate",
+      "kind": "validate",
+      "depends_on": ["backfill"],
+      "command": "run patchline backfill-plan and generated validation SQL"
+    },
+    {
+      "id": "contract",
+      "kind": "contract",
+      "depends_on": ["validate"],
+      "tightens_constraint": true,
+      "command": "set invoices.external_id NOT NULL"
+    },
+    {
+      "id": "delete-compatibility",
+      "kind": "delete_compatibility",
+      "depends_on": ["validate"],
+      "deletes_compatibility": true,
+      "command": "remove legacy dual-write compatibility code after contract review"
+    }
+  ]
+}

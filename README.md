@@ -119,6 +119,8 @@ Run `cert normalize`, `cert diff`, `cert revoke-verify`, and `cert plugfest` to 
 
 Run `expand-contract-template` to generate invariant-backed expand/contract templates and verify Rails, Django, and Prisma evidence; reproduce it with `make expand-contract-templates-gate`.
 
+Run `backfill-plan` to gate constraint tightening and compatibility-code deletion on an exhaustive replay-store backfill proof; reproduce it with `make staged-backfill-planner-gate`.
+
 Run `golden-fixture generate --github owner/repo --ref <sha> --subpath <path> --out <dir>` to turn a real-repo slice into a tiny deterministic Go test without vendoring the full repository; see [docs/golden-fixtures.md](docs/golden-fixtures.md).
 
 <details>

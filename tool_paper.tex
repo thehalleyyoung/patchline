@@ -47,8 +47,9 @@ reproducibly from any of several source hosts, inventories what is actually pres
 project-native \emph{fact layer} with full provenance, ranks data-change risks, and---only when asked,
 and only within an explicit budget---generates bounded interventions that are quarantined and then
 \emph{deterministically re-analyzed and rejected} if they do not improve the evidence. Its remediation
-surface now also derives invariant-backed expand/contract templates and checks Rails, Django, and
-Prisma evidence before a contract step is trusted. Critically,
+surface now also derives invariant-backed expand/contract templates, then uses a staged backfill
+planner to gate constraint-tightening and compatibility-code deletion on an exhaustive replay-store
+proof. Critically,
 every capability in \tool{} is backed by a reproducible \emph{gate}: a script that proves the
 capability against real, pinned public code and fails loudly on drift. \tool{} currently ships more
 than 600 such gates over 560 documented capabilities, spanning relational migrations across nine
@@ -417,6 +418,16 @@ against Rails ActiveRecord, Django migration/model, and Prisma schema/migration 
 only stable relative paths, line numbers, and obligation names. Its negative control removes the
 backfill migration from an ORM project and must be refuted by the scanner, so the gate exercises the
 real evidence path rather than a synthetic flag.
+
+\paragraph{Staged backfill planning.} The \code{backfill-plan} command takes the next step from a
+template to a release-blocking proof artifact. Given a versioned plan, an expand/backfill/validate/
+contract stage graph, compatibility-code references, and a replay store, it exhaustively checks every
+row in the named table: the target column must be present and non-empty, and when a source column is
+declared the target must equal it. Contract stages and compatibility-deletion stages are marked ready
+only when they depend on \code{validate}, which depends on \code{backfill}, and when the completeness
+proof is \code{checked}. The \gate{staged-backfill-planner-gate} positive control certifies a complete
+three-row invoice fixture; its negative control leaves one legacy row empty and verifies that both
+\code{contract} and \code{delete-compatibility} remain blocked with the exact row id recorded.
 
 \paragraph{The accept/reject decision.} Table~\ref{tab:compare} makes the compare contract precise.
 Each proposed artifact is scored on the same fact-derived axes as the baseline, and the decision is a
@@ -1151,7 +1162,7 @@ deterministic analysis, bounded generation, real-repo gates, formal and causal s
 safety cases, standards hooks, privacy-preserving reviewer-outcome aggregation, and long-horizon impact
 evidence. The remaining frontier is not another isolated detector; it is the transition from a
 generational artifact to shared infrastructure. The open roadmap items around this transition include:
-production-grade remediation loops for backfill, rollback, repair escrow, playbooks, and patch-series safety; a
+production-grade remediation loops for rollback, repair escrow, playbooks, and patch-series safety; a
 public evidence marketplace with licenses, bounties, minimization, and governance; engine-version
 semantics for production databases, locks, replication, partitioning, and online schema change;
 socio-technical accountability for appeals, fairness, ethics, and detector deprecation; education and
@@ -1332,7 +1343,7 @@ Migration breadth & \code{multi-ecosystem-migration-gate}, \code{nosql-change-ga
 \code{data-pipeline-gate}, \code{schema-compat-gate}, \code{infra-ordering-gate} \\
 Intervention safety & \code{generated-code-quarantine-gate}, \code{rejected-generated-gate},
 \code{intervention-regression-archive-gate}, \code{expand-contract-templates-gate},
-\code{reviewability-examples-gate} \\
+\code{staged-backfill-planner-gate}, \code{reviewability-examples-gate} \\
 Runtime evidence & \code{otel-trace-gen-gate}, \code{datadog-timeline-gate}, \code{prom-grafana-gate},
 \code{runtime-confidence-gate} \\
 Evaluation rigor & \code{fp-adjudication-gate}, \code{fn-discovery-gate}, \code{ablation-study-gate},

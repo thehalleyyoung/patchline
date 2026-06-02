@@ -1,0 +1,21 @@
+{
+  "tables": {
+    "invoices": {
+      "1": {
+        "id": "1",
+        "legacy_external_id": "inv-001",
+        "external_id": "inv-001"
+      },
+      "2": {
+        "id": "2",
+        "legacy_external_id": "inv-002",
+        "external_id": "inv-002"
+      },
+      "3": {
+        "id": "3",
+        "legacy_external_id": "inv-003",
+        "external_id": ""
+      }
+    }
+  }
+}

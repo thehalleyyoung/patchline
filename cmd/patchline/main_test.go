@@ -15,6 +15,7 @@ import (
 
 	"github.com/thehalleyyoung/patchline/internal/artifact"
 	"github.com/thehalleyyoung/patchline/internal/attest"
+	"github.com/thehalleyyoung/patchline/internal/backfillplanner"
 	"github.com/thehalleyyoung/patchline/internal/evidence"
 	"github.com/thehalleyyoung/patchline/internal/expandcontract"
 	"github.com/thehalleyyoung/patchline/internal/feedback"
@@ -115,6 +116,51 @@ end
 		t.Fatalf("unexpected expand/contract report: %#v", report)
 	}
 	for _, rel := range []string{"expand-contract-template.md", "expand-contract-template.sql"} {
+		if stat, err := os.Stat(filepath.Join(out, rel)); err != nil || stat.Size() == 0 {
+			t.Fatalf("expected %s to be written, stat=%#v err=%v", rel, stat, err)
+		}
+	}
+}
+
+func TestBackfillPlanCommandWritesReports(t *testing.T) {
+	root := t.TempDir()
+	specPath := filepath.Join(root, "backfill-plan.json")
+	storePath := filepath.Join(root, "store.json")
+	writeMainTestFile(t, root, "backfill-plan.json", `{
+  "version": "patchline.backfill-plan/v1",
+  "name": "invoice external id staged backfill",
+  "table": "invoices",
+  "primary_key": "id",
+  "source_column": "legacy_external_id",
+  "target_column": "external_id",
+  "expected_rows": 2,
+  "compatibility_code_refs": ["app/models/invoice.rb:dual_write_external_id"],
+  "stages": [
+    {"id":"expand","kind":"expand","command":"add nullable external_id"},
+    {"id":"backfill","kind":"backfill","depends_on":["expand"],"command":"copy legacy_external_id"},
+    {"id":"validate","kind":"validate","depends_on":["backfill"],"command":"run validation SQL"},
+    {"id":"contract","kind":"contract","depends_on":["validate"],"tightens_constraint":true,"command":"set NOT NULL"},
+    {"id":"delete-compatibility","kind":"delete_compatibility","depends_on":["validate"],"deletes_compatibility":true,"command":"remove dual write"}
+  ]
+}`)
+	writeMainTestFile(t, root, "store.json", `{
+  "tables": {
+    "invoices": {
+      "1": {"id":"1","legacy_external_id":"inv-1","external_id":"inv-1"},
+      "2": {"id":"2","legacy_external_id":"inv-2","external_id":"inv-2"}
+    }
+  }
+}`)
+	out := filepath.Join(t.TempDir(), "backfill-plan")
+	if err := run([]string{"backfill-plan", "--spec", specPath, "--store", storePath, "--out", out, "--json"}); err != nil {
+		t.Fatalf("backfill-plan failed: %v", err)
+	}
+	var report backfillplanner.Report
+	readMainTestJSON(t, filepath.Join(out, "backfill-plan.json"), &report)
+	if !report.OK || report.Proof.Status != "checked" || report.Summary.RowsChecked != 2 {
+		t.Fatalf("unexpected backfill plan report: %#v", report)
+	}
+	for _, rel := range []string{"backfill-plan.md", "backfill-plan.sql"} {
 		if stat, err := os.Stat(filepath.Join(out, rel)); err != nil || stat.Size() == 0 {
 			t.Fatalf("expected %s to be written, stat=%#v err=%v", rel, stat, err)
 		}

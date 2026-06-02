@@ -23,6 +23,7 @@ import (
 	"github.com/thehalleyyoung/patchline/internal/archive"
 	"github.com/thehalleyyoung/patchline/internal/artifact"
 	"github.com/thehalleyyoung/patchline/internal/attest"
+	"github.com/thehalleyyoung/patchline/internal/backfillplanner"
 	"github.com/thehalleyyoung/patchline/internal/bench"
 	"github.com/thehalleyyoung/patchline/internal/bundle"
 	"github.com/thehalleyyoung/patchline/internal/canonical"
@@ -411,6 +412,8 @@ func run(args []string) error {
 		return adaptEvidence(args[1], args[2], hasFlag(args[3:], "--json"), outPath)
 	case "expand-contract-template":
 		return expandContractTemplate(args[1:], hasFlag(args[1:], "--json"))
+	case "backfill-plan":
+		return backfillPlanCommand(args[1:], hasFlag(args[1:], "--json"))
 	case "feedback":
 		return feedbackCommand(args[1:])
 	case "security":
@@ -546,6 +549,7 @@ Usage:
   patchline ingest-evidence <events.jsonl> [--json] [--out graph.json]
   patchline adapt-evidence <otlp|datadog|postgres|github|migration-runner|jira|linear> <input.json> [--json] [--out events.jsonl]
   patchline expand-contract-template --spec expand-contract.json --out dir [--json]
+  patchline backfill-plan --spec backfill-plan.json --store store.json --out dir [--json]
   patchline feedback counterfactual-log --feedback live-feedback.json --history policy-history.json --out dir [--json]
   patchline feedback online-eval --feedback live-feedback.json --spec online-evaluation.json --out dir [--json]
   patchline feedback active-learning-queue --spec active-learning.json --out dir [--json]
@@ -14539,6 +14543,51 @@ func expandContractTemplate(args []string, jsonOut bool) error {
 		return writeJSON(os.Stdout, report)
 	}
 	fmt.Printf("wrote %d invariant-backed expand/contract template(s) and %d ORM check(s) to %s\n", report.Summary.Templates, report.Summary.Projects, outPath)
+	return nil
+}
+
+func backfillPlanCommand(args []string, jsonOut bool) error {
+	specPath, outPath, err := feedbackSpecOut(args, "patchline backfill-plan --spec backfill-plan.json --store store.json --out <dir> [--json]")
+	if err != nil {
+		return err
+	}
+	storePath, ok := flagValue(args, "--store")
+	if !ok || storePath == "" {
+		return errors.New("usage: patchline backfill-plan --spec backfill-plan.json --store store.json --out <dir> [--json]")
+	}
+	file, err := os.Open(specPath)
+	if err != nil {
+		return err
+	}
+	defer file.Close()
+	spec, err := backfillplanner.ReadSpec(file)
+	if err != nil {
+		return err
+	}
+	store, err := readStore(storePath)
+	if err != nil {
+		return err
+	}
+	report, err := backfillplanner.BuildPlan(spec, store)
+	if err != nil {
+		return err
+	}
+	if err := os.MkdirAll(outPath, 0o755); err != nil {
+		return err
+	}
+	if err := writeJSONArtifact(filepath.Join(outPath, "backfill-plan.json"), report); err != nil {
+		return err
+	}
+	if err := os.WriteFile(filepath.Join(outPath, "backfill-plan.md"), []byte(backfillplanner.RenderMarkdown(report)), 0o644); err != nil {
+		return err
+	}
+	if err := os.WriteFile(filepath.Join(outPath, "backfill-plan.sql"), []byte(backfillplanner.RenderSQL(report)), 0o644); err != nil {
+		return err
+	}
+	if jsonOut {
+		return writeJSON(os.Stdout, report)
+	}
+	fmt.Printf("wrote staged backfill plan for %s.%s with %d checked row(s) to %s\n", report.Scope.Table, report.Scope.TargetColumn, report.Summary.RowsChecked, outPath)
 	return nil
 }
 
