@@ -34,6 +34,7 @@ type BaselineReport struct {
 	SymbolicChecks  []SymbolicCheck           `json:"symbolic_checks,omitempty"`
 	TemporalWindows []TemporalWindow          `json:"temporal_windows,omitempty"`
 	Recurrences     []RecurrencePattern       `json:"recurrences,omitempty"`
+	Transactions    []TransactionBoundary     `json:"transaction_boundaries,omitempty"`
 	PolicyChecks    []PolicyCheck             `json:"policy_checks,omitempty"`
 	RepairProofs    []RepairProofSummary      `json:"repair_proof_summaries,omitempty"`
 	NativeChecks    []Command                 `json:"native_checks,omitempty"`
@@ -64,6 +65,10 @@ type BaselineSummary struct {
 	TemporalSignals     int `json:"temporal_signals"`
 	Recurrences         int `json:"recurrences"`
 	RecurringRisks      int `json:"recurring_risks"`
+	Transactions        int `json:"transaction_boundaries"`
+	TransactionExplicit int `json:"transaction_explicit"`
+	TransactionMissing  int `json:"transaction_missing"`
+	TransactionPartial  int `json:"transaction_partial"`
 	PolicyChecks        int `json:"policy_checks"`
 	PolicyPassed        int `json:"policy_passed"`
 	PolicyWarnings      int `json:"policy_warnings"`
@@ -93,6 +98,22 @@ type BaselineRisk struct {
 	Identifiers  []Identifier  `json:"identifiers,omitempty"`
 	Rationale    string        `json:"rationale"`
 	NextCommand  string        `json:"next_command,omitempty"`
+}
+
+type TransactionBoundary struct {
+	ID          string       `json:"id"`
+	RiskID      string       `json:"risk_id,omitempty"`
+	Path        string       `json:"path"`
+	Line        int          `json:"line,omitempty"`
+	Table       string       `json:"table,omitempty"`
+	Surface     string       `json:"surface"`
+	Operation   string       `json:"operation,omitempty"`
+	Status      string       `json:"status"`
+	Confidence  string       `json:"confidence"`
+	Markers     []string     `json:"markers,omitempty"`
+	Evidence    []string     `json:"evidence,omitempty"`
+	Identifiers []Identifier `json:"identifiers,omitempty"`
+	Rationale   string       `json:"rationale"`
 }
 
 type ScoreFactor struct {
@@ -268,6 +289,7 @@ func Baseline(inv Inventory, facts []Fact, intakeReport intake.Report) BaselineR
 	report.SymbolicChecks = buildSymbolicChecks(report.Risks, report.AbstractEffects, report.Provenance)
 	report.TemporalWindows = buildTemporalWindows(report.Risks, report.Provenance, intakeReport)
 	report.Recurrences = buildRecurrences(report.Risks, report.AbstractEffects, report.Provenance)
+	report.Transactions = buildTransactionBoundaries(report.Risks, report.Provenance, intakeReport)
 	report.PolicyChecks = buildPolicyChecks(report.Risks, report.Provenance, report.SymbolicChecks)
 	report.RepairProofs = buildRepairProofSummaries(report.Risks, report.Provenance, report.AbstractEffects, report.SymbolicChecks)
 	report.Summary = BaselineSummary{
@@ -293,6 +315,10 @@ func Baseline(inv Inventory, facts []Fact, intakeReport intake.Report) BaselineR
 		TemporalSignals:     countTemporalSignals(report.TemporalWindows),
 		Recurrences:         len(report.Recurrences),
 		RecurringRisks:      countRecurringRisks(report.Recurrences),
+		Transactions:        len(report.Transactions),
+		TransactionExplicit: countTransactionStatus(report.Transactions, "explicit"),
+		TransactionMissing:  countTransactionStatus(report.Transactions, "missing"),
+		TransactionPartial:  countTransactionStatus(report.Transactions, "partial"),
 		PolicyChecks:        len(report.PolicyChecks),
 		PolicyPassed:        countPolicyStatus(report.PolicyChecks, "pass"),
 		PolicyWarnings:      countPolicyStatus(report.PolicyChecks, "warn"),
@@ -2032,6 +2058,277 @@ func countRecurringRisks(patterns []RecurrencePattern) int {
 	return len(seen)
 }
 
+func buildTransactionBoundaries(risks []BaselineRisk, slices []ProvenanceSlice, intakeReport intake.Report) []TransactionBoundary {
+	root := firstNonEmpty(intakeReport.Source.ScannedRoot, intakeReport.Source.Input)
+	sliceByRisk := map[string]ProvenanceSlice{}
+	for _, slice := range slices {
+		sliceByRisk[slice.RiskID] = slice
+	}
+	seen := map[string]bool{}
+	var out []TransactionBoundary
+	for _, risk := range risks {
+		if !riskNeedsTransactionBoundary(risk) {
+			continue
+		}
+		text := textForBoundary(root, risk.Path)
+		window := text
+		if risk.Statement > 0 {
+			window = lineWindow(text, risk.Statement, 8)
+		}
+		status, markers := classifyTransactionBoundary(window)
+		if status == "missing" && riskHasFactor(risk, "missing-transaction-boundary") == false {
+			status, markers = classifyTransactionBoundary(text)
+		}
+		boundary := TransactionBoundary{
+			ID:          "tx:" + canonical.Hash(fmt.Sprintf("risk\x00%s\x00%s\x00%d", risk.ID, risk.Path, risk.Statement))[:16],
+			RiskID:      risk.ID,
+			Path:        risk.Path,
+			Line:        risk.Statement,
+			Table:       risk.Table,
+			Surface:     transactionSurface(risk.Kind, risk.Path),
+			Operation:   transactionOperation(risk.Kind),
+			Status:      status,
+			Confidence:  transactionConfidence(status, text),
+			Markers:     markers,
+			Evidence:    transactionEvidence(risk, sliceByRisk[risk.ID], markers),
+			Identifiers: risk.Identifiers,
+			Rationale:   transactionRationale(status, transactionSurface(risk.Kind, risk.Path)),
+		}
+		if addTransactionBoundary(&out, seen, boundary) {
+			continue
+		}
+	}
+	for _, slice := range slices {
+		for _, path := range slice.RepairPaths {
+			text := textForBoundary(root, path)
+			status, markers := classifyTransactionBoundary(text)
+			surface := "repair"
+			if isGeneratedPath(path) {
+				surface = "generated_repair"
+			}
+			addTransactionBoundary(&out, seen, TransactionBoundary{
+				ID:          "tx:" + canonical.Hash(fmt.Sprintf("repair\x00%s\x00%s", slice.RiskID, path))[:16],
+				RiskID:      slice.RiskID,
+				Path:        path,
+				Table:       slice.Table,
+				Surface:     surface,
+				Operation:   "repair",
+				Status:      status,
+				Confidence:  transactionConfidence(status, text),
+				Markers:     markers,
+				Evidence:    []string{"repair path linked by provenance slice"},
+				Identifiers: slice.Identifiers,
+				Rationale:   transactionRationale(status, surface),
+			})
+		}
+	}
+	sort.Slice(out, func(i, j int) bool {
+		if out[i].Status != out[j].Status {
+			return transactionStatusRank(out[i].Status) > transactionStatusRank(out[j].Status)
+		}
+		if out[i].Path != out[j].Path {
+			return out[i].Path < out[j].Path
+		}
+		return out[i].ID < out[j].ID
+	})
+	return out
+}
+
+func addTransactionBoundary(out *[]TransactionBoundary, seen map[string]bool, boundary TransactionBoundary) bool {
+	key := boundary.RiskID + "\x00" + boundary.Path + "\x00" + boundary.Surface + "\x00" + boundary.Operation
+	if seen[key] {
+		return false
+	}
+	seen[key] = true
+	*out = append(*out, boundary)
+	return true
+}
+
+func riskNeedsTransactionBoundary(risk BaselineRisk) bool {
+	kind := strings.ToLower(risk.Kind)
+	if containsAny(kind, "update", "delete", "insert", "drop", "truncate", "alter", "create", "merge", "schema", "code-path") {
+		return true
+	}
+	for _, factor := range risk.Factors {
+		if containsAny(strings.ToLower(factor.Name), "persistent", "destructive", "write", "schema") {
+			return true
+		}
+	}
+	return false
+}
+
+func textForBoundary(root, path string) string {
+	if path == "" {
+		return ""
+	}
+	candidate := path
+	if !filepath.IsAbs(candidate) && root != "" {
+		candidate = filepath.Join(root, filepath.FromSlash(path))
+	}
+	text, err := readTextPrefix(candidate, factContentLimit)
+	if err == nil {
+		return text
+	}
+	return ""
+}
+
+func lineWindow(text string, line, radius int) string {
+	if text == "" || line <= 0 {
+		return text
+	}
+	lines := strings.Split(text, "\n")
+	if line > len(lines) {
+		return text
+	}
+	start := line - radius - 1
+	if start < 0 {
+		start = 0
+	}
+	end := line + radius
+	if end > len(lines) {
+		end = len(lines)
+	}
+	return strings.Join(lines[start:end], "\n")
+}
+
+func classifyTransactionBoundary(text string) (string, []string) {
+	lower := strings.ToLower(text)
+	var markers []string
+	markerChecks := []struct {
+		Name string
+		Need []string
+	}{
+		{"transaction-block", []string{"transaction"}},
+		{"atomic-block", []string{"atomic"}},
+		{"transactional-annotation", []string{"@transactional"}},
+		{"sql-begin", []string{"begin"}},
+		{"sql-commit", []string{"commit"}},
+		{"rollback", []string{"rollback"}},
+		{"savepoint", []string{"savepoint"}},
+		{"gorm-transaction", []string{".transaction("}},
+		{"django-atomic", []string{"transaction.atomic"}},
+		{"rails-transaction", []string{"activerecord::base.transaction", ".transaction do"}},
+		{"sqlalchemy-begin", []string{"session.begin"}},
+		{"typeorm-transaction", []string{"manager.transaction", "queryrunner.starttransaction"}},
+		{"prisma-transaction", []string{"$transaction"}},
+	}
+	for _, check := range markerChecks {
+		for _, token := range check.Need {
+			if strings.Contains(lower, token) {
+				markers = append(markers, check.Name)
+				break
+			}
+		}
+	}
+	markers = uniqueStrings(markers)
+	hasExplicit := containsAny(lower, "transaction", "atomic", "@transactional", ".transaction(", "$transaction", "session.begin", "starttransaction")
+	hasBegin := containsAny(lower, "begin", "start transaction")
+	hasCommit := strings.Contains(lower, "commit")
+	hasRollback := strings.Contains(lower, "rollback")
+	if hasExplicit || (hasBegin && (hasCommit || hasRollback)) {
+		return "explicit", markers
+	}
+	if hasBegin || hasCommit || hasRollback || strings.Contains(lower, "savepoint") || strings.Contains(lower, " tx.") || strings.Contains(lower, "tx.") {
+		return "partial", markers
+	}
+	return "missing", markers
+}
+
+func transactionSurface(kind, path string) string {
+	lower := strings.ToLower(kind + " " + path)
+	switch {
+	case strings.Contains(lower, "code-path"):
+		return "app_code"
+	case strings.Contains(lower, "schema"):
+		return "migration_dsl"
+	case strings.HasSuffix(lower, ".sql") || strings.Contains(lower, "sql"):
+		return "raw_sql"
+	case isGeneratedPath(path):
+		return "generated_repair"
+	case containsAny(lower, "job", "worker", "task", "cron"):
+		return "job"
+	default:
+		return "project_file"
+	}
+}
+
+func transactionOperation(kind string) string {
+	parts := strings.Split(kind, ":")
+	if len(parts) > 0 {
+		return parts[len(parts)-1]
+	}
+	return kind
+}
+
+func transactionConfidence(status, text string) string {
+	if text == "" {
+		return "low"
+	}
+	switch status {
+	case "explicit":
+		return "high"
+	case "partial":
+		return "medium"
+	default:
+		return "derived"
+	}
+}
+
+func transactionEvidence(risk BaselineRisk, slice ProvenanceSlice, markers []string) []string {
+	var evidence []string
+	if len(markers) > 0 {
+		evidence = append(evidence, "transaction markers: "+strings.Join(markers, ", "))
+	}
+	for _, factor := range risk.Factors {
+		if factor.Name == "missing-transaction-boundary" {
+			evidence = append(evidence, factor.Reason)
+		}
+	}
+	if len(slice.StagesPresent) > 0 {
+		evidence = append(evidence, "provenance stages: "+strings.Join(slice.StagesPresent, ", "))
+	}
+	return uniqueStrings(evidence)
+}
+
+func transactionRationale(status, surface string) string {
+	switch status {
+	case "explicit":
+		return surface + " has an explicit transaction boundary marker near the write"
+	case "partial":
+		return surface + " has partial transaction evidence but no complete begin/commit or framework transaction marker"
+	default:
+		return surface + " write has no obvious transaction boundary in the scanned context"
+	}
+}
+
+func isGeneratedPath(path string) bool {
+	lower := strings.ToLower(path)
+	return containsAny(lower, "generated", "proposal", "patchline", "repair")
+}
+
+func transactionStatusRank(status string) int {
+	switch status {
+	case "missing":
+		return 3
+	case "partial":
+		return 2
+	case "explicit":
+		return 1
+	default:
+		return 0
+	}
+}
+
+func countTransactionStatus(boundaries []TransactionBoundary, status string) int {
+	var count int
+	for _, boundary := range boundaries {
+		if boundary.Status == status {
+			count++
+		}
+	}
+	return count
+}
+
 func buildPolicyChecks(risks []BaselineRisk, slices []ProvenanceSlice, symbolic []SymbolicCheck) []PolicyCheck {
 	sliceByRisk := map[string]ProvenanceSlice{}
 	for _, slice := range slices {
@@ -2510,6 +2807,10 @@ func renderBaselineMarkdown(report BaselineReport) string {
 	fmt.Fprintf(&b, "| temporal signals | %d |\n", report.Summary.TemporalSignals)
 	fmt.Fprintf(&b, "| recurrence patterns | %d |\n", report.Summary.Recurrences)
 	fmt.Fprintf(&b, "| recurring risks | %d |\n", report.Summary.RecurringRisks)
+	fmt.Fprintf(&b, "| transaction boundaries | %d |\n", report.Summary.Transactions)
+	fmt.Fprintf(&b, "| transaction explicit | %d |\n", report.Summary.TransactionExplicit)
+	fmt.Fprintf(&b, "| transaction partial | %d |\n", report.Summary.TransactionPartial)
+	fmt.Fprintf(&b, "| transaction missing | %d |\n", report.Summary.TransactionMissing)
 	fmt.Fprintf(&b, "| policy checks | %d |\n", report.Summary.PolicyChecks)
 	fmt.Fprintf(&b, "| policy passed | %d |\n", report.Summary.PolicyPassed)
 	fmt.Fprintf(&b, "| policy warnings | %d |\n", report.Summary.PolicyWarnings)
@@ -2583,6 +2884,14 @@ func renderBaselineMarkdown(report BaselineReport) string {
 		limit := minInt(len(report.Recurrences), 20)
 		for _, pattern := range report.Recurrences[:limit] {
 			fmt.Fprintf(&b, "| %d | %s | %s | %s | %d | %s |\n", pattern.Count, pattern.Table, pattern.Kind, pattern.Effect, len(pattern.Paths), pattern.Confidence)
+		}
+		fmt.Fprintf(&b, "\n")
+	}
+	if len(report.Transactions) > 0 {
+		fmt.Fprintf(&b, "## Transaction boundaries\n\n| status | surface | risk | table | path | markers |\n| --- | --- | --- | --- | --- | --- |\n")
+		limit := minInt(len(report.Transactions), 25)
+		for _, boundary := range report.Transactions[:limit] {
+			fmt.Fprintf(&b, "| %s | %s | `%s` | %s | %s | %s |\n", boundary.Status, boundary.Surface, boundary.RiskID, boundary.Table, boundary.Path, strings.Join(boundary.Markers, ", "))
 		}
 		fmt.Fprintf(&b, "\n")
 	}

@@ -505,28 +505,50 @@ func TestBaselineRanksPersistentWriteCodePaths(t *testing.T) {
     Account.update_all(disabled: false)
   end
 end`)
+	writeFile(t, root, "app/jobs/transactional_repair.rb", `class TransactionalRepairJob
+  def perform
+    ActiveRecord::Base.transaction do
+      Account.where(id: account_id).update_all(disabled: false)
+    end
+  end
+end`)
 	inv := Inventory{
 		Root: filepath.ToSlash(root),
 		Facts: []Fact{
 			{Version: Version, ID: "fact:account", Kind: "file", Path: "app/jobs/repair.rb", Confidence: "observed", Identifiers: []Identifier{{Kind: "table", Value: "accounts"}}},
+			{Version: Version, ID: "fact:transactional-account", Kind: "file", Path: "app/jobs/transactional_repair.rb", Confidence: "observed", Identifiers: []Identifier{{Kind: "table", Value: "accounts"}}},
 		},
 	}
 	report := intake.Report{
-		Source: intake.Source{Input: "fixture"},
+		Source: intake.Source{Input: "fixture", ScannedRoot: filepath.ToSlash(root)},
 		SourceSQL: migration.SourceSQLReport{
 			Root: filepath.ToSlash(root),
-			Observations: []migration.SourceSQLObservation{{
-				Path:        "app/jobs/repair.rb",
-				Language:    "Ruby",
-				Detector:    "ruby.rails-active-record",
-				Line:        3,
-				Kind:        "orm_query",
-				Framework:   "rails",
-				Operation:   "update",
-				Table:       "accounts",
-				Confidence:  "medium",
-				SnippetHash: "snippet-hash",
-			}},
+			Observations: []migration.SourceSQLObservation{
+				{
+					Path:        "app/jobs/repair.rb",
+					Language:    "Ruby",
+					Detector:    "ruby.rails-active-record",
+					Line:        3,
+					Kind:        "orm_query",
+					Framework:   "rails",
+					Operation:   "update",
+					Table:       "accounts",
+					Confidence:  "medium",
+					SnippetHash: "snippet-hash",
+				},
+				{
+					Path:        "app/jobs/transactional_repair.rb",
+					Language:    "Ruby",
+					Detector:    "ruby.rails-active-record",
+					Line:        4,
+					Kind:        "orm_query",
+					Framework:   "rails",
+					Operation:   "update",
+					Table:       "accounts",
+					Confidence:  "medium",
+					SnippetHash: "transactional-snippet-hash",
+				},
+			},
 		},
 	}
 	baseline := Baseline(inv, inv.Facts, report)
@@ -546,6 +568,9 @@ end`)
 	}
 	if !sawMissingTransaction {
 		t.Fatalf("expected missing transaction factor: %#v", baseline.Risks)
+	}
+	if baseline.Summary.Transactions == 0 || baseline.Summary.TransactionMissing == 0 || baseline.Summary.TransactionExplicit == 0 {
+		t.Fatalf("expected missing and explicit transaction boundaries: %#v", baseline.Transactions)
 	}
 }
 
@@ -963,6 +988,34 @@ func TestCompareChecksRepairManifestSchema(t *testing.T) {
 	checks = checkGeneratedArtifacts([]GeneratedArtifact{mutated})
 	if len(checks) != 1 || checks[0].Status != "fail" || !strings.Contains(strings.Join(checks[0].Findings, "\n"), "validation commands") {
 		t.Fatalf("expected missing validation commands to fail, got %#v", checks)
+	}
+}
+
+func TestCompareInfersGeneratedTransactionBoundaries(t *testing.T) {
+	baseline := BaselineReport{Version: BaselineVersion, Hash: "baseline-hash"}
+	baseline.Hash = baselineHash(baseline)
+	proposal := ProposalReport{
+		BaselineHash: baseline.Hash,
+		OutputHash:   "proposal-hash",
+		GeneratedFiles: []GeneratedFile{
+			{Path: "patchline-proposals/sql/update_accounts.sql", Kind: "repair", ContentHash: "sha256:abc", RiskIDs: []string{"risk:accounts"}},
+		},
+		Generated: []GeneratedArtifact{{
+			Path: "patchline-proposals/sql/update_accounts.sql",
+			Kind: "repair",
+			Content: `BEGIN;
+UPDATE accounts SET disabled = false WHERE id = 1;
+COMMIT;`,
+			RiskIDs: []string{"risk:accounts"},
+		}},
+		TargetRiskIDs: []string{"risk:accounts"},
+	}
+	compare := Compare(baseline, proposal)
+	if compare.Summary.TransactionBoundaries != 1 || compare.Summary.TransactionExplicit != 1 {
+		t.Fatalf("expected explicit generated transaction boundary: summary=%#v boundaries=%#v", compare.Summary, compare.Transactions)
+	}
+	if len(compare.Transactions) != 1 || compare.Transactions[0].Surface != "generated_repair" || compare.Transactions[0].Status != "explicit" {
+		t.Fatalf("unexpected generated transaction boundary: %#v", compare.Transactions)
 	}
 }
 

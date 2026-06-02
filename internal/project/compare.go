@@ -19,19 +19,20 @@ import (
 const CompareVersion = "patchline.repo-compare/v1"
 
 type CompareReport struct {
-	Version         string           `json:"version"`
-	BaselineHash    string           `json:"baseline_hash"`
-	ProposalHash    string           `json:"proposal_hash"`
-	Summary         CompareSummary   `json:"summary"`
-	Intervention    InterventionLoop `json:"intervention_loop"`
-	ReviewBadge     ReviewBadge      `json:"review_badge"`
-	RiskDeltas      []RiskDelta      `json:"risk_deltas,omitempty"`
-	GeneratedChecks []GeneratedCheck `json:"generated_checks,omitempty"`
-	NativeChecks    []Command        `json:"native_checks,omitempty"`
-	NativeResults   []NativeResult   `json:"native_results,omitempty"`
-	Review          []ReviewItem     `json:"review,omitempty"`
-	Hash            string           `json:"hash"`
-	Markdown        string           `json:"markdown,omitempty"`
+	Version         string                `json:"version"`
+	BaselineHash    string                `json:"baseline_hash"`
+	ProposalHash    string                `json:"proposal_hash"`
+	Summary         CompareSummary        `json:"summary"`
+	Intervention    InterventionLoop      `json:"intervention_loop"`
+	ReviewBadge     ReviewBadge           `json:"review_badge"`
+	RiskDeltas      []RiskDelta           `json:"risk_deltas,omitempty"`
+	GeneratedChecks []GeneratedCheck      `json:"generated_checks,omitempty"`
+	Transactions    []TransactionBoundary `json:"transaction_boundaries,omitempty"`
+	NativeChecks    []Command             `json:"native_checks,omitempty"`
+	NativeResults   []NativeResult        `json:"native_results,omitempty"`
+	Review          []ReviewItem          `json:"review,omitempty"`
+	Hash            string                `json:"hash"`
+	Markdown        string                `json:"markdown,omitempty"`
 }
 
 type CompareSummary struct {
@@ -52,6 +53,10 @@ type CompareSummary struct {
 	NativeChecksPassed    int  `json:"native_checks_passed"`
 	NativeChecksFailed    int  `json:"native_checks_failed"`
 	NativeChecksSkipped   int  `json:"native_checks_skipped"`
+	TransactionBoundaries int  `json:"transaction_boundaries"`
+	TransactionExplicit   int  `json:"transaction_explicit"`
+	TransactionMissing    int  `json:"transaction_missing"`
+	TransactionPartial    int  `json:"transaction_partial"`
 	InterventionLoops     int  `json:"intervention_loops"`
 	InterventionAccepted  int  `json:"intervention_accepted"`
 	InterventionRejected  int  `json:"intervention_rejected"`
@@ -154,8 +159,13 @@ func CompareWithOptions(baseline BaselineReport, proposal ProposalReport, opts C
 	checks := checkGeneratedArtifacts(proposal.Generated)
 	report.GeneratedChecks = checks
 	report.RiskDeltas = riskDeltas(baseline.Risks, proposal.Generated)
+	report.Transactions = generatedTransactionBoundaries(proposal.Generated)
 	report.NativeResults = runNativeChecks(baseline.InventoryRoot, baseline.NativeChecks, opts)
 	report.Summary = summarizeCompare(baseline, proposal, checks, report.RiskDeltas, report.NativeResults)
+	report.Summary.TransactionBoundaries = len(report.Transactions)
+	report.Summary.TransactionExplicit = countTransactionStatus(report.Transactions, "explicit")
+	report.Summary.TransactionMissing = countTransactionStatus(report.Transactions, "missing")
+	report.Summary.TransactionPartial = countTransactionStatus(report.Transactions, "partial")
 	report.Intervention = buildInterventionLoop(baseline, proposal, report.Summary)
 	report.Summary.InterventionLoops = 1
 	if report.Intervention.Status == "accepted-for-review" {
@@ -403,6 +413,57 @@ func riskDeltas(risks []BaselineRisk, artifacts []GeneratedArtifact) []RiskDelta
 		return out[i].RiskID < out[j].RiskID
 	})
 	return out
+}
+
+func generatedTransactionBoundaries(generated []GeneratedArtifact) []TransactionBoundary {
+	var out []TransactionBoundary
+	for _, artifact := range generated {
+		if artifact.Content == "" || !generatedArtifactNeedsTransactionBoundary(artifact) {
+			continue
+		}
+		status, markers := classifyTransactionBoundary(artifact.Content)
+		riskID := ""
+		if len(artifact.RiskIDs) > 0 {
+			riskID = artifact.RiskIDs[0]
+		}
+		out = append(out, TransactionBoundary{
+			ID:         "tx:" + canonical.Hash("generated\x00" + artifact.Path + "\x00" + canonical.Hash(artifact.Content))[:16],
+			RiskID:     riskID,
+			Path:       artifact.Path,
+			Surface:    "generated_repair",
+			Operation:  generatedArtifactOperation(artifact),
+			Status:     status,
+			Confidence: transactionConfidence(status, artifact.Content),
+			Markers:    markers,
+			Evidence:   []string{"generated artifact re-scanned by compare"},
+			Rationale:  transactionRationale(status, "generated_repair"),
+		})
+	}
+	sort.Slice(out, func(i, j int) bool {
+		if out[i].Status != out[j].Status {
+			return transactionStatusRank(out[i].Status) > transactionStatusRank(out[j].Status)
+		}
+		return out[i].Path < out[j].Path
+	})
+	return out
+}
+
+func generatedArtifactNeedsTransactionBoundary(artifact GeneratedArtifact) bool {
+	lower := strings.ToLower(artifact.Kind + " " + artifact.Path + " " + artifact.Content)
+	return containsAny(lower, "update ", "delete ", "insert ", "merge ", "drop ", "truncate ", "alter table", "create table", "repair", "rollback", "backfill")
+}
+
+func generatedArtifactOperation(artifact GeneratedArtifact) string {
+	lower := strings.ToLower(artifact.Content)
+	for _, op := range []string{"update", "delete", "insert", "merge", "drop", "truncate", "alter", "create"} {
+		if strings.Contains(lower, op+" ") {
+			return op
+		}
+	}
+	if artifact.Kind != "" {
+		return artifact.Kind
+	}
+	return "generated"
 }
 
 func summarizeCompare(baseline BaselineReport, proposal ProposalReport, checks []GeneratedCheck, deltas []RiskDelta, nativeResults []NativeResult) CompareSummary {
@@ -831,6 +892,10 @@ func renderCompareMarkdown(report CompareReport) string {
 	fmt.Fprintf(&b, "| native checks passed | %d |\n", report.Summary.NativeChecksPassed)
 	fmt.Fprintf(&b, "| native checks failed | %d |\n", report.Summary.NativeChecksFailed)
 	fmt.Fprintf(&b, "| native checks skipped | %d |\n", report.Summary.NativeChecksSkipped)
+	fmt.Fprintf(&b, "| transaction boundaries | %d |\n", report.Summary.TransactionBoundaries)
+	fmt.Fprintf(&b, "| transaction explicit | %d |\n", report.Summary.TransactionExplicit)
+	fmt.Fprintf(&b, "| transaction partial | %d |\n", report.Summary.TransactionPartial)
+	fmt.Fprintf(&b, "| transaction missing | %d |\n", report.Summary.TransactionMissing)
 	fmt.Fprintf(&b, "| intervention loops | %d |\n", report.Summary.InterventionLoops)
 	fmt.Fprintf(&b, "| intervention accepted | %d |\n", report.Summary.InterventionAccepted)
 	fmt.Fprintf(&b, "| intervention rejected | %d |\n\n", report.Summary.InterventionRejected)
@@ -870,6 +935,13 @@ func renderCompareMarkdown(report CompareReport) string {
 				reason = result.Reason
 			}
 			fmt.Fprintf(&b, "| %s | `%s` | `%s` | %s |\n", result.Status, result.Command, result.LogHash, reason)
+		}
+		fmt.Fprintf(&b, "\n")
+	}
+	if len(report.Transactions) > 0 {
+		fmt.Fprintf(&b, "## Generated transaction boundaries\n\n| status | path | operation | markers |\n| --- | --- | --- | --- |\n")
+		for _, boundary := range report.Transactions {
+			fmt.Fprintf(&b, "| %s | %s | %s | %s |\n", boundary.Status, boundary.Path, boundary.Operation, strings.Join(boundary.Markers, ", "))
 		}
 		fmt.Fprintf(&b, "\n")
 	}
