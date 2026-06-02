@@ -361,6 +361,8 @@ Run `make rc-rehearsal-gate` to run a **release-candidate rehearsal** across cap
 
 Run `make leaderboard-gate` to build a **benchmark leaderboard** comparing releases over time on gates, determinism, and reproduction rate — releases are ranked and any release that **regress**ed against its predecessor is flagged; see [docs/leaderboard.md](docs/leaderboard.md).
 
+Run `make case-bundle-gate` to assemble an archival **case-study bundle** of deep narrative studies plus dozens of **lightweight** worked examples — deep studies must carry a sufficiently detailed narrative and a shallow one is rejected; see [docs/case-bundle.md](docs/case-bundle.md).
+
 Add `--redact` to write `analysis-bundle/` copies with stable redaction tokens for identifiers, literals, customer-like strings, and secret-like values while preserving joins and existing artifact hashes.
 
 Add `--ci` to write `ci/summary.md` plus upload snippets and code-quality artifacts for GitHub Actions, GitLab CI, and Bitbucket Pipelines: SARIF under `analysis-bundle/summary.sarif`, GitLab `ci/gl-code-quality-report.json`, and Bitbucket `ci/bitbucket-code-insights.json`.

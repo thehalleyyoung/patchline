@@ -1,0 +1,9 @@
+{
+  "version": "patchline.case-bundle-gate/v1",
+  "claim": "Patchline ships an archival case-study bundle that pairs a small number of deep narrative case studies with a long tail of lightweight worked examples, so a reviewer can read a handful of end-to-end stories in depth while still seeing the breadth of situations the tool handles across dozens of compact examples. The worker assembles the bundle, requiring every deep case study to carry a narrative of at least a minimum length plus linked evidence, while lightweight examples need only a one-line summary, and it rejects any deep study whose narrative is too shallow to count. The gate proves the bundle contains the required number of sufficiently deep case studies and lightweight examples and that a deliberately shallow narrative is rejected from the deep tier.",
+  "real_repo": "patchline (self): archival case-study bundle (deep + lightweight)",
+  "deep_count": 8,
+  "lightweight_count": 40,
+  "min_narrative_chars": 120,
+  "topics": ["migration-risk", "drift-detection", "reproducibility", "determinism", "provenance", "ranking", "calibration", "privacy-impact"]
+}
