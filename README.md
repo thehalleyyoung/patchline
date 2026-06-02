@@ -265,6 +265,8 @@ Run `make guard-effectiveness-gate` to simulate generated migration guards again
 
 Run `make intervention-budget-tuning-gate` to sweep the generated-intervention budget over files, lines, tokens, and changes — proving risk coverage rises monotonically with budget, zero budget covers nothing, full budget covers everything, and each dimension has a diminishing-returns knee that recommends a setting; see [docs/intervention-budget-tuning.md](docs/intervention-budget-tuning.md).
 
+Run `make intervention-scorecard-gate` to emit a reviewer scorecard for every intervention that keeps usefulness, safety, completeness, and uncertainty as four separate axes — proving the axes are separable, all scores fall in [0,1], and no card overclaims completeness while proof holes remain open; see [docs/intervention-scorecard.md](docs/intervention-scorecard.md).
+
 Add `--redact` to write `analysis-bundle/` copies with stable redaction tokens for identifiers, literals, customer-like strings, and secret-like values while preserving joins and existing artifact hashes.
 
 Add `--ci` to write `ci/summary.md` plus upload snippets and code-quality artifacts for GitHub Actions, GitLab CI, and Bitbucket Pipelines: SARIF under `analysis-bundle/summary.sarif`, GitLab `ci/gl-code-quality-report.json`, and Bitbucket `ci/bitbucket-code-insights.json`.

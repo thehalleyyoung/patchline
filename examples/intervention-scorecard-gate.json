@@ -1,0 +1,11 @@
+{
+  "version": "patchline.intervention-scorecard-gate/v1",
+  "claim": "Every generated intervention gets a reviewer-readable scorecard that keeps four axes separate and never collapses them into a single misleading grade: usefulness (how much real risk it addresses), safety (absence of deterministic rejection signals), completeness (scope and frame obligations met plus rollback present), and uncertainty (share of open proof holes). The gate proves all scores are in [0,1], all four axes are present and separable, the scorecard is deterministic, and no intervention overclaims completeness while proof holes remain open.",
+  "real_repo": {
+    "repo": "lobsters/lobsters",
+    "ref": "3b80b47aa5aaba37ec44413e7d1dc96fcf1585b6",
+    "subpath": "db/migrate"
+  },
+  "minimum_interventions": 20,
+  "dimensions": ["usefulness", "safety", "completeness", "uncertainty"]
+}
