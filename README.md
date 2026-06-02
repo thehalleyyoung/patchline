@@ -367,6 +367,8 @@ Run `make eval-matrix-gate` to build a best-paper **evaluation matrix** mapping 
 
 Run `make launch-kit-gate` to validate a star-growth **launch kit** of README hook, long-form post, social thread, demo script, and FAQ — every channel must be present and each social post within the platform **character limit**; see [docs/launch-kit.md](docs/launch-kit.md).
 
+Run `make burndown-gate` to compute a **roadmap burndown** where every deliverable is **gate-backed** — a deliverable counts as done only when its gate script exists on disk and one pointing at a missing gate stays outstanding; see [docs/burndown.md](docs/burndown.md).
+
 Add `--redact` to write `analysis-bundle/` copies with stable redaction tokens for identifiers, literals, customer-like strings, and secret-like values while preserving joins and existing artifact hashes.
 
 Add `--ci` to write `ci/summary.md` plus upload snippets and code-quality artifacts for GitHub Actions, GitLab CI, and Bitbucket Pipelines: SARIF under `analysis-bundle/summary.sarif`, GitLab `ci/gl-code-quality-report.json`, and Bitbucket `ci/bitbucket-code-insights.json`.

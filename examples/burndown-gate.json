@@ -1,0 +1,16 @@
+{
+  "version": "patchline.burndown-gate/v1",
+  "claim": "Patchline publishes a roadmap burndown where every milestone deliverable is tied to a concrete gate script in the repository, so progress is measured by counting deliverables whose backing gate actually exists on disk rather than by self-reported percentages, and a deliverable can only count as done when its gate is present. The worker walks each milestone, resolves each deliverable to its gate path, marks the deliverable complete only when that gate file exists, and computes a per-milestone and overall burndown, while a deliverable pointing at a missing gate is counted as outstanding. The gate proves the burndown counts only existing-gate deliverables as complete and that a deliverable referencing a non-existent gate remains outstanding.",
+  "real_repo": "patchline (self): gate-backed roadmap burndown",
+  "milestones": [
+    {"name": "evidence", "deliverables": [
+      {"name": "proof-hole-graph", "gate": "scripts/proof-hole-graph-gate.sh"},
+      {"name": "explainable-ranking", "gate": "scripts/explainable-ranking-gate.sh"}
+    ]},
+    {"name": "release", "deliverables": [
+      {"name": "rc-rehearsal", "gate": "scripts/rc-rehearsal-gate.sh"},
+      {"name": "leaderboard", "gate": "scripts/leaderboard-gate.sh"}
+    ]}
+  ],
+  "negative_control": {"name": "phantom", "gate": "scripts/does-not-exist-gate.sh"}
+}
