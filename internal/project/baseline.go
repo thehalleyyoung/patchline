@@ -35,6 +35,7 @@ type BaselineReport struct {
 	TemporalWindows []TemporalWindow          `json:"temporal_windows,omitempty"`
 	Recurrences     []RecurrencePattern       `json:"recurrences,omitempty"`
 	Transactions    []TransactionBoundary     `json:"transaction_boundaries,omitempty"`
+	Idempotency     []IdempotencyClass        `json:"idempotency_classifications,omitempty"`
 	PolicyChecks    []PolicyCheck             `json:"policy_checks,omitempty"`
 	RepairProofs    []RepairProofSummary      `json:"repair_proof_summaries,omitempty"`
 	NativeChecks    []Command                 `json:"native_checks,omitempty"`
@@ -69,6 +70,11 @@ type BaselineSummary struct {
 	TransactionExplicit int `json:"transaction_explicit"`
 	TransactionMissing  int `json:"transaction_missing"`
 	TransactionPartial  int `json:"transaction_partial"`
+	IdempotencyClasses  int `json:"idempotency_classifications"`
+	IdempotencyProven   int `json:"idempotency_proven"`
+	IdempotencyGuarded  int `json:"idempotency_guarded"`
+	IdempotencyUnknown  int `json:"idempotency_unknown"`
+	IdempotencyUnsafe   int `json:"idempotency_non_idempotent"`
 	PolicyChecks        int `json:"policy_checks"`
 	PolicyPassed        int `json:"policy_passed"`
 	PolicyWarnings      int `json:"policy_warnings"`
@@ -101,6 +107,22 @@ type BaselineRisk struct {
 }
 
 type TransactionBoundary struct {
+	ID          string       `json:"id"`
+	RiskID      string       `json:"risk_id,omitempty"`
+	Path        string       `json:"path"`
+	Line        int          `json:"line,omitempty"`
+	Table       string       `json:"table,omitempty"`
+	Surface     string       `json:"surface"`
+	Operation   string       `json:"operation,omitempty"`
+	Status      string       `json:"status"`
+	Confidence  string       `json:"confidence"`
+	Markers     []string     `json:"markers,omitempty"`
+	Evidence    []string     `json:"evidence,omitempty"`
+	Identifiers []Identifier `json:"identifiers,omitempty"`
+	Rationale   string       `json:"rationale"`
+}
+
+type IdempotencyClass struct {
 	ID          string       `json:"id"`
 	RiskID      string       `json:"risk_id,omitempty"`
 	Path        string       `json:"path"`
@@ -290,6 +312,7 @@ func Baseline(inv Inventory, facts []Fact, intakeReport intake.Report) BaselineR
 	report.TemporalWindows = buildTemporalWindows(report.Risks, report.Provenance, intakeReport)
 	report.Recurrences = buildRecurrences(report.Risks, report.AbstractEffects, report.Provenance)
 	report.Transactions = buildTransactionBoundaries(report.Risks, report.Provenance, intakeReport)
+	report.Idempotency = buildIdempotencyClasses(report.Risks, report.Provenance, report.SymbolicChecks, facts, intakeReport)
 	report.PolicyChecks = buildPolicyChecks(report.Risks, report.Provenance, report.SymbolicChecks)
 	report.RepairProofs = buildRepairProofSummaries(report.Risks, report.Provenance, report.AbstractEffects, report.SymbolicChecks)
 	report.Summary = BaselineSummary{
@@ -319,6 +342,11 @@ func Baseline(inv Inventory, facts []Fact, intakeReport intake.Report) BaselineR
 		TransactionExplicit: countTransactionStatus(report.Transactions, "explicit"),
 		TransactionMissing:  countTransactionStatus(report.Transactions, "missing"),
 		TransactionPartial:  countTransactionStatus(report.Transactions, "partial"),
+		IdempotencyClasses:  len(report.Idempotency),
+		IdempotencyProven:   countIdempotencyStatus(report.Idempotency, "proven"),
+		IdempotencyGuarded:  countIdempotencyStatus(report.Idempotency, "guarded"),
+		IdempotencyUnknown:  countIdempotencyStatus(report.Idempotency, "unknown"),
+		IdempotencyUnsafe:   countIdempotencyStatus(report.Idempotency, "non_idempotent"),
 		PolicyChecks:        len(report.PolicyChecks),
 		PolicyPassed:        countPolicyStatus(report.PolicyChecks, "pass"),
 		PolicyWarnings:      countPolicyStatus(report.PolicyChecks, "warn"),
@@ -2329,6 +2357,286 @@ func countTransactionStatus(boundaries []TransactionBoundary, status string) int
 	return count
 }
 
+func buildIdempotencyClasses(risks []BaselineRisk, slices []ProvenanceSlice, symbolic []SymbolicCheck, facts []Fact, intakeReport intake.Report) []IdempotencyClass {
+	root := firstNonEmpty(intakeReport.Source.ScannedRoot, intakeReport.Source.Input)
+	sliceByRisk := map[string]ProvenanceSlice{}
+	for _, slice := range slices {
+		sliceByRisk[slice.RiskID] = slice
+	}
+	symbolicByRisk := map[string][]SymbolicCheck{}
+	for _, check := range symbolic {
+		if check.Property == "idempotency" {
+			symbolicByRisk[check.RiskID] = append(symbolicByRisk[check.RiskID], check)
+		}
+	}
+	seen := map[string]bool{}
+	var out []IdempotencyClass
+	for _, fact := range facts {
+		if !isRunbookOrSupportFact(fact) {
+			continue
+		}
+		text := textForBoundary(root, fact.Path)
+		status, markers := classifyIdempotency(text, BaselineRisk{Kind: fact.Kind, Path: fact.Path}, nil)
+		addIdempotencyClass(&out, seen, IdempotencyClass{
+			ID:          "idem:" + canonical.Hash(fmt.Sprintf("fact\x00%s\x00%s", fact.ID, fact.Path))[:16],
+			Path:        fact.Path,
+			Table:       firstIdentifierValue(fact.Identifiers, "table"),
+			Surface:     "runbook_command",
+			Operation:   "support",
+			Status:      status,
+			Confidence:  idempotencyConfidence(status, text),
+			Markers:     markers,
+			Evidence:    []string{"project runbook or support file discovered by inventory"},
+			Identifiers: fact.Identifiers,
+			Rationale:   idempotencyRationale(status, "runbook_command"),
+		})
+	}
+	for _, risk := range risks {
+		if !riskNeedsIdempotencyClassification(risk) {
+			continue
+		}
+		text := textForBoundary(root, risk.Path)
+		window := text
+		if risk.Statement > 0 {
+			window = lineWindow(text, risk.Statement, 8)
+		}
+		status, markers := classifyIdempotency(window, risk, symbolicByRisk[risk.ID])
+		if status == "unknown" && window != text {
+			fullStatus, fullMarkers := classifyIdempotency(text, risk, symbolicByRisk[risk.ID])
+			if idempotencyStatusRank(fullStatus) > idempotencyStatusRank(status) {
+				status, markers = fullStatus, fullMarkers
+			}
+		}
+		addIdempotencyClass(&out, seen, IdempotencyClass{
+			ID:          "idem:" + canonical.Hash(fmt.Sprintf("risk\x00%s\x00%s\x00%d", risk.ID, risk.Path, risk.Statement))[:16],
+			RiskID:      risk.ID,
+			Path:        risk.Path,
+			Line:        risk.Statement,
+			Table:       risk.Table,
+			Surface:     idempotencySurface(risk.Kind, risk.Path),
+			Operation:   transactionOperation(risk.Kind),
+			Status:      status,
+			Confidence:  idempotencyConfidence(status, text),
+			Markers:     markers,
+			Evidence:    idempotencyEvidence(risk, sliceByRisk[risk.ID], symbolicByRisk[risk.ID], markers),
+			Identifiers: risk.Identifiers,
+			Rationale:   idempotencyRationale(status, idempotencySurface(risk.Kind, risk.Path)),
+		})
+	}
+	for _, slice := range slices {
+		for _, path := range append(append([]string{}, slice.RepairPaths...), slice.IncidentPaths...) {
+			if !isIdempotencySupportPath(path) {
+				continue
+			}
+			text := textForBoundary(root, path)
+			status, markers := classifyIdempotency(text, BaselineRisk{Kind: "runbook", Table: slice.Table}, symbolicByRisk[slice.RiskID])
+			surface := "runbook_command"
+			if isGeneratedPath(path) {
+				surface = "generated_script"
+			} else if containsAny(strings.ToLower(path), "repair", "rollback", "backfill", "reconcile", "fix") {
+				surface = "repair_job"
+			}
+			addIdempotencyClass(&out, seen, IdempotencyClass{
+				ID:          "idem:" + canonical.Hash(fmt.Sprintf("support\x00%s\x00%s", slice.RiskID, path))[:16],
+				RiskID:      slice.RiskID,
+				Path:        path,
+				Table:       slice.Table,
+				Surface:     surface,
+				Operation:   "support",
+				Status:      status,
+				Confidence:  idempotencyConfidence(status, text),
+				Markers:     markers,
+				Evidence:    []string{"support path linked by provenance slice"},
+				Identifiers: slice.Identifiers,
+				Rationale:   idempotencyRationale(status, surface),
+			})
+		}
+	}
+	sort.Slice(out, func(i, j int) bool {
+		if out[i].Status != out[j].Status {
+			return idempotencyStatusRank(out[i].Status) > idempotencyStatusRank(out[j].Status)
+		}
+		if out[i].Path != out[j].Path {
+			return out[i].Path < out[j].Path
+		}
+		return out[i].ID < out[j].ID
+	})
+	return out
+}
+
+func addIdempotencyClass(out *[]IdempotencyClass, seen map[string]bool, item IdempotencyClass) bool {
+	key := item.RiskID + "\x00" + item.Path + "\x00" + item.Surface + "\x00" + item.Operation
+	if seen[key] {
+		return false
+	}
+	seen[key] = true
+	*out = append(*out, item)
+	return true
+}
+
+func isRunbookOrSupportFact(fact Fact) bool {
+	lower := strings.ToLower(fact.Kind + " " + fact.Path + " " + fact.Rationale)
+	return containsAny(lower, "runbook", "rollback", "repair", "backfill", "reconcile", "fix", "script")
+}
+
+func riskNeedsIdempotencyClassification(risk BaselineRisk) bool {
+	if riskNeedsTransactionBoundary(risk) {
+		return true
+	}
+	kind := strings.ToLower(risk.Kind)
+	return containsAny(kind, "backfill", "repair", "runbook", "job", "script")
+}
+
+func classifyIdempotency(text string, risk BaselineRisk, symbolic []SymbolicCheck) (string, []string) {
+	lower := strings.ToLower(text)
+	var markers []string
+	markerChecks := []struct {
+		Name   string
+		Tokens []string
+	}{
+		{"explicit-idempotency-note", []string{"idempotent", "idempotency"}},
+		{"upsert", []string{"upsert", "update_or_create", "find_or_create", "insert_all", "upsert_all"}},
+		{"conflict-guard", []string{"on conflict", "on duplicate key", "insert ignore", "merge into"}},
+		{"uniqueness-guard", []string{"unique", "primary key", "dedupe", "deduplicate"}},
+		{"existence-guard", []string{"if not exists", "where not exists", "unless exists", "find_or_initialize"}},
+		{"checkpoint", []string{"checkpoint", "cursor", "last_processed", "resume", "processed_at"}},
+		{"dry-run", []string{"dry_run", "dry-run", "dryrun"}},
+		{"scoped-key", []string{" where id", " where ", "_id", ".where", "find_by", "primary_key"}},
+	}
+	for _, check := range markerChecks {
+		for _, token := range check.Tokens {
+			if strings.Contains(lower, token) {
+				markers = append(markers, check.Name)
+				break
+			}
+		}
+	}
+	markers = uniqueStrings(markers)
+	for _, check := range symbolic {
+		if check.Status == "pass" {
+			markers = append(markers, "symbolic-idempotency-pass")
+			return "proven", uniqueStrings(markers)
+		}
+	}
+	kind := strings.ToLower(risk.Kind)
+	if containsAny(kind, "drop", "truncate", "delete") || riskHasFactor(risk, "destructive-code-path") || riskHasFactor(risk, "destructive-schema-change") || riskHasFactor(risk, "broad-write") {
+		if containsAny(lower, "idempotent", "if exists", "where id", "where ", "limit", "primary key", "dry_run", "dry-run") {
+			return "guarded", markers
+		}
+		return "non_idempotent", markers
+	}
+	if containsAny(lower, "idempotent", "idempotency", "upsert", "on conflict", "on duplicate key", "insert ignore", "merge into", "if not exists", "where not exists") {
+		return "proven", markers
+	}
+	if containsAny(lower, "unique", "primary key", "dedupe", "deduplicate", "checkpoint", "cursor", "resume", "dry_run", "dry-run", "where id", "find_by", ".where") {
+		return "guarded", markers
+	}
+	if riskHasFactor(risk, "missing-idempotency") || riskHasFactor(risk, "retry-hazard") {
+		return "unknown", markers
+	}
+	if containsAny(kind, "insert", "create") {
+		return "guarded", markers
+	}
+	return "unknown", markers
+}
+
+func idempotencySurface(kind, path string) string {
+	lower := strings.ToLower(kind + " " + path)
+	switch {
+	case isGeneratedPath(path):
+		return "generated_script"
+	case containsAny(lower, "runbook", "rollback", "repair", "backfill", "reconcile", "fix"):
+		return "repair_job"
+	case strings.Contains(lower, "code-path"):
+		if containsAny(lower, "job", "worker", "task", "cron") {
+			return "backfill_job"
+		}
+		return "app_code"
+	case strings.Contains(lower, "schema"):
+		return "migration_dsl"
+	case strings.HasSuffix(lower, ".sql") || strings.Contains(lower, "sql"):
+		return "migration_sql"
+	default:
+		return "project_file"
+	}
+}
+
+func isIdempotencySupportPath(path string) bool {
+	lower := strings.ToLower(path)
+	return containsAny(lower, "runbook", "rollback", "repair", "backfill", "reconcile", "fix", "script", ".sh", ".sql", ".md")
+}
+
+func idempotencyConfidence(status, text string) string {
+	if text == "" {
+		return "low"
+	}
+	switch status {
+	case "proven":
+		return "high"
+	case "guarded", "non_idempotent":
+		return "medium"
+	default:
+		return "derived"
+	}
+}
+
+func idempotencyEvidence(risk BaselineRisk, slice ProvenanceSlice, symbolic []SymbolicCheck, markers []string) []string {
+	var evidence []string
+	if len(markers) > 0 {
+		evidence = append(evidence, "idempotency markers: "+strings.Join(markers, ", "))
+	}
+	for _, check := range symbolic {
+		evidence = append(evidence, "symbolic:idempotency:"+check.Status)
+	}
+	for _, factor := range risk.Factors {
+		if factor.Name == "missing-idempotency" || factor.Name == "retry-hazard" || factor.Name == "broad-write" {
+			evidence = append(evidence, factor.Name+": "+factor.Reason)
+		}
+	}
+	if len(slice.StagesPresent) > 0 {
+		evidence = append(evidence, "provenance stages: "+strings.Join(slice.StagesPresent, ", "))
+	}
+	return uniqueStrings(evidence)
+}
+
+func idempotencyRationale(status, surface string) string {
+	switch status {
+	case "proven":
+		return surface + " has explicit idempotency semantics or a symbolic idempotency pass"
+	case "guarded":
+		return surface + " has scope, uniqueness, checkpoint, dry-run, or existence guards but is not fully proven"
+	case "non_idempotent":
+		return surface + " appears destructive or broad without repeat-safe guards"
+	default:
+		return surface + " lacks enough evidence to prove repeat-safe execution"
+	}
+}
+
+func idempotencyStatusRank(status string) int {
+	switch status {
+	case "non_idempotent":
+		return 4
+	case "unknown":
+		return 3
+	case "guarded":
+		return 2
+	case "proven":
+		return 1
+	default:
+		return 0
+	}
+}
+
+func countIdempotencyStatus(classes []IdempotencyClass, status string) int {
+	var count int
+	for _, item := range classes {
+		if item.Status == status {
+			count++
+		}
+	}
+	return count
+}
+
 func buildPolicyChecks(risks []BaselineRisk, slices []ProvenanceSlice, symbolic []SymbolicCheck) []PolicyCheck {
 	sliceByRisk := map[string]ProvenanceSlice{}
 	for _, slice := range slices {
@@ -2811,6 +3119,11 @@ func renderBaselineMarkdown(report BaselineReport) string {
 	fmt.Fprintf(&b, "| transaction explicit | %d |\n", report.Summary.TransactionExplicit)
 	fmt.Fprintf(&b, "| transaction partial | %d |\n", report.Summary.TransactionPartial)
 	fmt.Fprintf(&b, "| transaction missing | %d |\n", report.Summary.TransactionMissing)
+	fmt.Fprintf(&b, "| idempotency classifications | %d |\n", report.Summary.IdempotencyClasses)
+	fmt.Fprintf(&b, "| idempotency proven | %d |\n", report.Summary.IdempotencyProven)
+	fmt.Fprintf(&b, "| idempotency guarded | %d |\n", report.Summary.IdempotencyGuarded)
+	fmt.Fprintf(&b, "| idempotency unknown | %d |\n", report.Summary.IdempotencyUnknown)
+	fmt.Fprintf(&b, "| idempotency non-idempotent | %d |\n", report.Summary.IdempotencyUnsafe)
 	fmt.Fprintf(&b, "| policy checks | %d |\n", report.Summary.PolicyChecks)
 	fmt.Fprintf(&b, "| policy passed | %d |\n", report.Summary.PolicyPassed)
 	fmt.Fprintf(&b, "| policy warnings | %d |\n", report.Summary.PolicyWarnings)
@@ -2892,6 +3205,14 @@ func renderBaselineMarkdown(report BaselineReport) string {
 		limit := minInt(len(report.Transactions), 25)
 		for _, boundary := range report.Transactions[:limit] {
 			fmt.Fprintf(&b, "| %s | %s | `%s` | %s | %s | %s |\n", boundary.Status, boundary.Surface, boundary.RiskID, boundary.Table, boundary.Path, strings.Join(boundary.Markers, ", "))
+		}
+		fmt.Fprintf(&b, "\n")
+	}
+	if len(report.Idempotency) > 0 {
+		fmt.Fprintf(&b, "## Idempotency classifications\n\n| status | surface | risk | table | path | markers |\n| --- | --- | --- | --- | --- | --- |\n")
+		limit := minInt(len(report.Idempotency), 25)
+		for _, item := range report.Idempotency[:limit] {
+			fmt.Fprintf(&b, "| %s | %s | `%s` | %s | %s | %s |\n", item.Status, item.Surface, item.RiskID, item.Table, item.Path, strings.Join(item.Markers, ", "))
 		}
 		fmt.Fprintf(&b, "\n")
 	}

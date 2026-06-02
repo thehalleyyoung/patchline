@@ -512,11 +512,17 @@ end`)
     end
   end
 end`)
+	writeFile(t, root, "app/jobs/idempotent_backfill.rb", `class IdempotentBackfill
+  def perform
+    Account.upsert_all(rows, unique_by: :index_accounts_on_id)
+  end
+end`)
 	inv := Inventory{
 		Root: filepath.ToSlash(root),
 		Facts: []Fact{
 			{Version: Version, ID: "fact:account", Kind: "file", Path: "app/jobs/repair.rb", Confidence: "observed", Identifiers: []Identifier{{Kind: "table", Value: "accounts"}}},
 			{Version: Version, ID: "fact:transactional-account", Kind: "file", Path: "app/jobs/transactional_repair.rb", Confidence: "observed", Identifiers: []Identifier{{Kind: "table", Value: "accounts"}}},
+			{Version: Version, ID: "fact:idempotent-account", Kind: "file", Path: "app/jobs/idempotent_backfill.rb", Confidence: "observed", Identifiers: []Identifier{{Kind: "table", Value: "accounts"}}},
 		},
 	}
 	report := intake.Report{
@@ -548,6 +554,18 @@ end`)
 					Confidence:  "medium",
 					SnippetHash: "transactional-snippet-hash",
 				},
+				{
+					Path:        "app/jobs/idempotent_backfill.rb",
+					Language:    "Ruby",
+					Detector:    "ruby.rails-active-record",
+					Line:        3,
+					Kind:        "orm_query",
+					Framework:   "rails",
+					Operation:   "insert",
+					Table:       "accounts",
+					Confidence:  "medium",
+					SnippetHash: "idempotent-snippet-hash",
+				},
 			},
 		},
 	}
@@ -571,6 +589,29 @@ end`)
 	}
 	if baseline.Summary.Transactions == 0 || baseline.Summary.TransactionMissing == 0 || baseline.Summary.TransactionExplicit == 0 {
 		t.Fatalf("expected missing and explicit transaction boundaries: %#v", baseline.Transactions)
+	}
+	if baseline.Summary.IdempotencyClasses == 0 || baseline.Summary.IdempotencyProven == 0 || baseline.Summary.IdempotencyUnsafe == 0 {
+		t.Fatalf("expected proven and non-idempotent classifications: %#v", baseline.Idempotency)
+	}
+}
+
+func TestBaselineClassifiesRunbookIdempotencyWithoutRisk(t *testing.T) {
+	root := t.TempDir()
+	writeFile(t, root, "docs/runbook.md", "Runbook command: rerun the cleanup until complete. The command is idempotent and safe to retry.")
+	inv := Inventory{
+		Root: filepath.ToSlash(root),
+		Facts: []Fact{{
+			Version:    Version,
+			ID:         "fact:runbook",
+			Kind:       "operational_doc",
+			Path:       "docs/runbook.md",
+			Confidence: "path",
+			Rationale:  "runbook path",
+		}},
+	}
+	baseline := Baseline(inv, inv.Facts, intake.Report{Source: intake.Source{Input: "fixture", ScannedRoot: filepath.ToSlash(root)}})
+	if baseline.Summary.IdempotencyClasses != 1 || baseline.Summary.IdempotencyProven != 1 {
+		t.Fatalf("expected proven runbook idempotency classification: summary=%#v classes=%#v", baseline.Summary, baseline.Idempotency)
 	}
 }
 
@@ -1016,6 +1057,9 @@ COMMIT;`,
 	}
 	if len(compare.Transactions) != 1 || compare.Transactions[0].Surface != "generated_repair" || compare.Transactions[0].Status != "explicit" {
 		t.Fatalf("unexpected generated transaction boundary: %#v", compare.Transactions)
+	}
+	if compare.Summary.IdempotencyClasses != 1 || compare.Summary.IdempotencyGuarded != 1 {
+		t.Fatalf("expected guarded generated idempotency classification: summary=%#v classes=%#v", compare.Summary, compare.Idempotency)
 	}
 }
 
