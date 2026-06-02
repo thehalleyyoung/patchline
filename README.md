@@ -315,6 +315,8 @@ Run `make parallel-corpus-gate` to run a public corpus concurrently with **deter
 
 Run `make resumable-gates-gate` to verify **resumable** gates — an **interrupt**ed corpus sweep preserves completed analyses, and a resume run recomputes none of them while finishing the remainder, so every repo is processed exactly once; see [docs/resumable-gates.md](docs/resumable-gates.md).
 
+Run `make error-taxonomy-gate` to verify the structured **error taxonomy** — every failure across the six pipeline stages carries a unique code, a **retryable** flag, and a concrete remediation; see [docs/error-taxonomy.md](docs/error-taxonomy.md).
+
 Add `--redact` to write `analysis-bundle/` copies with stable redaction tokens for identifiers, literals, customer-like strings, and secret-like values while preserving joins and existing artifact hashes.
 
 Add `--ci` to write `ci/summary.md` plus upload snippets and code-quality artifacts for GitHub Actions, GitLab CI, and Bitbucket Pipelines: SARIF under `analysis-bundle/summary.sarif`, GitLab `ci/gl-code-quality-report.json`, and Bitbucket `ci/bitbucket-code-insights.json`.

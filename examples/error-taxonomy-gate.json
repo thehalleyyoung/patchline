@@ -1,0 +1,14 @@
+{
+  "version": "patchline.error-taxonomy-gate/v1",
+  "claim": "Patchline classifies every failure into a structured error taxonomy spanning the six pipeline stages — fetch, parse, analyze, generate, compare, and report — so that any failure carries a stable code, the stage it belongs to, whether it is retryable, and a concrete remediation. The worker renders the taxonomy into a stable table and a machine-readable index keyed by code, and validates that every stage is represented and that codes are globally unique. The gate proves all six stages are covered, every error code is unique and well-formed, and every entry declares a retryable flag and a non-empty remediation.",
+  "real_repo": "patchline (self): error taxonomy spanning the six pipeline stages",
+  "errors": [
+    {"code": "E_FETCH_UNPINNED", "stage": "fetch", "retryable": false, "remediation": "Pin the ref to a commit SHA or tag."},
+    {"code": "E_FETCH_NETWORK", "stage": "fetch", "retryable": true, "remediation": "Retry the fetch or use a cached archive."},
+    {"code": "E_PARSE_MALFORMED", "stage": "parse", "retryable": false, "remediation": "Skip the malformed file and report it in known gaps."},
+    {"code": "E_ANALYZE_TIMEOUT", "stage": "analyze", "retryable": true, "remediation": "Reduce the subpath scope or raise the time budget."},
+    {"code": "E_GENERATE_REJECTED_GENERATOR", "stage": "generate", "retryable": false, "remediation": "Remove --llm-command when running in --no-llm mode."},
+    {"code": "E_COMPARE_REGRESSION", "stage": "compare", "retryable": false, "remediation": "Reject the proposal; the evidence delta regressed."},
+    {"code": "E_REPORT_OUTPUT_NONEMPTY", "stage": "report", "retryable": false, "remediation": "Clear the output directory before writing reports."}
+  ]
+}
