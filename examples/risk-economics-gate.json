@@ -1,0 +1,9 @@
+{
+  "version": "patchline.risk-economics-gate/v1",
+  "claim": "Patchline frames the ship-or-block decision as an explicit expected-cost calculation rather than a binary risk label: it multiplies the probability of failure by the dollar cost of that failure to get an expected loss, compares it against the known cost of blocking and remediating up front, and recommends blocking only when the expected loss from shipping exceeds the cost of holding the migration. The worker computes the expected loss and the block cost for each scenario and emits the cost-minimizing recommendation. The gate proves a high-probability high-impact migration is blocked on economics while a low-risk migration whose blocking cost outweighs its tiny expected loss is shipped.",
+  "real_repo": "patchline (self): expected-cost repair economics",
+  "scenarios": [
+    {"id": "risky", "p_failure": 0.4, "cost_failure": 100000, "cost_block": 5000},
+    {"id": "safe", "p_failure": 0.001, "cost_failure": 100000, "cost_block": 5000}
+  ]
+}
