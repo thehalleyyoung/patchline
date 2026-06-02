@@ -1,0 +1,25 @@
+{
+  "version": "patchline.starter-issues-gate/v1",
+  "claim": "Patchline generates ready-to-claim starter issues directly from structured roadmap cards, so every good-first-issue is concrete, reproducible, and tied to a gate from the moment it is filed. Each roadmap card declares a title, the failure mode the work prevents, the expected gate the contributor must make pass, and the artifact path where the generated evidence lands; the worker renders a complete issue with context, acceptance criteria, and a reproduce command for each card. The gate proves every generated issue carries all four structured fields, a valid gate target name, and an artifact path under results/generated.",
+  "real_repo": "patchline (self): roadmap cards rendered into starter issues",
+  "cards": [
+    {
+      "title": "Add Redis change detection coverage for a sixth real repository",
+      "failure_mode": "Destructive Redis FLUSHDB/DEL operations slip through review unflagged.",
+      "expected_gate": "nosql-change-gate",
+      "artifact_path": "results/generated/nosql-change-gate"
+    },
+    {
+      "title": "Extend the data-pipeline detector to a new Flink job pattern",
+      "failure_mode": "A Flink overwrite sink is not recognized as a destructive pipeline change.",
+      "expected_gate": "data-pipeline-gate",
+      "artifact_path": "results/generated/data-pipeline-gate"
+    },
+    {
+      "title": "Add a protobuf cross-version field-number reuse check",
+      "failure_mode": "A reused protobuf field number across versions breaks wire compatibility silently.",
+      "expected_gate": "schema-compat-gate",
+      "artifact_path": "results/generated/schema-compat-gate"
+    }
+  ]
+}

@@ -295,6 +295,8 @@ Run `make issue-to-artifact-gate` to turn accepted user submissions into **pinne
 
 Run `make contributor-badges-gate` to render contributor **recognition** badges from **gate-backed** data alone — tiers are monotonic in verified contribution count and unbacked claims are dropped, so a badge never credits unproven work; see [docs/contributor-badges.md](docs/contributor-badges.md).
 
+Run `make starter-issues-gate` to generate **good first issue** templates from structured **roadmap card** data — each issue names its failure mode, expected gate, artifact path, and acceptance criteria, so contributors never get a vague task; see [docs/starter-issues.md](docs/starter-issues.md).
+
 Add `--redact` to write `analysis-bundle/` copies with stable redaction tokens for identifiers, literals, customer-like strings, and secret-like values while preserving joins and existing artifact hashes.
 
 Add `--ci` to write `ci/summary.md` plus upload snippets and code-quality artifacts for GitHub Actions, GitLab CI, and Bitbucket Pipelines: SARIF under `analysis-bundle/summary.sarif`, GitLab `ci/gl-code-quality-report.json`, and Bitbucket `ci/bitbucket-code-insights.json`.
