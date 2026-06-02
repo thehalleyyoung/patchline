@@ -239,6 +239,8 @@ Run `make runtime-confidence-gate` to score every real finding on independent st
 
 Run `make incident-notebook-gate` to reconstruct a data-change failure hypothesis as a replayable, byte-identical notebook (load, select incident, gather evidence, temporal check, hypothesis, conclusion) from a real baseline; see [docs/incident-notebook.md](docs/incident-notebook.md).
 
+Run `make causality-limits-gate` to enforce the causality limitations of trace-to-migration links — constructing clean, confounded, temporally-inconsistent, and cross-table scenarios so correlation is never overclaimed as proven causation (ceiling verdict: consistent-with); see [docs/causality-limits.md](docs/causality-limits.md).
+
 Add `--redact` to write `analysis-bundle/` copies with stable redaction tokens for identifiers, literals, customer-like strings, and secret-like values while preserving joins and existing artifact hashes.
 
 Add `--ci` to write `ci/summary.md` plus upload snippets and code-quality artifacts for GitHub Actions, GitLab CI, and Bitbucket Pipelines: SARIF under `analysis-bundle/summary.sarif`, GitLab `ci/gl-code-quality-report.json`, and Bitbucket `ci/bitbucket-code-insights.json`.

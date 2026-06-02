@@ -1,0 +1,14 @@
+{
+  "version": "patchline.causality-limits-gate/v1",
+  "claim": "Trace-to-migration causality limitations prevent overclaiming from correlated telemetry. For real findings, the workflow constructs trace-link scenarios with controlled causal structure (clean temporal order, a confounding concurrent change, a temporal inconsistency, and a cross-table mismatch) and applies a deterministic classifier that never labels any link 'proven causal'. The strongest permitted verdict is 'plausible (consistent-with)', and confounded, temporally-inconsistent, and unlinked cases are explicitly downgraded.",
+  "real_repo": {
+    "repo": "lobsters/lobsters",
+    "ref": "3b80b47aa5aaba37ec44413e7d1dc96fcf1585b6",
+    "subpath": "db/migrate"
+  },
+  "max_findings": 8,
+  "minimum_findings": 4,
+  "causal_ceiling": "plausible",
+  "forbidden_labels": ["proven", "causal-confirmed", "definitely-caused"],
+  "required_labels": ["plausible", "confounded", "temporally-inconsistent", "unlinked"]
+}
