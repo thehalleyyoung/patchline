@@ -1,0 +1,16 @@
+{
+  "version": "patchline.dataflow-summary-gate/v1",
+  "claim": "Patchline builds dataflow summaries that connect application write sites to the columns a migration touches, so that a code change which writes to a column the migration drops or renames is surfaced as a concrete impact edge rather than discovered at deploy time. The worker joins application writes (file, table, column, operation) against migration changes (table, column, change kind), emits an impact edge for every write whose target column is altered destructively, and grades each edge by the change kind. The gate proves a write to a dropped column yields a high-severity edge, a write to a renamed column yields an edge, a write to a newly added column yields no edge, and a write to an unrelated table yields no edge.",
+  "real_repo": "synthetic-from-real patterns: Rails/Django-style writes vs migration column ops",
+  "writes": [
+    {"file": "app/models/order.rb", "table": "orders", "column": "legacy_status", "op": "update"},
+    {"file": "app/models/user.rb", "table": "users", "column": "email_addr", "op": "insert"},
+    {"file": "app/models/user.rb", "table": "users", "column": "signup_source", "op": "insert"},
+    {"file": "app/models/audit.rb", "table": "audit_logs", "column": "message", "op": "insert"}
+  ],
+  "migration_changes": [
+    {"table": "orders", "column": "legacy_status", "change": "drop_column"},
+    {"table": "users", "column": "email_addr", "change": "rename_column"},
+    {"table": "users", "column": "signup_source", "change": "add_column"}
+  ]
+}
