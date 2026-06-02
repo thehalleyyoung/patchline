@@ -1,0 +1,23 @@
+{
+  "version": "patchline.formal-methods-appendix-gate/v1",
+  "claim": "Patchline ships a formal-methods appendix with all proofs machine-checked in CI on every commit, so the proofs cannot silently rot. The worker checks every proof is machine-checked in CI. The gate proves every proof is CI-checked and that an unchecked proof is rejected.",
+  "real_repo": "patchline (self): formal-methods-appendix",
+  "items": [
+    {
+      "proof": "soundness.v",
+      "checked_in_ci": true
+    },
+    {
+      "proof": "termination.v",
+      "checked_in_ci": true
+    },
+    {
+      "proof": "cutover-invariant.v",
+      "checked_in_ci": true
+    }
+  ],
+  "bad": {
+    "proof": "stale.v",
+    "checked_in_ci": false
+  }
+}

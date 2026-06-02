@@ -1,0 +1,27 @@
+{
+  "version": "patchline.grand-unified-evidence-index-gate/v1",
+  "claim": "Patchline assembles a grand-unified evidence index proving, in one place, novelty, rigor, adoption, and reproducibility, where each pillar resolves to a backing gate. The worker checks every pillar is backed by a gate. The gate proves every pillar is gate-backed and that an unbacked pillar is rejected.",
+  "real_repo": "patchline (self): grand-unified-evidence-index",
+  "items": [
+    {
+      "pillar": "novelty",
+      "backing_gate": "neurosymbolic-explanations-gate"
+    },
+    {
+      "pillar": "rigor",
+      "backing_gate": "formal-methods-appendix-gate"
+    },
+    {
+      "pillar": "adoption",
+      "backing_gate": "adopter-incident-reduction-gate"
+    },
+    {
+      "pillar": "reproducibility",
+      "backing_gate": "bit-identical-rebuild-gate"
+    }
+  ],
+  "bad": {
+    "pillar": "unbacked",
+    "backing_gate": ""
+  }
+}

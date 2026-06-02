@@ -1,0 +1,23 @@
+{
+  "version": "patchline.citation-tracking-dashboard-gate/v1",
+  "claim": "Patchline maintains a citation-tracking dashboard linking academic citations to the artifact's DOI, so scholarly impact is measured and traceable. The worker checks every tracked citation is linked to the DOI. The gate proves every citation is DOI-linked and that an unlinked citation is rejected.",
+  "real_repo": "patchline (self): citation-tracking-dashboard",
+  "items": [
+    {
+      "citation": "paper-2026-a",
+      "doi_linked": true
+    },
+    {
+      "citation": "paper-2026-b",
+      "doi_linked": true
+    },
+    {
+      "citation": "thesis-2026",
+      "doi_linked": true
+    }
+  ],
+  "bad": {
+    "citation": "unverified-ref",
+    "doi_linked": false
+  }
+}

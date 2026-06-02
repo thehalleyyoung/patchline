@@ -1,0 +1,27 @@
+{
+  "version": "patchline.best-paper-readiness-gate/v1",
+  "claim": "Patchline scores a best-paper-readiness self-assessment against published award rubrics with evidence, so the readiness claim is grounded in concrete criteria. The worker checks every rubric criterion is scored with evidence. The gate proves every criterion is scored and evidenced and that an unsupported criterion is rejected.",
+  "real_repo": "patchline (self): best-paper-readiness",
+  "items": [
+    {
+      "criterion": "novelty",
+      "scored": true,
+      "evidence": "neuro-symbolic-verdict-gate"
+    },
+    {
+      "criterion": "rigor",
+      "scored": true,
+      "evidence": "formal-methods-appendix-gate"
+    },
+    {
+      "criterion": "reproducibility",
+      "scored": true,
+      "evidence": "bit-identical-rebuild-gate"
+    }
+  ],
+  "bad": {
+    "criterion": "unsupported",
+    "scored": true,
+    "evidence": ""
+  }
+}

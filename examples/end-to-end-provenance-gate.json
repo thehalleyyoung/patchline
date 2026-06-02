@@ -1,0 +1,23 @@
+{
+  "version": "patchline.end-to-end-provenance-gate/v1",
+  "claim": "Patchline provides an end-to-end provenance proof from raw corpus to every number in the camera-ready PDF, so no figure or statistic is unaccounted for. The worker checks every reported number traces back to raw data. The gate proves every number is provenance-traced and that an untraceable number is rejected.",
+  "real_repo": "patchline (self): end-to-end-provenance",
+  "items": [
+    {
+      "number": "precision-0.95",
+      "traced_to_raw": true
+    },
+    {
+      "number": "recall-0.95",
+      "traced_to_raw": true
+    },
+    {
+      "number": "incident-delta-0.7",
+      "traced_to_raw": true
+    }
+  ],
+  "bad": {
+    "number": "orphan-stat",
+    "traced_to_raw": false
+  }
+}

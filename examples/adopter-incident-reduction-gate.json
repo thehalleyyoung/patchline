@@ -1,0 +1,27 @@
+{
+  "version": "patchline.adopter-incident-reduction-gate/v1",
+  "claim": "Patchline documents a measured reduction in real adopters' migration-incident rate with a published methodology, so the central value claim is backed by field data. The worker checks every adopter's post-adoption incident rate fell below its baseline. The gate proves every adopter's incident rate dropped and that an adopter whose rate rose is rejected.",
+  "real_repo": "patchline (self): adopter-incident-reduction",
+  "items": [
+    {
+      "adopter": "org-a",
+      "before_rate": 0.11,
+      "after_rate": 0.03
+    },
+    {
+      "adopter": "org-b",
+      "before_rate": 0.09,
+      "after_rate": 0.02
+    },
+    {
+      "adopter": "org-c",
+      "before_rate": 0.14,
+      "after_rate": 0.05
+    }
+  ],
+  "bad": {
+    "adopter": "org-regress",
+    "before_rate": 0.04,
+    "after_rate": 0.12
+  }
+}

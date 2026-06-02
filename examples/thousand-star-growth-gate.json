@@ -1,0 +1,27 @@
+{
+  "version": "patchline.thousand-star-growth-gate/v1",
+  "claim": "Patchline runs a thousand-star growth experiment with measured funnel metrics and reproducible interventions, so growth is engineered and measured rather than hoped for. The worker checks every intervention is measured and reproducible. The gate proves every intervention is measured and reproducible and that an unmeasured intervention is rejected.",
+  "real_repo": "patchline (self): thousand-star-growth",
+  "items": [
+    {
+      "intervention": "launch-post",
+      "measured": true,
+      "reproducible": true
+    },
+    {
+      "intervention": "demo-video",
+      "measured": true,
+      "reproducible": true
+    },
+    {
+      "intervention": "conference-talk",
+      "measured": true,
+      "reproducible": true
+    }
+  ],
+  "bad": {
+    "intervention": "random-tweet",
+    "measured": false,
+    "reproducible": false
+  }
+}

@@ -1,0 +1,23 @@
+{
+  "version": "patchline.sustainability-endowment-gate/v1",
+  "claim": "Patchline publishes a sustainability endowment plan ensuring multi-year maintenance with a published budget, so the project's future is funded rather than volunteer-fragile. The worker checks every plan year is funded. The gate proves every year is funded and that an unfunded year is rejected.",
+  "real_repo": "patchline (self): sustainability-endowment",
+  "items": [
+    {
+      "year": 2026,
+      "funded": true
+    },
+    {
+      "year": 2027,
+      "funded": true
+    },
+    {
+      "year": 2028,
+      "funded": true
+    }
+  ],
+  "bad": {
+    "year": 2029,
+    "funded": false
+  }
+}

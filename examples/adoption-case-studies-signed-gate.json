@@ -1,0 +1,51 @@
+{
+  "version": "patchline.adoption-case-studies-signed-gate/v1",
+  "claim": "Patchline assembles an adoption case-study series with signed bundles from at least ten organizations, so each case study is attributable and tamper-evident. The worker checks every organization's case-study bundle is signed. The gate proves every case study is signed and that an unsigned bundle is rejected.",
+  "real_repo": "patchline (self): adoption-case-studies-signed",
+  "items": [
+    {
+      "org": "org01",
+      "signed": true
+    },
+    {
+      "org": "org02",
+      "signed": true
+    },
+    {
+      "org": "org03",
+      "signed": true
+    },
+    {
+      "org": "org04",
+      "signed": true
+    },
+    {
+      "org": "org05",
+      "signed": true
+    },
+    {
+      "org": "org06",
+      "signed": true
+    },
+    {
+      "org": "org07",
+      "signed": true
+    },
+    {
+      "org": "org08",
+      "signed": true
+    },
+    {
+      "org": "org09",
+      "signed": true
+    },
+    {
+      "org": "org10",
+      "signed": true
+    }
+  ],
+  "bad": {
+    "org": "unsigned-org",
+    "signed": false
+  }
+}

@@ -1,0 +1,27 @@
+{
+  "version": "patchline.bit-identical-rebuild-gate/v1",
+  "claim": "Patchline guarantees any release rebuilds bit-identically from its frozen snapshot, so a build is fully reproducible byte for byte. The worker checks every release rebuilds to an identical hash. The gate proves every release is bit-identical on rebuild and that a non-deterministic build is rejected.",
+  "real_repo": "patchline (self): bit-identical-rebuild",
+  "items": [
+    {
+      "release": "1.0",
+      "rebuilt": true,
+      "identical_hash": true
+    },
+    {
+      "release": "1.1",
+      "rebuilt": true,
+      "identical_hash": true
+    },
+    {
+      "release": "2.0",
+      "rebuilt": true,
+      "identical_hash": true
+    }
+  ],
+  "bad": {
+    "release": "flaky",
+    "rebuilt": true,
+    "identical_hash": false
+  }
+}

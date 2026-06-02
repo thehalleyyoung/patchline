@@ -606,6 +606,21 @@ Run `make localization-parity-gate` for a localization program with **parity** g
 Run `make lts-release-line-gate` for an LTS line with security **backport**s and a clear EOL policy, rejecting a release with no EOL; see [docs/lts-release-line.md](docs/lts-release-line.md).
 Run `make accessibility-conformance-gate` for a **WCAG** conformance audit of all human-facing surfaces, rejecting a failing surface; see [docs/accessibility-conformance.md](docs/accessibility-conformance.md).
 Run `make public-roadmap-burndown-gate` for a public roadmap with gate-backed quarterly **burndown**s and retrospectives, rejecting an unbacked quarter; see [docs/public-roadmap-burndown.md](docs/public-roadmap-burndown.md).
+Run `make third-party-security-audit-gate` for an independent security audit with all findings **remediated** and re-verified, rejecting an open finding; see [docs/third-party-security-audit.md](docs/third-party-security-audit.md).
+Run `make adopter-incident-reduction-gate` for a measured reduction in adopter migration-**incident rate**, rejecting an adopter whose rate rose; see [docs/adopter-incident-reduction.md](docs/adopter-incident-reduction.md).
+Run `make citation-tracking-dashboard-gate` for a **citation**-tracking dashboard linked to the artifact DOI, rejecting an unlinked citation; see [docs/citation-tracking-dashboard.md](docs/citation-tracking-dashboard.md).
+Run `make results-never-regress-gate` for a results-**never regress** guarantee enforced by the full historical benchmark, rejecting a regressing release; see [docs/results-never-regress.md](docs/results-never-regress.md).
+Run `make end-to-end-provenance-gate` for an end-to-end **provenance** proof from raw corpus to every paper number, rejecting an untraceable number; see [docs/end-to-end-provenance.md](docs/end-to-end-provenance.md).
+Run `make bit-identical-rebuild-gate` for a **bit-identical** rebuild guarantee from frozen snapshots, rejecting a non-deterministic build; see [docs/bit-identical-rebuild.md](docs/bit-identical-rebuild.md).
+Run `make formal-methods-appendix-gate` for a formal-methods appendix with all proofs **machine-checked** in CI, rejecting an unchecked proof; see [docs/formal-methods-appendix.md](docs/formal-methods-appendix.md).
+Run `make adoption-case-studies-signed-gate` for an adoption case-study series with **signed** bundles from ten organizations, rejecting an unsigned bundle; see [docs/adoption-case-studies-signed.md](docs/adoption-case-studies-signed.md).
+Run `make best-paper-readiness-gate` for a best-paper-readiness self-assessment against award **rubric**s with evidence, rejecting an unsupported criterion; see [docs/best-paper-readiness.md](docs/best-paper-readiness.md).
+Run `make thousand-star-growth-gate` for a thousand-star growth experiment with measured **funnel** metrics and reproducible interventions, rejecting an unmeasured one; see [docs/thousand-star-growth.md](docs/thousand-star-growth.md).
+Run `make one-command-paper-gate` for a **one command** that reproduces the entire paper in a clean container, rejecting a missing artifact; see [docs/one-command-paper.md](docs/one-command-paper.md).
+Run `make sustainability-endowment-gate` for a sustainability **endowment** plan with a multi-year funded budget, rejecting an unfunded year; see [docs/sustainability-endowment.md](docs/sustainability-endowment.md).
+Run `make extensibility-proof-gate` for an **extensibility** proof that new hazard classes are added cheaply, rejecting an over-budget addition; see [docs/extensibility-proof.md](docs/extensibility-proof.md).
+Run `make impact-retrospective-gate` for an impact retrospective tying every design decision to a measured **outcome**, rejecting an unmeasured decision; see [docs/impact-retrospective.md](docs/impact-retrospective.md).
+Run `make grand-unified-evidence-index-gate` for a grand-unified evidence index proving **novelty**, rigor, adoption, and reproducibility, rejecting an unbacked pillar; see [docs/grand-unified-evidence-index.md](docs/grand-unified-evidence-index.md).
 
 </details>
 

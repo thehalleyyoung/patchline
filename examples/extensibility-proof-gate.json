@@ -1,0 +1,27 @@
+{
+  "version": "patchline.extensibility-proof-gate/v1",
+  "claim": "Patchline provides a successor-tool extensibility proof showing the architecture admits new hazard classes cheaply, so the design scales to future hazards without rewrites. The worker checks every new hazard class is added within the cost budget. The gate proves every hazard class is cheap to add and that an over-budget addition is rejected.",
+  "real_repo": "patchline (self): extensibility-proof",
+  "items": [
+    {
+      "hazard_class": "partial-index-race",
+      "added_cost_lines": 40,
+      "budget": 120
+    },
+    {
+      "hazard_class": "enum-shrink",
+      "added_cost_lines": 55,
+      "budget": 120
+    },
+    {
+      "hazard_class": "json-schema-drift",
+      "added_cost_lines": 80,
+      "budget": 120
+    }
+  ],
+  "bad": {
+    "hazard_class": "rewrite-required",
+    "added_cost_lines": 900,
+    "budget": 120
+  }
+}
