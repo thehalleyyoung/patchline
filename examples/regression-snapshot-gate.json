@@ -1,0 +1,17 @@
+{
+  "version": "patchline.regression-snapshot-gate/v1",
+  "claim": "Patchline's regression-snapshot mode fails CI only on newly introduced hazards by diffing the current findings against a committed baseline snapshot, so pre-existing debt never blocks a merge while any new hazard does. The worker computes the set difference between current and baseline findings, identifies net-new hazards, and confirms baseline-only findings are not counted against the change. The gate proves a new hazard absent from the baseline fails CI and that a diff introducing no new hazards passes even with pre-existing ones present.",
+  "real_repo": "patchline (self): regression-snapshot",
+  "baseline": [
+    "pre-existing-1",
+    "pre-existing-2"
+  ],
+  "current_with_new": [
+    "pre-existing-1",
+    "pre-existing-2",
+    "new-hazard"
+  ],
+  "current_no_new": [
+    "pre-existing-1"
+  ]
+}

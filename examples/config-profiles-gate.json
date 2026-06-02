@@ -1,0 +1,30 @@
+{
+  "version": "patchline.config-profiles-gate/v1",
+  "claim": "Patchline offers strict/balanced/lenient configuration profiles with documented trade-offs, where stricter profiles monotonically increase recall at the cost of precision, so a team can pick its operating point deliberately. The worker checks the three profiles are ordered by recall, that the trade-off direction holds for precision, and that each profile documents its threshold. The gate proves the recall ordering strict >= balanced >= lenient holds and that a misconfigured profile violating the monotonic trade-off is rejected.",
+  "real_repo": "patchline (self): config-profiles",
+  "profiles": [
+    {
+      "name": "strict",
+      "threshold": 0.3,
+      "recall": 1.0,
+      "precision": 0.85
+    },
+    {
+      "name": "balanced",
+      "threshold": 0.5,
+      "recall": 0.95,
+      "precision": 0.95
+    },
+    {
+      "name": "lenient",
+      "threshold": 0.7,
+      "recall": 0.85,
+      "precision": 1.0
+    }
+  ],
+  "broken_profile": {
+    "name": "strict",
+    "recall": 0.5,
+    "precision": 1.0
+  }
+}

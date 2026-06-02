@@ -1,0 +1,25 @@
+{
+  "version": "patchline.quickstart-sixty-seconds-gate/v1",
+  "claim": "Patchline ships a single-command quickstart that clones, builds, and analyzes a real repository end to end, and a gate asserts the measured wall-clock budget for that path stays under sixty seconds so a newcomer reaches a verdict in under a minute. The worker sums the per-phase timings, compares the total against the budget, and confirms each phase is present. The gate proves the end-to-end total is under sixty seconds and that an over-budget run exceeding the threshold is flagged.",
+  "real_repo": "patchline (self): quickstart-sixty-seconds",
+  "budget_seconds": 60,
+  "phases": [
+    {
+      "name": "clone",
+      "seconds": 8
+    },
+    {
+      "name": "build",
+      "seconds": 21
+    },
+    {
+      "name": "analyze",
+      "seconds": 12
+    },
+    {
+      "name": "report",
+      "seconds": 4
+    }
+  ],
+  "slow_run_total": 74
+}

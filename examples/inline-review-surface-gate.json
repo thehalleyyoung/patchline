@@ -1,0 +1,25 @@
+{
+  "version": "patchline.inline-review-surface-gate/v1",
+  "claim": "Patchline renders findings inline on the code-review surface, anchoring each finding to a precise file and line with a one-click reproduction command, so a reviewer sees the hazard exactly where it lives. The worker validates that every rendered finding carries a file, a positive line number, and a runnable reproduce command. The gate proves every finding is fully anchored with a reproduce command and that a finding missing its line anchor is rejected as unrenderable.",
+  "real_repo": "patchline (self): inline-review-surface",
+  "findings": [
+    {
+      "id": "f1",
+      "file": "migrations/001.sql",
+      "line": 12,
+      "reproduce": "make signed-provenance-chain-gate"
+    },
+    {
+      "id": "f2",
+      "file": "migrations/002.sql",
+      "line": 3,
+      "reproduce": "make backfill-completeness-gate"
+    }
+  ],
+  "broken_finding": {
+    "id": "f3",
+    "file": "migrations/003.sql",
+    "line": 0,
+    "reproduce": "make x"
+  }
+}

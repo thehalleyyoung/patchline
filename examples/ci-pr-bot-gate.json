@@ -1,0 +1,11 @@
+{
+  "version": "patchline.ci-pr-bot-gate/v1",
+  "claim": "Patchline's CI bot comments gate-backed verdicts on pull requests with stable, idempotent output, so re-running the bot on an unchanged diff updates the existing comment in place rather than spamming duplicates. The worker hashes the rendered comment body, confirms two runs over the same diff produce an identical hash, and checks the bot targets a single anchored comment. The gate proves the output is idempotent across identical runs and that a changed diff produces a different, updated comment.",
+  "real_repo": "patchline (self): ci-pr-bot",
+  "run_a_body": "Patchline: 1 hazard, 2 safe \u2014 see gate results",
+  "run_a_hash": "H1",
+  "run_b_body": "Patchline: 1 hazard, 2 safe \u2014 see gate results",
+  "run_b_hash": "H1",
+  "changed_diff_hash": "H2",
+  "anchor": "patchline-comment"
+}

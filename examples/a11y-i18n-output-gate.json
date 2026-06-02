@@ -1,0 +1,26 @@
+{
+  "version": "patchline.a11y-i18n-output-gate/v1",
+  "claim": "Patchline runs an accessibility and internationalization pass over all human-facing output, ensuring messages avoid color-only signaling, carry text equivalents, and resolve through a message catalog so every string is localizable. The worker checks each output message has a non-color textual marker and a catalog key, and confirms the catalog covers every referenced key. The gate proves all messages are accessible and fully localizable and that a message relying on color alone with no catalog key is rejected.",
+  "real_repo": "patchline (self): a11y-i18n-output",
+  "messages": [
+    {
+      "id": "hazard",
+      "text_marker": "HAZARD",
+      "catalog_key": "msg.hazard"
+    },
+    {
+      "id": "safe",
+      "text_marker": "SAFE",
+      "catalog_key": "msg.safe"
+    }
+  ],
+  "catalog": [
+    "msg.hazard",
+    "msg.safe"
+  ],
+  "bad_message": {
+    "id": "warn",
+    "text_marker": "",
+    "catalog_key": ""
+  }
+}

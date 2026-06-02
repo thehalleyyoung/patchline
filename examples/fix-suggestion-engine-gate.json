@@ -1,0 +1,27 @@
+{
+  "version": "patchline.fix-suggestion-engine-gate/v1",
+  "claim": "Patchline proposes a safe migration variant for each detected hazard, mapping every hazard class to a concrete remediation, and asserts the suggested fix actually clears the hazard when re-analyzed. The worker checks each hazard has a suggested fix whose post-fix verdict is safe, and computes the remediation coverage. The gate proves every hazard receives a verdict-clearing fix and that a bogus suggestion whose post-fix verdict is still a hazard is rejected.",
+  "real_repo": "patchline (self): fix-suggestion-engine",
+  "hazards": [
+    {
+      "id": "notnull-no-default",
+      "fix": "add-default-then-backfill",
+      "post_fix_verdict": "safe"
+    },
+    {
+      "id": "drop-referenced-column",
+      "fix": "deprecate-read-path-first",
+      "post_fix_verdict": "safe"
+    },
+    {
+      "id": "rename-no-shim",
+      "fix": "add-compat-view",
+      "post_fix_verdict": "safe"
+    }
+  ],
+  "bogus_fix": {
+    "id": "x",
+    "fix": "noop",
+    "post_fix_verdict": "hazard"
+  }
+}

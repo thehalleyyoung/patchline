@@ -1,0 +1,14 @@
+{
+  "version": "patchline.minimal-repro-generator-gate/v1",
+  "claim": "Patchline reduces any finding to the smallest failing fixture by iteratively removing statements while the verdict is preserved, producing a minimal reproduction that still triggers the hazard. The worker checks that the reduced fixture is strictly smaller than the original, that the verdict is unchanged, and that no further single-statement removal still fails. The gate proves the reproduction is both reduced and verdict-preserving, and that a candidate which dropped the hazard-causing statement is rejected.",
+  "real_repo": "patchline (self): minimal-repro-generator",
+  "original_size": 40,
+  "reduced_size": 3,
+  "original_verdict": "hazard",
+  "reduced_verdict": "hazard",
+  "minimal": true,
+  "over_reduced": {
+    "size": 2,
+    "verdict": "safe"
+  }
+}

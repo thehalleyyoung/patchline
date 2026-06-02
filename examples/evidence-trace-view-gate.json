@@ -1,0 +1,44 @@
+{
+  "version": "patchline.evidence-trace-view-gate/v1",
+  "claim": "Patchline traces every verdict to its supporting evidence as an interactive view, where each conclusion links to the facts and rules that justify it down to source spans, so a reviewer can audit the reasoning rather than trust it. The worker verifies the verdict's evidence graph is acyclic, that every node is reachable from the verdict, and that each leaf grounds in a source span. The gate proves the trace is complete and grounded and that a verdict with a dangling, ungrounded evidence node is rejected.",
+  "real_repo": "patchline (self): evidence-trace-view",
+  "nodes": [
+    {
+      "id": "verdict",
+      "deps": [
+        "rule1"
+      ]
+    },
+    {
+      "id": "rule1",
+      "deps": [
+        "fact1",
+        "fact2"
+      ]
+    },
+    {
+      "id": "fact1",
+      "deps": [],
+      "span": "001.sql:12"
+    },
+    {
+      "id": "fact2",
+      "deps": [],
+      "span": "002.sql:3"
+    }
+  ],
+  "dangling": [
+    {
+      "id": "verdict",
+      "deps": [
+        "ruleX"
+      ]
+    },
+    {
+      "id": "ruleX",
+      "deps": [
+        "ghost"
+      ]
+    }
+  ]
+}

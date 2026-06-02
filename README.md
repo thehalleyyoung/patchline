@@ -458,6 +458,16 @@ Run `make red-team-adversarial-gate` for a red-team suite of **adversarial** mig
 Run `make fuzzing-harness-gate` for a **fuzzing** harness that mutates migrations and asserts no crash and no unsound pass, with a planted unsound pass detected; see [docs/fuzzing-harness.md](docs/fuzzing-harness.md).
 Run `make soundness-boundary-gate` for an explicit **soundness boundary** where every guaranteed hazard class is backed by a gate and an unbacked guarantee is rejected; see [docs/soundness-boundary.md](docs/soundness-boundary.md).
 Run `make security-threat-model-gate` for a security **threat model** where every threat has a present mitigation and an unmitigated threat is flagged; see [docs/security-threat-model.md](docs/security-threat-model.md).
+Run `make quickstart-sixty-seconds-gate` for a single-command quickstart that analyzes a real repo in under **sixty seconds**, where an over-budget run is flagged; see [docs/quickstart-sixty-seconds.md](docs/quickstart-sixty-seconds.md).
+Run `make inline-review-surface-gate` to render findings **inline** on the review surface with one-click reproduction, rejecting any finding missing its line anchor; see [docs/inline-review-surface.md](docs/inline-review-surface.md).
+Run `make minimal-repro-generator-gate` to reduce any finding to a **minimal reproduction** that preserves the verdict, rejecting an over-reduction that drops the hazard; see [docs/minimal-repro-generator.md](docs/minimal-repro-generator.md).
+Run `make fix-suggestion-engine-gate` to propose a **safe migration variant** for each hazard that clears it on re-analysis, rejecting a bogus fix that does not; see [docs/fix-suggestion-engine.md](docs/fix-suggestion-engine.md).
+Run `make evidence-trace-view-gate` for an interactive view tracing every verdict to its **supporting evidence** down to source spans, rejecting a dangling ungrounded node; see [docs/evidence-trace-view.md](docs/evidence-trace-view.md).
+Run `make ci-pr-bot-gate` for a CI bot that posts gate-backed PR verdicts with stable, **idempotent** output, updating in place on a changed diff; see [docs/ci-pr-bot.md](docs/ci-pr-bot.md).
+Run `make triage-prioritizer-gate` to deduplicate and **prioritize** findings by severity-times-confidence so the highest-impact item is first; see [docs/triage-prioritizer.md](docs/triage-prioritizer.md).
+Run `make config-profiles-gate` for **strict/balanced/lenient** profiles with a documented, monotonic recall-precision trade-off, rejecting a misconfigured profile; see [docs/config-profiles.md](docs/config-profiles.md).
+Run `make regression-snapshot-gate` for a snapshot mode that fails CI only on **newly introduced** hazards, never on pre-existing debt; see [docs/regression-snapshot.md](docs/regression-snapshot.md).
+Run `make a11y-i18n-output-gate` for an **accessibility** and i18n pass ensuring every message is text-marked and localizable, rejecting color-only output; see [docs/a11y-i18n-output.md](docs/a11y-i18n-output.md).
 
 Add `--redact` to write `analysis-bundle/` copies with stable redaction tokens for identifiers, literals, customer-like strings, and secret-like values while preserving joins and existing artifact hashes.
 

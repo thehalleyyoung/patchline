@@ -1,0 +1,31 @@
+{
+  "version": "patchline.triage-prioritizer-gate/v1",
+  "claim": "Patchline batches, deduplicates, and prioritizes findings for a reviewer, collapsing duplicate root causes and ordering the survivors by a severity-times-confidence score so the highest-impact item is reviewed first. The worker deduplicates by root-cause key, sorts the survivors by descending priority score, and verifies the ordering is monotonic with the top item being the highest score. The gate proves duplicates are collapsed and the queue is correctly prioritized, and that an unsorted queue violating the ordering is rejected.",
+  "real_repo": "patchline (self): triage-prioritizer",
+  "findings": [
+    {
+      "id": "a",
+      "root": "drop-col-x",
+      "severity": 9,
+      "confidence": 1.0
+    },
+    {
+      "id": "b",
+      "root": "drop-col-x",
+      "severity": 9,
+      "confidence": 1.0
+    },
+    {
+      "id": "c",
+      "root": "notnull-y",
+      "severity": 5,
+      "confidence": 0.8
+    },
+    {
+      "id": "d",
+      "root": "index-z",
+      "severity": 2,
+      "confidence": 0.9
+    }
+  ]
+}
