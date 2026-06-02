@@ -1,0 +1,14 @@
+{
+  "version": "patchline.symexec-gate/v1",
+  "claim": "Patchline ships symbolic-execution hooks that explore a migration guard over its full space of symbolic inputs to decide whether any feasible path reaches an unsafe state, returning a concrete witness assignment when one exists, so an unsafe migration cannot hide behind an input combination a human reviewer failed to imagine. The worker enumerates the bounded symbolic domain of the guard variables, evaluates the guarded program on every assignment, reports which leaves are reachable, and produces a satisfying witness for any unsafe leaf, while a guard that is unsafe-free yields no such path. The gate proves the vulnerable guard exposes a reachable unsafe leaf with a witness and the hardened guard exposes none.",
+  "real_repo": "patchline (self): bounded symbolic execution of migration guards",
+  "variables": ["has_rows", "has_lock"],
+  "vulnerable_guard": [
+    {"when": {"has_rows": true, "has_lock": false}, "leaf": "unsafe"},
+    {"when": {}, "leaf": "safe"}
+  ],
+  "hardened_guard": [
+    {"when": {"has_lock": false}, "leaf": "blocked"},
+    {"when": {}, "leaf": "safe"}
+  ]
+}
