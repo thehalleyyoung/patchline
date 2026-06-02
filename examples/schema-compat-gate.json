@@ -1,0 +1,10 @@
+{
+  "version": "patchline.schema-compat-gate/v1",
+  "claim": "Patchline ties schema-registry and protobuf/Avro compatibility to concrete data-change risk. It inspects protobuf (.proto) and Avro (.avsc) schemas plus buf/schema-registry configuration, and flags evolution hazards that cause stored records or live consumers to fail decoding: proto2 required fields that cannot be removed safely, protobuf messages lacking reserved declarations that risk tag reuse, and Avro record fields without defaults that break backward/forward compatibility. Each risk becomes a searchable schema_compatibility fact with a breaking flag. This is proven against the real apache/avro repository, which contains both Avro records without defaults and proto2 required fields, and is reinforced by a deterministic unit test plus a no-false-positive rule that ignores ordinary JSON config.",
+  "real_repo": {
+    "repo": "https://github.com/apache/avro",
+    "ref": "main",
+    "minimum_avro_breaking": 5,
+    "minimum_proto_breaking": 1
+  }
+}

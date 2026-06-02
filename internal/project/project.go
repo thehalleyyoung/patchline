@@ -92,6 +92,7 @@ type Inventory struct {
 	NoSQLChanges      []Finding      `json:"nosql_changes,omitempty"`
 	DataPipelines     []Finding      `json:"data_pipelines,omitempty"`
 	InfraDataOrdering []Finding      `json:"infra_data_ordering,omitempty"`
+	SchemaCompat      []Finding      `json:"schema_compatibility,omitempty"`
 	PackageBoundaries []PackageBoundary `json:"package_boundaries,omitempty"`
 	NextCommands      []Command      `json:"next_commands,omitempty"`
 	SkippedDirs       []string       `json:"skipped_dirs,omitempty"`
@@ -1451,6 +1452,7 @@ func (inv *Inventory) addFileFact(file scanFile, language string) {
 		inv.scanInfrastructure(file, prefix)
 		inv.scanNoSQL(file, prefix)
 		inv.scanDataPipeline(file, prefix)
+		inv.scanSchemaCompat(file, prefix)
 	}
 }
 
@@ -1900,6 +1902,88 @@ func (inv *Inventory) scanDataPipeline(file scanFile, text string) {
 			})
 		}
 	}
+}
+
+var (
+	protoFieldNumberPattern = regexp.MustCompile(`(?m)^\s*(?:optional|required|repeated)?\s*[A-Za-z0-9_.<> ]+\s+[A-Za-z0-9_]+\s*=\s*([0-9]+)\s*;`)
+	protoRequiredPattern    = regexp.MustCompile(`(?m)^\s*required\s+[A-Za-z0-9_.<>]+\s+[A-Za-z0-9_]+\s*=\s*[0-9]+`)
+	protoReservedPattern    = regexp.MustCompile(`(?m)^\s*reserved\b`)
+	avroFieldPattern        = regexp.MustCompile(`(?s)\{[^{}]*"name"\s*:\s*"[^"]+"[^{}]*\}`)
+)
+
+// scanSchemaCompat inspects protobuf (.proto) and Avro (.avsc) schemas and schema-registry
+// configuration for compatibility risks that translate directly into data-change risk: a consumer
+// or stored record can fail to decode when a producer evolves a schema in a breaking way. Each
+// schema file is only inspected when its extension confirms the format, and risky constructs are
+// recorded as searchable `schema_compatibility` facts with a `breaking` flag.
+func (inv *Inventory) scanSchemaCompat(file scanFile, text string) {
+	lower := strings.ToLower(file.Rel)
+	switch {
+	case strings.HasSuffix(lower, ".proto"):
+		inv.scanProtoSchema(file.Rel, text)
+	case strings.HasSuffix(lower, ".avsc"):
+		inv.scanAvroSchema(file.Rel, text)
+	case strings.HasSuffix(lower, "buf.yaml") || strings.HasSuffix(lower, "buf.gen.yaml") || strings.HasSuffix(lower, ".asyncapi.yaml"):
+		inv.addSchemaCompatFinding(file.Rel, "schema_registry_config", false, "schema-registry / buf configuration present; compatibility policy governs safe data evolution")
+	}
+}
+
+func (inv *Inventory) scanProtoSchema(path, text string) {
+	proto2 := strings.Contains(text, "syntax = \"proto2\"") || strings.Contains(text, "syntax=\"proto2\"")
+	if protoRequiredPattern.MatchString(text) {
+		inv.addSchemaCompatFinding(path, "protobuf_required_field", true, "proto2 required field cannot be removed without breaking existing readers; this is a known schema-evolution hazard")
+	}
+	hasFields := protoFieldNumberPattern.MatchString(text)
+	if !protoReservedPattern.MatchString(text) && hasFields {
+		inv.addSchemaCompatFinding(path, "protobuf_no_reserved", false, "protobuf message defines fields without any reserved declarations; removing a field later risks tag reuse")
+	}
+	_ = proto2
+}
+
+func (inv *Inventory) scanAvroSchema(path, text string) {
+	if !strings.Contains(text, "\"type\"") || !strings.Contains(strings.ToLower(text), "record") {
+		return
+	}
+	noDefault := false
+	for _, field := range avroFieldPattern.FindAllString(text, -1) {
+		if !strings.Contains(field, "\"name\"") || !strings.Contains(field, "\"type\"") {
+			continue
+		}
+		if !strings.Contains(field, "\"default\"") {
+			noDefault = true
+			break
+		}
+	}
+	if noDefault {
+		inv.addSchemaCompatFinding(path, "avro_field_without_default", true, "Avro record field has no default value; adding or removing it breaks backward/forward compatibility for stored records")
+	} else {
+		inv.addSchemaCompatFinding(path, "avro_record", false, "Avro record schema detected; field defaults govern compatible evolution")
+	}
+}
+
+func (inv *Inventory) addSchemaCompatFinding(path, kind string, breaking bool, rationale string) {
+	breakingStr := "false"
+	if breaking {
+		breakingStr = "true"
+	}
+	inv.SchemaCompat = append(inv.SchemaCompat, Finding{
+		Kind:       kind,
+		Path:       path,
+		Confidence: "observed",
+		Rationale:  rationale,
+	})
+	inv.addFact(Fact{
+		Version:     Version,
+		Kind:        "schema_compatibility",
+		Path:        path,
+		Confidence:  "observed",
+		Rationale:   rationale,
+		Identifiers: identifiersFromText(path + "\n" + kind),
+		Properties: map[string]string{
+			"kind":     kind,
+			"breaking": breakingStr,
+		},
+	})
 }
 
 func isKubernetesConfigPath(path, text string) bool {

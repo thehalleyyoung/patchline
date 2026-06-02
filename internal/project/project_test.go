@@ -238,6 +238,66 @@ func TestInventoryDoesNotFlagNoSQLWithoutSignal(t *testing.T) {
 	}
 }
 
+func TestInventoryDetectsSchemaCompatRisks(t *testing.T) {
+	root := t.TempDir()
+	writeFile(t, root, "proto/user.proto", `syntax = "proto2";
+message User {
+  required string id = 1;
+  optional string name = 2;
+}
+`)
+	writeFile(t, root, "schemas/event.avsc", `{
+  "type": "record",
+  "name": "Event",
+  "fields": [
+    {"name": "id", "type": "string"},
+    {"name": "ts", "type": "long"}
+  ]
+}
+`)
+	writeFile(t, root, "buf.yaml", "version: v1\nbreaking:\n  use:\n    - FILE\n")
+	inv, err := InventoryPath(InventoryOptions{Path: root})
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := map[string]bool{
+		"protobuf_required_field":    false,
+		"avro_field_without_default": false,
+		"schema_registry_config":     false,
+	}
+	for _, f := range inv.SchemaCompat {
+		if _, ok := want[f.Kind]; ok {
+			want[f.Kind] = true
+		}
+	}
+	for k, seen := range want {
+		if !seen {
+			t.Fatalf("expected schema-compat finding %s, got %#v", k, inv.SchemaCompat)
+		}
+	}
+	breakingFacts := 0
+	for _, fact := range inv.Facts {
+		if fact.Kind == "schema_compatibility" && fact.Properties["breaking"] == "true" {
+			breakingFacts++
+		}
+	}
+	if breakingFacts < 2 {
+		t.Fatalf("expected at least 2 breaking schema_compatibility facts, got %d", breakingFacts)
+	}
+}
+
+func TestInventoryDoesNotFlagSchemaCompatForPlainJSON(t *testing.T) {
+	root := t.TempDir()
+	writeFile(t, root, "config/settings.json", `{"type": "production", "record": false, "name": "app"}`)
+	inv, err := InventoryPath(InventoryOptions{Path: root})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(inv.SchemaCompat) != 0 {
+		t.Fatalf("plain .json must not be treated as an Avro schema: %#v", inv.SchemaCompat)
+	}
+}
+
 func TestInventoryAnalyzesInfraDataOrdering(t *testing.T) {
 	root := t.TempDir()
 	// An unordered migration job: a Kubernetes Job that runs migrations with no ordering marker.

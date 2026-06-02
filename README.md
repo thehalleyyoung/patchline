@@ -281,6 +281,8 @@ Run `make data-pipeline-gate` to surface destructive **data-pipeline** changes i
 
 Run `make infra-ordering-gate` to run **infrastructure/data ordering** analysis across Helm hooks, Argo sync-waves, initContainers, and Terraform depends_on — classifying each migration/database job as sequenced or unordered; proven on the real helm/charts repo (Kong/Anchore sequenced migrations) plus a unit test; see [docs/infra-ordering.md](docs/infra-ordering.md).
 
+Run `make schema-compat-gate` to flag **protobuf/Avro schema-compatibility** hazards (proto2 required fields, missing reserved tags, Avro fields without defaults) tied to data-change risk — proven on the real apache/avro repo plus a unit matrix with a no-false-positive rule; see [docs/schema-compat.md](docs/schema-compat.md).
+
 Add `--redact` to write `analysis-bundle/` copies with stable redaction tokens for identifiers, literals, customer-like strings, and secret-like values while preserving joins and existing artifact hashes.
 
 Add `--ci` to write `ci/summary.md` plus upload snippets and code-quality artifacts for GitHub Actions, GitLab CI, and Bitbucket Pipelines: SARIF under `analysis-bundle/summary.sarif`, GitLab `ci/gl-code-quality-report.json`, and Bitbucket `ci/bitbucket-code-insights.json`.
