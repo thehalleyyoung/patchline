@@ -159,6 +159,7 @@ make recurrence-gate
 make corpus-release-gate
 make research-question-gate
 make research-experiment-driver-gate
+make bootstrap-confidence-gate
 ```
 
 The demo downloads real GitHub project subpaths and writes:
@@ -236,6 +237,8 @@ The real-repo slice matrix is backed by `examples/real-repo-slices.json` and `ex
 `make research-question-gate` validates the primary research questions and operationalizes fact extraction, risk ranking, evidence linking, generated-intervention safety, and before/after re-analysis on the four pinned public slices.
 
 `make research-experiment-driver-gate` runs the research-question experiment driver from a detached clean checkout and writes immutable hashed result ledgers.
+
+`make bootstrap-confidence-gate` computes deterministic bootstrap confidence intervals for ranking, linking, generated-check, runtime, and review-burden metrics across the four pinned public slices.
 
 Current default projects:
 
