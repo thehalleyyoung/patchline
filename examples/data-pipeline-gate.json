@@ -1,0 +1,11 @@
+{
+  "version": "patchline.data-pipeline-gate/v1",
+  "claim": "Patchline surfaces data-pipeline repair evidence beyond relational migrations: it recognizes destructive and structural data operations in Airflow DAGs, dbt models, Spark jobs, and Kafka consumers. Each framework is gated by a signal so prose and unrelated code are not misclassified, and destructive operations (table overwrites, dbt full-refresh/table materializations, Airflow backfills and dagrun resets, and Kafka offset resets) are recorded as searchable data_pipeline_change facts. This is proven against a real multi-framework lakehouse repository that combines Airflow orchestration, dbt transforms, and Spark overwrite writes, plus a deterministic four-framework unit matrix with a no-false-positive rule.",
+  "frameworks": ["airflow", "dbt", "spark", "kafka"],
+  "real_repo": {
+    "repo": "https://github.com/harrydevforlife/building-lakehouse",
+    "ref": "master",
+    "expected_frameworks": ["airflow", "dbt", "spark"],
+    "minimum_destructive": 5
+  }
+}

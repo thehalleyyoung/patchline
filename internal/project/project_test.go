@@ -238,6 +238,62 @@ func TestInventoryDoesNotFlagNoSQLWithoutSignal(t *testing.T) {
 	}
 }
 
+func TestInventoryDetectsDataPipelineChanges(t *testing.T) {
+	cases := []struct {
+		rel       string
+		content   string
+		framework string
+		op        string
+		destruct  bool
+	}{
+		{"dags/backfill.py", "from airflow import DAG\nwith DAG('backfill') as dag:\n    pass\n# clear_task_instances reset", "airflow", "backfillOrReset", true},
+		{"dags/etl.py", "from airflow.operators.postgres_operator import PostgresOperator\nPostgresOperator(task_id='t', sql='SELECT 1')", "airflow", "sqlOperator", false},
+		{"models/orders.sql", "{{ config(materialized='table') }}\nselect * from {{ ref('raw_orders') }}", "dbt", "fullRefreshOrTable", true},
+		{"jobs/transform.py", "from pyspark.sql import SparkSession\ndf.write.mode('overwrite').saveAsTable('warehouse.orders')", "spark", "writeOverwriteOrTable", true},
+		{"consumers/listener.py", "from kafka import KafkaConsumer\nc = KafkaConsumer('topic', auto_offset_reset='earliest')", "kafka", "offsetReset", true},
+	}
+	for _, c := range cases {
+		root := t.TempDir()
+		writeFile(t, root, c.rel, c.content)
+		inv, err := InventoryPath(InventoryOptions{Path: root})
+		if err != nil {
+			t.Fatalf("%s: %v", c.rel, err)
+		}
+		found := false
+		for _, f := range inv.DataPipelines {
+			if f.Kind == c.framework+":"+c.op {
+				found = true
+			}
+		}
+		if !found {
+			t.Fatalf("%s: expected %s:%s, got %#v", c.rel, c.framework, c.op, inv.DataPipelines)
+		}
+		if c.destruct {
+			destructiveFact := false
+			for _, fact := range inv.Facts {
+				if fact.Kind == "data_pipeline_change" && fact.Properties["framework"] == c.framework && fact.Properties["destructive"] == "true" {
+					destructiveFact = true
+				}
+			}
+			if !destructiveFact {
+				t.Fatalf("%s: expected destructive data_pipeline_change fact for %s", c.rel, c.framework)
+			}
+		}
+	}
+}
+
+func TestInventoryDoesNotFlagDataPipelineWithoutSignal(t *testing.T) {
+	root := t.TempDir()
+	writeFile(t, root, "docs/notes.md", "We overwrite the whiteboard and reset our plans each sprint. The spark of an idea.\n")
+	inv, err := InventoryPath(InventoryOptions{Path: root})
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, f := range inv.DataPipelines {
+		t.Fatalf("unexpected data-pipeline change from prose: %#v", f)
+	}
+}
+
 func TestInventoryDetectsMultiEcosystemMigrationFrameworks(t *testing.T) {
 	cases := []struct {
 		rel    string

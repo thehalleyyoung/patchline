@@ -277,6 +277,8 @@ Run `make multi-ecosystem-migration-gate` to detect **Laravel, Ecto, Diesel, Seq
 
 Run `make nosql-change-gate` to detect destructive **NoSQL** changes across MongoDB, Cassandra, Elasticsearch, Redis, and DynamoDB — proven on a real Cassandra repo (DROP KEYSPACE/TABLE) plus a five-engine unit matrix with a no-false-positive rule; see [docs/nosql-change.md](docs/nosql-change.md).
 
+Run `make data-pipeline-gate` to surface destructive **data-pipeline** changes in Airflow DAGs, dbt models, Spark jobs, and Kafka consumers — proven on a real lakehouse repo (Spark overwrites + dbt full-refresh + Airflow backfills) plus a four-framework unit matrix with a no-false-positive rule; see [docs/data-pipeline.md](docs/data-pipeline.md).
+
 Add `--redact` to write `analysis-bundle/` copies with stable redaction tokens for identifiers, literals, customer-like strings, and secret-like values while preserving joins and existing artifact hashes.
 
 Add `--ci` to write `ci/summary.md` plus upload snippets and code-quality artifacts for GitHub Actions, GitLab CI, and Bitbucket Pipelines: SARIF under `analysis-bundle/summary.sarif`, GitLab `ci/gl-code-quality-report.json`, and Bitbucket `ci/bitbucket-code-insights.json`.

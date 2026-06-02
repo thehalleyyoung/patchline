@@ -90,6 +90,7 @@ type Inventory struct {
 	EvidenceExports   []Finding      `json:"evidence_exports,omitempty"`
 	Infrastructure    []Finding      `json:"infrastructure_scans,omitempty"`
 	NoSQLChanges      []Finding      `json:"nosql_changes,omitempty"`
+	DataPipelines     []Finding      `json:"data_pipelines,omitempty"`
 	PackageBoundaries []PackageBoundary `json:"package_boundaries,omitempty"`
 	NextCommands      []Command      `json:"next_commands,omitempty"`
 	SkippedDirs       []string       `json:"skipped_dirs,omitempty"`
@@ -1358,6 +1359,7 @@ func (inv *Inventory) addFileFact(file scanFile, language string) {
 		inv.preserveFieldEvidence(file, prefix)
 		inv.scanInfrastructure(file, prefix)
 		inv.scanNoSQL(file, prefix)
+		inv.scanDataPipeline(file, prefix)
 	}
 }
 
@@ -1656,10 +1658,6 @@ var (
 	}
 )
 
-// scanNoSQL detects schema-change and data-migration operations against NoSQL engines (MongoDB,
-// Cassandra, Elasticsearch, Redis, DynamoDB). Each engine is only scanned when a signal confirms
-// the file targets it, and each matched operation is recorded as searchable evidence with a
-// destructive flag so destructive NoSQL changes surface alongside SQL migration risks.
 func (inv *Inventory) scanNoSQL(file scanFile, text string) {
 	lower := strings.ToLower(file.Rel)
 	// Skip obvious non-script payloads to limit false positives.
@@ -1711,6 +1709,100 @@ func (inv *Inventory) scanNoSQL(file scanFile, text string) {
 				}, identifiersFromText(file.Rel)...),
 				Properties: map[string]string{
 					"engine":      e.name,
+					"operation":   rule.operation,
+					"destructive": destructive,
+				},
+			})
+		}
+	}
+}
+
+type pipelineRule struct {
+	pattern     *regexp.Regexp
+	operation   string
+	destructive bool
+}
+
+var (
+	pipelineAirflowSignal = regexp.MustCompile(`(?i)from\s+airflow|import\s+airflow|\bairflow\.|\bDAG\s*\(|@dag\b|airflow\.operators`)
+	pipelineAirflowRules  = []pipelineRule{
+		{regexp.MustCompile(`(?i)\bdrop\s+table\b|\btruncate\s+table\b|dropdatabase`), "destructiveSql", true},
+		{regexp.MustCompile(`(?i)backfill|clear_task_instances|--reset[-_]?dagrun`), "backfillOrReset", true},
+		{regexp.MustCompile(`(?i)PostgresOperator|MySqlOperator|BigQueryOperator|SnowflakeOperator|RedshiftSQLOperator`), "sqlOperator", false},
+		{regexp.MustCompile(`(?i)\bDAG\s*\(|@dag\b`), "dagDefinition", false},
+	}
+	pipelineDbtSignal = regexp.MustCompile(`(?i)\{\{\s*config\s*\(|\{\{\s*ref\s*\(|\{\{\s*source\s*\(|dbt_project\.yml|dbt\b`)
+	pipelineDbtRules  = []pipelineRule{
+		{regexp.MustCompile(`(?i)--full-refresh|full_refresh\s*=\s*true|materialized\s*=\s*['"]table['"]`), "fullRefreshOrTable", true},
+		{regexp.MustCompile(`(?i)\bpre[-_]?hook\b|\bpost[-_]?hook\b`), "hook", false},
+		{regexp.MustCompile(`(?i)materialized\s*=\s*['"]incremental['"]`), "incremental", false},
+		{regexp.MustCompile(`(?i)\{\{\s*ref\s*\(`), "modelRef", false},
+	}
+	pipelineSparkSignal = regexp.MustCompile(`(?i)pyspark|SparkSession|org\.apache\.spark|spark\.read|spark\.sql\s*\(`)
+	pipelineSparkRules  = []pipelineRule{
+		{regexp.MustCompile(`(?i)\.mode\s*\(\s*['"]overwrite['"]|saveastable|insertinto|\.write\.format`), "writeOverwriteOrTable", true},
+		{regexp.MustCompile(`(?i)\.write\b|\.save\s*\(`), "write", false},
+		{regexp.MustCompile(`(?i)\.read\b|spark\.sql\s*\(`), "readOrQuery", false},
+	}
+	pipelineKafkaSignal = regexp.MustCompile(`(?i)KafkaConsumer|@KafkaListener|kafka\.consumer|org\.apache\.kafka|bootstrap[._]servers`)
+	pipelineKafkaRules  = []pipelineRule{
+		{regexp.MustCompile(`(?i)auto[._]offset[._]reset|seektobeginning|--reset-offsets`), "offsetReset", true},
+		{regexp.MustCompile(`(?i)\bsubscribe\s*\(|@KafkaListener|group[._]id`), "consumer", false},
+	}
+)
+
+// scanDataPipeline records data-pipeline repair evidence for Airflow DAGs, dbt models, Spark jobs,
+// and Kafka consumers. Each framework is only scanned when a signal confirms the file targets it,
+// and destructive data operations (overwrites, full refreshes, backfills, offset resets) surface as
+// searchable evidence so pipeline data-changes are reviewed alongside database migrations.
+func (inv *Inventory) scanDataPipeline(file scanFile, text string) {
+	lower := strings.ToLower(file.Rel)
+	if strings.HasSuffix(lower, ".lock") || strings.HasSuffix(lower, ".min.js") {
+		return
+	}
+	type framework struct {
+		name   string
+		signal *regexp.Regexp
+		rules  []pipelineRule
+	}
+	frameworks := []framework{
+		{"airflow", pipelineAirflowSignal, pipelineAirflowRules},
+		{"dbt", pipelineDbtSignal, pipelineDbtRules},
+		{"spark", pipelineSparkSignal, pipelineSparkRules},
+		{"kafka", pipelineKafkaSignal, pipelineKafkaRules},
+	}
+	pathOrText := lower + "\n" + text
+	for _, f := range frameworks {
+		if !f.signal.MatchString(pathOrText) {
+			continue
+		}
+		for _, rule := range f.rules {
+			if !rule.pattern.MatchString(text) {
+				continue
+			}
+			destructive := "false"
+			if rule.destructive {
+				destructive = "true"
+			}
+			finding := Finding{
+				Kind:       f.name + ":" + rule.operation,
+				Path:       file.Rel,
+				Confidence: "observed",
+				Rationale:  f.name + " " + rule.operation + " operation detected (destructive=" + destructive + ")",
+			}
+			inv.DataPipelines = append(inv.DataPipelines, finding)
+			inv.addFact(Fact{
+				Version:    Version,
+				Kind:       "data_pipeline_change",
+				Path:       file.Rel,
+				Confidence: "observed",
+				Rationale:  finding.Rationale,
+				Identifiers: append([]Identifier{
+					{Kind: "pipeline_framework", Value: f.name},
+					{Kind: "pipeline_operation", Value: rule.operation},
+				}, identifiersFromText(file.Rel)...),
+				Properties: map[string]string{
+					"framework":   f.name,
 					"operation":   rule.operation,
 					"destructive": destructive,
 				},
