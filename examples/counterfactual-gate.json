@@ -1,0 +1,10 @@
+{
+  "version": "patchline.counterfactual-gate/v1",
+  "claim": "Patchline evaluates its repair decisions counterfactually: it takes a baseline migration scenario and perturbs exactly one factor at a time, then checks that the safety verdict changes only when a causally relevant factor changes and stays put when an irrelevant edit is made, so the decision is demonstrably driven by the migration's actual risk rather than by incidental surface features. The worker scores the baseline and each counterfactual, labels each perturbation as causally-relevant or irrelevant, and verifies that relevant perturbations flip the verdict while irrelevant ones do not. The gate proves removing a required backfill flips a safe verdict to unsafe while editing a comment leaves the verdict unchanged.",
+  "real_repo": "patchline (self): counterfactual repair sensitivity eval",
+  "baseline": {"drops_column": true, "has_backfill": true, "comment": "migrate users", "verdict": "safe"},
+  "counterfactuals": [
+    {"name": "remove-backfill", "kind": "causal", "change": {"has_backfill": false}},
+    {"name": "edit-comment", "kind": "irrelevant", "change": {"comment": "migrate user table"}}
+  ]
+}

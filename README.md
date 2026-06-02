@@ -369,6 +369,8 @@ Run `make launch-kit-gate` to validate a star-growth **launch kit** of README ho
 
 Run `make burndown-gate` to compute a **roadmap burndown** where every deliverable is **gate-backed** — a deliverable counts as done only when its gate script exists on disk and one pointing at a missing gate stays outstanding; see [docs/burndown.md](docs/burndown.md).
 
+Run `make counterfactual-gate` to run a **counterfactual** repair eval — the safety verdict flips only when a **causally** relevant factor changes (removing a backfill) and stays put under an irrelevant edit (a comment change); see [docs/counterfactual.md](docs/counterfactual.md).
+
 Add `--redact` to write `analysis-bundle/` copies with stable redaction tokens for identifiers, literals, customer-like strings, and secret-like values while preserving joins and existing artifact hashes.
 
 Add `--ci` to write `ci/summary.md` plus upload snippets and code-quality artifacts for GitHub Actions, GitLab CI, and Bitbucket Pipelines: SARIF under `analysis-bundle/summary.sarif`, GitLab `ci/gl-code-quality-report.json`, and Bitbucket `ci/bitbucket-code-insights.json`.
