@@ -1,0 +1,10 @@
+{
+  "version": "patchline.intervention-provenance-graph-gate/v1",
+  "claim": "Every line of a generated intervention is bound to the real risk it addresses and to at least one piece of repository source evidence it was derived from. The gate builds a provenance graph over generated lines, risk nodes, and evidence nodes; proves there are zero orphan (untraceable) lines; rebuilds the graph to prove determinism; and runs a negative control that injects an untraceable line and confirms the builder flags it.",
+  "real_repo": {
+    "repo": "lobsters/lobsters",
+    "ref": "3b80b47aa5aaba37ec44413e7d1dc96fcf1585b6",
+    "subpath": "db/migrate"
+  },
+  "minimum_lines": 40
+}

@@ -255,6 +255,8 @@ Run `make diff-minimization-gate` to minimize a redundant intervention bundle (t
 
 Run `make quarantine-attestation-gate` to issue a quarantine attestation for every real repair candidate — explicit non-execution, manual-review requirement (escalating with open proof holes), and a stable fingerprint — so no generated repair is ever auto-applied; see [docs/quarantine-attestation.md](docs/quarantine-attestation.md).
 
+Run `make intervention-provenance-graph-gate` to build a provenance graph over every generated intervention line — proving zero orphan (untraceable) lines because each line is bound to both the real risk it addresses and at least one source-evidence path, with a negative control that flags an injected untraceable line; see [docs/intervention-provenance-graph.md](docs/intervention-provenance-graph.md).
+
 Add `--redact` to write `analysis-bundle/` copies with stable redaction tokens for identifiers, literals, customer-like strings, and secret-like values while preserving joins and existing artifact hashes.
 
 Add `--ci` to write `ci/summary.md` plus upload snippets and code-quality artifacts for GitHub Actions, GitLab CI, and Bitbucket Pipelines: SARIF under `analysis-bundle/summary.sarif`, GitLab `ci/gl-code-quality-report.json`, and Bitbucket `ci/bitbucket-code-insights.json`.
