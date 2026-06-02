@@ -1,0 +1,25 @@
+{
+  "version": "patchline.adoption-case-studies-gate/v1",
+  "claim": "Patchline ships adoption case studies showing teams using it alongside their existing CI, observability, and migration tooling, with each narrative anchored to the specific gate-backed capabilities the team relied on rather than to marketing claims. Every case study declares the integration context, the capabilities used, and a measurable outcome, and the worker renders a narrative plus an integration matrix. The gate proves that the CI, observability, and migration integration contexts are all represented and that every capability cited by a case study maps to a real gate.",
+  "real_repo": "patchline (self): case-study capabilities validated against scripts/*-gate.sh",
+  "case_studies": [
+    {
+      "team": "Payments platform",
+      "context": "ci",
+      "capabilities": ["nosql-change-gate", "schema-compat-gate"],
+      "outcome": "Blocked a destructive Cassandra DROP in a pull request before merge."
+    },
+    {
+      "team": "Search infrastructure",
+      "context": "observability",
+      "capabilities": ["datadog-timeline-gate", "runtime-confidence-gate"],
+      "outcome": "Correlated an SLO breach to a high-severity migration finding within minutes."
+    },
+    {
+      "team": "Data platform",
+      "context": "migration",
+      "capabilities": ["multi-ecosystem-migration-gate", "data-pipeline-gate", "infra-ordering-gate"],
+      "outcome": "Caught an unordered migration Job that would have raced its deploy."
+    }
+  ]
+}

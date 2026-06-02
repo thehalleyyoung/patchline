@@ -307,6 +307,8 @@ Run `make feedback-forms-gate` to render **analytics-free** docs feedback forms 
 
 Run `make conference-demos-gate` to generate audience-tailored **conference demo** run sheets for Datadog, Microsoft RISE, database, and PL audiences — every step is a real **gate-backed** `make` target, so what's green on main is green on stage; see [docs/conference-demos.md](docs/conference-demos.md).
 
+Run `make adoption-case-studies-gate` to render **case studies** of teams using Patchline alongside CI, **observability**, and migration tooling — every cited capability maps to a real gate, so adoption stories are anchored to proof, not marketing; see [docs/adoption-case-studies.md](docs/adoption-case-studies.md).
+
 Add `--redact` to write `analysis-bundle/` copies with stable redaction tokens for identifiers, literals, customer-like strings, and secret-like values while preserving joins and existing artifact hashes.
 
 Add `--ci` to write `ci/summary.md` plus upload snippets and code-quality artifacts for GitHub Actions, GitLab CI, and Bitbucket Pipelines: SARIF under `analysis-bundle/summary.sarif`, GitLab `ci/gl-code-quality-report.json`, and Bitbucket `ci/bitbucket-code-insights.json`.
