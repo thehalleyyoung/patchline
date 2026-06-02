@@ -1,0 +1,54 @@
+{
+  "version": "patchline.artifact-evaluation-kit-gate/v1",
+  "claim": "Patchline ships an artifact-evaluation landing kit that assigns reviewer roles, time budgets, expected outputs, and pass/fail criteria, and anchors those instructions in regenerated public-code capstone evidence.",
+  "minimum_roles": 4,
+  "minimum_expected_outputs": 8,
+  "minimum_pass_fail_criteria": 8,
+  "capstone_spec": "examples/capstone-demo-gate.json",
+  "roles": [
+    {
+      "id": "quickstart-reviewer",
+      "title": "Quickstart reviewer",
+      "time_budget_minutes": 20,
+      "goal": "Confirm a fresh user can run the capstone command, inspect the session report, and locate all expected artifacts."
+    },
+    {
+      "id": "artifact-reviewer",
+      "title": "Artifact reviewer",
+      "time_budget_minutes": 45,
+      "goal": "Verify that generated evidence is reproducible, checksummed, deterministic, and tied to pinned public repositories."
+    },
+    {
+      "id": "security-reviewer",
+      "title": "Security reviewer",
+      "time_budget_minutes": 30,
+      "goal": "Check that generated code remains quarantined, bad output is rejected, and no production credentials are required."
+    },
+    {
+      "id": "research-reviewer",
+      "title": "Research reviewer",
+      "time_budget_minutes": 60,
+      "goal": "Validate that claims, limitations, figures, taxonomy, metrics, and case studies align with regenerated evidence."
+    }
+  ],
+  "expected_outputs": [
+    "landing.md",
+    "reviewer-guide.md",
+    "roles.json",
+    "expected-outputs.json",
+    "pass-fail-criteria.json",
+    "capstone/session.md",
+    "capstone/summary.json",
+    "capstone/checksums.txt"
+  ],
+  "pass_fail_criteria": [
+    {"id": "capstone-summary", "description": "Capstone summary exists and has verified true."},
+    {"id": "public-repos", "description": "At least four pinned public repositories are analyzed."},
+    {"id": "ranked-risks", "description": "The session reports more than 100 ranked data-change risks."},
+    {"id": "bounded-interventions", "description": "Every public repository has bounded generated intervention artifacts."},
+    {"id": "bad-output-rejection", "description": "Plausible bad generated output is rejected by deterministic checks."},
+    {"id": "experiment-evidence", "description": "Metrics, taxonomy, claims, limitations, figures, and case studies are regenerated."},
+    {"id": "checksums", "description": "Generated session artifacts have checksum coverage."},
+    {"id": "role-budgets", "description": "Every reviewer role has a concrete time budget and expected review goal."}
+  ]
+}
