@@ -405,6 +405,7 @@ Usage:
   patchline repo baseline --inventory inventory-dir --intake intake-dir [--out dir] [--json]
   patchline repo propose --from-report baseline-dir --proposal-kind tests|guards|instrumentation|repair|all [--budget files=N,lines=N,tokens=N,changes=N] [--no-llm] [--llm-command cmd] [--prompt-without-facts] [--out dir] [--json]
   patchline repo compare --before baseline-dir --after proposal-dir [--out dir] [--run-native-tests] [--json]
+  patchline repo proposal-minimize --before baseline-dir --after proposal-dir [--out dir] [--json]
   patchline repo suppressions --baseline baseline-dir --suppressions suppressions.json [--out dir] [--json]
   patchline repo why-now --previous baseline-dir --current baseline-dir [--out dir] [--json]
   patchline repo changes --previous analysis-dir --current analysis-dir [--out dir] [--json]
@@ -500,7 +501,7 @@ Examples:
 
 func repoCommand(args []string) error {
 	if len(args) == 0 {
-		return errors.New("usage: patchline repo <doctor|fetch|analyze|inventory|baseline|propose|compare|suppressions|why-now|changes|notify-summary|minimize|recurrence> ...")
+		return errors.New("usage: patchline repo <doctor|fetch|analyze|inventory|baseline|propose|compare|proposal-minimize|suppressions|why-now|changes|notify-summary|minimize|recurrence> ...")
 	}
 	switch args[0] {
 	case "doctor":
@@ -517,6 +518,8 @@ func repoCommand(args []string) error {
 		return repoPropose(args[1:])
 	case "compare":
 		return repoCompare(args[1:])
+	case "proposal-minimize":
+		return repoProposalMinimize(args[1:])
 	case "suppressions":
 		return repoSuppressions(args[1:])
 	case "why-now":
@@ -2549,6 +2552,48 @@ func repoCompare(args []string) error {
 		report.Summary.RisksWithCoverage,
 		report.Summary.PatchlineChecksFailed,
 		report.Hash,
+	)
+	if *outPath != "" {
+		fmt.Printf("  out=%s\n", *outPath)
+	}
+	return nil
+}
+
+func repoProposalMinimize(args []string) error {
+	fs := flag.NewFlagSet("repo proposal-minimize", flag.ContinueOnError)
+	fs.SetOutput(ioDiscard{})
+	beforePath := fs.String("before", "", "baseline directory or baseline.json")
+	afterPath := fs.String("after", "", "proposal directory or proposal.json")
+	outPath := fs.String("out", filepath.Join("results", "generated", "proposal-minimized"), "output directory")
+	jsonOut := fs.Bool("json", false, "emit JSON")
+	if err := fs.Parse(args); err != nil {
+		return err
+	}
+	if *beforePath == "" || *afterPath == "" {
+		return errors.New("usage: patchline repo proposal-minimize --before baseline-dir --after proposal-dir [--out dir] [--json]")
+	}
+	baseline, err := project.LoadBaseline(*beforePath)
+	if err != nil {
+		return err
+	}
+	proposal, err := project.LoadProposal(*afterPath)
+	if err != nil {
+		return err
+	}
+	minimized := project.MinimizeGeneratedProposal(baseline, proposal)
+	if *outPath != "" {
+		if err := project.WriteProposal(*outPath, minimized); err != nil {
+			return err
+		}
+	}
+	if *jsonOut {
+		return writeJSON(os.Stdout, minimized)
+	}
+	fmt.Printf("proposal minimize before=%d after=%d removed=%d output_hash=%s\n",
+		minimized.Minimization.BeforeFiles,
+		minimized.Minimization.AfterFiles,
+		minimized.Minimization.RemovedFiles,
+		minimized.OutputHash,
 	)
 	if *outPath != "" {
 		fmt.Printf("  out=%s\n", *outPath)

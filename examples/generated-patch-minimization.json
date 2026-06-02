@@ -1,0 +1,5 @@
+{
+  "version": "patchline.generated-patch-minimization/v1",
+  "minimum_public_slices": 4,
+  "claim": "Generated proposal minimization removes redundant or orphaned files and rewrites the patch while preserving risk coverage and deterministic compare outcomes."
+}

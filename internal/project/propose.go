@@ -31,29 +31,30 @@ type ProposalOptions struct {
 }
 
 type ProposalReport struct {
-	Version        string              `json:"version"`
-	BaselineHash   string              `json:"baseline_hash"`
-	Kind           string              `json:"kind"`
-	Generator      string              `json:"generator"`
-	Deterministic  bool                `json:"deterministic_only"`
-	PromptMode     string              `json:"prompt_mode"`
-	Trust          string              `json:"trust"`
-	BudgetRisks    int                 `json:"budget_risks"`
-	ScopeBudget    ProposalBudget      `json:"scope_budget,omitempty"`
-	TargetRiskIDs  []string            `json:"target_risk_ids"`
-	ContextHash    string              `json:"context_hash"`
-	PromptHash     string              `json:"prompt_hash"`
-	OutputHash     string              `json:"output_hash"`
-	Intervention   RepairIntervention  `json:"intervention"`
-	GeneratedFiles []GeneratedFile     `json:"generated_files,omitempty"`
-	Constraints    []string            `json:"constraints,omitempty"`
-	Warnings       []string            `json:"warnings,omitempty"`
-	Artifacts      map[string]string   `json:"artifacts,omitempty"`
-	Markdown       string              `json:"markdown,omitempty"`
-	Context        ProposalContext     `json:"-"`
-	Prompt         string              `json:"-"`
-	Generated      []GeneratedArtifact `json:"-"`
-	Patch          string              `json:"-"`
+	Version        string               `json:"version"`
+	BaselineHash   string               `json:"baseline_hash"`
+	Kind           string               `json:"kind"`
+	Generator      string               `json:"generator"`
+	Deterministic  bool                 `json:"deterministic_only"`
+	PromptMode     string               `json:"prompt_mode"`
+	Trust          string               `json:"trust"`
+	BudgetRisks    int                  `json:"budget_risks"`
+	ScopeBudget    ProposalBudget       `json:"scope_budget,omitempty"`
+	TargetRiskIDs  []string             `json:"target_risk_ids"`
+	ContextHash    string               `json:"context_hash"`
+	PromptHash     string               `json:"prompt_hash"`
+	OutputHash     string               `json:"output_hash"`
+	Intervention   RepairIntervention   `json:"intervention"`
+	Minimization   ProposalMinimization `json:"minimization,omitempty"`
+	GeneratedFiles []GeneratedFile      `json:"generated_files,omitempty"`
+	Constraints    []string             `json:"constraints,omitempty"`
+	Warnings       []string             `json:"warnings,omitempty"`
+	Artifacts      map[string]string    `json:"artifacts,omitempty"`
+	Markdown       string               `json:"markdown,omitempty"`
+	Context        ProposalContext      `json:"-"`
+	Prompt         string               `json:"-"`
+	Generated      []GeneratedArtifact  `json:"-"`
+	Patch          string               `json:"-"`
 }
 
 type ProposalContext struct {
@@ -93,6 +94,23 @@ type GeneratedArtifact struct {
 	Kind    string
 	Content string
 	RiskIDs []string
+}
+
+type ProposalMinimization struct {
+	Applied                    bool                       `json:"applied,omitempty"`
+	BeforeFiles                int                        `json:"before_files,omitempty"`
+	AfterFiles                 int                        `json:"after_files,omitempty"`
+	RemovedFiles               int                        `json:"removed_files,omitempty"`
+	PreservedRisksWithCoverage int                        `json:"preserved_risks_with_coverage,omitempty"`
+	PreservedCheckFailures     int                        `json:"preserved_check_failures,omitempty"`
+	Removed                    []RemovedGeneratedArtifact `json:"removed,omitempty"`
+}
+
+type RemovedGeneratedArtifact struct {
+	Path    string   `json:"path"`
+	Kind    string   `json:"kind"`
+	RiskIDs []string `json:"risk_ids,omitempty"`
+	Reason  string   `json:"reason"`
 }
 
 type testPlacement struct {
@@ -847,6 +865,119 @@ func renderProposalPatch(artifacts []GeneratedArtifact) string {
 	return b.String()
 }
 
+func MinimizeGeneratedProposal(baseline BaselineReport, proposal ProposalReport) ProposalReport {
+	before := append([]GeneratedArtifact(nil), proposal.Generated...)
+	sort.Slice(before, func(i, j int) bool { return before[i].Path < before[j].Path })
+	checks := checkGeneratedArtifacts(before)
+	checkByPath := map[string]GeneratedCheck{}
+	failuresBefore := 0
+	for _, check := range checks {
+		checkByPath[check.Path] = check
+		if check.Status == "fail" {
+			failuresBefore++
+		}
+	}
+	validRisks := map[string]bool{}
+	for _, risk := range baseline.Risks {
+		validRisks[risk.ID] = true
+	}
+	targetRisks := map[string]bool{}
+	for _, id := range proposal.TargetRiskIDs {
+		if validRisks[id] {
+			targetRisks[id] = true
+		}
+	}
+	if len(targetRisks) == 0 {
+		for id := range validRisks {
+			targetRisks[id] = true
+		}
+	}
+	covered := map[string]bool{}
+	seen := map[string]bool{}
+	var kept []GeneratedArtifact
+	var removed []RemovedGeneratedArtifact
+	for _, artifact := range before {
+		relevant := relevantRiskIDs(artifact.RiskIDs, targetRisks)
+		reason := ""
+		switch {
+		case len(relevant) == 0:
+			reason = "no-target-risk-coverage"
+		case checkByPath[artifact.Path].Status == "fail":
+			reason = "deterministic-check-failed"
+		case seen[minimizationKey(artifact)]:
+			reason = "duplicate-generated-hunk"
+		case !addsNewCoverage(relevant, covered):
+			reason = "no-new-risk-coverage"
+		}
+		if reason != "" {
+			removed = append(removed, RemovedGeneratedArtifact{Path: artifact.Path, Kind: artifact.Kind, RiskIDs: append([]string(nil), artifact.RiskIDs...), Reason: reason})
+			continue
+		}
+		seen[minimizationKey(artifact)] = true
+		for _, id := range relevant {
+			covered[id] = true
+		}
+		kept = append(kept, artifact)
+	}
+	afterChecks := checkGeneratedArtifacts(kept)
+	failuresAfter := 0
+	for _, check := range afterChecks {
+		if check.Status == "fail" {
+			failuresAfter++
+		}
+	}
+	proposal.Generated = kept
+	proposal.GeneratedFiles = generatedFilesForArtifacts(kept)
+	proposal.Patch = renderProposalPatch(kept)
+	proposal.OutputHash = canonical.Hash(proposal.Patch)
+	proposal.Intervention = buildRepairIntervention(proposal.BaselineHash, proposal.OutputHash, proposal.TargetRiskIDs, kept)
+	proposal.Minimization = ProposalMinimization{
+		Applied:                    true,
+		BeforeFiles:                len(before),
+		AfterFiles:                 len(kept),
+		RemovedFiles:               len(removed),
+		PreservedRisksWithCoverage: len(covered),
+		PreservedCheckFailures:     minInt(failuresBefore, failuresAfter),
+		Removed:                    removed,
+	}
+	proposal.Markdown = renderProposalMarkdown(proposal)
+	return proposal
+}
+
+func generatedFilesForArtifacts(artifacts []GeneratedArtifact) []GeneratedFile {
+	var files []GeneratedFile
+	for _, artifact := range artifacts {
+		files = append(files, GeneratedFile{Path: artifact.Path, Kind: artifact.Kind, ContentHash: "sha256:" + canonical.Hash(artifact.Content), RiskIDs: append([]string(nil), artifact.RiskIDs...)})
+	}
+	sort.Slice(files, func(i, j int) bool { return files[i].Path < files[j].Path })
+	return files
+}
+
+func relevantRiskIDs(ids []string, target map[string]bool) []string {
+	var out []string
+	for _, id := range ids {
+		if target[id] {
+			out = append(out, id)
+		}
+	}
+	return uniqueSortedStrings(out)
+}
+
+func addsNewCoverage(ids []string, covered map[string]bool) bool {
+	for _, id := range ids {
+		if !covered[id] {
+			return true
+		}
+	}
+	return false
+}
+
+func minimizationKey(artifact GeneratedArtifact) string {
+	ids := append([]string(nil), artifact.RiskIDs...)
+	sort.Strings(ids)
+	return artifact.Kind + "\x00" + strings.Join(ids, ",") + "\x00" + canonical.Hash(artifact.Content)
+}
+
 func renderProposalMarkdown(report ProposalReport) string {
 	var b strings.Builder
 	fmt.Fprintf(&b, "# Patchline repo proposal\n\n")
@@ -859,6 +990,19 @@ func renderProposalMarkdown(report ProposalReport) string {
 		fmt.Fprintf(&b, "- scope_budget: `%s`\n", report.ScopeBudget.Raw)
 	}
 	fmt.Fprintf(&b, "- output_hash: `%s`\n\n", report.OutputHash)
+	if report.Minimization.Applied {
+		fmt.Fprintf(&b, "## Minimization\n\n")
+		fmt.Fprintf(&b, "| before files | after files | removed files | preserved covered risks |\n")
+		fmt.Fprintf(&b, "| ---: | ---: | ---: | ---: |\n")
+		fmt.Fprintf(&b, "| %d | %d | %d | %d |\n\n", report.Minimization.BeforeFiles, report.Minimization.AfterFiles, report.Minimization.RemovedFiles, report.Minimization.PreservedRisksWithCoverage)
+		if len(report.Minimization.Removed) > 0 {
+			fmt.Fprintf(&b, "| removed path | reason |\n| --- | --- |\n")
+			for _, removed := range report.Minimization.Removed {
+				fmt.Fprintf(&b, "| %s | %s |\n", removed.Path, removed.Reason)
+			}
+			fmt.Fprintf(&b, "\n")
+		}
+	}
 	fmt.Fprintf(&b, "## Intervention\n\n")
 	fmt.Fprintf(&b, "- id: `%s`\n", report.Intervention.ID)
 	fmt.Fprintf(&b, "- stage: `%s`\n", report.Intervention.Stage)

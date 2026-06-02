@@ -173,6 +173,7 @@ make guard-mutation-gate
 make native-sandbox-profile-gate
 make generated-provenance-gate
 make repair-manifest-schema-gate
+make generated-patch-minimization-gate
 ```
 
 The demo downloads real GitHub project subpaths and writes:
@@ -278,6 +279,8 @@ The real-repo slice matrix is backed by `examples/real-repo-slices.json` and `ex
 `make generated-provenance-gate` checks four public repo slices and proves generated patches cite risk IDs, fact hashes, and sanitized evidence paths.
 
 `make repair-manifest-schema-gate` generates repair manifests for four public repo slices and checks machine-readable scope, preconditions, postconditions, rollback steps, validation commands, and owner review status.
+
+`make generated-patch-minimization-gate` injects redundant generated proposal hunks into four public repo analyses and proves `repo proposal-minimize` removes them while preserving compare coverage and deterministic checks.
 
 Current default projects:
 

@@ -189,6 +189,12 @@ func LoadProposal(path string) (ProposalReport, error) {
 	if err := json.Unmarshal(data, &report); err != nil {
 		return ProposalReport{}, err
 	}
+	if contextData, err := os.ReadFile(filepath.Join(baseDir, "prompt-context.json")); err == nil {
+		_ = json.Unmarshal(contextData, &report.Context)
+	}
+	if promptData, err := os.ReadFile(filepath.Join(baseDir, "prompt.txt")); err == nil {
+		report.Prompt = string(promptData)
+	}
 	for _, file := range report.GeneratedFiles {
 		content, err := os.ReadFile(filepath.Join(baseDir, filepath.FromSlash(file.Path)))
 		if err != nil {

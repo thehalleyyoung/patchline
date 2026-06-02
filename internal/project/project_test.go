@@ -790,6 +790,55 @@ func TestProposeAddsSanitizedProvenanceComments(t *testing.T) {
 	}
 }
 
+func TestMinimizeGeneratedProposalRemovesNonImprovingArtifacts(t *testing.T) {
+	baseline := BaselineReport{
+		Version: BaselineVersion,
+		Hash:    "baseline-hash",
+		Risks: []BaselineRisk{{
+			ID:        "risk:accounts",
+			Path:      "db/migrate/001.sql",
+			Kind:      "update",
+			Table:     "accounts",
+			Severity:  "high",
+			Score:     120,
+			Rationale: "unbounded update",
+		}},
+	}
+	baseline.Hash = baselineHash(baseline)
+	baselineDir := filepath.Join(t.TempDir(), "baseline")
+	if err := WriteBaseline(baselineDir, baseline); err != nil {
+		t.Fatal(err)
+	}
+	proposal, err := Propose(ProposalOptions{BaselinePath: baselineDir, Kind: "all", BudgetRisks: 1})
+	if err != nil {
+		t.Fatal(err)
+	}
+	proposal.Generated = append(proposal.Generated,
+		GeneratedArtifact{Path: "patchline-proposals/duplicates/redundant.sql", Kind: proposal.Generated[0].Kind, Content: proposal.Generated[0].Content, RiskIDs: append([]string(nil), proposal.Generated[0].RiskIDs...)},
+		GeneratedArtifact{Path: "patchline-proposals/orphans/no-coverage.md", Kind: "tests", Content: "# untrusted generated\n\nSuggested assertions:\n", RiskIDs: []string{"risk:not-in-baseline"}},
+	)
+	proposal.GeneratedFiles = generatedFilesForArtifacts(proposal.Generated)
+	proposal.Patch = renderProposalPatch(proposal.Generated)
+	minimized := MinimizeGeneratedProposal(baseline, proposal)
+	if !minimized.Minimization.Applied || minimized.Minimization.RemovedFiles == 0 || len(minimized.Generated) >= len(proposal.Generated) {
+		t.Fatalf("expected generated proposal to be minimized: %#v", minimized.Minimization)
+	}
+	reasons := map[string]bool{}
+	for _, removed := range minimized.Minimization.Removed {
+		reasons[removed.Reason] = true
+	}
+	if !reasons["no-new-risk-coverage"] || !reasons["no-target-risk-coverage"] {
+		t.Fatalf("expected non-improving artifacts to be removed, got %#v", minimized.Minimization.Removed)
+	}
+	compare := Compare(baseline, minimized)
+	if compare.Summary.RisksWithCoverage != 1 || compare.Summary.PatchlineChecksFailed != 0 {
+		t.Fatalf("minimized proposal should preserve coverage and checks: %#v", compare.Summary)
+	}
+	if !strings.Contains(minimized.Markdown, "## Minimization") {
+		t.Fatalf("expected minimization markdown, got %s", minimized.Markdown)
+	}
+}
+
 func TestProposeLLMCommandCapturesOutputAsUntrustedArtifact(t *testing.T) {
 	baseline := BaselineReport{Version: BaselineVersion, Hash: "baseline-hash", Risks: []BaselineRisk{{ID: "risk:1", Path: "db/migrate/001.sql", Table: "accounts", Severity: "high", Score: 100, Rationale: "risk"}}}
 	baseline.Hash = baselineHash(baseline)
