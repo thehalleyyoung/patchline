@@ -150,6 +150,24 @@ func TestRepoAnalyzeTraceFlushesDiagnosticsOnError(t *testing.T) {
 	}
 }
 
+func TestBundleRedactorRemovesCanaryValues(t *testing.T) {
+	redactor := newBundleRedactor()
+	data := []byte(`{"path":"db/migrate/PATCHLINE_LEAK_CANARY_ALPHA.sql","message":"contact patchline_canary@example.invalid and quote 'PATCHLINE_LEAK_CANARY_BETA'"}` + "\n")
+	redacted, err := redactor.redactJSONBytes(data)
+	if err != nil {
+		t.Fatal(err)
+	}
+	text := string(redacted)
+	for _, canary := range []string{"PATCHLINE_LEAK_CANARY_ALPHA", "PATCHLINE_LEAK_CANARY_BETA", "patchline_canary@example.invalid"} {
+		if strings.Contains(text, canary) {
+			t.Fatalf("redacted JSON leaked %s:\n%s", canary, text)
+		}
+	}
+	if !strings.Contains(text, "[redacted:") {
+		t.Fatalf("expected redaction tokens in:\n%s", text)
+	}
+}
+
 func TestContributorCheckPlanWritesExpectedSteps(t *testing.T) {
 	out := filepath.Join(t.TempDir(), "contributor")
 	if err := run([]string{"contributor", "check", "--root", ".", "--out", out, "--packages", "./cmd/patchline", "--gates", "gate,impact-gate", "--plan-only", "--json"}); err != nil {

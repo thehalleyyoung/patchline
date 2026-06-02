@@ -28,3 +28,16 @@ func TestRecorderWritesStructuredEventsAndSummary(t *testing.T) {
 		}
 	}
 }
+
+func TestSpanEndMergesFinalAttributesWithoutStartAttributes(t *testing.T) {
+	rec := New(filepath.Join(t.TempDir(), "diag"), true)
+	span := rec.StartSpan("redacted-artifacts", nil)
+	span.End(nil, map[string]any{"out": "results/generated"})
+	summary, err := rec.Write()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if summary.Spans != 1 || summary.FailedSpans != 0 {
+		t.Fatalf("unexpected summary: %#v", summary)
+	}
+}

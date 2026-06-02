@@ -1399,6 +1399,9 @@ func repoAnalyze(args []string) (err error) {
 		triageSpan.End(nil, map[string]any{"groups": len(triage.Groups), "owner_routes": triage.Summary.OwnerRoutes})
 	}
 	report.Outputs["analysis_bundle"] = filepath.Join(*outPath, "analysis-bundle")
+	if *redact {
+		report.Outputs["redacted_artifacts"] = filepath.Join(*outPath, "redacted-artifacts")
+	}
 	report.CommandsPath = filepath.Join(*outPath, "commands.md")
 	report.Outputs["commands"] = report.CommandsPath
 	if err := writeCopyCommandsReport(*outPath, report, *githubRepo != "", *ref, *proposalKind, *llmCommand, *budget, *noLLM, *promptNoFacts, *redact, *ciMode); err != nil {
@@ -1487,6 +1490,14 @@ func repoAnalyze(args []string) (err error) {
 		if err := writeRepoAnalyzeReport(*outPath, report); err != nil {
 			return err
 		}
+	}
+	if *redact {
+		redactedSpan := rootSpan.Child("redacted-artifacts", nil)
+		if err := writeRedactedAnalysisArtifacts(*outPath, report); err != nil {
+			redactedSpan.End(err, nil)
+			return err
+		}
+		redactedSpan.End(nil, map[string]any{"out": report.Outputs["redacted_artifacts"]})
 	}
 	if *jsonOut {
 		return writeJSON(os.Stdout, report)
@@ -2896,6 +2907,99 @@ func writeAnalysisBundle(outDir string, report repoAnalyzeReport) error {
 		}
 	}
 	return copyIfExists(filepath.Join(outDir, "analyze.md"), "summary.md")
+}
+
+func writeRedactedAnalysisArtifacts(outDir string, report repoAnalyzeReport) error {
+	redactedDir := filepath.Join(outDir, "redacted-artifacts")
+	if err := os.RemoveAll(redactedDir); err != nil {
+		return err
+	}
+	if err := os.MkdirAll(redactedDir, 0o755); err != nil {
+		return err
+	}
+	redactor := newBundleRedactor()
+	copyItem := func(src, rel string) error {
+		info, err := os.Stat(src)
+		if err != nil {
+			if errors.Is(err, os.ErrNotExist) {
+				return nil
+			}
+			return err
+		}
+		dst := filepath.Join(redactedDir, filepath.FromSlash(rel))
+		if info.IsDir() {
+			return copyRedactedTree(src, dst, redactor)
+		}
+		if err := os.MkdirAll(filepath.Dir(dst), 0o755); err != nil {
+			return err
+		}
+		return copyBundleFile(src, dst, true, redactor)
+	}
+	items := []struct {
+		src string
+		rel string
+	}{
+		{filepath.Join(outDir, "analyze.json"), "reports/analyze.json"},
+		{filepath.Join(outDir, "analyze.md"), "reports/analyze.md"},
+		{filepath.Join(outDir, "commands.md"), "reports/commands.md"},
+		{filepath.Join(outDir, "inventory"), "reports/inventory"},
+		{filepath.Join(outDir, "intake"), "reports/intake"},
+		{filepath.Join(outDir, "baseline"), "reports/baseline"},
+		{filepath.Join(outDir, "proposal"), "prompts-and-generated/proposal"},
+		{filepath.Join(outDir, "compare"), "reports/compare"},
+		{filepath.Join(outDir, "triage"), "reports/triage"},
+		{filepath.Join(outDir, "analysis-bundle"), "bundles/analysis-bundle"},
+		{filepath.Join(outDir, "diagnostics"), "logs/diagnostics"},
+		{filepath.Join(outDir, "ci"), "reports/ci"},
+	}
+	for _, item := range items {
+		if err := copyItem(item.src, item.rel); err != nil {
+			return err
+		}
+	}
+	if fetchOut := report.Outputs["fetch"]; fetchOut != "" {
+		if err := copyItem(filepath.Join(fetchOut, "source.json"), "reports/fetch/source.json"); err != nil {
+			return err
+		}
+	}
+	manifest := map[string]any{
+		"version":          "patchline.redacted-artifacts/v1",
+		"source_analysis":  filepath.ToSlash(outDir),
+		"redaction_policy": "stable tokens for identifiers, literals, customers, and secret-like values",
+		"hash":             report.Hash,
+	}
+	data, err := json.MarshalIndent(manifest, "", "  ")
+	if err != nil {
+		return err
+	}
+	return os.WriteFile(filepath.Join(redactedDir, "manifest.json"), append(data, '\n'), 0o644)
+}
+
+func copyRedactedTree(srcDir, dstDir string, redactor *bundleRedactor) error {
+	return filepath.WalkDir(srcDir, func(path string, entry fs.DirEntry, err error) error {
+		if err != nil {
+			return err
+		}
+		rel, err := filepath.Rel(srcDir, path)
+		if err != nil {
+			return err
+		}
+		if rel == "." {
+			return nil
+		}
+		if entry.IsDir() {
+			switch entry.Name() {
+			case ".git", "repo", "downloads", "cache":
+				return filepath.SkipDir
+			}
+			return os.MkdirAll(filepath.Join(dstDir, rel), 0o755)
+		}
+		dst := filepath.Join(dstDir, rel)
+		if err := os.MkdirAll(filepath.Dir(dst), 0o755); err != nil {
+			return err
+		}
+		return copyBundleFile(path, dst, true, redactor)
+	})
 }
 
 func writeCopyCommandsReport(outDir string, report repoAnalyzeReport, githubInput bool, githubRef, proposalKind, llmCommand, budget string, noLLM, promptNoFacts, redact, ciMode bool) error {

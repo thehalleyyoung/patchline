@@ -110,7 +110,11 @@ func (s *Span) End(err error, attrs map[string]any) {
 		errText = err.Error()
 	}
 	merged := normalizeAttrs(s.attrs)
-	for key, value := range normalizeAttrs(attrs) {
+	finalAttrs := normalizeAttrs(attrs)
+	if len(finalAttrs) > 0 && merged == nil {
+		merged = map[string]any{}
+	}
+	for key, value := range finalAttrs {
 		merged[key] = value
 	}
 	s.rec.append(Event{
