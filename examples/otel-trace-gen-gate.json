@@ -1,0 +1,25 @@
+{
+  "version": "patchline.otel-trace-gen-gate/v1",
+  "claim": "Synthetic OpenTelemetry trace generators turn real Patchline findings into valid OTLP spans so observability links can be exercised without a live backend. For a real downloaded baseline, each selected finding becomes a database span (deploy parent + migration child) whose attributes carry the finding id, table, and operation, and an expected-link record asserts the span resolves back to a real finding by id and table.",
+  "real_repo": {
+    "repo": "lobsters/lobsters",
+    "ref": "3b80b47aa5aaba37ec44413e7d1dc96fcf1585b6",
+    "subpath": "db/migrate"
+  },
+  "service_name": "lobsters-migrations",
+  "max_traces": 12,
+  "minimum_traces": 6,
+  "minimum_link_coverage": 1.0,
+  "operation_map": {
+    "code-path:delete": "DELETE",
+    "code-path:update": "UPDATE",
+    "code-path:schema:drop_column": "ALTER",
+    "code-path:schema:drop_table": "DROP",
+    "code-path:schema:add_column": "ALTER",
+    "create_table": "CREATE",
+    "alter": "ALTER",
+    "delete": "DELETE",
+    "update": "UPDATE",
+    "drop": "DROP"
+  }
+}

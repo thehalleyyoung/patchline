@@ -229,6 +229,8 @@ Run `make ablation-study-gate` to ablate provenance links, cross-file context, g
 
 Run `make effect-size-strata-gate` to compare risk density and hazard-class severity across ecosystem, repository size, and migration framework with standardized Cohen's d effect sizes on real downloaded baselines; see [docs/effect-size-strata.md](docs/effect-size-strata.md).
 
+Run `make otel-trace-gen-gate` to generate valid OpenTelemetry (OTLP) traces from a real baseline, linking each data-change span back to a real finding by id and table for offline observability replay; see [docs/otel-trace-gen.md](docs/otel-trace-gen.md).
+
 Add `--redact` to write `analysis-bundle/` copies with stable redaction tokens for identifiers, literals, customer-like strings, and secret-like values while preserving joins and existing artifact hashes.
 
 Add `--ci` to write `ci/summary.md` plus upload snippets and code-quality artifacts for GitHub Actions, GitLab CI, and Bitbucket Pipelines: SARIF under `analysis-bundle/summary.sarif`, GitLab `ci/gl-code-quality-report.json`, and Bitbucket `ci/bitbucket-code-insights.json`.
