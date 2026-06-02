@@ -1,0 +1,59 @@
+{
+  "version": "patchline.performance-budget-gate/v1",
+  "claim": "Patchline performance budgets cover large repositories, monorepo slices, generated bundles, and four-repo matrix runs on real public code.",
+  "budgets": {
+    "large_repo_seconds": 240,
+    "monorepo_seconds": 240,
+    "generated_bundle_seconds": 240,
+    "generated_bundle_bytes": 25000000,
+    "matrix_case_seconds": 240,
+    "matrix_total_seconds": 720
+  },
+  "large_repo": {
+    "id": "forem-large-migrations",
+    "repo": "forem/forem",
+    "ref": "9c5509c3aeecd4a86a8950206fa937ebcbc2f8d1",
+    "subpath": "db/migrate"
+  },
+  "monorepo": {
+    "id": "grafana-monorepo-sqlstore",
+    "repo": "grafana/grafana",
+    "ref": "9bcff8f6f5e84fafac24e57794973cb034869055",
+    "subpath": "pkg/services/sqlstore"
+  },
+  "generated_bundle": {
+    "id": "lobsters-redacted-ci-bundle",
+    "repo": "lobsters/lobsters",
+    "ref": "3b80b47aa5aaba37ec44413e7d1dc96fcf1585b6",
+    "subpath": "db/migrate"
+  },
+  "matrix": {
+    "minimum_public_repos": 4,
+    "slices": [
+      {
+        "id": "forem-rails-migrations",
+        "repo": "forem/forem",
+        "ref": "9c5509c3aeecd4a86a8950206fa937ebcbc2f8d1",
+        "subpath": "db/migrate"
+      },
+      {
+        "id": "bytebase-go-migrator",
+        "repo": "bytebase/bytebase",
+        "ref": "0765652ea2dbdf8e93ae44bff5acafc1b97a92cc",
+        "subpath": "backend/migrator/migration"
+      },
+      {
+        "id": "mastodon-rails-migrations",
+        "repo": "mastodon/mastodon",
+        "ref": "facb552c9cdbe8a2ebff0b94ebf2c9e9ec385347",
+        "subpath": "db/migrate"
+      },
+      {
+        "id": "lobsters-rails-migrations",
+        "repo": "lobsters/lobsters",
+        "ref": "3b80b47aa5aaba37ec44413e7d1dc96fcf1585b6",
+        "subpath": "db/migrate"
+      }
+    ]
+  }
+}
