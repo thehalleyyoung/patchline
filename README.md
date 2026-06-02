@@ -359,6 +359,8 @@ Run `make artifact-mirror-gate` to publish a public **artifact mirror** of non-s
 
 Run `make rc-rehearsal-gate` to run a **release-candidate rehearsal** across capstone, reviewer-walkthrough, reproducibility, and docs stages — the candidate is **blessed** only when every stage passes and a single failure blocks it at the named stage; see [docs/rc-rehearsal.md](docs/rc-rehearsal.md).
 
+Run `make leaderboard-gate` to build a **benchmark leaderboard** comparing releases over time on gates, determinism, and reproduction rate — releases are ranked and any release that **regress**ed against its predecessor is flagged; see [docs/leaderboard.md](docs/leaderboard.md).
+
 Add `--redact` to write `analysis-bundle/` copies with stable redaction tokens for identifiers, literals, customer-like strings, and secret-like values while preserving joins and existing artifact hashes.
 
 Add `--ci` to write `ci/summary.md` plus upload snippets and code-quality artifacts for GitHub Actions, GitLab CI, and Bitbucket Pipelines: SARIF under `analysis-bundle/summary.sarif`, GitLab `ci/gl-code-quality-report.json`, and Bitbucket `ci/bitbucket-code-insights.json`.

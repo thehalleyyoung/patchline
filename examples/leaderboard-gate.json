@@ -1,0 +1,11 @@
+{
+  "version": "patchline.leaderboard-gate/v1",
+  "claim": "Patchline tracks its own progress as a benchmark leaderboard that compares releases over time on the metrics that matter — number of proven gates, determinism rate, and reproduction rate — ranking releases and computing the delta between each release and its predecessor so that improvement and regression are both visible rather than hidden behind a single headline number. The worker ingests an ordered release history, builds a ranked leaderboard on the primary metric, computes per-release deltas, and flags any release whose reproduction rate regressed against the prior release. The gate proves the leaderboard ranks the strongest release first and flags exactly the release that regressed.",
+  "real_repo": "patchline (self): release-over-release benchmark leaderboard",
+  "primary_metric": "gates",
+  "releases": [
+    {"release": "v0.1", "gates": 120, "determinism_rate": 0.98, "repro_rate": 0.95},
+    {"release": "v0.2", "gates": 160, "determinism_rate": 0.99, "repro_rate": 0.90},
+    {"release": "v0.3", "gates": 190, "determinism_rate": 1.0, "repro_rate": 0.99}
+  ]
+}
