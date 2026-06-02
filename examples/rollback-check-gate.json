@@ -1,0 +1,12 @@
+{
+  "version": "patchline.rollback-check-gate/v1",
+  "claim": "Patchline performs rollback semantic checks on each migration operation so that irreversible, data-lossy, and partially-reversible steps are classified before a migration ships, rather than discovered when a rollback is attempted in production. The worker inspects each operation together with its declared down step and classifies it as reversible, irreversible, data_lossy, or partial, explaining why. The gate proves an add_column with a matching drop down step is reversible, a drop_column with no backup is data_lossy, a drop_table is irreversible, a narrowing type change is data_lossy, and a multi-statement up whose down only reverts some statements is partial.",
+  "real_repo": "synthetic-from-real patterns: Rails/Django up/down migration pairs",
+  "operations": [
+    {"id": "m1", "up": ["add_column users.nickname"], "down": ["drop_column users.nickname"], "narrowing": false, "backup": false},
+    {"id": "m2", "up": ["drop_column users.legacy_status"], "down": [], "narrowing": false, "backup": false},
+    {"id": "m3", "up": ["drop_table audit_logs"], "down": [], "narrowing": false, "backup": false},
+    {"id": "m4", "up": ["change_type orders.amount decimal->integer"], "down": ["change_type orders.amount integer->decimal"], "narrowing": true, "backup": false},
+    {"id": "m5", "up": ["add_column users.a", "drop_column users.b"], "down": ["drop_column users.a"], "narrowing": false, "backup": false}
+  ]
+}

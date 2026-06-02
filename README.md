@@ -333,6 +333,8 @@ Run `make dataflow-summary-gate` to build a **dataflow summary** joining applica
 
 Run `make query-shape-gate` to extract a normalized **query shape** from ORM, raw SQL, prepared-statement, and **query-builder** code — all four reduce to the same `(operation, table)` while a non-query comment yields no shape; see [docs/query-shape.md](docs/query-shape.md).
 
+Run `make rollback-check-gate` to run **rollback** semantic checks — each migration step is classified reversible, data_lossy, **irreversible**, or partial from its up/down pair, so dangerous rollbacks are named before deploy; see [docs/rollback-check.md](docs/rollback-check.md).
+
 Add `--redact` to write `analysis-bundle/` copies with stable redaction tokens for identifiers, literals, customer-like strings, and secret-like values while preserving joins and existing artifact hashes.
 
 Add `--ci` to write `ci/summary.md` plus upload snippets and code-quality artifacts for GitHub Actions, GitLab CI, and Bitbucket Pipelines: SARIF under `analysis-bundle/summary.sarif`, GitLab `ci/gl-code-quality-report.json`, and Bitbucket `ci/bitbucket-code-insights.json`.
