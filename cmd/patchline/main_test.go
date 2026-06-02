@@ -16,6 +16,7 @@ import (
 	"github.com/thehalleyyoung/patchline/internal/artifact"
 	"github.com/thehalleyyoung/patchline/internal/attest"
 	"github.com/thehalleyyoung/patchline/internal/evidence"
+	"github.com/thehalleyyoung/patchline/internal/expandcontract"
 	"github.com/thehalleyyoung/patchline/internal/feedback"
 	"github.com/thehalleyyoung/patchline/internal/intake"
 	"github.com/thehalleyyoung/patchline/internal/project"
@@ -52,6 +53,68 @@ func TestPluginsListAndProbeCommands(t *testing.T) {
 		t.Fatalf("plugins probe failed: %v", err)
 	}
 	for _, rel := range []string{"plugin-probe.json", "plugin-probe.md", "baseline/baseline.json", "proposal/proposal.json", "compare/compare.json", "rendered/baseline.json", "rendered/baseline.md"} {
+		if stat, err := os.Stat(filepath.Join(out, rel)); err != nil || stat.Size() == 0 {
+			t.Fatalf("expected %s to be written, stat=%#v err=%v", rel, stat, err)
+		}
+	}
+}
+
+func TestExpandContractTemplateCommandWritesReports(t *testing.T) {
+	root := t.TempDir()
+	writeMainTestFile(t, root, "rails/app/models/invoice.rb", `class Invoice < ApplicationRecord
+  before_validation :dual_write_external_id
+  def dual_write_external_id
+    self.external_id ||= legacy_external_id
+  end
+end
+`)
+	writeMainTestFile(t, root, "rails/db/migrate/20260101010101_expand_invoice_external_id.rb", `class ExpandInvoiceExternalId < ActiveRecord::Migration[7.1]
+  def change
+    add_column :invoices, :external_id, :string, null: true
+  end
+end
+`)
+	writeMainTestFile(t, root, "rails/db/migrate/20260101010202_backfill_invoice_external_id.rb", `class BackfillInvoiceExternalId < ActiveRecord::Migration[7.1]
+  def up
+    Invoice.where(external_id: nil).find_each { |invoice| invoice.update_all(external_id: invoice.legacy_external_id) }
+  end
+end
+`)
+	writeMainTestFile(t, root, "rails/db/migrate/20260101010303_contract_invoice_external_id.rb", `class ContractInvoiceExternalId < ActiveRecord::Migration[7.1]
+  def change
+    change_column_null :invoices, :external_id, false
+    remove_column :invoices, :legacy_external_id
+  end
+end
+`)
+	specPath := filepath.Join(root, "expand-contract.json")
+	writeMainTestFile(t, root, "expand-contract.json", `{
+  "version": "patchline.expand-contract/v1",
+  "name": "invoice external id expand/contract",
+  "invariant_spec": {
+    "version": "patchline.invariants/v1",
+    "name": "invoice invariants",
+    "invariants": [
+      {"id":"invoice-external-id-unique","kind":"unique","table":"invoices","column":"external_id"}
+    ]
+  },
+  "templates": [
+    {"id":"invoice-external-id","invariant_id":"invoice-external-id-unique","legacy_column":"legacy_external_id","new_column":"external_id","backfill_expression":"legacy_external_id"}
+  ],
+  "orm_projects": [
+    {"name":"rails","ecosystem":"rails","root":"rails","table":"invoices","column":"external_id","legacy_column":"legacy_external_id"}
+  ]
+}`)
+	out := filepath.Join(t.TempDir(), "expand-contract")
+	if err := run([]string{"expand-contract-template", "--spec", specPath, "--out", out, "--json"}); err != nil {
+		t.Fatalf("expand-contract-template failed: %v", err)
+	}
+	var report expandcontract.Report
+	readMainTestJSON(t, filepath.Join(out, "expand-contract-template.json"), &report)
+	if !report.OK || report.Summary.Templates != 1 || report.Summary.ProjectsVerified != 1 {
+		t.Fatalf("unexpected expand/contract report: %#v", report)
+	}
+	for _, rel := range []string{"expand-contract-template.md", "expand-contract-template.sql"} {
 		if stat, err := os.Stat(filepath.Join(out, rel)); err != nil || stat.Size() == 0 {
 			t.Fatalf("expected %s to be written, stat=%#v err=%v", rel, stat, err)
 		}

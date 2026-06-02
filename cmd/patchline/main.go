@@ -35,6 +35,7 @@ import (
 	"github.com/thehalleyyoung/patchline/internal/diagnostics"
 	"github.com/thehalleyyoung/patchline/internal/effects"
 	"github.com/thehalleyyoung/patchline/internal/evidence"
+	"github.com/thehalleyyoung/patchline/internal/expandcontract"
 	"github.com/thehalleyyoung/patchline/internal/feedback"
 	"github.com/thehalleyyoung/patchline/internal/gate"
 	"github.com/thehalleyyoung/patchline/internal/goldenfixture"
@@ -408,6 +409,8 @@ func run(args []string) error {
 		}
 		outPath, _ := flagValue(args[3:], "--out")
 		return adaptEvidence(args[1], args[2], hasFlag(args[3:], "--json"), outPath)
+	case "expand-contract-template":
+		return expandContractTemplate(args[1:], hasFlag(args[1:], "--json"))
 	case "feedback":
 		return feedbackCommand(args[1:])
 	case "security":
@@ -542,6 +545,7 @@ Usage:
   patchline artifact-benchmark compare <actual.json> <expected.json> [--json]
   patchline ingest-evidence <events.jsonl> [--json] [--out graph.json]
   patchline adapt-evidence <otlp|datadog|postgres|github|migration-runner|jira|linear> <input.json> [--json] [--out events.jsonl]
+  patchline expand-contract-template --spec expand-contract.json --out dir [--json]
   patchline feedback counterfactual-log --feedback live-feedback.json --history policy-history.json --out dir [--json]
   patchline feedback online-eval --feedback live-feedback.json --spec online-evaluation.json --out dir [--json]
   patchline feedback active-learning-queue --spec active-learning.json --out dir [--json]
@@ -14498,6 +14502,43 @@ func adaptEvidence(adapter, path string, jsonOut bool, outPath string) error {
 	for _, warning := range result.Warnings {
 		fmt.Printf("  warning %s\n", warning)
 	}
+	return nil
+}
+
+func expandContractTemplate(args []string, jsonOut bool) error {
+	specPath, outPath, err := feedbackSpecOut(args, "patchline expand-contract-template --spec expand-contract.json --out <dir> [--json]")
+	if err != nil {
+		return err
+	}
+	file, err := os.Open(specPath)
+	if err != nil {
+		return err
+	}
+	defer file.Close()
+	spec, err := expandcontract.ReadSpec(file)
+	if err != nil {
+		return err
+	}
+	report, err := expandcontract.BuildReport(spec, filepath.Dir(specPath))
+	if err != nil {
+		return err
+	}
+	if err := os.MkdirAll(outPath, 0o755); err != nil {
+		return err
+	}
+	if err := writeJSONArtifact(filepath.Join(outPath, "expand-contract-template.json"), report); err != nil {
+		return err
+	}
+	if err := os.WriteFile(filepath.Join(outPath, "expand-contract-template.md"), []byte(expandcontract.RenderMarkdown(report)), 0o644); err != nil {
+		return err
+	}
+	if err := os.WriteFile(filepath.Join(outPath, "expand-contract-template.sql"), []byte(expandcontract.RenderSQL(report)), 0o644); err != nil {
+		return err
+	}
+	if jsonOut {
+		return writeJSON(os.Stdout, report)
+	}
+	fmt.Printf("wrote %d invariant-backed expand/contract template(s) and %d ORM check(s) to %s\n", report.Summary.Templates, report.Summary.Projects, outPath)
 	return nil
 }
 

@@ -1,0 +1,12 @@
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Invoice {
+  id               Int     @id
+  legacyExternalId String  @map("legacy_external_id")
+  externalId       String? @map("external_id")
+
+  @@map("invoices")
+}

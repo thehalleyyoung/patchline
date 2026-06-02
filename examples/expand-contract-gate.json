@@ -1,0 +1,51 @@
+{
+  "version": "patchline.expand-contract/v1",
+  "name": "invoice external id expand/contract gate",
+  "invariant_spec": {
+    "version": "patchline.invariants/v1",
+    "name": "invoice external id invariants",
+    "invariants": [
+      {
+        "id": "invoice-external-id-unique",
+        "kind": "unique",
+        "table": "invoices",
+        "column": "external_id"
+      }
+    ]
+  },
+  "templates": [
+    {
+      "id": "invoice-external-id",
+      "invariant_id": "invoice-external-id-unique",
+      "legacy_column": "legacy_external_id",
+      "new_column": "external_id",
+      "backfill_expression": "legacy_external_id"
+    }
+  ],
+  "orm_projects": [
+    {
+      "name": "rails-billing",
+      "ecosystem": "rails",
+      "root": "expand-contract/rails-billing",
+      "table": "invoices",
+      "column": "external_id",
+      "legacy_column": "legacy_external_id"
+    },
+    {
+      "name": "django-billing",
+      "ecosystem": "django",
+      "root": "expand-contract/django-billing",
+      "table": "invoices",
+      "column": "external_id",
+      "legacy_column": "legacy_external_id"
+    },
+    {
+      "name": "prisma-billing",
+      "ecosystem": "prisma",
+      "root": "expand-contract/prisma-billing",
+      "table": "invoices",
+      "column": "external_id",
+      "legacy_column": "legacy_external_id"
+    }
+  ]
+}

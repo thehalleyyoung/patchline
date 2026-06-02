@@ -46,7 +46,9 @@ data-change surface of a real repository as a first-class object. \tool{} fetche
 reproducibly from any of several source hosts, inventories what is actually present, derives a
 project-native \emph{fact layer} with full provenance, ranks data-change risks, and---only when asked,
 and only within an explicit budget---generates bounded interventions that are quarantined and then
-\emph{deterministically re-analyzed and rejected} if they do not improve the evidence. Critically,
+\emph{deterministically re-analyzed and rejected} if they do not improve the evidence. Its remediation
+surface now also derives invariant-backed expand/contract templates and checks Rails, Django, and
+Prisma evidence before a contract step is trusted. Critically,
 every capability in \tool{} is backed by a reproducible \emph{gate}: a script that proves the
 capability against real, pinned public code and fails loudly on drift. \tool{} currently ships more
 than 600 such gates over 560 documented capabilities, spanning relational migrations across nine
@@ -405,6 +407,16 @@ via a negative control.
 artifact for deterministic compare. \code{--no-llm} disables generation entirely and rejects any
 generator command, enabling fully template-only, reproducible analysis---the mode used by every gate
 in this paper.
+
+\paragraph{Invariant-backed expand/contract templates.} The \code{expand-contract-template} command
+turns a \code{patchline.invariants/v1} declaration into a four-stage remediation skeleton:
+\emph{expand} a nullable compatibility column, \emph{backfill} it from the declared source expression,
+\emph{validate} the invariant with executable SQL, and \emph{contract} only after the invariant and
+backfill-completeness obligations are explicit. The accompanying gate checks this generated template
+against Rails ActiveRecord, Django migration/model, and Prisma schema/migration projects by recording
+only stable relative paths, line numbers, and obligation names. Its negative control removes the
+backfill migration from an ORM project and must be refuted by the scanner, so the gate exercises the
+real evidence path rather than a synthetic flag.
 
 \paragraph{The accept/reject decision.} Table~\ref{tab:compare} makes the compare contract precise.
 Each proposed artifact is scored on the same fact-derived axes as the baseline, and the decision is a
@@ -1139,7 +1151,7 @@ deterministic analysis, bounded generation, real-repo gates, formal and causal s
 safety cases, standards hooks, privacy-preserving reviewer-outcome aggregation, and long-horizon impact
 evidence. The remaining frontier is not another isolated detector; it is the transition from a
 generational artifact to shared infrastructure. The open roadmap items around this transition include:
-production-grade remediation loops for expand/contract, backfill, rollback, and patch-series safety; a
+production-grade remediation loops for backfill, rollback, repair escrow, playbooks, and patch-series safety; a
 public evidence marketplace with licenses, bounties, minimization, and governance; engine-version
 semantics for production databases, locks, replication, partitioning, and online schema change;
 socio-technical accountability for appeals, fairness, ethics, and detector deprecation; education and
@@ -1319,7 +1331,8 @@ Source breadth & \code{mercurial-fossil-source-gate}, \code{monorepo-boundary-ga
 Migration breadth & \code{multi-ecosystem-migration-gate}, \code{nosql-change-gate},
 \code{data-pipeline-gate}, \code{schema-compat-gate}, \code{infra-ordering-gate} \\
 Intervention safety & \code{generated-code-quarantine-gate}, \code{rejected-generated-gate},
-\code{intervention-regression-archive-gate}, \code{reviewability-examples-gate} \\
+\code{intervention-regression-archive-gate}, \code{expand-contract-templates-gate},
+\code{reviewability-examples-gate} \\
 Runtime evidence & \code{otel-trace-gen-gate}, \code{datadog-timeline-gate}, \code{prom-grafana-gate},
 \code{runtime-confidence-gate} \\
 Evaluation rigor & \code{fp-adjudication-gate}, \code{fn-discovery-gate}, \code{ablation-study-gate},

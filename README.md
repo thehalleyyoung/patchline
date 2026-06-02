@@ -117,6 +117,8 @@ Run `plugins list` or `plugins probe <path>` to inspect the deterministic parser
 
 Run `cert normalize`, `cert diff`, `cert revoke-verify`, and `cert plugfest` to normalize PLCI witness identities, semantically compare obligations, replay signed revocation/supersession ledgers, and validate offline interoperability submissions.
 
+Run `expand-contract-template` to generate invariant-backed expand/contract templates and verify Rails, Django, and Prisma evidence; reproduce it with `make expand-contract-templates-gate`.
+
 Run `golden-fixture generate --github owner/repo --ref <sha> --subpath <path> --out <dir>` to turn a real-repo slice into a tiny deterministic Go test without vendoring the full repository; see [docs/golden-fixtures.md](docs/golden-fixtures.md).
 
 <details>
