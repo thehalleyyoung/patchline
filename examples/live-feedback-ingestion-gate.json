@@ -1,0 +1,133 @@
+{
+  "version": "patchline.live-feedback-ingestion/v1",
+  "claim": "Patchline can ingest live reviewer feedback from adopters without collecting source code: the ingester accepts only a typed outcome schema, rejects source-like fields or values, discards finding identifiers after in-memory deduplication, enforces a k-anonymity floor above adopter requests, and emits only aggregate reviewer outcomes suitable for calibration gates.",
+  "adopter_id": "team-alpha",
+  "salt": "local-secret-feedback-salt-2026",
+  "min_group_size": 1,
+  "outcomes": [
+    {
+      "finding_id": "finding-001",
+      "detector": "sql.destructive-ddl",
+      "release": "v1.0.0",
+      "confidence": 0.93,
+      "verdict": "confirmed",
+      "action": "blocked",
+      "burden_minutes": 9,
+      "evidence_hash": "ev-001",
+      "reviewer_role": "maintainer"
+    },
+    {
+      "finding_id": "finding-002",
+      "detector": "sql.destructive-ddl",
+      "release": "v1.0.0",
+      "confidence": 0.91,
+      "verdict": "confirmed",
+      "action": "blocked",
+      "burden_minutes": 11,
+      "evidence_hash": "ev-002",
+      "reviewer_role": "dba"
+    },
+    {
+      "finding_id": "finding-003",
+      "detector": "sql.destructive-ddl",
+      "release": "v1.0.0",
+      "confidence": 0.95,
+      "verdict": "confirmed",
+      "action": "blocked",
+      "burden_minutes": 10,
+      "evidence_hash": "ev-003",
+      "reviewer_role": "sre"
+    },
+    {
+      "finding_id": "finding-004",
+      "detector": "orm.write-breadth",
+      "release": "v1.0.0",
+      "confidence": 0.73,
+      "verdict": "false_positive",
+      "action": "dismissed",
+      "burden_minutes": 4,
+      "evidence_hash": "ev-004",
+      "reviewer_role": "maintainer"
+    },
+    {
+      "finding_id": "finding-005",
+      "detector": "orm.write-breadth",
+      "release": "v1.0.0",
+      "confidence": 0.78,
+      "verdict": "false_positive",
+      "action": "dismissed",
+      "burden_minutes": 5,
+      "evidence_hash": "ev-005",
+      "reviewer_role": "dba"
+    },
+    {
+      "finding_id": "finding-006",
+      "detector": "orm.write-breadth",
+      "release": "v1.0.0",
+      "confidence": 0.71,
+      "verdict": "false_positive",
+      "action": "dismissed",
+      "burden_minutes": 6,
+      "evidence_hash": "ev-006",
+      "reviewer_role": "sre"
+    },
+    {
+      "finding_id": "finding-007",
+      "detector": "migration.guard",
+      "release": "v1.0.0",
+      "confidence": 0.52,
+      "verdict": "uncertain",
+      "action": "deferred",
+      "burden_minutes": 12,
+      "evidence_hash": "ev-007",
+      "reviewer_role": "security"
+    },
+    {
+      "finding_id": "finding-007",
+      "detector": "migration.guard",
+      "release": "v1.0.0",
+      "confidence": 0.52,
+      "verdict": "uncertain",
+      "action": "deferred",
+      "burden_minutes": 12,
+      "evidence_hash": "ev-007",
+      "reviewer_role": "security"
+    },
+    {
+      "finding_id": "finding-008",
+      "detector": "sql.raw-leak",
+      "release": "v1.0.0",
+      "confidence": 0.8,
+      "verdict": "confirmed",
+      "action": "blocked",
+      "burden_minutes": 3,
+      "evidence_hash": "ev-008",
+      "reviewer_role": "maintainer",
+      "details": {
+        "source_code": "DROP TABLE accounts;"
+      }
+    },
+    {
+      "finding_id": "finding-009",
+      "detector": "UPDATE accounts SET plan = 'free'",
+      "release": "v1.0.0",
+      "confidence": 0.8,
+      "verdict": "confirmed",
+      "action": "blocked",
+      "burden_minutes": 3,
+      "evidence_hash": "ev-009",
+      "reviewer_role": "maintainer"
+    },
+    {
+      "finding_id": "finding-010",
+      "detector": "sql.destructive-ddl",
+      "release": "v1.0.0",
+      "confidence": 1.2,
+      "verdict": "confirmed",
+      "action": "blocked",
+      "burden_minutes": 3,
+      "evidence_hash": "ev-010",
+      "reviewer_role": "maintainer"
+    }
+  ]
+}

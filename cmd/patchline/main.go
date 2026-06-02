@@ -35,6 +35,7 @@ import (
 	"github.com/thehalleyyoung/patchline/internal/diagnostics"
 	"github.com/thehalleyyoung/patchline/internal/effects"
 	"github.com/thehalleyyoung/patchline/internal/evidence"
+	"github.com/thehalleyyoung/patchline/internal/feedback"
 	"github.com/thehalleyyoung/patchline/internal/gate"
 	"github.com/thehalleyyoung/patchline/internal/goldenfixture"
 	"github.com/thehalleyyoung/patchline/internal/historical"
@@ -407,6 +408,8 @@ func run(args []string) error {
 		}
 		outPath, _ := flagValue(args[3:], "--out")
 		return adaptEvidence(args[1], args[2], hasFlag(args[3:], "--json"), outPath)
+	case "feedback":
+		return feedbackCommand(args[1:])
 	case "security":
 		return securityCommand(args[1:])
 	case "ci-gate":
@@ -14488,6 +14491,110 @@ func adaptEvidence(adapter, path string, jsonOut bool, outPath string) error {
 		fmt.Printf("  warning %s\n", warning)
 	}
 	return nil
+}
+
+func feedbackCommand(args []string) error {
+	if len(args) == 0 {
+		return errors.New("usage: patchline feedback ingest <input.json> --out <dir> [--json]")
+	}
+	switch args[0] {
+	case "ingest":
+		if len(args) < 2 {
+			return errors.New("usage: patchline feedback ingest <input.json> --out <dir> [--json]")
+		}
+		outPath, ok := flagValue(args[2:], "--out")
+		if !ok || outPath == "" {
+			return errors.New("usage: patchline feedback ingest <input.json> --out <dir> [--json]")
+		}
+		return feedbackIngest(args[1], outPath, hasFlag(args[2:], "--json"))
+	default:
+		return fmt.Errorf("unknown feedback command %q", args[0])
+	}
+}
+
+func feedbackIngest(inputPath, outPath string, jsonOut bool) error {
+	file, err := os.Open(inputPath)
+	if err != nil {
+		return err
+	}
+	defer file.Close()
+	report, err := feedback.Ingest(file, feedback.Options{})
+	if err != nil {
+		return err
+	}
+	if err := os.MkdirAll(outPath, 0o755); err != nil {
+		return err
+	}
+	jsonPath := filepath.Join(outPath, "live-feedback.json")
+	jsonFile, err := os.Create(jsonPath)
+	if err != nil {
+		return err
+	}
+	if err := writeJSON(jsonFile, report); err != nil {
+		jsonFile.Close()
+		return err
+	}
+	if err := jsonFile.Close(); err != nil {
+		return err
+	}
+	if err := os.WriteFile(filepath.Join(outPath, "live-feedback.md"), []byte(renderLiveFeedbackMarkdown(report)), 0o644); err != nil {
+		return err
+	}
+	if jsonOut {
+		return writeJSON(os.Stdout, report)
+	}
+	fmt.Printf("ingested %d source-free live feedback outcomes to %s\n", report.Summary.AcceptedRecords, outPath)
+	return nil
+}
+
+func renderLiveFeedbackMarkdown(report feedback.Report) string {
+	var b strings.Builder
+	fmt.Fprintf(&b, "# Source-free live feedback\n\n")
+	fmt.Fprintf(&b, "Patchline ingested reviewer outcomes into **privacy-preserving live feedback** aggregates without retaining source code, file paths, diffs, raw evidence, finding IDs, evidence hashes, adopter IDs, or the local salt.\n\n")
+	fmt.Fprintf(&b, "## Privacy summary\n\n")
+	fmt.Fprintf(&b, "- source-free: `%t`\n", report.Privacy.SourceFree)
+	fmt.Fprintf(&b, "- raw-evidence-free: `%t`\n", report.Privacy.RawEvidenceFree)
+	fmt.Fprintf(&b, "- identifier-free: `%t`\n", report.Privacy.IdentifierFree)
+	fmt.Fprintf(&b, "- salt emitted: `%t`\n", report.Privacy.SaltEmitted)
+	fmt.Fprintf(&b, "- effective k-anonymity floor: `%d`\n\n", report.Summary.EffectiveMinGroupSize)
+	fmt.Fprintf(&b, "## Outcome totals\n\n")
+	fmt.Fprintf(&b, "| Metric | Count |\n| --- | ---: |\n")
+	fmt.Fprintf(&b, "| Input records | %d |\n", report.Summary.InputRecords)
+	fmt.Fprintf(&b, "| Accepted records | %d |\n", report.Summary.AcceptedRecords)
+	fmt.Fprintf(&b, "| Rejected records | %d |\n", report.Summary.RejectedRecords)
+	fmt.Fprintf(&b, "| Deduplicated records | %d |\n", report.Summary.DeduplicatedRecords)
+	fmt.Fprintf(&b, "| Published groups | %d |\n", report.Summary.GroupsPublished)
+	fmt.Fprintf(&b, "| Suppressed groups | %d |\n", report.Summary.GroupsSuppressed)
+	fmt.Fprintf(&b, "| Residual records | %d |\n", report.Summary.ResidualRecords)
+	fmt.Fprintf(&b, "| Total burden minutes | %d |\n", report.Summary.TotalBurdenMinutes)
+	fmt.Fprintf(&b, "\n## Published k-anonymous groups\n\n")
+	if len(report.Groups) == 0 {
+		fmt.Fprintf(&b, "No detector-level groups cleared the effective k-anonymity floor.\n\n")
+	} else {
+		fmt.Fprintf(&b, "| Detector | Release | Confidence decile | Verdict | Action | Count | Burden minutes |\n")
+		fmt.Fprintf(&b, "| --- | --- | --- | --- | --- | ---: | ---: |\n")
+		for _, group := range report.Groups {
+			fmt.Fprintf(&b, "| `%s` | `%s` | `%s` | `%s` | `%s` | %d | %d |\n", group.Detector, group.Release, group.ConfidenceDecile, group.Verdict, group.Action, group.Count, group.TotalBurdenMinutes)
+		}
+		fmt.Fprintf(&b, "\n")
+	}
+	fmt.Fprintf(&b, "Suppressed low-count detector/release/decile groups are folded into a dimension-free residual bucket. The residual keeps aggregate reviewer outcomes useful without allowing subtraction to recover a singleton detector or finding.\n\n")
+	if len(report.Residual.OutcomeCounts) > 0 {
+		fmt.Fprintf(&b, "| Residual verdict | Residual action | Count |\n| --- | --- | ---: |\n")
+		for _, outcome := range report.Residual.OutcomeCounts {
+			fmt.Fprintf(&b, "| `%s` | `%s` | %d |\n", outcome.Verdict, outcome.Action, outcome.Count)
+		}
+		fmt.Fprintf(&b, "\n")
+	}
+	if len(report.Rejected) > 0 {
+		fmt.Fprintf(&b, "## Rejected records\n\n")
+		fmt.Fprintf(&b, "Rejected records are reported only by index and reason code; offending fields and values are not stored.\n\n")
+		fmt.Fprintf(&b, "| Index | Reason |\n| ---: | --- |\n")
+		for _, rejected := range report.Rejected {
+			fmt.Fprintf(&b, "| %d | `%s` |\n", rejected.Index, rejected.Reason)
+		}
+	}
+	return b.String()
 }
 
 func ciGate(path string, opts gate.Options, jsonOut bool) error {

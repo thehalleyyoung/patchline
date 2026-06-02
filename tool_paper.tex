@@ -508,7 +508,10 @@ calculation: \tool{} weighs the expected failure loss (probability $\times$ cost
 blocking and recommends the cost-minimizing action, blocking a high-expected-loss migration while
 shipping a low-risk one. An uncertainty-calibration gate measures expected calibration error so that
 the confidences feeding this calculation are trustworthy, and an active-learning queue prioritizes the
-examples nearest the decision boundary for scarce human adjudication.
+examples nearest the decision boundary for scarce human adjudication. A newly added live-feedback
+ingester closes the first operational loop: adopters can submit reviewer outcomes as a typed local JSON
+export, while \tool{} rejects source-like fields and values, discards finding/evidence identifiers after
+in-memory deduplication, enforces a k-anonymity floor, and emits only aggregate calibration signals.
 
 \paragraph{Multi-agent review and interoperability.} A simulated panel of reviewer agents with
 distinct risk tolerances votes per migration, and the same panel is shown to yield different outcomes
@@ -1109,14 +1112,16 @@ implicit.
 \section{Future Work}
 %======================================================================
 
-The completed 700-step roadmap leaves \tool{} with an unusually broad artifact: deterministic analysis,
-bounded generation, real-repo gates, formal and causal scaffolding, autonomy safety cases, standards
-hooks, and long-horizon impact evidence. The next frontier is not another isolated detector; it is the
-transition from a generational artifact to shared infrastructure. We have therefore identified the next
-100 roadmap items around ten themes: verified certificate interoperability across independent
-implementations; privacy-preserving live operational learning that cannot silently weaken policy;
-production-grade remediation loops for expand/contract, backfill, rollback, and patch-series safety;
-a public evidence marketplace with licenses, bounties, minimization, and governance; engine-version
+The completed roadmap now extends beyond the original 700-step artifact into standard-scale certificate
+interoperability and source-free live feedback ingestion. \tool{} therefore already combines
+deterministic analysis, bounded generation, real-repo gates, formal and causal scaffolding, autonomy
+safety cases, standards hooks, privacy-preserving reviewer-outcome aggregation, and long-horizon impact
+evidence. The remaining frontier is not another isolated detector; it is the transition from a
+generational artifact to shared infrastructure. The open roadmap items around this transition include:
+drift-aware threshold suggestions that cannot silently weaken policy; counterfactual logging for
+previous releases; shadow-mode online evaluation; adopter-local active-learning queues;
+production-grade remediation loops for expand/contract, backfill, rollback, and patch-series safety; a
+public evidence marketplace with licenses, bounties, minimization, and governance; engine-version
 semantics for production databases, locks, replication, partitioning, and online schema change;
 socio-technical accountability for appeals, fairness, ethics, and detector deprecation; education and
 certification materials that make migration safety teachable; resilient offline, edge, confidential,
@@ -1303,7 +1308,8 @@ Evaluation rigor & \code{fp-adjudication-gate}, \code{fn-discovery-gate}, \code{
 Stratification & \code{ecosystem-balanced-benchmark-gate}, \code{repository-size-stratification-gate},
 \code{migration-age-stratification-gate}, \code{longitudinal-public-reruns-gate} \\
 Security \& privacy & \code{secret-scan-gate}, \code{archive-security-gate}, \code{threat-model-gate},
-\code{redaction-stability-gate}, \code{privacy-metrics-gate}, \code{supply-chain-provenance-gate} \\
+\code{redaction-stability-gate}, \code{privacy-metrics-gate}, \code{live-feedback-ingestion-gate},
+\code{supply-chain-provenance-gate} \\
 Robustness \& DX & \code{fuzz-coverage-gate}, \code{parser-dashboard-gate},
 \code{fixture-minimizer-gate}, \code{onboarding-quest-gate}, \code{performance-budget-gate} \\
 Artifact \& paper & \code{reviewer-walkthrough-gate}, \code{artifact-evaluation-kit-gate},
@@ -1311,7 +1317,8 @@ Artifact \& paper & \code{reviewer-walkthrough-gate}, \code{artifact-evaluation-
 Formal methods & \code{invariant-extract-gate}, \code{symexec-gate}, \code{modelcheck-gate},
 \code{causal-graph-gate}, \code{counterfactual-gate} \\
 Decision science & \code{risk-economics-gate}, \code{uncertainty-calibration-gate},
-\code{active-learning-gate}, \code{reviewer-sim-gate}, \code{explainable-ranking-gate} \\
+\code{active-learning-gate}, \code{reviewer-sim-gate}, \code{live-feedback-ingestion-gate},
+\code{explainable-ranking-gate} \\
 Release \& interop & \code{rc-rehearsal-gate}, \code{leaderboard-gate}, \code{dossier-gate},
 \code{interop-gate}, \code{standards-body-conformance-corpus-gate},
 \code{certificate-interop-dashboard-gate}, \code{conformance-failure-minimizer-gate},
@@ -1350,8 +1357,11 @@ excluded from native execution unless the user explicitly enables an allowlist o
 Redaction is byte-stable across repeated and resumed runs, secret-scanning proves that redacted
 reports, prompts, bundles, and CI artifacts do not leak deterministic canary values, and an aggregate
 privacy-metrics mode emits source-free risk trends with salted cohort identifiers so results can be
-shared without raw evidence. Binaries, release archives, and public-corpus downloads carry
-deterministic provenance and sorted checksums.
+shared without raw evidence. The source-free live-feedback ingester applies the same discipline to
+adopter reviewer outcomes: it stores no source, diffs, paths, raw evidence, finding IDs, evidence
+hashes, adopter IDs, or salts, and low-count detector groups are folded into a dimension-free residual
+bucket. Binaries, release archives, and public-corpus downloads carry deterministic provenance and
+sorted checksums.
 
 \section{Reproduction Guide}
 \label{app:repro}
