@@ -35,6 +35,7 @@ import (
 	"github.com/thehalleyyoung/patchline/internal/invariant"
 	"github.com/thehalleyyoung/patchline/internal/ledger"
 	"github.com/thehalleyyoung/patchline/internal/migration"
+	"github.com/thehalleyyoung/patchline/internal/plugins"
 	"github.com/thehalleyyoung/patchline/internal/policy"
 	"github.com/thehalleyyoung/patchline/internal/project"
 	"github.com/thehalleyyoung/patchline/internal/proof"
@@ -96,6 +97,8 @@ func run(args []string) error {
 		return quickstart(args[1:])
 	case "repo":
 		return repoCommand(args[1:])
+	case "plugins":
+		return pluginsCommand(args[1:])
 	case "semantics-contract":
 		return semanticsContract(hasFlag(args[1:], "--json"))
 	case "semantics-audit":
@@ -408,6 +411,8 @@ Usage:
   patchline about
   patchline doctor [<path>|--github owner/repo] [--ref ref] [--subpath path] [--out dir] [--download-dir dir] [--json]
   patchline quickstart --github owner/repo --subpath path [--ref ref] [--out dir] [--json]
+  patchline plugins list [--json]
+  patchline plugins probe [<path>|--github owner/repo] [--ref ref] [--subpath path] [--out dir] [--download-dir dir] [--json]
   patchline repo doctor [<path>|--github owner/repo] [--ref ref] [--subpath path] [--out dir] [--download-dir dir] [--json]
   patchline repo fetch <owner/repo|github-url|path|archive> [--ref ref] [--subpath path] [--out dir] [--download-dir dir] [--json]
   patchline repo analyze [<path>|--github owner/repo] [--ref ref] [--subpath path] [--stages inventory,baseline,propose,compare,deep] [--proposal-kind tests|guards|instrumentation|repair|all] [--budget files=N,lines=N,tokens=N,changes=N] [--ci] [--redact] [--resume] [--no-llm] [--llm-command cmd] [--prompt-without-facts] [--out dir] [--json]
@@ -1816,6 +1821,77 @@ func renderQuickstartMarkdown(report quickstartReport) string {
 	}
 	fmt.Fprintf(&b, "\nHash: `%s`\n", report.Hash)
 	return b.String()
+}
+
+func pluginsCommand(args []string) error {
+	if len(args) == 0 {
+		return errors.New("usage: patchline plugins <list|probe> [--json]")
+	}
+	switch args[0] {
+	case "list":
+		catalog := plugins.DefaultCatalog()
+		if hasFlag(args[1:], "--json") {
+			return writeJSON(os.Stdout, catalog)
+		}
+		fmt.Printf("plugin catalog %s hash=%s\n", catalog.Version, catalog.Hash)
+		for _, plugin := range catalog.Plugins {
+			fmt.Printf("- %s (%s): %s\n", plugin.Name, plugin.Kind, plugin.Description)
+		}
+		return nil
+	case "probe":
+		return pluginsProbe(args[1:])
+	default:
+		return fmt.Errorf("unknown plugins subcommand %q", args[0])
+	}
+}
+
+func pluginsProbe(args []string) error {
+	fs := flag.NewFlagSet("plugins probe", flag.ContinueOnError)
+	fs.SetOutput(ioDiscard{})
+	githubRepo := fs.String("github", "", "GitHub owner/repo")
+	ref := fs.String("ref", "", "GitHub ref")
+	subpath := fs.String("subpath", "", "source subpath")
+	outPath := fs.String("out", "", "output directory")
+	downloadDir := fs.String("download-dir", "", "download cache directory")
+	kind := fs.String("proposal-kind", "all", "proposal kind")
+	budget := fs.String("budget", "files=4,lines=80,tokens=12000,changes=2", "proposal budget")
+	jsonOut := fs.Bool("json", false, "print JSON")
+	positional, flagArgs, err := onePositionalWithFlags(args, map[string]bool{"--json": true})
+	if err != nil {
+		return err
+	}
+	if err := fs.Parse(flagArgs); err != nil {
+		return err
+	}
+	if *githubRepo == "" && positional == "" {
+		return errors.New("usage: patchline plugins probe [<path>|--github owner/repo] [--ref ref] [--subpath path] [--out dir] [--download-dir dir] [--json]")
+	}
+	if *githubRepo != "" && *outPath == "" {
+		return errors.New("patchline plugins probe --github requires --out so fetched source metadata is persisted")
+	}
+	report, err := plugins.Probe(context.Background(), plugins.ProbeOptions{
+		Path:        positional,
+		GitHub:      *githubRepo,
+		Ref:         *ref,
+		Subpath:     *subpath,
+		DownloadDir: *downloadDir,
+		OutDir:      *outPath,
+		Kind:        *kind,
+		Budget:      *budget,
+	})
+	if err != nil {
+		return err
+	}
+	if *outPath != "" {
+		if err := plugins.WriteProbe(*outPath, report); err != nil {
+			return err
+		}
+	}
+	if *jsonOut {
+		return writeJSON(os.Stdout, report)
+	}
+	fmt.Printf("plugins probe input=%s plugins=%d files=%d risks=%d generated=%d checks=%d rendered=%d hash=%s\n", report.Input, len(report.Catalog.Plugins), report.Summary.FilesScanned, report.Summary.RankedRisks, report.Summary.GeneratedFiles, report.Summary.GeneratedChecks, report.Summary.RenderedReports, report.Hash)
+	return nil
 }
 
 func parseAnalyzeStages(value string) ([]string, error) {

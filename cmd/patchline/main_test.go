@@ -37,6 +37,23 @@ func TestParseGateOptionsRejectsInvalidThresholds(t *testing.T) {
 	}
 }
 
+func TestPluginsListAndProbeCommands(t *testing.T) {
+	root := t.TempDir()
+	writeMainTestFile(t, root, "db/migrate/001_backfill.sql", "UPDATE accounts SET status = 'active';\n")
+	out := filepath.Join(t.TempDir(), "probe")
+	if err := run([]string{"plugins", "list", "--json"}); err != nil {
+		t.Fatalf("plugins list failed: %v", err)
+	}
+	if err := run([]string{"plugins", "probe", root, "--out", out, "--json"}); err != nil {
+		t.Fatalf("plugins probe failed: %v", err)
+	}
+	for _, rel := range []string{"plugin-probe.json", "plugin-probe.md", "baseline/baseline.json", "proposal/proposal.json", "compare/compare.json", "rendered/baseline.json", "rendered/baseline.md"} {
+		if stat, err := os.Stat(filepath.Join(out, rel)); err != nil || stat.Size() == 0 {
+			t.Fatalf("expected %s to be written, stat=%#v err=%v", rel, stat, err)
+		}
+	}
+}
+
 func TestOnePositionalWithFlagsAllowsFlagsAfterPath(t *testing.T) {
 	pos, flags, err := onePositionalWithFlags([]string{"django/django", "--subpath", "django/contrib/auth/migrations", "--json"}, map[string]bool{"--json": true})
 	if err != nil {
