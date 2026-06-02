@@ -71,6 +71,62 @@ func TestFetchLocalCopiesRepoAndWritesSourceMetadata(t *testing.T) {
 	}
 }
 
+func TestBaselineRoutesRisksWithCodeowners(t *testing.T) {
+	root := t.TempDir()
+	writeFile(t, root, ".github/CODEOWNERS", "* @org/global\n/db/migrate/ @org/db-team @alice\n")
+	writeFile(t, root, "db/migrate/001_backfill.sql", "UPDATE accounts SET status = 'active';\n")
+	inv, err := InventoryPath(InventoryOptions{Path: filepath.Join(root, "db/migrate")})
+	if err != nil {
+		t.Fatal(err)
+	}
+	intakeReport, err := intake.Run(context.Background(), intake.Options{Path: filepath.Join(root, "db/migrate")})
+	if err != nil {
+		t.Fatal(err)
+	}
+	baseline := Baseline(inv, inv.Facts, intakeReport)
+	if baseline.Summary.OwnerRoutes == 0 || baseline.Summary.OwnerRouteOwners != 2 {
+		t.Fatalf("expected CODEOWNERS owner routing summary, got %#v", baseline.Summary)
+	}
+	if len(baseline.OwnerRoutes) == 0 || strings.Join(baseline.OwnerRoutes[0].Owners, ",") != "@alice,@org/db-team" {
+		t.Fatalf("expected db-team route, got %#v", baseline.OwnerRoutes)
+	}
+	if !strings.Contains(baseline.Markdown, "CODEOWNERS routing") {
+		t.Fatalf("expected routing section in markdown: %s", baseline.Markdown)
+	}
+}
+
+func TestProposalRoutesGeneratedInterventionsToRiskOwners(t *testing.T) {
+	root := t.TempDir()
+	writeFile(t, root, ".github/CODEOWNERS", "/db/migrate/ @org/db-team\n")
+	writeFile(t, root, "db/migrate/001_delete.sql", "DELETE FROM accounts;\n")
+	inv, err := InventoryPath(InventoryOptions{Path: filepath.Join(root, "db/migrate")})
+	if err != nil {
+		t.Fatal(err)
+	}
+	intakeReport, err := intake.Run(context.Background(), intake.Options{Path: filepath.Join(root, "db/migrate")})
+	if err != nil {
+		t.Fatal(err)
+	}
+	baseline := Baseline(inv, inv.Facts, intakeReport)
+	baselineDir := filepath.Join(t.TempDir(), "baseline")
+	if err := WriteBaseline(baselineDir, baseline); err != nil {
+		t.Fatal(err)
+	}
+	proposal, err := Propose(ProposalOptions{BaselinePath: baselineDir, Kind: "guards", OutDir: filepath.Join(t.TempDir(), "proposal"), NoLLM: true, BudgetRisks: 1})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(proposal.GeneratedFiles) == 0 || strings.Join(proposal.GeneratedFiles[0].Reviewers, ",") != "@org/db-team" {
+		t.Fatalf("expected generated file reviewers from CODEOWNERS, got %#v", proposal.GeneratedFiles)
+	}
+	if len(proposal.OwnerRoutes) == 0 || proposal.OwnerRoutes[0].SubjectKind != "generated_file" {
+		t.Fatalf("expected generated owner routes, got %#v", proposal.OwnerRoutes)
+	}
+	if !strings.Contains(proposal.Markdown, "likely reviewers") {
+		t.Fatalf("expected reviewers in proposal markdown: %s", proposal.Markdown)
+	}
+}
+
 func TestFetchLocalGitRecordsResolvedCommit(t *testing.T) {
 	src := t.TempDir()
 	writeFile(t, src, "db/migrate/001.sql", "create table accounts(id int);")

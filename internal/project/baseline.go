@@ -53,6 +53,7 @@ type BaselineReport struct {
 	ProofMinimizers []ProofHoleMinimization   `json:"proof_hole_minimizations,omitempty"`
 	PolicyChecks    []PolicyCheck             `json:"policy_checks,omitempty"`
 	RepairProofs    []RepairProofSummary      `json:"repair_proof_summaries,omitempty"`
+	OwnerRoutes     []OwnerRoute              `json:"owner_routes,omitempty"`
 	NativeChecks    []Command                 `json:"native_checks,omitempty"`
 	Hash            string                    `json:"hash"`
 	Markdown        string                    `json:"markdown,omitempty"`
@@ -134,6 +135,8 @@ type BaselineSummary struct {
 	RepairProofCond     int `json:"repair_proof_conditional"`
 	RepairProofOpen     int `json:"repair_proof_open"`
 	RepairProofRefuted  int `json:"repair_proof_refuted"`
+	OwnerRoutes         int `json:"owner_routes"`
+	OwnerRouteOwners    int `json:"owner_route_owners"`
 	GrepOnlyMatches     int `json:"grep_only_matches"`
 	SQLOnlyRankedRisks  int `json:"sql_only_ranked_risks"`
 	IdentifierOnlyLinks int `json:"identifier_only_links"`
@@ -154,6 +157,17 @@ type BaselineRisk struct {
 	Identifiers  []Identifier  `json:"identifiers,omitempty"`
 	Rationale    string        `json:"rationale"`
 	NextCommand  string        `json:"next_command,omitempty"`
+}
+
+type OwnerRoute struct {
+	SubjectKind string   `json:"subject_kind"`
+	SubjectID   string   `json:"subject_id"`
+	Path        string   `json:"path"`
+	Owners      []string `json:"owners"`
+	Pattern     string   `json:"pattern,omitempty"`
+	Source      string   `json:"source,omitempty"`
+	Confidence  string   `json:"confidence"`
+	Rationale   string   `json:"rationale"`
 }
 
 type TransactionBoundary struct {
@@ -473,6 +487,7 @@ func Baseline(inv Inventory, facts []Fact, intakeReport intake.Report) BaselineR
 	report.NativeChecks = uniqueCommands(append([]Command(nil), inv.TestCommands...))
 	report.Provenance = buildProvenanceSlices(inv, report.Risks, intakeReport, factIndex)
 	assignStableRiskIDs(report.Risks, report.Provenance)
+	report.OwnerRoutes = buildOwnerRoutes(inv.Root, report.Risks)
 	report.DatalogQueries = buildDatalogQueries(report.Risks, report.Provenance)
 	report.AbstractEffects = buildAbstractEffectSummaries(report.Risks, report.Provenance)
 	report.SymbolicChecks = buildSymbolicChecks(report.Risks, report.AbstractEffects, report.Provenance)
@@ -565,6 +580,8 @@ func Baseline(inv Inventory, facts []Fact, intakeReport intake.Report) BaselineR
 		RepairProofCond:     countRepairProofStatus(report.RepairProofs, "conditional"),
 		RepairProofOpen:     countRepairProofStatus(report.RepairProofs, "open"),
 		RepairProofRefuted:  countRepairProofStatus(report.RepairProofs, "refuted"),
+		OwnerRoutes:         len(report.OwnerRoutes),
+		OwnerRouteOwners:    countOwnerRouteOwners(report.OwnerRoutes),
 		GrepOnlyMatches:     grepOnlyMatches(inv.Root),
 		SQLOnlyRankedRisks:  sqlOnlyRankedRisks(intakeReport),
 		IdentifierOnlyLinks: countLinksByIdentifierKind(report.EvidenceLinks, false),
@@ -5513,6 +5530,8 @@ func renderBaselineMarkdown(report BaselineReport) string {
 	fmt.Fprintf(&b, "| repair proof conditional | %d |\n", report.Summary.RepairProofCond)
 	fmt.Fprintf(&b, "| repair proof open | %d |\n", report.Summary.RepairProofOpen)
 	fmt.Fprintf(&b, "| repair proof refuted | %d |\n", report.Summary.RepairProofRefuted)
+	fmt.Fprintf(&b, "| owner routes | %d |\n", report.Summary.OwnerRoutes)
+	fmt.Fprintf(&b, "| owner route owners | %d |\n", report.Summary.OwnerRouteOwners)
 	fmt.Fprintf(&b, "| grep-only matches | %d |\n", report.Summary.GrepOnlyMatches)
 	fmt.Fprintf(&b, "| SQL-only ranked risks | %d |\n", report.Summary.SQLOnlyRankedRisks)
 	fmt.Fprintf(&b, "| identifier-only links | %d |\n", report.Summary.IdentifierOnlyLinks)
@@ -5522,6 +5541,14 @@ func renderBaselineMarkdown(report BaselineReport) string {
 		limit := minInt(len(report.Risks), 25)
 		for _, risk := range report.Risks[:limit] {
 			fmt.Fprintf(&b, "| `%s` | %d | %s | %s | %s | %s | %s |\n", risk.StableID, risk.Score, risk.Severity, risk.Path, risk.Kind, risk.Table, risk.Rationale)
+		}
+		fmt.Fprintf(&b, "\n")
+	}
+	if len(report.OwnerRoutes) > 0 {
+		fmt.Fprintf(&b, "## CODEOWNERS routing\n\n| subject | path | likely reviewers | pattern | source |\n| --- | --- | --- | --- | --- |\n")
+		limit := minInt(len(report.OwnerRoutes), 30)
+		for _, route := range report.OwnerRoutes[:limit] {
+			fmt.Fprintf(&b, "| `%s` | %s | %s | `%s` | `%s` |\n", route.SubjectID, route.Path, strings.Join(route.Owners, ", "), route.Pattern, route.Source)
 		}
 		fmt.Fprintf(&b, "\n")
 	}

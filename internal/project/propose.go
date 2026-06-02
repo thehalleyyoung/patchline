@@ -47,6 +47,7 @@ type ProposalReport struct {
 	Intervention   RepairIntervention   `json:"intervention"`
 	Minimization   ProposalMinimization `json:"minimization,omitempty"`
 	GeneratedFiles []GeneratedFile      `json:"generated_files,omitempty"`
+	OwnerRoutes    []OwnerRoute         `json:"owner_routes,omitempty"`
 	Constraints    []string             `json:"constraints,omitempty"`
 	Warnings       []string             `json:"warnings,omitempty"`
 	Artifacts      map[string]string    `json:"artifacts,omitempty"`
@@ -80,6 +81,7 @@ type ProposalRiskContext struct {
 	FactHashes    []string      `json:"fact_hashes,omitempty"`
 	EvidencePaths []string      `json:"evidence_paths,omitempty"`
 	Excerpt       string        `json:"excerpt,omitempty"`
+	Reviewers     []string      `json:"reviewers,omitempty"`
 }
 
 type GeneratedFile struct {
@@ -87,6 +89,7 @@ type GeneratedFile struct {
 	Kind        string   `json:"kind"`
 	ContentHash string   `json:"content_hash"`
 	RiskIDs     []string `json:"risk_ids,omitempty"`
+	Reviewers   []string `json:"reviewers,omitempty"`
 }
 
 type GeneratedArtifact struct {
@@ -219,9 +222,16 @@ func Propose(opts ProposalOptions) (ProposalReport, error) {
 	report.Warnings = append(report.Warnings, budgetWarnings...)
 	report.Intervention = buildRepairIntervention(report.BaselineHash, report.OutputHash, report.TargetRiskIDs, generated)
 	for _, artifact := range generated {
-		report.GeneratedFiles = append(report.GeneratedFiles, GeneratedFile{Path: artifact.Path, Kind: artifact.Kind, ContentHash: "sha256:" + canonical.Hash(artifact.Content), RiskIDs: artifact.RiskIDs})
+		report.GeneratedFiles = append(report.GeneratedFiles, GeneratedFile{
+			Path:        artifact.Path,
+			Kind:        artifact.Kind,
+			ContentHash: "sha256:" + canonical.Hash(artifact.Content),
+			RiskIDs:     artifact.RiskIDs,
+			Reviewers:   ownersForRiskIDs(baseline.OwnerRoutes, artifact.RiskIDs),
+		})
 	}
 	sort.Slice(report.GeneratedFiles, func(i, j int) bool { return report.GeneratedFiles[i].Path < report.GeneratedFiles[j].Path })
+	report.OwnerRoutes = ownerRoutesForGeneratedFiles(baseline, report.GeneratedFiles)
 	report.Markdown = renderProposalMarkdown(report)
 	return report, nil
 }
@@ -317,6 +327,7 @@ func buildProposalContext(baseline BaselineReport, kind string, budget int) Prop
 			FactHashes:    factHashes,
 			EvidencePaths: evidencePaths,
 			Excerpt:       excerptForRisk(baseline.InventoryRoot, risk.Path),
+			Reviewers:     ownersForRiskIDs(baseline.OwnerRoutes, []string{risk.ID}),
 		})
 	}
 	return context
@@ -1008,9 +1019,15 @@ func renderProposalMarkdown(report ProposalReport) string {
 	fmt.Fprintf(&b, "- stage: `%s`\n", report.Intervention.Stage)
 	fmt.Fprintf(&b, "- trust: `%s`\n", report.Intervention.Trust)
 	fmt.Fprintf(&b, "- hypothesis: %s\n\n", report.Intervention.Hypothesis)
-	fmt.Fprintf(&b, "## Generated files\n\n| path | kind | risks |\n| --- | --- | --- |\n")
+	fmt.Fprintf(&b, "## Generated files\n\n| path | kind | risks | likely reviewers |\n| --- | --- | --- | --- |\n")
 	for _, file := range report.GeneratedFiles {
-		fmt.Fprintf(&b, "| %s | %s | %s |\n", file.Path, file.Kind, strings.Join(file.RiskIDs, ", "))
+		fmt.Fprintf(&b, "| %s | %s | %s | %s |\n", file.Path, file.Kind, strings.Join(file.RiskIDs, ", "), strings.Join(file.Reviewers, ", "))
+	}
+	if len(report.OwnerRoutes) > 0 {
+		fmt.Fprintf(&b, "\n## Owner routing\n\n| generated file | likely reviewers | rationale |\n| --- | --- | --- |\n")
+		for _, route := range report.OwnerRoutes {
+			fmt.Fprintf(&b, "| %s | %s | %s |\n", route.Path, strings.Join(route.Owners, ", "), route.Rationale)
+		}
 	}
 	fmt.Fprintf(&b, "\n## Constraints\n\n")
 	for _, constraint := range report.Constraints {

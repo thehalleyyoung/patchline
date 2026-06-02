@@ -703,6 +703,7 @@ type maintainerTriageReport struct {
 	ProposalHash string                  `json:"proposal_hash,omitempty"`
 	CompareHash  string                  `json:"compare_hash,omitempty"`
 	Groups       []maintainerTriageGroup `json:"groups"`
+	OwnerRoutes  []project.OwnerRoute    `json:"owner_routes,omitempty"`
 	Summary      maintainerTriageSummary `json:"summary"`
 	Hash         string                  `json:"hash"`
 	Markdown     string                  `json:"markdown,omitempty"`
@@ -714,26 +715,30 @@ type maintainerTriageSummary struct {
 	TotalFindings          int `json:"total_findings"`
 	GeneratedInterventions int `json:"generated_interventions"`
 	NativeChecks           int `json:"native_checks"`
+	OwnerRoutes            int `json:"owner_routes"`
+	OwnerRouteOwners       int `json:"owner_route_owners"`
 }
 
 type maintainerTriageGroup struct {
-	Surface        string                  `json:"surface"`
-	OwnerHint      string                  `json:"owner_hint"`
-	FindingCount   int                     `json:"finding_count"`
-	TopRisks       []maintainerTriageRisk  `json:"top_risks,omitempty"`
-	EvidencePaths  []string                `json:"evidence_paths,omitempty"`
-	GeneratedFiles []project.GeneratedFile `json:"generated_files,omitempty"`
-	NativeChecks   []project.Command       `json:"native_checks,omitempty"`
-	Rationale      string                  `json:"rationale"`
+	Surface         string                  `json:"surface"`
+	OwnerHint       string                  `json:"owner_hint"`
+	LikelyReviewers []string                `json:"likely_reviewers,omitempty"`
+	FindingCount    int                     `json:"finding_count"`
+	TopRisks        []maintainerTriageRisk  `json:"top_risks,omitempty"`
+	EvidencePaths   []string                `json:"evidence_paths,omitempty"`
+	GeneratedFiles  []project.GeneratedFile `json:"generated_files,omitempty"`
+	NativeChecks    []project.Command       `json:"native_checks,omitempty"`
+	Rationale       string                  `json:"rationale"`
 }
 
 type maintainerTriageRisk struct {
-	ID       string `json:"id"`
-	Path     string `json:"path"`
-	Kind     string `json:"kind"`
-	Table    string `json:"table,omitempty"`
-	Severity string `json:"severity"`
-	Score    int    `json:"score"`
+	ID        string   `json:"id"`
+	Path      string   `json:"path"`
+	Kind      string   `json:"kind"`
+	Table     string   `json:"table,omitempty"`
+	Severity  string   `json:"severity"`
+	Score     int      `json:"score"`
+	Reviewers []string `json:"reviewers,omitempty"`
 }
 
 type repoDoctorReport struct {
@@ -1862,6 +1867,14 @@ func buildMaintainerTriage(baseline project.BaselineReport, proposal project.Pro
 		ProposalHash: proposal.OutputHash,
 		CompareHash:  compare.Hash,
 	}
+	report.OwnerRoutes = append(report.OwnerRoutes, baseline.OwnerRoutes...)
+	report.OwnerRoutes = append(report.OwnerRoutes, proposal.OwnerRoutes...)
+	ownersByRisk := map[string][]string{}
+	for _, route := range baseline.OwnerRoutes {
+		if route.SubjectKind == "risk" {
+			ownersByRisk[route.SubjectID] = mergeTriageReviewers(ownersByRisk[route.SubjectID], route.Owners)
+		}
+	}
 	groups := []maintainerTriageGroup{
 		{Surface: "migrations", OwnerHint: "database or migration owner", Rationale: "schema/data migrations and raw migration SQL with ranked risk"},
 		{Surface: "app_write_paths", OwnerHint: "service or feature owner", Rationale: "application source paths that write persistent data"},
@@ -1876,7 +1889,7 @@ func buildMaintainerTriage(baseline project.BaselineReport, proposal project.Pro
 		bySurface[groups[i].Surface] = &groups[i]
 	}
 	for _, risk := range baseline.Risks {
-		addTriageRisk(bySurface[triageRiskSurface(risk)], risk)
+		addTriageRisk(bySurface[triageRiskSurface(risk)], risk, ownersByRisk[risk.ID])
 	}
 	for _, slice := range baseline.Provenance {
 		for _, path := range slice.SourcePaths {
@@ -1906,6 +1919,7 @@ func buildMaintainerTriage(baseline project.BaselineReport, proposal project.Pro
 	}
 	for _, generated := range proposal.GeneratedFiles {
 		bySurface["generated_interventions"].GeneratedFiles = append(bySurface["generated_interventions"].GeneratedFiles, generated)
+		bySurface["generated_interventions"].LikelyReviewers = mergeTriageReviewers(bySurface["generated_interventions"].LikelyReviewers, generated.Reviewers)
 	}
 	for i := range groups {
 		sort.Slice(groups[i].TopRisks, func(a, b int) bool {
@@ -1918,6 +1932,7 @@ func buildMaintainerTriage(baseline project.BaselineReport, proposal project.Pro
 			groups[i].TopRisks = groups[i].TopRisks[:10]
 		}
 		sort.Strings(groups[i].EvidencePaths)
+		sort.Strings(groups[i].LikelyReviewers)
 		sort.Slice(groups[i].GeneratedFiles, func(a, b int) bool { return groups[i].GeneratedFiles[a].Path < groups[i].GeneratedFiles[b].Path })
 		sort.Slice(groups[i].NativeChecks, func(a, b int) bool { return groups[i].NativeChecks[a].Command < groups[i].NativeChecks[b].Command })
 		groups[i].FindingCount = len(groups[i].TopRisks) + len(groups[i].EvidencePaths) + len(groups[i].GeneratedFiles) + len(groups[i].NativeChecks)
@@ -1930,6 +1945,8 @@ func buildMaintainerTriage(baseline project.BaselineReport, proposal project.Pro
 	}
 	report.Groups = groups
 	report.Summary.Groups = len(groups)
+	report.Summary.OwnerRoutes = len(report.OwnerRoutes)
+	report.Summary.OwnerRouteOwners = countTriageRouteOwners(report.OwnerRoutes)
 	report.Hash = maintainerTriageHash(report)
 	report.Markdown = renderMaintainerTriageMarkdown(report)
 	return report
@@ -1954,11 +1971,12 @@ func triageRiskSurface(risk project.BaselineRisk) string {
 	}
 }
 
-func addTriageRisk(group *maintainerTriageGroup, risk project.BaselineRisk) {
+func addTriageRisk(group *maintainerTriageGroup, risk project.BaselineRisk, reviewers []string) {
 	if group == nil {
 		return
 	}
-	group.TopRisks = append(group.TopRisks, maintainerTriageRisk{ID: risk.ID, Path: risk.Path, Kind: risk.Kind, Table: risk.Table, Severity: risk.Severity, Score: risk.Score})
+	group.TopRisks = append(group.TopRisks, maintainerTriageRisk{ID: risk.ID, Path: risk.Path, Kind: risk.Kind, Table: risk.Table, Severity: risk.Severity, Score: risk.Score, Reviewers: reviewers})
+	group.LikelyReviewers = mergeTriageReviewers(group.LikelyReviewers, reviewers)
 }
 
 func addTriagePath(group *maintainerTriageGroup, path string) {
@@ -1983,6 +2001,37 @@ func addTriageCommand(group *maintainerTriageGroup, command project.Command) {
 		}
 	}
 	group.NativeChecks = append(group.NativeChecks, command)
+}
+
+func mergeTriageReviewers(existing, values []string) []string {
+	seen := map[string]bool{}
+	var out []string
+	for _, value := range existing {
+		if value != "" && !seen[value] {
+			seen[value] = true
+			out = append(out, value)
+		}
+	}
+	for _, value := range values {
+		if value != "" && !seen[value] {
+			seen[value] = true
+			out = append(out, value)
+		}
+	}
+	sort.Strings(out)
+	return out
+}
+
+func countTriageRouteOwners(routes []project.OwnerRoute) int {
+	owners := map[string]bool{}
+	for _, route := range routes {
+		for _, owner := range route.Owners {
+			if owner != "" {
+				owners[owner] = true
+			}
+		}
+	}
+	return len(owners)
 }
 
 func writeMaintainerTriage(outDir string, report maintainerTriageReport) error {
@@ -2024,14 +2073,22 @@ func renderMaintainerTriageMarkdown(report maintainerTriageReport) string {
 	fmt.Fprintf(&b, "| groups with findings | %d |\n", report.Summary.GroupsWithFindings)
 	fmt.Fprintf(&b, "| total findings | %d |\n", report.Summary.TotalFindings)
 	fmt.Fprintf(&b, "| generated interventions | %d |\n", report.Summary.GeneratedInterventions)
-	fmt.Fprintf(&b, "| native checks | %d |\n\n", report.Summary.NativeChecks)
-	fmt.Fprintf(&b, "## Owner surfaces\n\n| surface | owner hint | findings | top risk | rationale |\n| --- | --- | ---: | --- | --- |\n")
+	fmt.Fprintf(&b, "| native checks | %d |\n", report.Summary.NativeChecks)
+	fmt.Fprintf(&b, "| CODEOWNERS routes | %d |\n", report.Summary.OwnerRoutes)
+	fmt.Fprintf(&b, "| CODEOWNERS owners | %d |\n\n", report.Summary.OwnerRouteOwners)
+	fmt.Fprintf(&b, "## Owner surfaces\n\n| surface | owner hint | likely reviewers | findings | top risk | rationale |\n| --- | --- | --- | ---: | --- | --- |\n")
 	for _, group := range report.Groups {
 		topRisk := ""
 		if len(group.TopRisks) > 0 {
 			topRisk = fmt.Sprintf("%s (%s %d)", group.TopRisks[0].ID, group.TopRisks[0].Severity, group.TopRisks[0].Score)
 		}
-		fmt.Fprintf(&b, "| %s | %s | %d | %s | %s |\n", group.Surface, group.OwnerHint, group.FindingCount, topRisk, group.Rationale)
+		fmt.Fprintf(&b, "| %s | %s | %s | %d | %s | %s |\n", group.Surface, group.OwnerHint, strings.Join(group.LikelyReviewers, ", "), group.FindingCount, topRisk, group.Rationale)
+	}
+	if len(report.OwnerRoutes) > 0 {
+		fmt.Fprintf(&b, "\n## CODEOWNERS routes\n\n| subject | path | likely reviewers | confidence |\n| --- | --- | --- | --- |\n")
+		for _, route := range report.OwnerRoutes {
+			fmt.Fprintf(&b, "| `%s` | %s | %s | %s |\n", route.SubjectID, route.Path, strings.Join(route.Owners, ", "), route.Confidence)
+		}
 	}
 	return b.String()
 }
