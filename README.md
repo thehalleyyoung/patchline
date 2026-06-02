@@ -118,7 +118,7 @@ Run `plugins list` or `plugins probe <path>` to inspect the deterministic parser
 Run `golden-fixture generate --github owner/repo --ref <sha> --subpath <path> --out <dir>` to turn a real-repo slice into a tiny deterministic Go test without vendoring the full repository; see [docs/golden-fixtures.md](docs/golden-fixtures.md).
 
 <details>
-<summary><strong>Full verification catalog</strong> — 430+ reproducible <code>make &lt;name&gt;-gate</code> checks, each with a positive proof and a negative control on real public-repo data (click to expand)</summary>
+<summary><strong>Full verification catalog</strong> — 500+ reproducible <code>make &lt;name&gt;-gate</code> checks, each with a positive proof and a negative control on real public-repo data (click to expand)</summary>
 
 Run `make fuzz-coverage-gate` to execute the parser, fact normalization, redaction, SQL analysis, archive extraction, and report-loading fuzz seed suite plus a short stress pass and real-repo slice proof; see [docs/fuzzing.md](docs/fuzzing.md).
 
