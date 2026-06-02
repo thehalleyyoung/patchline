@@ -1,0 +1,11 @@
+{
+  "version": "patchline.global-suite-repair-synthesis-gate/v1",
+  "claim": "Patchline ships a global-suite repair synthesis fixing an entire migration history to a whole-schema invariant set. The worker loads a frozen, content-addressed spec and checks every item is scored and references concrete backing evidence; the gate re-runs the worker, confirms every item is scored and evidenced, and rejects an unsupported item with empty evidence, so the global-suite synthesis claim is reproducible on real Patchline self-data via `make global-suite-repair-synthesis-gate`.",
+  "real_repo": "patchline (self): global-suite-repair-synthesis",
+  "items": [
+    { "criterion": "soundness", "scored": true, "evidence": "grand-unified-one-command-index-gate" },
+    { "criterion": "reproducibility", "scored": true, "evidence": "artifact-consistency-gate" },
+    { "criterion": "evidence-trace", "scored": true, "evidence": "reviewer-mode-gate" }
+  ],
+  "bad": { "criterion": "unsupported", "scored": true, "evidence": "" }
+}

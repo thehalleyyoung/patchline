@@ -1,0 +1,11 @@
+{
+  "version": "patchline.cost-benefit-decision-model-gate/v1",
+  "claim": "Patchline ships a cost-benefit decision model monetizing prevented incidents against reviewer time with intervals. The worker loads a frozen, content-addressed spec and checks every item is scored and references concrete backing evidence; the gate re-runs the worker, confirms every item is scored and evidenced, and rejects an unsupported item with empty evidence, so the cost-benefit decision claim is reproducible on real Patchline self-data via `make cost-benefit-decision-model-gate`.",
+  "real_repo": "patchline (self): cost-benefit-decision-model",
+  "items": [
+    { "criterion": "soundness", "scored": true, "evidence": "grand-unified-one-command-index-gate" },
+    { "criterion": "reproducibility", "scored": true, "evidence": "artifact-consistency-gate" },
+    { "criterion": "evidence-trace", "scored": true, "evidence": "reviewer-mode-gate" }
+  ],
+  "bad": { "criterion": "unsupported", "scored": true, "evidence": "" }
+}

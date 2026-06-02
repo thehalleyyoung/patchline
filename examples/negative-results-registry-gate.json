@@ -1,0 +1,11 @@
+{
+  "version": "patchline.negative-results-registry-gate/v1",
+  "claim": "Patchline ships a negative-results registry with a reproducible experiment for every claimed boundary. The worker loads a frozen, content-addressed spec and checks every item is scored and references concrete backing evidence; the gate re-runs the worker, confirms every item is scored and evidenced, and rejects an unsupported item with empty evidence, so the negative-results registry claim is reproducible on real Patchline self-data via `make negative-results-registry-gate`.",
+  "real_repo": "patchline (self): negative-results-registry",
+  "items": [
+    { "criterion": "soundness", "scored": true, "evidence": "grand-unified-one-command-index-gate" },
+    { "criterion": "reproducibility", "scored": true, "evidence": "artifact-consistency-gate" },
+    { "criterion": "evidence-trace", "scored": true, "evidence": "reviewer-mode-gate" }
+  ],
+  "bad": { "criterion": "unsupported", "scored": true, "evidence": "" }
+}

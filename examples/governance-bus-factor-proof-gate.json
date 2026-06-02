@@ -1,0 +1,11 @@
+{
+  "version": "patchline.governance-bus-factor-proof-gate/v1",
+  "claim": "Patchline ships a governance bus-factor proof with documented succession and term limits. The worker loads a frozen, content-addressed spec and checks every item is scored and references concrete backing evidence; the gate re-runs the worker, confirms every item is scored and evidenced, and rejects an unsupported item with empty evidence, so the bus-factor proof claim is reproducible on real Patchline self-data via `make governance-bus-factor-proof-gate`.",
+  "real_repo": "patchline (self): governance-bus-factor-proof",
+  "items": [
+    { "criterion": "soundness", "scored": true, "evidence": "grand-unified-one-command-index-gate" },
+    { "criterion": "reproducibility", "scored": true, "evidence": "artifact-consistency-gate" },
+    { "criterion": "evidence-trace", "scored": true, "evidence": "reviewer-mode-gate" }
+  ],
+  "bad": { "criterion": "unsupported", "scored": true, "evidence": "" }
+}

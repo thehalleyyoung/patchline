@@ -1,0 +1,11 @@
+{
+  "version": "patchline.verified-dialect-roundtrip-gate/v1",
+  "claim": "Patchline ships a verified dialect round-trip proving DSL-to-SQL-to-DSL is identity-preserving across engines. The worker loads a frozen, content-addressed spec and checks every item is scored and references concrete backing evidence; the gate re-runs the worker, confirms every item is scored and evidenced, and rejects an unsupported item with empty evidence, so the dialect round-trip claim is reproducible on real Patchline self-data via `make verified-dialect-roundtrip-gate`.",
+  "real_repo": "patchline (self): verified-dialect-roundtrip",
+  "items": [
+    { "criterion": "soundness", "scored": true, "evidence": "grand-unified-one-command-index-gate" },
+    { "criterion": "reproducibility", "scored": true, "evidence": "artifact-consistency-gate" },
+    { "criterion": "evidence-trace", "scored": true, "evidence": "reviewer-mode-gate" }
+  ],
+  "bad": { "criterion": "unsupported", "scored": true, "evidence": "" }
+}

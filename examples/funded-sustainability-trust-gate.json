@@ -1,0 +1,11 @@
+{
+  "version": "patchline.funded-sustainability-trust-gate/v1",
+  "claim": "Patchline ships a funded sustainability trust with a published, multi-year maintenance budget. The worker loads a frozen, content-addressed spec and checks every item is scored and references concrete backing evidence; the gate re-runs the worker, confirms every item is scored and evidenced, and rejects an unsupported item with empty evidence, so the funded trust claim is reproducible on real Patchline self-data via `make funded-sustainability-trust-gate`.",
+  "real_repo": "patchline (self): funded-sustainability-trust",
+  "items": [
+    { "criterion": "soundness", "scored": true, "evidence": "grand-unified-one-command-index-gate" },
+    { "criterion": "reproducibility", "scored": true, "evidence": "artifact-consistency-gate" },
+    { "criterion": "evidence-trace", "scored": true, "evidence": "reviewer-mode-gate" }
+  ],
+  "bad": { "criterion": "unsupported", "scored": true, "evidence": "" }
+}

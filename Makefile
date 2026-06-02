@@ -1735,3 +1735,308 @@ artifact-clean:
 
 fmt:
 	gofmt -w cmd internal
+
+
+# Steps 601-700 self-gates
+.PHONY: verified-end-to-end-pipeline-gate proof-carrying-patch-bundle-gate verified-dialect-roundtrip-gate mechanized-rollback-safety-gate verified-online-migration-protocol-gate refinement-typed-dsl-gate verified-constraint-solver-gate mechanized-isolation-levels-gate proof-minimization-engine-gate self-checking-certificate-checker-gate hundred-million-migration-index-gate continuous-corpus-refresh-stream-gate cross-language-hazard-atlas-gate longitudinal-hazard-trends-gate corpus-sampling-theory-gate incremental-global-dedup-gate differentially-private-aggregation-gate carbon-aware-scheduler-gate throughput-per-dollar-frontier-gate replicable-corpus-api-gate stepped-wedge-trial-gate synthetic-control-study-gate doubly-robust-estimator-gate negative-control-outcomes-gate partial-identification-bounds-gate incident-survival-analysis-gate prospective-power-analysis-gate specification-multiverse-gate placebo-gate-falsification-gate external-validity-transport-gate manski-attrition-bounds-gate cost-benefit-decision-model-gate causal-forest-heterogeneity-gate external-meta-analysis-gate confirmatory-preregistration-gate autonomous-fleet-orchestrator-gate dependency-aware-sequencing-gate runtime-policy-monitor-gate online-learning-guard-gate agent-budget-market-gate staged-rollout-controller-gate incident-auto-remediation-gate multi-tenant-agent-isolation-gate signed-agent-actions-gate counterfactual-regret-eval-gate faithful-agent-explanations-gate safe-interruptibility-gate agent-liveness-guarantee-gate fleet-slo-enforcer-gate autonomy-certification-suite-gate iso-track-certificate-standard-gate multi-impl-conformance-gate ide-native-integration-gate ci-marketplace-actions-gate native-orm-plugins-gate cloud-provider-integration-gate registry-distribution-gate enterprise-sso-rbac-gate compliance-evidence-export-gate multi-region-hosted-slo-gate neutral-governance-foundation-gate partner-certification-program-gate university-curriculum-network-gate standards-interop-plugfest-gate million-run-adoption-gate global-suite-repair-synthesis-gate verified-learned-heuristics-gate neuro-symbolic-proof-search-gate schema-foundation-model-gate hazard-taxonomy-completeness-gate information-bottleneck-features-gate automated-lemma-library-gate streaming-state-transfer-repair-gate verified-macro-extension-gate live-benchmark-anti-overfit-gate mechanistic-decision-circuits-gate calibrated-risk-frontier-gate certified-distributional-robustness-gate reproducible-rl-repair-policy-gate open-problem-bounty-board-gate one-command-full-repro-2-gate provenance-linked-every-number-gate machine-checked-appendix-2-gate interactive-claim-explorer-gate doi-snapshot-attestation-2-gate threats-validity-matrix-2-gate living-related-work-comparison-gate negative-results-registry-gate external-artifact-audit-2-gate results-never-regress-2-gate multi-org-incident-reduction-2-gate impact-citation-graph-gate successor-frontier-roadmap-gate funded-sustainability-trust-gate governance-bus-factor-proof-gate ratified-standard-conformance-gate award-readiness-dossier-2-gate ten-thousand-star-funnel-gate decade-impact-retrospective-gate grand-unified-evidence-index-2-gate 
+
+verified-end-to-end-pipeline-gate:
+	bash scripts/verified-end-to-end-pipeline-gate.sh
+
+proof-carrying-patch-bundle-gate:
+	bash scripts/proof-carrying-patch-bundle-gate.sh
+
+verified-dialect-roundtrip-gate:
+	bash scripts/verified-dialect-roundtrip-gate.sh
+
+mechanized-rollback-safety-gate:
+	bash scripts/mechanized-rollback-safety-gate.sh
+
+verified-online-migration-protocol-gate:
+	bash scripts/verified-online-migration-protocol-gate.sh
+
+refinement-typed-dsl-gate:
+	bash scripts/refinement-typed-dsl-gate.sh
+
+verified-constraint-solver-gate:
+	bash scripts/verified-constraint-solver-gate.sh
+
+mechanized-isolation-levels-gate:
+	bash scripts/mechanized-isolation-levels-gate.sh
+
+proof-minimization-engine-gate:
+	bash scripts/proof-minimization-engine-gate.sh
+
+self-checking-certificate-checker-gate:
+	bash scripts/self-checking-certificate-checker-gate.sh
+
+hundred-million-migration-index-gate:
+	bash scripts/hundred-million-migration-index-gate.sh
+
+continuous-corpus-refresh-stream-gate:
+	bash scripts/continuous-corpus-refresh-stream-gate.sh
+
+cross-language-hazard-atlas-gate:
+	bash scripts/cross-language-hazard-atlas-gate.sh
+
+longitudinal-hazard-trends-gate:
+	bash scripts/longitudinal-hazard-trends-gate.sh
+
+corpus-sampling-theory-gate:
+	bash scripts/corpus-sampling-theory-gate.sh
+
+incremental-global-dedup-gate:
+	bash scripts/incremental-global-dedup-gate.sh
+
+differentially-private-aggregation-gate:
+	bash scripts/differentially-private-aggregation-gate.sh
+
+carbon-aware-scheduler-gate:
+	bash scripts/carbon-aware-scheduler-gate.sh
+
+throughput-per-dollar-frontier-gate:
+	bash scripts/throughput-per-dollar-frontier-gate.sh
+
+replicable-corpus-api-gate:
+	bash scripts/replicable-corpus-api-gate.sh
+
+stepped-wedge-trial-gate:
+	bash scripts/stepped-wedge-trial-gate.sh
+
+synthetic-control-study-gate:
+	bash scripts/synthetic-control-study-gate.sh
+
+doubly-robust-estimator-gate:
+	bash scripts/doubly-robust-estimator-gate.sh
+
+negative-control-outcomes-gate:
+	bash scripts/negative-control-outcomes-gate.sh
+
+partial-identification-bounds-gate:
+	bash scripts/partial-identification-bounds-gate.sh
+
+incident-survival-analysis-gate:
+	bash scripts/incident-survival-analysis-gate.sh
+
+prospective-power-analysis-gate:
+	bash scripts/prospective-power-analysis-gate.sh
+
+specification-multiverse-gate:
+	bash scripts/specification-multiverse-gate.sh
+
+placebo-gate-falsification-gate:
+	bash scripts/placebo-gate-falsification-gate.sh
+
+external-validity-transport-gate:
+	bash scripts/external-validity-transport-gate.sh
+
+manski-attrition-bounds-gate:
+	bash scripts/manski-attrition-bounds-gate.sh
+
+cost-benefit-decision-model-gate:
+	bash scripts/cost-benefit-decision-model-gate.sh
+
+causal-forest-heterogeneity-gate:
+	bash scripts/causal-forest-heterogeneity-gate.sh
+
+external-meta-analysis-gate:
+	bash scripts/external-meta-analysis-gate.sh
+
+confirmatory-preregistration-gate:
+	bash scripts/confirmatory-preregistration-gate.sh
+
+autonomous-fleet-orchestrator-gate:
+	bash scripts/autonomous-fleet-orchestrator-gate.sh
+
+dependency-aware-sequencing-gate:
+	bash scripts/dependency-aware-sequencing-gate.sh
+
+runtime-policy-monitor-gate:
+	bash scripts/runtime-policy-monitor-gate.sh
+
+online-learning-guard-gate:
+	bash scripts/online-learning-guard-gate.sh
+
+agent-budget-market-gate:
+	bash scripts/agent-budget-market-gate.sh
+
+staged-rollout-controller-gate:
+	bash scripts/staged-rollout-controller-gate.sh
+
+incident-auto-remediation-gate:
+	bash scripts/incident-auto-remediation-gate.sh
+
+multi-tenant-agent-isolation-gate:
+	bash scripts/multi-tenant-agent-isolation-gate.sh
+
+signed-agent-actions-gate:
+	bash scripts/signed-agent-actions-gate.sh
+
+counterfactual-regret-eval-gate:
+	bash scripts/counterfactual-regret-eval-gate.sh
+
+faithful-agent-explanations-gate:
+	bash scripts/faithful-agent-explanations-gate.sh
+
+safe-interruptibility-gate:
+	bash scripts/safe-interruptibility-gate.sh
+
+agent-liveness-guarantee-gate:
+	bash scripts/agent-liveness-guarantee-gate.sh
+
+fleet-slo-enforcer-gate:
+	bash scripts/fleet-slo-enforcer-gate.sh
+
+autonomy-certification-suite-gate:
+	bash scripts/autonomy-certification-suite-gate.sh
+
+iso-track-certificate-standard-gate:
+	bash scripts/iso-track-certificate-standard-gate.sh
+
+multi-impl-conformance-gate:
+	bash scripts/multi-impl-conformance-gate.sh
+
+ide-native-integration-gate:
+	bash scripts/ide-native-integration-gate.sh
+
+ci-marketplace-actions-gate:
+	bash scripts/ci-marketplace-actions-gate.sh
+
+native-orm-plugins-gate:
+	bash scripts/native-orm-plugins-gate.sh
+
+cloud-provider-integration-gate:
+	bash scripts/cloud-provider-integration-gate.sh
+
+registry-distribution-gate:
+	bash scripts/registry-distribution-gate.sh
+
+enterprise-sso-rbac-gate:
+	bash scripts/enterprise-sso-rbac-gate.sh
+
+compliance-evidence-export-gate:
+	bash scripts/compliance-evidence-export-gate.sh
+
+multi-region-hosted-slo-gate:
+	bash scripts/multi-region-hosted-slo-gate.sh
+
+neutral-governance-foundation-gate:
+	bash scripts/neutral-governance-foundation-gate.sh
+
+partner-certification-program-gate:
+	bash scripts/partner-certification-program-gate.sh
+
+university-curriculum-network-gate:
+	bash scripts/university-curriculum-network-gate.sh
+
+standards-interop-plugfest-gate:
+	bash scripts/standards-interop-plugfest-gate.sh
+
+million-run-adoption-gate:
+	bash scripts/million-run-adoption-gate.sh
+
+global-suite-repair-synthesis-gate:
+	bash scripts/global-suite-repair-synthesis-gate.sh
+
+verified-learned-heuristics-gate:
+	bash scripts/verified-learned-heuristics-gate.sh
+
+neuro-symbolic-proof-search-gate:
+	bash scripts/neuro-symbolic-proof-search-gate.sh
+
+schema-foundation-model-gate:
+	bash scripts/schema-foundation-model-gate.sh
+
+hazard-taxonomy-completeness-gate:
+	bash scripts/hazard-taxonomy-completeness-gate.sh
+
+information-bottleneck-features-gate:
+	bash scripts/information-bottleneck-features-gate.sh
+
+automated-lemma-library-gate:
+	bash scripts/automated-lemma-library-gate.sh
+
+streaming-state-transfer-repair-gate:
+	bash scripts/streaming-state-transfer-repair-gate.sh
+
+verified-macro-extension-gate:
+	bash scripts/verified-macro-extension-gate.sh
+
+live-benchmark-anti-overfit-gate:
+	bash scripts/live-benchmark-anti-overfit-gate.sh
+
+mechanistic-decision-circuits-gate:
+	bash scripts/mechanistic-decision-circuits-gate.sh
+
+calibrated-risk-frontier-gate:
+	bash scripts/calibrated-risk-frontier-gate.sh
+
+certified-distributional-robustness-gate:
+	bash scripts/certified-distributional-robustness-gate.sh
+
+reproducible-rl-repair-policy-gate:
+	bash scripts/reproducible-rl-repair-policy-gate.sh
+
+open-problem-bounty-board-gate:
+	bash scripts/open-problem-bounty-board-gate.sh
+
+one-command-full-repro-2-gate:
+	bash scripts/one-command-full-repro-2-gate.sh
+
+provenance-linked-every-number-gate:
+	bash scripts/provenance-linked-every-number-gate.sh
+
+machine-checked-appendix-2-gate:
+	bash scripts/machine-checked-appendix-2-gate.sh
+
+interactive-claim-explorer-gate:
+	bash scripts/interactive-claim-explorer-gate.sh
+
+doi-snapshot-attestation-2-gate:
+	bash scripts/doi-snapshot-attestation-2-gate.sh
+
+threats-validity-matrix-2-gate:
+	bash scripts/threats-validity-matrix-2-gate.sh
+
+living-related-work-comparison-gate:
+	bash scripts/living-related-work-comparison-gate.sh
+
+negative-results-registry-gate:
+	bash scripts/negative-results-registry-gate.sh
+
+external-artifact-audit-2-gate:
+	bash scripts/external-artifact-audit-2-gate.sh
+
+results-never-regress-2-gate:
+	bash scripts/results-never-regress-2-gate.sh
+
+multi-org-incident-reduction-2-gate:
+	bash scripts/multi-org-incident-reduction-2-gate.sh
+
+impact-citation-graph-gate:
+	bash scripts/impact-citation-graph-gate.sh
+
+successor-frontier-roadmap-gate:
+	bash scripts/successor-frontier-roadmap-gate.sh
+
+funded-sustainability-trust-gate:
+	bash scripts/funded-sustainability-trust-gate.sh
+
+governance-bus-factor-proof-gate:
+	bash scripts/governance-bus-factor-proof-gate.sh
+
+ratified-standard-conformance-gate:
+	bash scripts/ratified-standard-conformance-gate.sh
+
+award-readiness-dossier-2-gate:
+	bash scripts/award-readiness-dossier-2-gate.sh
+
+ten-thousand-star-funnel-gate:
+	bash scripts/ten-thousand-star-funnel-gate.sh
+
+decade-impact-retrospective-gate:
+	bash scripts/decade-impact-retrospective-gate.sh
+
+grand-unified-evidence-index-2-gate:
+	bash scripts/grand-unified-evidence-index-2-gate.sh
+

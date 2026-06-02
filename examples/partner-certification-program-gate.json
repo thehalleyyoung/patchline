@@ -1,0 +1,11 @@
+{
+  "version": "patchline.partner-certification-program-gate/v1",
+  "claim": "Patchline ships a partner certification program with conformance tests and a public registry of passers. The worker loads a frozen, content-addressed spec and checks every item is scored and references concrete backing evidence; the gate re-runs the worker, confirms every item is scored and evidenced, and rejects an unsupported item with empty evidence, so the partner certification claim is reproducible on real Patchline self-data via `make partner-certification-program-gate`.",
+  "real_repo": "patchline (self): partner-certification-program",
+  "items": [
+    { "criterion": "soundness", "scored": true, "evidence": "grand-unified-one-command-index-gate" },
+    { "criterion": "reproducibility", "scored": true, "evidence": "artifact-consistency-gate" },
+    { "criterion": "evidence-trace", "scored": true, "evidence": "reviewer-mode-gate" }
+  ],
+  "bad": { "criterion": "unsupported", "scored": true, "evidence": "" }
+}

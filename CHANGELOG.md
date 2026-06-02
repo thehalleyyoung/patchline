@@ -6,6 +6,7 @@ Patchline changelog entries are evidence-linked: every user-visible feature must
 
 | Feature | User-visible surface | Real-repo proof | Gate |
 | --- | --- | --- | --- |
+| Generational-artifact frontier (steps 601--700) | 100 new `make <name>-gate` checks across mechanized end-to-end verification, exascale evidence, field causal inference, autonomous fleet, standardization, frontier research, and definitive-artifact 2.0 | `thehalleyyoung/patchline`, self-data, each gate emitting a positive proof and a frozen-spec negative control | `make grand-unified-evidence-index-2-gate` |
 | Compatibility gate | `make compatibility-gate` | `lobsters/lobsters@3b80b47aa5aaba37ec44413e7d1dc96fcf1585b6`, `db/migrate`, proving macOS/Linux builds plus a real analysis slice | `make compatibility-gate` |
 | Issue triage labels and templates | `.github/ISSUE_TEMPLATE/*.yml` and `.github/labels.yml` | `bytebase/bytebase@0765652ea2dbdf8e93ae44bff5acafc1b97a92cc`, `backend/migrator/migration`, generating sample false-positive, false-negative, parser, ecosystem, and artifact-regression payloads | `make issue-template-gate` |
 | Contributor check command | `patchline contributor check` | `thehalleyyoung/patchline`, local worktree, with focused command-package tests and the fast impact gate in one contributor report | `make contributor-check-gate` |
