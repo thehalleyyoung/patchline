@@ -1,0 +1,20 @@
+{
+  "version": "patchline.artifact-release-manifest-gate/v1",
+  "claim": "Patchline emits a deterministic artifact DOI/release manifest with exact public repository refs, archive URLs, archive checksums, generated artifact checksums, and command versions for reviewer reproduction.",
+  "release_name": "patchline-artifact-evaluation",
+  "release_tag": "artifact-eval-2026-06",
+  "doi_prefix": "10.5281/zenodo.patchline",
+  "minimum_public_repos": 4,
+  "minimum_archives": 4,
+  "minimum_checksums": 10,
+  "minimum_command_versions": 5,
+  "evidence_profile_spec": "examples/artifact-container-profile-gate.json",
+  "required_outputs": [
+    "artifact-release-manifest.json",
+    "artifact-release-manifest.md",
+    "artifact-checksums.sha256",
+    "archives.json",
+    "command-versions.json",
+    "evidence/artifact-container-rebuild/rebuild-summary.json"
+  ]
+}

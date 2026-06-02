@@ -199,6 +199,8 @@ Run `make paper-appendix-gate` to render claims, limitations, figures, tables, a
 
 Run `make reviewer-dry-run-logs-gate` to generate anonymized reviewer dry-run logs with setup failures, fixes, and final regenerated public-code results; see [docs/reviewer-dry-run-logs.md](docs/reviewer-dry-run-logs.md).
 
+Run `make artifact-release-manifest-gate` to generate the deterministic artifact DOI/release manifest with exact refs, archives, checksums, and command versions; see [docs/artifact-release-manifest.md](docs/artifact-release-manifest.md).
+
 Add `--redact` to write `analysis-bundle/` copies with stable redaction tokens for identifiers, literals, customer-like strings, and secret-like values while preserving joins and existing artifact hashes.
 
 Add `--ci` to write `ci/summary.md` plus upload snippets and code-quality artifacts for GitHub Actions, GitLab CI, and Bitbucket Pipelines: SARIF under `analysis-bundle/summary.sarif`, GitLab `ci/gl-code-quality-report.json`, and Bitbucket `ci/bitbucket-code-insights.json`.
