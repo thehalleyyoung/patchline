@@ -257,6 +257,8 @@ Run `make quarantine-attestation-gate` to issue a quarantine attestation for eve
 
 Run `make intervention-provenance-graph-gate` to build a provenance graph over every generated intervention line — proving zero orphan (untraceable) lines because each line is bound to both the real risk it addresses and at least one source-evidence path, with a negative control that flags an injected untraceable line; see [docs/intervention-provenance-graph.md](docs/intervention-provenance-graph.md).
 
+Run `make rejection-taxonomy-gate` to classify candidate data changes through a closed, deterministic rejection taxonomy — unsafe SQL, broad writes, missing rollback, and unbounded runtime — proving every category fires on real evidence while a synthetic safe candidate yields zero rejection codes; see [docs/rejection-taxonomy.md](docs/rejection-taxonomy.md).
+
 Add `--redact` to write `analysis-bundle/` copies with stable redaction tokens for identifiers, literals, customer-like strings, and secret-like values while preserving joins and existing artifact hashes.
 
 Add `--ci` to write `ci/summary.md` plus upload snippets and code-quality artifacts for GitHub Actions, GitLab CI, and Bitbucket Pipelines: SARIF under `analysis-bundle/summary.sarif`, GitLab `ci/gl-code-quality-report.json`, and Bitbucket `ci/bitbucket-code-insights.json`.

@@ -1,0 +1,11 @@
+{
+  "version": "patchline.rejection-taxonomy-gate/v1",
+  "claim": "Generated and candidate data changes are rejected through a closed, deterministic taxonomy of four reason families: unsafe SQL, broad writes, missing rollback, and unbounded runtime behavior. Each rejection is reason-bearing and derived from real ranking factors and risk kinds; a candidate carrying none of the taxonomy signals is never rejected. The gate proves every category fires on real evidence, that classification is deterministic across reruns, and that a synthetic safe candidate yields zero rejection codes.",
+  "real_repo": {
+    "repo": "lobsters/lobsters",
+    "ref": "3b80b47aa5aaba37ec44413e7d1dc96fcf1585b6",
+    "subpath": "db/migrate"
+  },
+  "minimum_candidates": 50,
+  "categories": ["unsafe-sql", "broad-write", "missing-rollback", "unbounded-runtime"]
+}
