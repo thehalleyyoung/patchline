@@ -455,6 +455,7 @@ Usage:
   patchline repo metrics --analyses analysis-dir[,analysis-dir...] [--salt value] [--out dir] [--json]
   patchline repo case-studies --analyses analysis-dir[,analysis-dir...] [--out dir] [--json]
   patchline repo taxonomy --analyses analysis-dir[,analysis-dir...] [--out dir] [--json]
+  patchline repo qualitative-notes --analyses analysis-dir[,analysis-dir...] [--out dir] [--json]
   patchline intake <path> [--out results/generated/intake] [--json]
   patchline intake --github owner/repo [--ref ref] [--subpath path] [--out results/generated/intake] [--json]
   patchline semantics-contract [--json]
@@ -591,6 +592,8 @@ func repoCommand(args []string) error {
 		return repoCaseStudies(args[1:])
 	case "taxonomy":
 		return repoTaxonomy(args[1:])
+	case "qualitative-notes":
+		return repoQualitativeNotes(args[1:])
 	default:
 		return fmt.Errorf("unknown repo subcommand %q", args[0])
 	}
@@ -782,6 +785,52 @@ type repoTaxonomyRepo struct {
 	Repo    string `json:"repo"`
 	Ref     string `json:"ref,omitempty"`
 	Subpath string `json:"subpath,omitempty"`
+}
+
+type repoQualitativeNotesReport struct {
+	Version  string                 `json:"version"`
+	Rubric   repoQualitativeRubric  `json:"rubric"`
+	Summary  repoQualitativeSummary `json:"summary"`
+	Notes    []repoQualitativeNote  `json:"notes"`
+	Corpus   []repoTaxonomyRepo     `json:"corpus"`
+	Hash     string                 `json:"hash"`
+	Markdown string                 `json:"markdown,omitempty"`
+}
+
+type repoQualitativeRubric struct {
+	Purpose     string   `json:"purpose"`
+	Labels      []string `json:"labels"`
+	Statuses    []string `json:"statuses"`
+	Limitations []string `json:"limitations"`
+}
+
+type repoQualitativeSummary struct {
+	Analyses            int            `json:"analyses"`
+	PublicRepos         int            `json:"public_repos"`
+	Notes               int            `json:"notes"`
+	FalsePositiveNotes  int            `json:"false_positive_notes"`
+	FalseNegativeNotes  int            `json:"false_negative_notes"`
+	ProofHoleNotes      int            `json:"proof_hole_notes"`
+	MaintainerDecisions int            `json:"maintainer_decision_notes"`
+	ByLabel             map[string]int `json:"by_label"`
+	ByConfidence        map[string]int `json:"by_confidence"`
+}
+
+type repoQualitativeNote struct {
+	ID                  string   `json:"id"`
+	Label               string   `json:"label"`
+	Status              string   `json:"status"`
+	Confidence          string   `json:"confidence"`
+	Repo                string   `json:"repo"`
+	Ref                 string   `json:"ref,omitempty"`
+	Subpath             string   `json:"subpath,omitempty"`
+	RiskID              string   `json:"risk_id,omitempty"`
+	Source              string   `json:"source"`
+	Observation         string   `json:"observation"`
+	Evidence            []string `json:"evidence"`
+	CoderInstruction    string   `json:"coder_instruction"`
+	MaintainerQuestion  string   `json:"maintainer_question"`
+	RecommendedDecision string   `json:"recommended_decision"`
 }
 
 type repoAnalyzeCIArtifacts struct {
@@ -7073,6 +7122,361 @@ func renderRepoTaxonomyMarkdown(report repoTaxonomyReport) string {
 }
 
 func repoTaxonomyHash(report repoTaxonomyReport) string {
+	copy := report
+	copy.Hash = ""
+	copy.Markdown = ""
+	return canonical.Hash(copy)
+}
+
+func repoQualitativeNotes(args []string) error {
+	fs := flag.NewFlagSet("repo qualitative-notes", flag.ContinueOnError)
+	fs.SetOutput(ioDiscard{})
+	analysesValue := fs.String("analyses", "", "comma-separated repo analyze output directories")
+	outPath := fs.String("out", filepath.Join("results", "generated", "repo-qualitative-notes"), "output directory")
+	jsonOut := fs.Bool("json", false, "emit JSON")
+	if err := fs.Parse(args); err != nil {
+		return err
+	}
+	if *analysesValue == "" || fs.NArg() != 0 {
+		return errors.New("usage: patchline repo qualitative-notes --analyses analysis-dir[,analysis-dir...] [--out dir] [--json]")
+	}
+	report, err := buildRepoQualitativeNotesReport(splitNonEmpty(*analysesValue, ","))
+	if err != nil {
+		return err
+	}
+	if err := writeRepoQualitativeNotesReport(*outPath, report); err != nil {
+		return err
+	}
+	if *jsonOut {
+		return writeJSON(os.Stdout, report)
+	}
+	fmt.Printf("repo qualitative-notes notes=%d repos=%d hash=%s\n", report.Summary.Notes, report.Summary.PublicRepos, report.Hash)
+	fmt.Printf("  out=%s\n", *outPath)
+	return nil
+}
+
+func buildRepoQualitativeNotesReport(analyses []string) (repoQualitativeNotesReport, error) {
+	if len(analyses) == 0 {
+		return repoQualitativeNotesReport{}, errors.New("at least one analysis directory is required")
+	}
+	report := repoQualitativeNotesReport{
+		Version: "patchline.repo-qualitative-notes/v1",
+		Rubric: repoQualitativeRubric{
+			Purpose:  "Qualitative coding notes for reviewers sampling Patchline findings; notes are candidate adjudications, not ground-truth labels.",
+			Labels:   []string{"false_positive_candidate", "false_negative_candidate", "proof_hole", "maintainer_decision"},
+			Statuses: []string{"needs_human_review", "evidence_gap", "action_required"},
+			Limitations: []string{
+				"does not claim a confirmed false positive or false negative without maintainer review",
+				"uses deterministic analysis artifacts and public code slices as coding evidence",
+				"preserves proof holes instead of upgrading weak evidence into proof",
+			},
+		},
+		Summary: repoQualitativeSummary{ByLabel: map[string]int{}, ByConfidence: map[string]int{}},
+	}
+	repos := map[string]bool{}
+	for _, analysis := range analyses {
+		analyze, err := loadRepoAnalyzeReport(filepath.Join(analysis, "analyze.json"))
+		if err != nil {
+			return repoQualitativeNotesReport{}, err
+		}
+		baseline, err := project.LoadBaseline(filepath.Join(analysis, "baseline"))
+		if err != nil {
+			return repoQualitativeNotesReport{}, err
+		}
+		compare, err := loadCompareReport(filepath.Join(analysis, "compare", "compare.json"))
+		if err != nil {
+			return repoQualitativeNotesReport{}, err
+		}
+		repo := firstNonEmpty(analyze.Input, analyze.Source.Input)
+		repos[repo] = true
+		report.Corpus = append(report.Corpus, repoTaxonomyRepo{Repo: repo, Ref: analyze.Source.ResolvedCommit, Subpath: analyze.Subpath})
+		report.Notes = append(report.Notes, qualitativeFalsePositiveNotes(repo, analyze, baseline)...)
+		report.Notes = append(report.Notes, qualitativeFalseNegativeNotes(repo, analyze, baseline, compare)...)
+		report.Notes = append(report.Notes, qualitativeProofHoleNotes(repo, analyze, baseline, compare)...)
+		report.Notes = append(report.Notes, qualitativeMaintainerDecisionNotes(repo, analyze, baseline, compare)...)
+	}
+	sort.Slice(report.Notes, func(i, j int) bool {
+		if report.Notes[i].Label != report.Notes[j].Label {
+			return report.Notes[i].Label < report.Notes[j].Label
+		}
+		if report.Notes[i].Repo != report.Notes[j].Repo {
+			return report.Notes[i].Repo < report.Notes[j].Repo
+		}
+		return report.Notes[i].ID < report.Notes[j].ID
+	})
+	report.Summary.Analyses = len(analyses)
+	report.Summary.PublicRepos = len(repos)
+	report.Summary.Notes = len(report.Notes)
+	for _, note := range report.Notes {
+		report.Summary.ByLabel[note.Label]++
+		report.Summary.ByConfidence[note.Confidence]++
+		switch note.Label {
+		case "false_positive_candidate":
+			report.Summary.FalsePositiveNotes++
+		case "false_negative_candidate":
+			report.Summary.FalseNegativeNotes++
+		case "proof_hole":
+			report.Summary.ProofHoleNotes++
+		case "maintainer_decision":
+			report.Summary.MaintainerDecisions++
+		}
+	}
+	report.Hash = repoQualitativeNotesHash(report)
+	report.Markdown = renderRepoQualitativeNotesMarkdown(report)
+	return report, nil
+}
+
+func qualitativeFalsePositiveNotes(repo string, analyze repoAnalyzeReport, baseline project.BaselineReport) []repoQualitativeNote {
+	var notes []repoQualitativeNote
+	for i, risk := range baseline.Risks {
+		if i >= 2 {
+			break
+		}
+		evidence := []string{risk.Rationale}
+		for _, factor := range risk.Factors {
+			evidence = append(evidence, factor.Name+": "+factor.Reason)
+			if len(evidence) >= 4 {
+				break
+			}
+		}
+		note := qualitativeNote(repo, analyze, "false_positive_candidate", "needs_human_review", "medium", firstNonEmpty(risk.StableID, risk.ID), "ranked risk",
+			fmt.Sprintf("Static ranking flagged %s risk score %d; a maintainer should check whether the operation is intentionally scoped, test-only, generated-only, or already protected outside the analyzed slice.", risk.Severity, risk.Score),
+			evidence,
+			"Code as false positive only if public-source context shows the flagged data change cannot affect production data or is fully guarded by evidence not visible to the analyzer.",
+			"Is the ranked operation intentionally bounded or non-production in the analyzed repository slice?",
+			"Keep as actionable until maintainer-visible bounds, environment, or guard evidence is attached.")
+		notes = append(notes, note)
+	}
+	return notes
+}
+
+func qualitativeFalseNegativeNotes(repo string, analyze repoAnalyzeReport, baseline project.BaselineReport, compare project.CompareReport) []repoQualitativeNote {
+	var notes []repoQualitativeNote
+	if compare.Summary.NewHighRiskSQL > 0 || compare.Summary.PatchlineChecksFailed > 0 {
+		notes = append(notes, qualitativeNote(repo, analyze, "false_negative_candidate", "needs_human_review", "high", "", "compare",
+			fmt.Sprintf("Deterministic compare found %d new high-risk SQL signals and %d failed checks after proposal generation.", compare.Summary.NewHighRiskSQL, compare.Summary.PatchlineChecksFailed),
+			[]string{compare.Intervention.Rationale, fmt.Sprintf("review badge=%s", compare.ReviewBadge.Status)},
+			"Code as false negative if the original baseline summary would have missed this class of risk without generated-intervention re-analysis.",
+			"Would a reviewer relying only on the initial finding list miss this generated or downstream data-change hazard?",
+			"Do not accept the intervention until newly surfaced risk is either covered or explicitly rejected."))
+	}
+	if baseline.Summary.IdentifierOnlyLinks > 0 || baseline.Summary.DateOnlyLinks > 0 || baseline.Summary.AbstractProofHoles > 0 {
+		notes = append(notes, qualitativeNote(repo, analyze, "false_negative_candidate", "evidence_gap", "medium", "", "baseline summary",
+			fmt.Sprintf("Weak links or abstract proof holes remain: identifier-only=%d date-only=%d abstract-proof-holes=%d.", baseline.Summary.IdentifierOnlyLinks, baseline.Summary.DateOnlyLinks, baseline.Summary.AbstractProofHoles),
+			[]string{"weak linking evidence can hide causal repair clues that are not strong enough for a ranked claim"},
+			"Code as false negative if manual review finds a real data-change repair clue behind these weak links that Patchline did not rank.",
+			"Do weak identifier/date/proof-hole signals point to a real omitted problem, cause, or repair?",
+			"Collect stronger trace, migration, test, or incident evidence before downgrading the omission."))
+	}
+	if len(notes) == 0 && len(baseline.ProofMinimizers) > 0 {
+		min := baseline.ProofMinimizers[0]
+		notes = append(notes, qualitativeNote(repo, analyze, "false_negative_candidate", "evidence_gap", "low", min.RiskID, "proof minimization",
+			"A proof minimization shows missing evidence that could conceal a stronger defect than the current ranked finding claims.",
+			[]string{min.Hole, min.MissingEvidence, min.Rationale},
+			"Code as false negative only if the missing artifact confirms an omitted concrete failure.",
+			"Does the missing artifact reveal a real defect not captured by the current risk label?",
+			"Preserve as an evidence-gap note until the artifact is supplied."))
+	}
+	return notes
+}
+
+func qualitativeProofHoleNotes(repo string, analyze repoAnalyzeReport, baseline project.BaselineReport, compare project.CompareReport) []repoQualitativeNote {
+	var notes []repoQualitativeNote
+	for i, hole := range baseline.ProofMinimizers {
+		if i >= 2 {
+			break
+		}
+		notes = append(notes, qualitativeNote(repo, analyze, "proof_hole", "evidence_gap", proofHoleConfidence(hole.Priority), hole.RiskID, "proof-hole minimization",
+			fmt.Sprintf("%s blocks upgrade from %s to %s.", hole.Hole, hole.UpgradeFrom, hole.UpgradeTo),
+			[]string{hole.MissingEvidence, strings.Join(hole.MinimalArtifacts, ", "), hole.Rationale},
+			"Record the smallest missing artifact needed to upgrade this claim; do not treat the claim as proven.",
+			"What exact artifact would discharge this proof hole with the least maintainer effort?",
+			"Request the minimal artifact before accepting stronger repair claims."))
+	}
+	for _, proof := range baseline.RepairProofs {
+		if len(notes) >= 3 {
+			break
+		}
+		if len(proof.ProofHoles) == 0 {
+			continue
+		}
+		notes = append(notes, qualitativeNote(repo, analyze, "proof_hole", "evidence_gap", "high", proof.RiskID, "repair proof",
+			fmt.Sprintf("Repair proof status is %s with scope=%s frame=%s.", proof.Status, proof.ScopeStatus, proof.FrameStatus),
+			append([]string{proof.Rationale}, proof.ProofHoles...),
+			"Record whether the proof hole is about scope, frame, rollback, row count, or runtime validation.",
+			"Which proof hole prevents this repair from moving from open/conditional to checked?",
+			"Keep the generated or manual repair review-blocked until the hole is discharged."))
+	}
+	for _, hole := range compare.ReviewBadge.ProofHoles {
+		if len(notes) >= 4 {
+			break
+		}
+		notes = append(notes, qualitativeNote(repo, analyze, "proof_hole", "evidence_gap", "medium", "", "review badge",
+			"Review badge lists an unresolved proof hole for generated intervention review.",
+			[]string{hole, compare.Intervention.Rationale},
+			"Keep this as a reviewer-facing blocker rather than collapsing it into pass/fail.",
+			"Does the listed generated-intervention proof hole require code, tests, runtime evidence, or owner approval?",
+			"Require the specific proof hole to be listed in PR review."))
+	}
+	return notes
+}
+
+func qualitativeMaintainerDecisionNotes(repo string, analyze repoAnalyzeReport, baseline project.BaselineReport, compare project.CompareReport) []repoQualitativeNote {
+	var notes []repoQualitativeNote
+	for i, policy := range baseline.PolicyChecks {
+		if i >= 2 {
+			break
+		}
+		if policy.Status != "warn" && policy.Status != "fail" {
+			continue
+		}
+		notes = append(notes, qualitativeNote(repo, analyze, "maintainer_decision", "action_required", policyConfidence(policy.Status), policy.RiskID, "policy check",
+			fmt.Sprintf("%s policy is %s at %s review level.", policy.Policy, policy.Status, policy.ReviewLevel),
+			[]string{policy.Rationale, "missing: " + strings.Join(policy.Missing, ", "), "required: " + strings.Join(policy.Required, ", ")},
+			"Code the maintainer decision as block, request evidence, approve with conditions, or suppress with rationale.",
+			"What evidence or owner decision is needed before this data change should merge?",
+			"Request missing policy evidence before merge."))
+	}
+	for _, action := range compare.Intervention.RequiredNextActions {
+		if len(notes) >= 3 {
+			break
+		}
+		notes = append(notes, qualitativeNote(repo, analyze, "maintainer_decision", "action_required", "high", "", "intervention loop",
+			"Generated intervention requires a concrete next action before review can proceed.",
+			[]string{action, compare.Intervention.Rationale, "badge: " + compare.ReviewBadge.Status},
+			"Code whether the action is owner review, rollback evidence, deterministic test, native test, or generated-code rejection.",
+			"Who owns this next action and what artifact proves completion?",
+			action))
+	}
+	if len(notes) == 0 && len(compare.Review) > 0 {
+		item := compare.Review[0]
+		notes = append(notes, qualitativeNote(repo, analyze, "maintainer_decision", "action_required", "medium", "", "compare review",
+			item.Message,
+			[]string{"severity: " + item.Severity, "path: " + item.Path},
+			"Code the reviewer action requested by the compare report.",
+			"What maintainer action resolves this review item?",
+			item.Message))
+	}
+	return notes
+}
+
+func qualitativeNote(repo string, analyze repoAnalyzeReport, label, status, confidence, riskID, source, observation string, evidence []string, instruction, question, decision string) repoQualitativeNote {
+	note := repoQualitativeNote{
+		Label:               label,
+		Status:              status,
+		Confidence:          confidence,
+		Repo:                repo,
+		Ref:                 analyze.Source.ResolvedCommit,
+		Subpath:             analyze.Subpath,
+		RiskID:              riskID,
+		Source:              source,
+		Observation:         observation,
+		Evidence:            compactEvidence(evidence, 5),
+		CoderInstruction:    instruction,
+		MaintainerQuestion:  question,
+		RecommendedDecision: decision,
+	}
+	note.ID = "note:" + canonical.Hash(strings.Join([]string{label, repo, note.Ref, note.Subpath, riskID, source, observation}, "\x00"))[:16]
+	return note
+}
+
+func compactEvidence(values []string, limit int) []string {
+	var out []string
+	seen := map[string]bool{}
+	for _, value := range values {
+		value = strings.TrimSpace(value)
+		if value == "" || seen[value] {
+			continue
+		}
+		seen[value] = true
+		out = append(out, value)
+		if len(out) >= limit {
+			break
+		}
+	}
+	return out
+}
+
+func proofHoleConfidence(priority string) string {
+	switch strings.ToLower(priority) {
+	case "critical", "high":
+		return "high"
+	case "medium":
+		return "medium"
+	default:
+		return "low"
+	}
+}
+
+func policyConfidence(status string) string {
+	if status == "fail" {
+		return "high"
+	}
+	return "medium"
+}
+
+func writeRepoQualitativeNotesReport(outDir string, report repoQualitativeNotesReport) error {
+	if err := os.MkdirAll(outDir, 0o755); err != nil {
+		return err
+	}
+	copy := report
+	copy.Markdown = ""
+	data, err := json.MarshalIndent(copy, "", "  ")
+	if err != nil {
+		return err
+	}
+	if err := os.WriteFile(filepath.Join(outDir, "qualitative-notes.json"), append(data, '\n'), 0o644); err != nil {
+		return err
+	}
+	return os.WriteFile(filepath.Join(outDir, "qualitative-notes.md"), []byte(report.Markdown), 0o644)
+}
+
+func renderRepoQualitativeNotesMarkdown(report repoQualitativeNotesReport) string {
+	var b strings.Builder
+	fmt.Fprintf(&b, "# Patchline qualitative coding notes\n\n")
+	fmt.Fprintf(&b, "- analyses: `%d`\n", report.Summary.Analyses)
+	fmt.Fprintf(&b, "- public repos: `%d`\n", report.Summary.PublicRepos)
+	fmt.Fprintf(&b, "- notes: `%d`\n", report.Summary.Notes)
+	fmt.Fprintf(&b, "- false positive notes: `%d`\n", report.Summary.FalsePositiveNotes)
+	fmt.Fprintf(&b, "- false negative notes: `%d`\n", report.Summary.FalseNegativeNotes)
+	fmt.Fprintf(&b, "- proof hole notes: `%d`\n", report.Summary.ProofHoleNotes)
+	fmt.Fprintf(&b, "- maintainer decision notes: `%d`\n", report.Summary.MaintainerDecisions)
+	fmt.Fprintf(&b, "- hash: `%s`\n\n", report.Hash)
+	fmt.Fprintf(&b, "## Rubric\n\n%s\n\n", report.Rubric.Purpose)
+	fmt.Fprintf(&b, "Labels: `%s`.\n\n", strings.Join(report.Rubric.Labels, "`, `"))
+	fmt.Fprintf(&b, "Limitations:\n")
+	for _, limitation := range report.Rubric.Limitations {
+		fmt.Fprintf(&b, "- %s\n", limitation)
+	}
+	fmt.Fprintf(&b, "\n## Corpus coverage\n\n")
+	for _, repo := range report.Corpus {
+		fmt.Fprintf(&b, "- `%s` `%s` `%s`\n", repo.Repo, repo.Subpath, repo.Ref)
+	}
+	fmt.Fprintf(&b, "\n## Notes\n\n")
+	for _, note := range report.Notes {
+		fmt.Fprintf(&b, "### %s `%s`\n\n", note.Label, note.ID)
+		fmt.Fprintf(&b, "- repo: `%s`\n", note.Repo)
+		fmt.Fprintf(&b, "- source: `%s`\n", note.Source)
+		fmt.Fprintf(&b, "- status: `%s`, confidence: `%s`\n", note.Status, note.Confidence)
+		if note.RiskID != "" {
+			fmt.Fprintf(&b, "- risk: `%s`\n", note.RiskID)
+		}
+		fmt.Fprintf(&b, "- observation: %s\n", note.Observation)
+		fmt.Fprintf(&b, "- maintainer question: %s\n", note.MaintainerQuestion)
+		fmt.Fprintf(&b, "- recommended decision: %s\n", note.RecommendedDecision)
+		fmt.Fprintf(&b, "- coder instruction: %s\n", note.CoderInstruction)
+		if len(note.Evidence) > 0 {
+			fmt.Fprintf(&b, "- evidence:\n")
+			for _, evidence := range note.Evidence {
+				fmt.Fprintf(&b, "  - %s\n", evidence)
+			}
+		}
+		fmt.Fprintf(&b, "\n")
+	}
+	return b.String()
+}
+
+func repoQualitativeNotesHash(report repoQualitativeNotesReport) string {
 	copy := report
 	copy.Hash = ""
 	copy.Markdown = ""

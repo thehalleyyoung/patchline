@@ -249,6 +249,49 @@ func TestRepoTaxonomyClassifiesFailureModesFromAnalyses(t *testing.T) {
 	}
 }
 
+func TestRepoQualitativeNotesWriteCodingNotesFromAnalyses(t *testing.T) {
+	rootA := t.TempDir()
+	writeMainTestFile(t, rootA, "db/migrate/001_update.sql", "UPDATE accounts SET status = 'active';\n")
+	writeMainTestFile(t, rootA, "db/migrate/002_delete.sql", "DELETE FROM account_events;\n")
+	outA := filepath.Join(t.TempDir(), "analysis-a")
+	if err := run([]string{"repo", "analyze", rootA, "--stages", "inventory,baseline,propose,compare", "--proposal-kind", "all", "--budget", "files=3,lines=80,tokens=4000,changes=2", "--no-llm", "--out", outA, "--json"}); err != nil {
+		t.Fatalf("first analysis failed: %v", err)
+	}
+	rootB := t.TempDir()
+	writeMainTestFile(t, rootB, "db/migrate/001_alter.sql", "ALTER TABLE accounts ADD COLUMN repaired_at timestamp;\n")
+	writeMainTestFile(t, rootB, "scripts/repair_backfill.sql", "UPDATE accounts SET repaired_at = now();\n")
+	outB := filepath.Join(t.TempDir(), "analysis-b")
+	if err := run([]string{"repo", "analyze", rootB, "--stages", "inventory,baseline,propose,compare", "--proposal-kind", "all", "--budget", "files=3,lines=80,tokens=4000,changes=2", "--no-llm", "--out", outB, "--json"}); err != nil {
+		t.Fatalf("second analysis failed: %v", err)
+	}
+	out := filepath.Join(t.TempDir(), "notes")
+	if err := run([]string{"repo", "qualitative-notes", "--analyses", outA + "," + outB, "--out", out, "--json"}); err != nil {
+		t.Fatalf("qualitative notes failed: %v", err)
+	}
+	var report repoQualitativeNotesReport
+	readMainTestJSON(t, filepath.Join(out, "qualitative-notes.json"), &report)
+	if report.Version != "patchline.repo-qualitative-notes/v1" || report.Summary.Analyses != 2 || report.Summary.Notes < 6 || report.Hash == "" {
+		t.Fatalf("unexpected qualitative notes report: %#v", report)
+	}
+	for _, label := range []string{"false_positive_candidate", "false_negative_candidate", "proof_hole", "maintainer_decision"} {
+		if report.Summary.ByLabel[label] == 0 {
+			t.Fatalf("expected label %s in %#v", label, report.Summary.ByLabel)
+		}
+	}
+	for _, note := range report.Notes {
+		if note.ID == "" || note.Label == "" || note.Status == "" || note.Observation == "" || note.CoderInstruction == "" || note.MaintainerQuestion == "" || note.RecommendedDecision == "" || len(note.Evidence) == 0 {
+			t.Fatalf("note missing coding fields: %#v", note)
+		}
+	}
+	markdown, err := os.ReadFile(filepath.Join(out, "qualitative-notes.md"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(string(markdown), "qualitative coding notes") || !strings.Contains(string(markdown), "false_positive_candidate") || !strings.Contains(string(markdown), "maintainer question") {
+		t.Fatalf("expected qualitative markdown, got:\n%s", string(markdown))
+	}
+}
+
 func TestGoldenFixtureGenerateCommand(t *testing.T) {
 	root := t.TempDir()
 	writeMainTestFile(t, root, "db/migrate/001_delete_events.sql", "DELETE FROM account_events;\n")
