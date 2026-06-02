@@ -1,0 +1,14 @@
+{
+  "version": "patchline.launch-kit-gate/v1",
+  "claim": "Patchline keeps a launch kit for star-growth that bundles the assets a public launch actually needs — a README hook, a long-form post, a short social thread, a demo script, and an FAQ — and validates them mechanically so the launch cannot go out with a missing channel or a social post that exceeds the platform character limit. The worker checks that every required channel is present and non-empty and that each social post respects its length budget, rejecting any post that runs over the limit. The gate proves a complete kit with an in-budget thread passes while an over-length social post is flagged and blocks the launch.",
+  "real_repo": "patchline (self): star-growth launch kit",
+  "char_limit": 280,
+  "channels": [
+    {"name": "readme-hook", "kind": "prose", "text": "Patchline proves database-migration safety with 190 deterministic, reproducible gates."},
+    {"name": "long-post", "kind": "prose", "text": "A deep dive into how Patchline turns migration review into byte-reproducible evidence."},
+    {"name": "social-thread", "kind": "social", "text": "We built 190 deterministic gates that prove a migration is safe — each with a negative control. Reproducible end to end. Star it."},
+    {"name": "demo-script", "kind": "prose", "text": "60-second screencast walking from a risky migration to a blocked release."},
+    {"name": "faq", "kind": "prose", "text": "Why deterministic? Because reproducibility is the whole point."}
+  ],
+  "negative_control": {"name": "bad-tweet", "kind": "social", "text": "TOO LONG: pad pad pad pad pad pad pad pad pad pad pad pad pad pad pad pad pad pad pad pad pad pad pad pad pad pad pad pad pad pad pad pad pad pad pad pad pad pad pad pad pad pad pad pad pad pad pad pad pad pad pad pad pad pad pad pad pad pad pad pad pad pad pad pad pad pad pad pad pad pad pad pad"}
+}

@@ -365,6 +365,8 @@ Run `make case-bundle-gate` to assemble an archival **case-study bundle** of dee
 
 Run `make eval-matrix-gate` to build a best-paper **evaluation matrix** mapping novelty, rigor, impact, reproducibility, and limitations to concrete backing artifacts — every criterion must resolve to a real file and an empty one is reported **unsupported**; see [docs/eval-matrix.md](docs/eval-matrix.md).
 
+Run `make launch-kit-gate` to validate a star-growth **launch kit** of README hook, long-form post, social thread, demo script, and FAQ — every channel must be present and each social post within the platform **character limit**; see [docs/launch-kit.md](docs/launch-kit.md).
+
 Add `--redact` to write `analysis-bundle/` copies with stable redaction tokens for identifiers, literals, customer-like strings, and secret-like values while preserving joins and existing artifact hashes.
 
 Add `--ci` to write `ci/summary.md` plus upload snippets and code-quality artifacts for GitHub Actions, GitLab CI, and Bitbucket Pipelines: SARIF under `analysis-bundle/summary.sarif`, GitLab `ci/gl-code-quality-report.json`, and Bitbucket `ci/bitbucket-code-insights.json`.
