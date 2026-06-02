@@ -1,0 +1,7 @@
+{
+  "version": "patchline.disposable-worktree/v1",
+  "minimum_public_slices": 4,
+  "proposal_kind": "all",
+  "budget": "files=3,lines=120,tokens=12000,changes=3",
+  "claim": "Generated proposal files are applied in disposable Git worktrees and checked as real diffs before review."
+}
