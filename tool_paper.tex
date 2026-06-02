@@ -1050,20 +1050,22 @@ implicit.
 \section{Future Work}
 %======================================================================
 
-Several extensions follow naturally from \tool's architecture. First, the cross-file infrastructure
-ordering analysis currently classifies each data job independently; linking Helm hooks, Argo
-sync-waves, and \code{initContainers} into a single repository-wide ordering graph would let \tool{}
-detect ordering hazards that span multiple manifests rather than only per-job markers. Second, schema
-compatibility is presently evaluated within a single revision; diffing protobuf and Avro schemas
-\emph{across} versions---tracking field-number reuse, type narrowing, and default changes over a commit
-range---would turn the static schema lens into a true compatibility checker. Third, the runtime axis
-ingests exported telemetry; a streaming mode that correlates live traces against the static baseline in
-near-real-time would tighten the confirmed-incident quadrant. Fourth, the plugin interfaces invite
-retargeting the deterministic-fact-plus-gate methodology at adjacent weak-oracle domains such as
-access-control and feature-flag changes. Finally, the evaluation harness is positioned to grow into a
-public, longitudinal leaderboard that reruns the full gate suite across an expanding corpus of pinned
-public repositories, turning reproducibility from a property of this paper into an ongoing community
-benchmark.
+The completed 700-step roadmap leaves \tool{} with an unusually broad artifact: deterministic analysis,
+bounded generation, real-repo gates, formal and causal scaffolding, autonomy safety cases, standards
+hooks, and long-horizon impact evidence. The next frontier is not another isolated detector; it is the
+transition from a generational artifact to shared infrastructure. We have therefore identified the next
+100 roadmap items around ten themes: verified certificate interoperability across independent
+implementations; privacy-preserving live operational learning that cannot silently weaken policy;
+production-grade remediation loops for expand/contract, backfill, rollback, and patch-series safety;
+a public evidence marketplace with licenses, bounties, minimization, and governance; engine-version
+semantics for production databases, locks, replication, partitioning, and online schema change;
+socio-technical accountability for appeals, fairness, ethics, and detector deprecation; education and
+certification materials that make migration safety teachable; resilient offline, edge, confidential,
+and disaster-recovery deployments; and an award-to-standard transition that externalizes benchmarks,
+errata, conformance labels, and long-term stewardship. These items are intentionally recorded as future
+work, not as claims in the deployed gate catalog: the standard for adding them remains the same as the
+current system's standard---a positive proof on real code, a negative control, stable artifacts, and
+documentation that fails if it overstates the evidence.
 
 %======================================================================
 \section{Conclusion}

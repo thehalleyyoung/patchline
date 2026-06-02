@@ -90,7 +90,7 @@
 \contentsline {paragraph}{On the cost of conservatism.}{21}{section.19}%
 \contentsline {section}{\numberline {20}Future Work}{21}{section.20}%
 \contentsline {section}{\numberline {21}Conclusion}{21}{section.21}%
-\contentsline {paragraph}{Availability.}{21}{section.21}%
+\contentsline {paragraph}{Availability.}{22}{section.21}%
 \contentsline {section}{\numberline {A}A Worked End-to-End Example}{22}{appendix.A}%
 \contentsline {section}{\numberline {B}Fact Schema Reference}{22}{appendix.B}%
 \contentsline {section}{\numberline {C}Detector Rule Catalog}{23}{appendix.C}%
