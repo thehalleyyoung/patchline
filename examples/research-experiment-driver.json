@@ -1,0 +1,10 @@
+{
+  "version": "patchline.research-experiment-driver/v1",
+  "driver": {
+    "id": "rq-clean-checkout-driver",
+    "clean_checkout": true,
+    "questions": "examples/research-questions.json",
+    "command": "bash scripts/research-question-gate.sh examples/research-questions.json <out>/research-questions",
+    "ledger_claim": "The driver records commit, clean-checkout status, question coverage, output hashes, and immutable result paths."
+  }
+}

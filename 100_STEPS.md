@@ -165,7 +165,7 @@ Every addition to the repo should be judged by whether it makes that loop more a
 ## Stage 12: Add paper-grade evaluation methodology
 
 121. [x] Define primary research questions for repo-native fact extraction, risk ranking, evidence linking, generated-intervention safety, and before/after re-analysis.
-122. [ ] Add experiment drivers that run every research question from a clean checkout and write immutable result ledgers.
+122. [x] Add experiment drivers that run every research question from a clean checkout and write immutable result ledgers.
 123. [ ] Add bootstrap confidence intervals for ranking, linking, generated-check, runtime, and review-burden metrics.
 124. [ ] Add paired statistical tests for Patchline versus grep-only, SQL-only, identifier-only, temporal-only, and no-facts-generation baselines.
 125. [ ] Add effect-size reporting so improvements are not presented only as p-values.
