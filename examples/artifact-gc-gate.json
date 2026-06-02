@@ -1,0 +1,14 @@
+{
+  "version": "patchline.artifact-gc-gate/v1",
+  "claim": "Patchline prunes its artifact cache under a fixed entry budget using least-recently-used eviction while never evicting a pinned entry, so that disk stays bounded without ever discarding an artifact that an open proof still references. The worker takes a cache of dated entries with pin flags and a max-entries budget, evicts the least-recently-used unpinned entries until the cache fits, and reports what was kept and evicted. The gate proves the surviving cache is within budget, every pinned entry survives even when it is the oldest, and eviction proceeds strictly in least-recently-used order among unpinned entries.",
+  "real_repo": "patchline (self): LRU artifact GC preserving pinned entries",
+  "max_entries": 4,
+  "cache": [
+    {"key": "a", "last_used": "2024-01-01", "pinned": true},
+    {"key": "b", "last_used": "2024-02-01", "pinned": false},
+    {"key": "c", "last_used": "2024-03-01", "pinned": false},
+    {"key": "d", "last_used": "2024-04-01", "pinned": false},
+    {"key": "e", "last_used": "2024-05-01", "pinned": false},
+    {"key": "f", "last_used": "2024-06-01", "pinned": false}
+  ]
+}

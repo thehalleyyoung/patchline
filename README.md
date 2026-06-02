@@ -325,6 +325,8 @@ Run `make canonical-json-gate` to verify order-independent proof checksums — a
 
 Run `make shell-portability-gate` to lint gate scripts for **portability** hazards (mapfile, `/tmp` writes, GNU `sed -i`) — shipped scripts stay clean while a **negative-control** fixture is flagged for every hazard; see [docs/shell-portability.md](docs/shell-portability.md).
 
+Run `make artifact-gc-gate` to prune the artifact cache by **LRU** under a fixed budget while never evicting a **pinned** entry — disk stays bounded but open-proof artifacts are never collected; see [docs/artifact-gc.md](docs/artifact-gc.md).
+
 Add `--redact` to write `analysis-bundle/` copies with stable redaction tokens for identifiers, literals, customer-like strings, and secret-like values while preserving joins and existing artifact hashes.
 
 Add `--ci` to write `ci/summary.md` plus upload snippets and code-quality artifacts for GitHub Actions, GitLab CI, and Bitbucket Pipelines: SARIF under `analysis-bundle/summary.sarif`, GitLab `ci/gl-code-quality-report.json`, and Bitbucket `ci/bitbucket-code-insights.json`.
