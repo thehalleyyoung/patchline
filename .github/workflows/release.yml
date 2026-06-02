@@ -1,0 +1,34 @@
+name: release
+
+on:
+  push:
+    tags:
+      - "v*"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  package:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+      - name: Package release archives
+        env:
+          PATCHLINE_RELEASE_SEED_HEX: ${{ secrets.PATCHLINE_RELEASE_SEED_HEX }}
+        run: |
+          test -n "${PATCHLINE_RELEASE_SEED_HEX:-}"
+          bash scripts/package-release.sh "${GITHUB_REF_NAME:-v0.0.0}" dist/release-distribution "$PATCHLINE_RELEASE_SEED_HEX"
+      - name: Upload GitHub Release artifacts
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            dist/release-distribution/*.tar.gz
+            dist/release-distribution/checksums/checksums.sha256
+            dist/release-distribution/checksums/checksums.attestation.json
+            dist/release-distribution/release-manifest.json
+            dist/release-distribution/install.md
