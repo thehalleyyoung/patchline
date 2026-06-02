@@ -1,0 +1,17 @@
+{
+  "version": "patchline.rc-rehearsal-gate/v1",
+  "claim": "Before any release candidate is blessed, Patchline runs a rehearsal that walks the full reviewer-facing checklist as an ordered sequence of stages — capstone evidence, reviewer walkthrough, reproducibility replay, and documentation coverage — and the candidate is blessed only when every stage passes. A single failing stage blocks the candidate and names the first failing stage, so a release can never go out with a broken reproducibility replay or missing reviewer walkthrough hiding behind otherwise-green checks. The gate proves an all-green rehearsal blesses the candidate while a rehearsal with one injected failing stage is blocked at exactly that stage.",
+  "real_repo": "patchline (self): release-candidate rehearsal across capstone/walkthrough/reproducibility/docs",
+  "stages": [
+    {"name": "capstone-evidence", "passed": true},
+    {"name": "reviewer-walkthrough", "passed": true},
+    {"name": "reproducibility-replay", "passed": true},
+    {"name": "docs-coverage", "passed": true}
+  ],
+  "negative_control_stages": [
+    {"name": "capstone-evidence", "passed": true},
+    {"name": "reviewer-walkthrough", "passed": true},
+    {"name": "reproducibility-replay", "passed": false},
+    {"name": "docs-coverage", "passed": true}
+  ]
+}
