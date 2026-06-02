@@ -48,8 +48,8 @@ project-native \emph{fact layer} with full provenance, ranks data-change risks, 
 and only within an explicit budget---generates bounded interventions that are quarantined and then
 \emph{deterministically re-analyzed and rejected} if they do not improve the evidence. Critically,
 every capability in \tool{} is backed by a reproducible \emph{gate}: a script that proves the
-capability against real, pinned public code and fails loudly on drift. \tool{} currently ships 159
-such gates over 116 documented capabilities, spanning relational migrations across nine ecosystems,
+capability against real, pinned public code and fails loudly on drift. \tool{} currently ships 209
+such gates over 166 documented capabilities, spanning relational migrations across nine ecosystems,
 five NoSQL engines, four data-pipeline frameworks, protobuf/Avro schema compatibility,
 infrastructure/data ordering, and a research-grade evaluation methodology that includes blinded
 false-positive adjudication, seeded false-negative recall, ablations, standardized effect sizes, and
@@ -105,7 +105,7 @@ ranks the risks, and prints the next commands that can run immediately.
   \item A \textbf{runtime and observability evidence} layer that scores findings on independent
   static-risk and observed-runtime axes using OpenTelemetry, Datadog-style, and Prometheus/Grafana
   exports (Section~\ref{sec:runtime}).
-  \item A \textbf{gate-backed reproducibility and evaluation methodology}---159 gates, blinded
+  \item A \textbf{gate-backed reproducibility and evaluation methodology}---209 gates, blinded
   false-positive adjudication, seeded false-negative recall, ablations, standardized effect sizes,
   and severity calibration---designed for artifact evaluation and best-paper-grade rigor
   (Sections~\ref{sec:repro}--\ref{sec:eval}).
@@ -196,7 +196,7 @@ A cross-cutting \emph{gate layer} sits beside the pipeline. Each gate is a self-
 (a) validates a versioned example specification, (b) checks that the relevant documentation and the
 README still describe the capability, (c) runs the capability against real pinned code, (d) asserts
 machine-checkable invariants on the output, and (e) writes a \code{gate-summary.json}. The repository
-currently ships \textbf{159 gates}, \textbf{116 capability documents}, and \textbf{92 example
+currently ships \textbf{209 gates}, \textbf{166 capability documents}, and \textbf{142 example
 specifications}, with a single analyzer core of roughly 2{,}900 lines of Go.
 
 \paragraph{Resumability and offline operation.} \code{repo analyze --resume} reuses existing fetch,
@@ -467,6 +467,57 @@ shard by repository without risking nondeterministic diffs. The build itself is 
 performance-budget gate that fails if the hot analysis path regresses beyond a documented threshold.
 
 %======================================================================
+\section{Formal and Decision-Theoretic Guarantees}
+\label{sec:formal}
+%======================================================================
+
+Beyond pattern detection, \tool{} layers a family of capabilities that turn migration review into a
+checkable formal and economic argument. Each is, as always, a deterministic gate with an explicit
+negative control.
+
+\paragraph{Formal invariant extraction.} \tool{} extracts the schema's formal invariants---\code{NOT
+NULL} columns, unique keys, and foreign-key references---into an explicit set and checks every
+proposed migration against it. A migration that drops a \code{NOT NULL} guarantee is reported as
+violating exactly that named invariant, while a safe additive migration preserves all of them. This
+makes constraint preservation mechanical rather than a reviewer's burden of memory.
+
+\paragraph{Bounded symbolic execution and model checking.} A guard over data-change preconditions is
+explored across its entire bounded symbolic input space; if any feasible assignment reaches an unsafe
+leaf, \tool{} returns a concrete \emph{witness}, and a hardened guard is proven to expose none. A
+migration rollout is additionally modeled as a finite state machine: a bounded reachability search
+checks a \emph{never reach data\_loss} invariant and, when it can be violated, emits the shortest
+\emph{counterexample} trace of transitions---a debuggable artifact rather than a bare boolean.
+
+\paragraph{Causal attribution and counterfactual sensitivity.} Failure analysis is represented as a
+causal graph: \tool{} verifies the graph is acyclic, computes the transitive ancestors of the failure
+node as the genuine root causes, and excludes a mere correlate that has no directed path to failure.
+Complementarily, a counterfactual evaluation perturbs one migration factor at a time and confirms the
+safety verdict flips only for a causally relevant change (removing a required backfill) and stays put
+under an irrelevant edit (a comment change), demonstrating that the decision is driven by real risk
+rather than surface features.
+
+\paragraph{Decision economics and abstention.} The ship-or-block call is framed as an expected-cost
+calculation: \tool{} weighs the expected failure loss (probability $\times$ cost) against the cost of
+blocking and recommends the cost-minimizing action, blocking a high-expected-loss migration while
+shipping a low-risk one. An uncertainty-calibration gate measures expected calibration error so that
+the confidences feeding this calculation are trustworthy, and an active-learning queue prioritizes the
+examples nearest the decision boundary for scarce human adjudication.
+
+\paragraph{Multi-agent review and interoperability.} A simulated panel of reviewer agents with
+distinct risk tolerances votes per migration, and the same panel is shown to yield different outcomes
+under majority versus any-reviewer-veto aggregation, making the governance policy an explicit and
+reproducible choice. Findings export to a SARIF-style interchange document and round-trip back
+field-for-field, so \tool{}'s verdicts flow into any SARIF-consuming dashboard without distortion,
+while a malformed interchange document is rejected.
+
+\paragraph{Release engineering as evidence.} Finally, release readiness is itself gated: a
+release-candidate rehearsal walks the reviewer-facing checklist and blesses a candidate only when
+every stage passes; a benchmark leaderboard ranks releases over time and flags regressions; and a
+1.0 release-readiness dossier audits the full six-artifact evidence chain (example, worker, gate, doc,
+\code{make} target, and README mention) for each capability, certifying readiness only when every
+artifact is present and wired.
+
+%======================================================================
 \section{Reproducibility and the Gate Methodology}
 \label{sec:repro}
 %======================================================================
@@ -590,7 +641,7 @@ results that recur throughout the paper, each regenerated by a gate against a pi
 10 sequenced / 3 unordered data jobs & \code{helm/charts} \\
 dozens of schema-evolution hazards & \code{apache/avro} \\
 6/6 ecosystems fuzz-clean (0 crashes) & parser dashboard corpus \\
-159 gates / 116 docs / 92 examples & repository inventory \\
+209 gates / 166 docs / 142 examples & repository inventory \\
 \bottomrule
 \end{tabular}
 \end{table}
@@ -775,7 +826,7 @@ benchmark.
 data changes---can be analyzed \emph{deterministically}, with full provenance, across relational,
 NoSQL, pipeline, schema, and infrastructure surfaces, and that generation can be made safe by bounding
 it, quarantining it, and deterministically rejecting it. Just as important, \tool{} shows that
-\emph{every} such claim can be made reproducible: 159 gates prove the system against real, pinned
+\emph{every} such claim can be made reproducible: 209 gates prove the system against real, pinned
 public code and fail loudly on drift, and a research-grade evaluation methodology---blinded
 adjudication, seeded recall, ablations, effect sizes, and severity calibration---turns the artifact
 into evidence. We believe this combination of breadth, safety, and gate-backed reproducibility is a
@@ -923,7 +974,7 @@ co-located with any such marker is classified \emph{sequenced}; one with none is
 \section{Selected Gate Catalog}
 \label{app:gates}
 
-\tool{} ships 159 gates; Table~\ref{tab:gatecatalog} lists a representative selection grouped by
+\tool{} ships 209 gates; Table~\ref{tab:gatecatalog} lists a representative selection grouped by
 theme to convey the breadth of what is proven against real, pinned public code. Each gate is a single
 \code{make} target.
 
@@ -949,8 +1000,14 @@ Robustness \& DX & \code{fuzz-coverage-gate}, \code{parser-dashboard-gate},
 \code{fixture-minimizer-gate}, \code{onboarding-quest-gate}, \code{performance-budget-gate} \\
 Artifact \& paper & \code{reviewer-walkthrough-gate}, \code{artifact-evaluation-kit-gate},
 \code{paper-figures-gate}, \code{paper-appendix-gate}, \code{camera-ready-checklist-gate} \\
+Formal methods & \code{invariant-extract-gate}, \code{symexec-gate}, \code{modelcheck-gate},
+\code{causal-graph-gate}, \code{counterfactual-gate} \\
+Decision science & \code{risk-economics-gate}, \code{uncertainty-calibration-gate},
+\code{active-learning-gate}, \code{reviewer-sim-gate}, \code{explainable-ranking-gate} \\
+Release \& interop & \code{rc-rehearsal-gate}, \code{leaderboard-gate}, \code{dossier-gate},
+\code{interop-gate}, \code{artifact-mirror-gate} \\
 \bottomrule
-\caption{A representative selection from the 159-gate catalog, grouped by theme.}
+\caption{A representative selection from the 209-gate catalog, grouped by theme.}
 \label{tab:gatecatalog}
 \end{longtable}
 
