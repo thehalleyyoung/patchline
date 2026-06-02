@@ -1,0 +1,21 @@
+{
+  "version": "patchline.effect-size-strata-gate/v1",
+  "claim": "Effect-size reports quantify how Patchline risk density and severity differ across ecosystem, repository size, migration framework, and hazard class. Per-file and per-risk samples are drawn from real downloaded baselines and compared with Cohen's d (standardized mean difference) plus group means, so differences between strata are reported as effect sizes rather than raw counts.",
+  "minimum_slices": 6,
+  "minimum_dimensions": 4,
+  "slices": [
+    {"repo": "lobsters/lobsters", "ref": "3b80b47aa5aaba37ec44413e7d1dc96fcf1585b6", "subpath": "db/migrate", "ecosystem": "Ruby", "framework": "Rails Active Record", "size": "small"},
+    {"repo": "adlternative/tinyhacknews", "ref": "b02895a0a927f010269661557a1951ac4e314a76", "subpath": "src/main/resources/db/migration", "ecosystem": "Java", "framework": "Flyway", "size": "small"},
+    {"repo": "golang-migrate/migrate", "ref": "2bd822b3aad4e86f3028324a5b754fc6b4ea54a1", "subpath": "database/postgres/examples/migrations", "ecosystem": "Go", "framework": "golang-migrate", "size": "medium"},
+    {"repo": "liquibase/liquibase-test-harness", "ref": "a01573d77fb4a1135eaf897860160c317e175e87", "subpath": "src/main/resources", "ecosystem": "Java", "framework": "Liquibase", "size": "medium"},
+    {"repo": "django/django", "ref": "9383fae0d55a553be3bda620db87fa9ee8a81478", "subpath": "django/contrib/auth/migrations", "ecosystem": "Python", "framework": "Django migrations", "size": "large"},
+    {"repo": "typeorm/typeorm", "ref": "d513f227337077dd6aa53ae890020cfa2bb165ae", "subpath": "test/functional/migrations", "ecosystem": "Node", "framework": "TypeORM", "size": "large"}
+  ],
+  "hazard_classes": {
+    "destructive": "drop|delete|destructive",
+    "dml-write": "update|high-risk-sql|broad-write|loose-sql",
+    "schema": "schema|create|add_column|alter"
+  },
+  "minimum_total_files": 20,
+  "minimum_effect_size": 0.2
+}
