@@ -1,0 +1,67 @@
+{
+  "version": "patchline.comparison-pages-gate/v1",
+  "claim": "Patchline publishes comparison pages against code scanning, SQL linters, migration tools, observability dashboards, and AI coding assistants. The pages are grounded in regenerated public-code evidence and explain when Patchline complements, differs from, or should defer to adjacent tools.",
+  "minimum_public_repos": 2,
+  "minimum_pages": 5,
+  "minimum_ranked_risks": 100,
+  "real_code": [
+    {
+      "id": "lobsters-rails-migrations",
+      "repo": "lobsters/lobsters",
+      "ref": "3b80b47aa5aaba37ec44413e7d1dc96fcf1585b6",
+      "subpath": "db/migrate",
+      "ecosystem": "Ruby",
+      "framework": "Rails Active Record"
+    },
+    {
+      "id": "grafana-go-migrations",
+      "repo": "grafana/grafana",
+      "ref": "a54b2e1e9aaf979938813f6ed9e44de569fe1105",
+      "subpath": "pkg/services/sqlstore/migrations",
+      "ecosystem": "Go",
+      "framework": "Go SQL migrations"
+    }
+  ],
+  "pages": [
+    {
+      "id": "code-scanning",
+      "title": "Patchline vs code scanning",
+      "category": "code scanning",
+      "adjacent_strength": "Great at surfacing language-level vulnerabilities and publishing SARIF into review workflows.",
+      "patchline_difference": "Patchline specializes in data-change repair evidence: migration context, ranked data risks, bounded generated interventions, and compare artifacts.",
+      "complementary_workflow": "Upload Patchline SARIF beside code-scanning SARIF, then link high-risk data-change findings to the analysis bundle."
+    },
+    {
+      "id": "sql-linters",
+      "title": "Patchline vs SQL linters",
+      "category": "SQL linters",
+      "adjacent_strength": "Great at style, dialect syntax, local anti-patterns, and fast SQL feedback.",
+      "patchline_difference": "Patchline links SQL-like changes to repository context, provenance, generated guards, risk budgets, and deterministic compare results.",
+      "complementary_workflow": "Run SQL linters before Patchline; use Patchline when a migration needs cross-file evidence and reviewable repair context."
+    },
+    {
+      "id": "migration-tools",
+      "title": "Patchline vs migration tools",
+      "category": "migration tools",
+      "adjacent_strength": "Great at applying, ordering, and rolling back framework-native migrations.",
+      "patchline_difference": "Patchline does not replace migration runners; it analyzes and packages evidence about risky data changes before humans approve them.",
+      "complementary_workflow": "Keep framework migration tools as the executor, and use Patchline to review blast radius, generated interventions, and proof holes."
+    },
+    {
+      "id": "observability-dashboards",
+      "title": "Patchline vs observability dashboards",
+      "category": "observability dashboards",
+      "adjacent_strength": "Great at showing production symptoms, deploy timelines, traces, logs, monitors, and SLO impact.",
+      "patchline_difference": "Patchline starts in code review and links repository-native findings to incident and telemetry exports without requiring proprietary APIs.",
+      "complementary_workflow": "Use dashboards to identify runtime impact, then use Patchline artifacts to connect the incident back to data-change evidence."
+    },
+    {
+      "id": "ai-coding-assistants",
+      "title": "Patchline vs AI coding assistants",
+      "category": "AI coding assistants",
+      "adjacent_strength": "Great at interactive code generation, explanation, and broad programming assistance.",
+      "patchline_difference": "Patchline is deterministic by default: generated code remains quarantined review material until evidence and compare checks justify trust.",
+      "complementary_workflow": "Use assistants for drafting if desired, but route data-change repairs through Patchline's budgets, provenance, rejection examples, and bundle evidence."
+    }
+  ]
+}

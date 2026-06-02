@@ -175,6 +175,8 @@ Run `make screencast-gate` to regenerate short terminal screencasts for first-ru
 
 Run `make awesome-patchline-gate` to regenerate the Awesome Patchline catalog of community-submitted examples across ecosystems and source hosts from pinned public code; see [docs/awesome-patchline.md](docs/awesome-patchline.md).
 
+Run `make comparison-pages-gate` to regenerate comparison pages against code scanning, SQL linters, migration tools, observability dashboards, and AI coding assistants from pinned public-code evidence; see [docs/comparison-pages.md](docs/comparison-pages.md).
+
 Add `--redact` to write `analysis-bundle/` copies with stable redaction tokens for identifiers, literals, customer-like strings, and secret-like values while preserving joins and existing artifact hashes.
 
 Add `--ci` to write `ci/summary.md` plus upload snippets and code-quality artifacts for GitHub Actions, GitLab CI, and Bitbucket Pipelines: SARIF under `analysis-bundle/summary.sarif`, GitLab `ci/gl-code-quality-report.json`, and Bitbucket `ci/bitbucket-code-insights.json`.
