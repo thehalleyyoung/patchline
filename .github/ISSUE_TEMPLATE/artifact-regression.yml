@@ -1,0 +1,59 @@
+name: Artifact regression report
+description: Report unexpected changes in generated reports, bundles, SARIF, gates, fixtures, or CI artifacts.
+title: "[artifact regression]: "
+labels:
+  - triage
+  - artifact-regression
+  - needs-repro
+body:
+  - type: dropdown
+    id: artifact-kind
+    attributes:
+      label: Artifact kind
+      options:
+        - analyze.json or analyze.md
+        - analysis-bundle
+        - SARIF or CI artifact
+        - proposal or compare report
+        - golden fixture
+        - gate summary
+        - diagnostics
+        - other
+    validations:
+      required: true
+  - type: textarea
+    id: reproduction
+    attributes:
+      label: Reproduction command
+      description: Include the exact public-safe command, pinned ref, and output directory.
+      placeholder: make contributor-check-gate
+    validations:
+      required: true
+  - type: textarea
+    id: expected-artifact
+    attributes:
+      label: Expected artifact
+      description: Describe the expected file, hash, schema field, report section, or gate result.
+    validations:
+      required: true
+  - type: textarea
+    id: actual-artifact
+    attributes:
+      label: Actual artifact
+      description: Describe the observed file, hash, schema field, report section, or gate result.
+    validations:
+      required: true
+  - type: textarea
+    id: impact
+    attributes:
+      label: Impact
+      description: Explain whether this affects reproducibility, redaction, CI upload, generated intervention review, or research artifacts.
+    validations:
+      required: true
+  - type: checkboxes
+    id: safety
+    attributes:
+      label: Safety
+      options:
+        - label: Attached logs or snippets are public-safe and do not include secrets.
+          required: true

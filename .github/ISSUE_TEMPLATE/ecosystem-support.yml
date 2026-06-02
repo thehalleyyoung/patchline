@@ -1,0 +1,68 @@
+name: Ecosystem support request
+description: Request support for a source host, framework, language, migration tool, or evidence format.
+title: "[ecosystem]: "
+labels:
+  - triage
+  - ecosystem
+  - needs-repro
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Use public examples only. Include enough pinned evidence for maintainers to reproduce without private credentials.
+  - type: input
+    id: ecosystem
+    attributes:
+      label: Ecosystem or tool
+      description: Name the framework, migration tool, source host, telemetry export, or language.
+      placeholder: Prisma, Liquibase, GitLab archive, OTLP logs, etc.
+    validations:
+      required: true
+  - type: input
+    id: public-repo
+    attributes:
+      label: Public repository or artifact
+      description: Link a public repo, archive, or fixture that demonstrates the requested ecosystem.
+      placeholder: https://github.com/owner/repo
+    validations:
+      required: true
+  - type: input
+    id: pinned-ref
+    attributes:
+      label: Pinned ref or artifact hash
+      description: Provide a commit SHA, tag, release URL, or checksum.
+      placeholder: 0123456789abcdef0123456789abcdef01234567
+    validations:
+      required: true
+  - type: input
+    id: subpath
+    attributes:
+      label: Minimal subpath
+      description: Smallest directory or file needed to reproduce.
+      placeholder: db/migrate
+    validations:
+      required: true
+  - type: textarea
+    id: current-result
+    attributes:
+      label: Current Patchline result
+      description: Paste a public-safe command and summarize what Patchline currently emits or misses.
+      placeholder: go run ./cmd/patchline repo analyze --github owner/repo --ref ... --subpath ...
+    validations:
+      required: true
+  - type: textarea
+    id: expected-support
+    attributes:
+      label: Expected support
+      description: Describe the facts, risks, evidence links, generated artifacts, or reports that should be added.
+    validations:
+      required: true
+  - type: checkboxes
+    id: safety
+    attributes:
+      label: Safety and reproducibility
+      options:
+        - label: The reproduction uses public data only.
+          required: true
+        - label: The command does not require production credentials or destructive execution.
+          required: true

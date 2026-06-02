@@ -1,0 +1,61 @@
+name: Parser or extractor request
+description: Request a parser, fact extractor, linker, or normalization improvement.
+title: "[parser]: "
+labels:
+  - triage
+  - parser
+  - needs-repro
+body:
+  - type: input
+    id: parser-scope
+    attributes:
+      label: Parser or extractor scope
+      description: Name the file type, framework construct, SQL dialect, telemetry format, or code pattern.
+      placeholder: Alembic op.execute, Prisma schema, Kubernetes Job env refs, etc.
+    validations:
+      required: true
+  - type: input
+    id: public-repo
+    attributes:
+      label: Public repository or fixture
+      description: Link the public source that contains the pattern.
+      placeholder: https://github.com/owner/repo
+    validations:
+      required: true
+  - type: input
+    id: pinned-ref
+    attributes:
+      label: Pinned ref
+      description: Provide the commit, tag, or artifact hash.
+      placeholder: 0123456789abcdef0123456789abcdef01234567
+    validations:
+      required: true
+  - type: input
+    id: file-path
+    attributes:
+      label: File path or subpath
+      description: Point to the smallest public file or directory with the construct.
+      placeholder: backend/migrator/migration
+    validations:
+      required: true
+  - type: textarea
+    id: expected-fact
+    attributes:
+      label: Expected fact or link
+      description: Describe the normalized fact, identifier, table, owner route, evidence link, or risk signal expected.
+    validations:
+      required: true
+  - type: textarea
+    id: current-output
+    attributes:
+      label: Current output
+      description: Paste public-safe command output or report paths showing the missing or malformed fact.
+    validations:
+      required: true
+  - type: checkboxes
+    id: safety
+    attributes:
+      label: Safety
+      options:
+        - label: The linked sample is public and does not contain secrets.
+          required: true

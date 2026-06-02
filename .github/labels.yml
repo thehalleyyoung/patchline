@@ -1,0 +1,30 @@
+- name: triage
+  color: "ededed"
+  description: Needs initial maintainer classification.
+- name: ecosystem
+  color: "1d76db"
+  description: Request for a new source host, framework, language, or migration ecosystem.
+- name: parser
+  color: "5319e7"
+  description: Parser, extractor, or fact-normalization support request.
+- name: false-positive
+  color: "fbca04"
+  description: Patchline reported a finding that appears not to be actionable.
+- name: false-negative
+  color: "d93f0b"
+  description: Patchline missed a risky data-change behavior or evidence link.
+- name: artifact-regression
+  color: "b60205"
+  description: Generated report, bundle, SARIF, CI, fixture, or gate artifact changed unexpectedly.
+- name: corpus
+  color: "0e8a16"
+  description: Public corpus, benchmark, or real-repository nomination work.
+- name: real-repo
+  color: "0052cc"
+  description: Requires reproduction on a pinned public repository slice.
+- name: needs-repro
+  color: "cfd3d7"
+  description: Needs a minimal command, pinned ref, artifact, or reproduction bundle.
+- name: security-review
+  color: "ee0701"
+  description: Needs security review for untrusted inputs, generated code, execution, or redaction.

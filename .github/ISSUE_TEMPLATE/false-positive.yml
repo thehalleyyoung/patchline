@@ -1,0 +1,52 @@
+name: False positive report
+description: Report a Patchline finding that appears not actionable on public evidence.
+title: "[false positive]: "
+labels:
+  - triage
+  - false-positive
+  - needs-repro
+body:
+  - type: input
+    id: finding-id
+    attributes:
+      label: Finding or stable ID
+      description: Copy the `stable_id`, risk ID, policy check ID, or artifact path.
+      placeholder: stable-risk:...
+    validations:
+      required: true
+  - type: textarea
+    id: reproduction
+    attributes:
+      label: Reproduction command
+      description: Provide the smallest public-safe command and pinned ref that reproduces the finding.
+      placeholder: go run ./cmd/patchline repo analyze --github owner/repo --ref ... --subpath ...
+    validations:
+      required: true
+  - type: textarea
+    id: evidence
+    attributes:
+      label: Why it is not actionable
+      description: Link public code, tests, docs, generated artifacts, or report lines that contradict the finding.
+    validations:
+      required: true
+  - type: dropdown
+    id: affected-surface
+    attributes:
+      label: Affected surface
+      options:
+        - parser
+        - ranking
+        - policy check
+        - proposal
+        - compare
+        - report or bundle
+        - CI artifact
+    validations:
+      required: true
+  - type: checkboxes
+    id: safety
+    attributes:
+      label: Safety
+      options:
+        - label: The reproduction and evidence are public-safe.
+          required: true

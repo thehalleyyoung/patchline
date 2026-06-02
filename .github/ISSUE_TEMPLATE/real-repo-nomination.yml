@@ -2,8 +2,10 @@ name: Real repository or failure-mode nomination
 description: Nominate a public repo slice or data-change failure mode Patchline should support.
 title: "[repo nomination]: "
 labels:
+  - triage
   - corpus
   - real-repo
+  - needs-repro
 body:
   - type: markdown
     attributes:

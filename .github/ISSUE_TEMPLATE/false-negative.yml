@@ -1,0 +1,53 @@
+name: False negative report
+description: Report a public risky data-change behavior or evidence link Patchline missed.
+title: "[false negative]: "
+labels:
+  - triage
+  - false-negative
+  - needs-repro
+body:
+  - type: input
+    id: public-repo
+    attributes:
+      label: Public repository or artifact
+      description: Link the public source where Patchline missed the behavior.
+      placeholder: https://github.com/owner/repo
+    validations:
+      required: true
+  - type: input
+    id: pinned-ref
+    attributes:
+      label: Pinned ref
+      description: Provide the exact commit, tag, release URL, or checksum.
+      placeholder: 0123456789abcdef0123456789abcdef01234567
+    validations:
+      required: true
+  - type: input
+    id: path
+    attributes:
+      label: File path or subpath
+      description: Point to the smallest public path containing the missed behavior.
+      placeholder: db/migrate/20240101000000_backfill.rb
+    validations:
+      required: true
+  - type: textarea
+    id: missed-behavior
+    attributes:
+      label: Missed behavior
+      description: Describe the broad write, rollback gap, evidence link, parser fact, privacy hazard, lock hazard, or generated-intervention issue Patchline should catch.
+    validations:
+      required: true
+  - type: textarea
+    id: current-output
+    attributes:
+      label: Current output
+      description: Paste public-safe Patchline command output or report paths showing the miss.
+    validations:
+      required: true
+  - type: checkboxes
+    id: safety
+    attributes:
+      label: Safety
+      options:
+        - label: The reproduction uses public data only and does not require production credentials.
+          required: true
