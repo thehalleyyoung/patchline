@@ -101,14 +101,31 @@ type CompareOptions struct {
 }
 
 type NativeResult struct {
-	Command        string `json:"command"`
-	Reason         string `json:"reason,omitempty"`
-	Status         string `json:"status"`
-	ExitCode       int    `json:"exit_code,omitempty"`
-	DurationMillis int64  `json:"duration_millis,omitempty"`
-	Log            string `json:"log,omitempty"`
-	LogHash        string `json:"log_hash,omitempty"`
-	SkippedReason  string `json:"skipped_reason,omitempty"`
+	Command        string                `json:"command"`
+	Reason         string                `json:"reason,omitempty"`
+	Status         string                `json:"status"`
+	ExitCode       int                   `json:"exit_code,omitempty"`
+	DurationMillis int64                 `json:"duration_millis,omitempty"`
+	Log            string                `json:"log,omitempty"`
+	LogHash        string                `json:"log_hash,omitempty"`
+	SkippedReason  string                `json:"skipped_reason,omitempty"`
+	Sandbox        *NativeSandboxProfile `json:"sandbox,omitempty"`
+}
+
+type NativeSandboxProfile struct {
+	Name            string   `json:"name"`
+	Ecosystem       string   `json:"ecosystem"`
+	NetworkEnabled  bool     `json:"network_enabled"`
+	Filesystem      string   `json:"filesystem"`
+	WriteScopes     []string `json:"write_scopes"`
+	TimeoutMillis   int64    `json:"timeout_millis"`
+	EnvironmentKeys []string `json:"environment_keys,omitempty"`
+}
+
+type nativeCommandProfile struct {
+	Args    []string
+	Sandbox NativeSandboxProfile
+	Env     []string
 }
 
 func Compare(baseline BaselineReport, proposal ProposalReport) CompareReport {
@@ -392,12 +409,14 @@ func runNativeChecks(root string, commands []Command, opts CompareOptions) []Nat
 	var results []NativeResult
 	for _, command := range commands {
 		result := NativeResult{Command: command.Command, Reason: command.Reason, Status: "skipped"}
-		args, ok := safeNativeTestArgs(command.Command)
+		profile, ok := safeNativeTestProfile(command.Command, timeout)
 		if !ok {
 			result.SkippedReason = "command is not on the safe native-test allowlist"
 			results = append(results, result)
 			continue
 		}
+		sandbox := profile.Sandbox
+		result.Sandbox = &sandbox
 		if root == "" {
 			result.SkippedReason = "baseline inventory root is unavailable"
 			results = append(results, result)
@@ -408,15 +427,26 @@ func runNativeChecks(root string, commands []Command, opts CompareOptions) []Nat
 			results = append(results, result)
 			continue
 		}
+		sandboxRoot, err := os.MkdirTemp("", "patchline-native-sandbox-*")
+		if err != nil {
+			result.Status = "fail"
+			result.ExitCode = -1
+			result.Log = fmt.Sprintf("failed to create native-test sandbox: %v", err)
+			result.LogHash = canonical.Hash(result.Log)
+			results = append(results, result)
+			continue
+		}
 		start := time.Now()
 		ctx, cancel := context.WithTimeout(context.Background(), timeout)
-		cmd := exec.CommandContext(ctx, args[0], args[1:]...)
+		cmd := exec.CommandContext(ctx, profile.Args[0], profile.Args[1:]...)
 		cmd.Dir = root
+		cmd.Env = nativeSandboxEnv(os.Environ(), sandboxRoot, profile.Env)
 		var output bytes.Buffer
 		cmd.Stdout = &output
 		cmd.Stderr = &output
-		err := cmd.Run()
+		err = cmd.Run()
 		cancel()
+		_ = os.RemoveAll(sandboxRoot)
 		log := output.String()
 		result.DurationMillis = time.Since(start).Milliseconds()
 		result.LogHash = canonical.Hash(log)
@@ -447,21 +477,76 @@ func runNativeChecks(root string, commands []Command, opts CompareOptions) []Nat
 	return results
 }
 
-func safeNativeTestArgs(command string) ([]string, bool) {
+func safeNativeTestProfile(command string, timeout time.Duration) (nativeCommandProfile, bool) {
+	base := NativeSandboxProfile{
+		NetworkEnabled: false,
+		Filesystem:     "workspace read/write with isolated HOME, cache, config, and temp directories",
+		WriteScopes:    []string{"workspace", "isolated-home", "isolated-cache", "isolated-temp"},
+		TimeoutMillis:  timeout.Milliseconds(),
+		EnvironmentKeys: []string{
+			"HOME",
+			"TMPDIR",
+			"XDG_CACHE_HOME",
+			"XDG_CONFIG_HOME",
+			"HTTP_PROXY",
+			"HTTPS_PROXY",
+			"ALL_PROXY",
+			"NO_PROXY",
+		},
+	}
 	switch strings.TrimSpace(command) {
 	case "go test ./...":
-		return []string{"go", "test", "./..."}, true
+		base.Name = "go-offline-tests"
+		base.Ecosystem = "go"
+		base.EnvironmentKeys = append(base.EnvironmentKeys, "GOPROXY", "GOSUMDB")
+		return nativeCommandProfile{Args: []string{"go", "test", "./..."}, Sandbox: base, Env: []string{"GOPROXY=off", "GOSUMDB=off"}}, true
 	case "npm test":
-		return []string{"npm", "test"}, true
+		base.Name = "node-offline-tests"
+		base.Ecosystem = "node"
+		base.EnvironmentKeys = append(base.EnvironmentKeys, "npm_config_offline", "npm_config_audit", "npm_config_fund")
+		return nativeCommandProfile{Args: []string{"npm", "test"}, Sandbox: base, Env: []string{"npm_config_offline=true", "npm_config_audit=false", "npm_config_fund=false"}}, true
 	case "python manage.py test":
-		return []string{"python", "manage.py", "test"}, true
+		base.Name = "django-offline-tests"
+		base.Ecosystem = "python"
+		base.EnvironmentKeys = append(base.EnvironmentKeys, "PIP_NO_INDEX", "PYTHONDONTWRITEBYTECODE")
+		return nativeCommandProfile{Args: []string{"python", "manage.py", "test"}, Sandbox: base, Env: []string{"PIP_NO_INDEX=1", "PYTHONDONTWRITEBYTECODE=1"}}, true
 	case "pytest":
-		return []string{"pytest"}, true
+		base.Name = "python-offline-tests"
+		base.Ecosystem = "python"
+		base.EnvironmentKeys = append(base.EnvironmentKeys, "PIP_NO_INDEX", "PYTHONDONTWRITEBYTECODE")
+		return nativeCommandProfile{Args: []string{"pytest"}, Sandbox: base, Env: []string{"PIP_NO_INDEX=1", "PYTHONDONTWRITEBYTECODE=1"}}, true
 	case "bundle exec rake test":
-		return []string{"bundle", "exec", "rake", "test"}, true
+		base.Name = "ruby-offline-tests"
+		base.Ecosystem = "ruby"
+		base.EnvironmentKeys = append(base.EnvironmentKeys, "BUNDLE_DISABLE_VERSION_CHECK", "BUNDLE_FROZEN")
+		return nativeCommandProfile{Args: []string{"bundle", "exec", "rake", "test"}, Sandbox: base, Env: []string{"BUNDLE_DISABLE_VERSION_CHECK=true", "BUNDLE_FROZEN=true"}}, true
 	default:
-		return nil, false
+		return nativeCommandProfile{}, false
 	}
+}
+
+func nativeSandboxEnv(base []string, sandboxRoot string, overrides []string) []string {
+	env := append([]string{}, base...)
+	home := filepath.Join(sandboxRoot, "home")
+	tmp := filepath.Join(sandboxRoot, "tmp")
+	cache := filepath.Join(sandboxRoot, "cache")
+	config := filepath.Join(sandboxRoot, "config")
+	_ = os.MkdirAll(home, 0o755)
+	_ = os.MkdirAll(tmp, 0o755)
+	_ = os.MkdirAll(cache, 0o755)
+	_ = os.MkdirAll(config, 0o755)
+	env = append(env,
+		"HOME="+home,
+		"TMPDIR="+tmp,
+		"XDG_CACHE_HOME="+cache,
+		"XDG_CONFIG_HOME="+config,
+		"HTTP_PROXY=",
+		"HTTPS_PROXY=",
+		"ALL_PROXY=",
+		"NO_PROXY=*",
+	)
+	env = append(env, overrides...)
+	return env
 }
 
 func truncateString(value string, limit int) string {

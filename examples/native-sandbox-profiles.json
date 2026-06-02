@@ -1,0 +1,35 @@
+{
+  "version": "patchline.native-sandbox-profiles/v1",
+  "minimum_public_slices": 4,
+  "required_profiles": ["go-offline-tests", "node-offline-tests", "python-offline-tests", "ruby-offline-tests"],
+  "slices": [
+    {
+      "id": "cobra-go",
+      "repo": "spf13/cobra",
+      "ref": "ad460ea8f249db69c943a365fb84f3a59042d54e",
+      "subpath": ".",
+      "expected_profile": "go-offline-tests"
+    },
+    {
+      "id": "express-node",
+      "repo": "expressjs/express",
+      "ref": "dae209ae6559c29cfca2a1f4414c51d89ea643d5",
+      "subpath": ".",
+      "expected_profile": "node-offline-tests"
+    },
+    {
+      "id": "click-python",
+      "repo": "pallets/click",
+      "ref": "c48021040a50c659b74e24ac2b11c9c9c6620a21",
+      "subpath": ".",
+      "expected_profile": "python-offline-tests"
+    },
+    {
+      "id": "lobsters-ruby",
+      "repo": "lobsters/lobsters",
+      "ref": "3b80b47aa5aaba37ec44413e7d1dc96fcf1585b6",
+      "subpath": ".",
+      "expected_profile": "ruby-offline-tests"
+    }
+  ]
+}

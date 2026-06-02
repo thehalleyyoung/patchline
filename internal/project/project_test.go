@@ -836,8 +836,19 @@ func TestCompareRunsSafeNativeChecks(t *testing.T) {
 	writeFile(t, root, "native_test.go", `package nativecheck
 
 import "testing"
+import "os"
 
-func TestNative(t *testing.T) {}
+func TestNative(t *testing.T) {
+	if os.Getenv("GOPROXY") != "off" {
+		t.Fatalf("expected offline go proxy, got %q", os.Getenv("GOPROXY"))
+	}
+	if os.Getenv("NO_PROXY") != "*" {
+		t.Fatalf("expected network-off no-proxy marker, got %q", os.Getenv("NO_PROXY"))
+	}
+	if os.Getenv("HOME") == "" || os.Getenv("TMPDIR") == "" {
+		t.Fatal("expected isolated HOME and TMPDIR")
+	}
+}
 `)
 	baseline := BaselineReport{
 		Version:       BaselineVersion,
@@ -852,6 +863,9 @@ func TestNative(t *testing.T) {}
 	}
 	if len(compare.NativeResults) != 1 || compare.NativeResults[0].Status != "pass" || compare.NativeResults[0].LogHash == "" {
 		t.Fatalf("expected passing native result with log hash: %#v", compare.NativeResults)
+	}
+	if compare.NativeResults[0].Sandbox == nil || compare.NativeResults[0].Sandbox.Name != "go-offline-tests" || compare.NativeResults[0].Sandbox.NetworkEnabled {
+		t.Fatalf("expected offline go sandbox profile: %#v", compare.NativeResults[0].Sandbox)
 	}
 }
 

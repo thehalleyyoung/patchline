@@ -170,6 +170,7 @@ make artifact-consistency-gate
 make disposable-worktree-gate
 make language-test-placement-gate
 make guard-mutation-gate
+make native-sandbox-profile-gate
 ```
 
 The demo downloads real GitHub project subpaths and writes:
@@ -269,6 +270,8 @@ The real-repo slice matrix is backed by `examples/real-repo-slices.json` and `ex
 `make language-test-placement-gate` verifies generated test proposals land in ecosystem-native test locations for Rails, Django/Python, Go, Java, Node, and Python public slices.
 
 `make guard-mutation-gate` deletes required generated-guard checks across four public slices and proves deterministic compare rejects each weakened artifact.
+
+`make native-sandbox-profile-gate` checks Go, Node, Python, and Ruby public repositories and proves discovered native tests carry network-off sandbox profiles with isolated HOME/cache/temp write scopes.
 
 Current default projects:
 
