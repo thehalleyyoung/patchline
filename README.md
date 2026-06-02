@@ -323,6 +323,8 @@ Run `make flaky-detect-gate` to catch **flaky** gates — each candidate is run 
 
 Run `make canonical-json-gate` to verify order-independent proof checksums — a **canonical** JSON form (sorted keys, compact) makes a reordered-but-equal document collide under **checksum** while a content change diverges; see [docs/canonical-json.md](docs/canonical-json.md).
 
+Run `make shell-portability-gate` to lint gate scripts for **portability** hazards (mapfile, `/tmp` writes, GNU `sed -i`) — shipped scripts stay clean while a **negative-control** fixture is flagged for every hazard; see [docs/shell-portability.md](docs/shell-portability.md).
+
 Add `--redact` to write `analysis-bundle/` copies with stable redaction tokens for identifiers, literals, customer-like strings, and secret-like values while preserving joins and existing artifact hashes.
 
 Add `--ci` to write `ci/summary.md` plus upload snippets and code-quality artifacts for GitHub Actions, GitLab CI, and Bitbucket Pipelines: SARIF under `analysis-bundle/summary.sarif`, GitLab `ci/gl-code-quality-report.json`, and Bitbucket `ci/bitbucket-code-insights.json`.

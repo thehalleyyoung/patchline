@@ -1,0 +1,11 @@
+{
+  "version": "patchline.shell-portability-gate/v1",
+  "claim": "Patchline guards its gate scripts against non-portable shell constructs so that gates run identically on macOS bash 3.2 and Linux without relying on GNU-only or interactive-only features. The worker lints a set of scripts for a catalog of portability hazards — mapfile, /tmp writes, GNU sed -i without a backup suffix, and process substitution into mapfile — and reports any hits. The gate proves the shipped portability-sensitive scripts are clean against the hazard catalog while a deliberately non-portable negative-control snippet is flagged for every hazard it contains.",
+  "real_repo": "patchline (self): shell portability lint over gate scripts",
+  "clean_scripts": [
+    "scripts/resource-budgets.sh",
+    "scripts/canonical-json.sh",
+    "scripts/error-taxonomy.sh"
+  ],
+  "negative_control": "scripts/_portability_negative_control.sh"
+}
