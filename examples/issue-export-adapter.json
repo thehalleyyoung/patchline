@@ -1,0 +1,46 @@
+{
+  "version": "patchline.issue-export-adapter/v1",
+  "claim": "Jira and Linear incident export adapters preserve issue IDs, timestamps, owners, labels, and repair links from public issue-shaped fixtures not designed for Patchline.",
+  "minimum_public_repos": 4,
+  "required_adapters": [
+    "jira",
+    "linear"
+  ],
+  "slices": [
+    {
+      "id": "snapp-jira-production-payload",
+      "adapter": "jira",
+      "repo": "snapp-incubator/jira-MSTeams-proxy",
+      "ref": "b7df38181107c128452ba44be7e415a7654512ac",
+      "path": "sample_jira_payload.json"
+    },
+    {
+      "id": "terjira-jira-mock-issues",
+      "adapter": "jira",
+      "repo": "keepcosmos/terjira",
+      "ref": "1d53a3d2e16f50daf848e179e409571f66ed0615",
+      "path": "spec/mock_responses/issues.json"
+    },
+    {
+      "id": "tidev-jira-archive-merge-request",
+      "adapter": "jira",
+      "repo": "tidev/jira-archive",
+      "ref": "5e177a1d0eb062d0ef950c87c4ba267f0c9ef350",
+      "path": "data/TIMOB/23000-23999/TIMOB-23536.json"
+    },
+    {
+      "id": "garra-linear-issues",
+      "adapter": "linear",
+      "repo": "michelbr84/GarraRUST",
+      "ref": "20f8979181fa34c077393cc0bccc01fdd3a75ad3",
+      "path": "linear_issues.json"
+    },
+    {
+      "id": "agent-diff-linear-seed",
+      "adapter": "linear",
+      "repo": "agent-diff-bench/agent-diff",
+      "ref": "920abcedd8a5ef071892dd1177aab17fe909a36d",
+      "path": "backend/seeds/linear/linear_default.json"
+    }
+  ]
+}

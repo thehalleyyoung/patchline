@@ -368,7 +368,7 @@ func run(args []string) error {
 		return ingestEvidence(args[1], hasFlag(args[2:], "--json"), outPath)
 	case "adapt-evidence":
 		if len(args) < 3 {
-			return errors.New("usage: patchline adapt-evidence <otlp|datadog|postgres|github|migration-runner> <input.json> [--json] [--out events.jsonl]")
+			return errors.New("usage: patchline adapt-evidence <otlp|datadog|postgres|github|migration-runner|jira|linear> <input.json> [--json] [--out events.jsonl]")
 		}
 		outPath, _ := flagValue(args[3:], "--out")
 		return adaptEvidence(args[1], args[2], hasFlag(args[3:], "--json"), outPath)
@@ -481,7 +481,7 @@ Usage:
   patchline artifact-benchmark run <manifest.json> [--out report.json] [--json]
   patchline artifact-benchmark compare <actual.json> <expected.json> [--json]
   patchline ingest-evidence <events.jsonl> [--json] [--out graph.json]
-  patchline adapt-evidence <otlp|datadog|postgres|github|migration-runner> <input.json> [--json] [--out events.jsonl]
+  patchline adapt-evidence <otlp|datadog|postgres|github|migration-runner|jira|linear> <input.json> [--json] [--out events.jsonl]
   patchline ci-gate <suite.json> [--min-precision 0.95] [--min-recall 0.95] [--json]
   patchline ledger-verify [--json]
 

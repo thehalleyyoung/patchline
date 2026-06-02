@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"regexp"
 	"sort"
 	"strings"
 
@@ -46,6 +47,10 @@ func AdaptJSON(reader io.Reader, adapter string) (AdaptResult, error) {
 		result.Events, result.Warnings, err = adaptGitHubDeployments(content)
 	case "migration-runner", "runner":
 		result.Events, result.Warnings, err = adaptMigrationRunner(content)
+	case "jira", "jira-issues":
+		result.Events, result.Warnings, err = adaptJiraIssues(content)
+	case "linear", "linear-issues":
+		result.Events, result.Warnings, err = adaptLinearIssues(content)
 	default:
 		err = fmt.Errorf("unknown evidence adapter %q", adapter)
 	}
@@ -296,6 +301,228 @@ func adaptMigrationRunner(content []byte) ([]map[string]string, []string, error)
 		}
 	}
 	return events, warnings, nil
+}
+
+func adaptJiraIssues(content []byte) ([]map[string]string, []string, error) {
+	var payload any
+	decoder := json.NewDecoder(bytes.NewReader(content))
+	decoder.UseNumber()
+	if err := decoder.Decode(&payload); err != nil {
+		return nil, nil, err
+	}
+	var objects []map[string]any
+	collectObjects(payload, &objects)
+	var events []map[string]string
+	for _, object := range objects {
+		if event := jiraIncidentEvent(object); event != nil {
+			events = append(events, event)
+		}
+	}
+	if len(events) == 0 {
+		return nil, []string{"jira export contained no issue objects with key/id and fields"}, nil
+	}
+	return events, nil, nil
+}
+
+func jiraIncidentEvent(object map[string]any) map[string]string {
+	fields, _ := object["fields"].(map[string]any)
+	key := firstNonEmpty(stringValue(object["key"]), stringValue(object["issueKey"]), stringValue(fields["key"]))
+	id := firstNonEmpty(key, stringValue(object["id"]))
+	if id == "" || fields == nil {
+		return nil
+	}
+	event := map[string]string{
+		"type":       "incident",
+		"id":         ensurePrefix(cleanID(id), "incident:jira/"),
+		"source":     "jira",
+		"title":      firstNonEmpty(stringValue(fields["summary"]), key),
+		"status":     firstNonEmpty(nestedString(fields, "status", "name"), stringValue(fields["status"])),
+		"owner":      firstNonEmpty(userName(fields["assignee"]), userName(fields["reporter"])),
+		"labels":     strings.Join(valuesFromAny(fields["labels"]), ","),
+		"url":        firstNonEmpty(stringValue(object["self"]), stringValue(fields["url"])),
+		"created_at": firstNonEmpty(stringValue(fields["created"]), stringValue(object["created"])),
+		"updated_at": firstNonEmpty(stringValue(fields["updated"]), stringValue(object["updated"])),
+		"resolved_at": firstNonEmpty(
+			stringValue(fields["resolutiondate"]),
+			stringValue(fields["resolved"]),
+		),
+	}
+	if event["created_at"] == "" && event["updated_at"] == "" && event["resolved_at"] == "" {
+		return nil
+	}
+	message := firstNonEmpty(textFromAny(fields["description"]), stringValue(fields["environment"]))
+	if message != "" {
+		event["message"] = normalizeWhitespace(message)
+	}
+	repairText := strings.Join([]string{
+		message,
+		strings.Join(valuesFromAny(fields["labels"]), "\n"),
+		strings.Join(valuesFromAny(fields["fixVersions"]), "\n"),
+		textFromAny(fields["issuelinks"]),
+		textFromAny(fields["comment"]),
+		textFromAny(fields["comments"]),
+		textFromAny(fields["customfield_10000"]),
+	}, "\n")
+	if repair := firstRepairLink(repairText); repair != "" {
+		event["repair"] = ensurePrefix(cleanID(repair), "repair:")
+	}
+	return compactEvent(event)
+}
+
+func adaptLinearIssues(content []byte) ([]map[string]string, []string, error) {
+	var payload any
+	decoder := json.NewDecoder(bytes.NewReader(content))
+	decoder.UseNumber()
+	if err := decoder.Decode(&payload); err != nil {
+		return nil, nil, err
+	}
+	var objects []map[string]any
+	collectObjects(payload, &objects)
+	var events []map[string]string
+	for _, object := range objects {
+		if event := linearIncidentEvent(object); event != nil {
+			events = append(events, event)
+		}
+	}
+	if len(events) == 0 {
+		return nil, []string{"linear export contained no issue objects with identifier/id"}, nil
+	}
+	return events, nil, nil
+}
+
+func linearIncidentEvent(object map[string]any) map[string]string {
+	identifier := firstNonEmpty(stringValue(object["identifier"]), stringValue(object["issueIdentifier"]), stringValue(object["number"]))
+	id := firstNonEmpty(identifier, stringValue(object["id"]), stringValue(object["linear_id"]))
+	if id == "" {
+		return nil
+	}
+	title := firstNonEmpty(stringValue(object["title"]), stringValue(object["name"]))
+	description := firstNonEmpty(textFromAny(object["description"]), textFromAny(object["body"]))
+	labels := valuesFromAny(object["labels"])
+	event := map[string]string{
+		"type":        "incident",
+		"id":          ensurePrefix(cleanID(id), "incident:linear/"),
+		"source":      "linear",
+		"title":       firstNonEmpty(title, id),
+		"status":      firstNonEmpty(nestedString(object, "state", "name"), nestedString(object, "state", "type"), stringValue(object["status"])),
+		"owner":       firstNonEmpty(userName(object["assignee"]), userName(object["creator"])),
+		"labels":      strings.Join(labels, ","),
+		"url":         firstNonEmpty(stringValue(object["url"]), stringValue(object["link"])),
+		"created_at":  firstNonEmpty(stringValue(object["createdAt"]), stringValue(object["created_at"]), stringValue(object["created"])),
+		"updated_at":  firstNonEmpty(stringValue(object["updatedAt"]), stringValue(object["updated_at"]), stringValue(object["updated"])),
+		"resolved_at": firstNonEmpty(stringValue(object["completedAt"]), stringValue(object["resolvedAt"]), stringValue(object["closedAt"])),
+	}
+	if description != "" {
+		event["message"] = normalizeWhitespace(description)
+	}
+	repairText := strings.Join([]string{
+		description,
+		strings.Join(labels, "\n"),
+		textFromAny(object["attachments"]),
+		textFromAny(object["relations"]),
+	}, "\n")
+	if repair := firstRepairLink(repairText); repair != "" {
+		event["repair"] = ensurePrefix(cleanID(repair), "repair:")
+	}
+	return compactEvent(event)
+}
+
+func containsAny(text string, needles ...string) bool {
+	for _, needle := range needles {
+		if strings.Contains(text, needle) {
+			return true
+		}
+	}
+	return false
+}
+
+func userName(value any) string {
+	object, ok := value.(map[string]any)
+	if !ok {
+		return stringValue(value)
+	}
+	return firstNonEmpty(stringValue(object["displayName"]), stringValue(object["name"]), stringValue(object["emailAddress"]), stringValue(object["accountId"]), stringValue(object["id"]))
+}
+
+func valuesFromAny(value any) []string {
+	var out []string
+	switch typed := value.(type) {
+	case []any:
+		for _, item := range typed {
+			out = append(out, valuesFromAny(item)...)
+		}
+	case []string:
+		out = append(out, typed...)
+	case map[string]any:
+		out = append(out, firstNonEmpty(stringValue(typed["name"]), stringValue(typed["value"]), stringValue(typed["title"]), stringValue(typed["id"])))
+		out = append(out, valuesFromAny(typed["nodes"])...)
+	case string:
+		if typed != "" {
+			out = append(out, typed)
+		}
+	}
+	return stableAdapterStrings(out)
+}
+
+func textFromAny(value any) string {
+	switch typed := value.(type) {
+	case string:
+		return typed
+	case map[string]any:
+		var parts []string
+		for _, key := range []string{"text", "content", "value", "description", "body", "url", "html_url", "web"} {
+			parts = append(parts, textFromAny(typed[key]))
+		}
+		for _, key := range []string{"content", "nodes", "attachments", "issuelinks", "comments"} {
+			parts = append(parts, textFromAny(typed[key]))
+		}
+		return strings.Join(stableAdapterStrings(parts), " ")
+	case []any:
+		var parts []string
+		for _, item := range typed {
+			parts = append(parts, textFromAny(item))
+		}
+		return strings.Join(stableAdapterStrings(parts), " ")
+	default:
+		return stringValue(value)
+	}
+}
+
+func firstRepairLink(text string) string {
+	for _, match := range urlPattern.FindAllString(text, 8) {
+		lower := strings.ToLower(match)
+		if containsAny(lower, "repair", "fix", "rollback", "restore", "hotfix", "patch", "pull", "merge_requests", "commit") {
+			return match
+		}
+	}
+	return ""
+}
+
+var urlPattern = regexp.MustCompile(`https?://[^\s<>"')]+`)
+
+func compactEvent(event map[string]string) map[string]string {
+	out := map[string]string{}
+	for key, value := range event {
+		if strings.TrimSpace(value) != "" {
+			out[key] = strings.TrimSpace(value)
+		}
+	}
+	return out
+}
+
+func stableAdapterStrings(values []string) []string {
+	seen := map[string]bool{}
+	var out []string
+	for _, value := range values {
+		value = strings.TrimSpace(value)
+		if value == "" || seen[value] {
+			continue
+		}
+		seen[value] = true
+		out = append(out, value)
+	}
+	sort.Strings(out)
+	return out
 }
 
 func isSuccessfulMigrationStatus(status string) bool {

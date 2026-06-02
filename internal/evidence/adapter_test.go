@@ -1,6 +1,7 @@
 package evidence
 
 import (
+	"encoding/json"
 	"strings"
 	"testing"
 )
@@ -305,16 +306,105 @@ func TestAdaptMigrationRunner(t *testing.T) {
 	}
 }
 
+func TestAdaptJiraIssuePreservesIncidentMetadata(t *testing.T) {
+	input := `{
+	  "id": "17092",
+	  "self": "https://jira.example/rest/api/2/issue/17092",
+	  "key": "PLT-123",
+	  "fields": {
+	    "summary": "Production billing incident after migration",
+	    "description": "Rollback tracked in https://github.com/acme/app/pull/42",
+	    "created": "2026-05-29T12:00:00.000+0000",
+	    "updated": "2026-05-29T13:00:00.000+0000",
+	    "resolutiondate": "2026-05-29T14:00:00.000+0000",
+	    "status": {"name": "Done"},
+	    "issuetype": {"name": "Bug"},
+	    "assignee": {"displayName": "Dana Scully"},
+	    "labels": ["incident", "billing", "rollback"]
+	  }
+	}`
+	result, err := AdaptJSON(strings.NewReader(input), "jira")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if result.EventCount != 1 {
+		t.Fatalf("unexpected jira adapter result: %#v", result)
+	}
+	event := result.Events[0]
+	for key, want := range map[string]string{
+		"id":          "incident:jira/PLT-123",
+		"owner":       "Dana Scully",
+		"labels":      "billing,incident,rollback",
+		"repair":      "repair:https://github.com/acme/app/pull/42",
+		"created_at":  "2026-05-29T12:00:00.000+0000",
+		"updated_at":  "2026-05-29T13:00:00.000+0000",
+		"resolved_at": "2026-05-29T14:00:00.000+0000",
+	} {
+		if event[key] != want {
+			t.Fatalf("expected %s=%q, got %#v", key, want, event)
+		}
+	}
+	ingested, err := IngestJSONL(strings.NewReader(eventsJSONL(result.Events)))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !ingested.OK {
+		t.Fatalf("adapted jira evidence should ingest cleanly: %#v events=%#v", ingested.Errors, result.Events)
+	}
+}
+
+func TestAdaptLinearIssuePreservesIncidentMetadata(t *testing.T) {
+	input := `{
+	  "id": "77cb745e-803c-47d3-be36-4e768f24e16c",
+	  "identifier": "GAR-172",
+	  "title": "Checkout outage regression",
+	  "description": "Hotfix PR: https://gitlab.com/acme/app/-/merge_requests/77",
+	  "url": "https://linear.app/acme/issue/GAR-172",
+	  "createdAt": "2026-05-29T12:00:00Z",
+	  "updatedAt": "2026-05-29T13:00:00Z",
+	  "completedAt": "2026-05-29T14:00:00Z",
+	  "state": {"name": "Done"},
+	  "assignee": {"name": "Fox Mulder"},
+	  "labels": [{"name": "incident"}, {"name": "checkout"}]
+	}`
+	result, err := AdaptJSON(strings.NewReader(input), "linear")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if result.EventCount != 1 {
+		t.Fatalf("unexpected linear adapter result: %#v", result)
+	}
+	event := result.Events[0]
+	for key, want := range map[string]string{
+		"id":          "incident:linear/GAR-172",
+		"owner":       "Fox Mulder",
+		"labels":      "checkout,incident",
+		"repair":      "repair:https://gitlab.com/acme/app/-/merge_requests/77",
+		"created_at":  "2026-05-29T12:00:00Z",
+		"updated_at":  "2026-05-29T13:00:00Z",
+		"resolved_at": "2026-05-29T14:00:00Z",
+	} {
+		if event[key] != want {
+			t.Fatalf("expected %s=%q, got %#v", key, want, event)
+		}
+	}
+	ingested, err := IngestJSONL(strings.NewReader(eventsJSONL(result.Events)))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !ingested.OK {
+		t.Fatalf("adapted linear evidence should ingest cleanly: %#v events=%#v", ingested.Errors, result.Events)
+	}
+}
+
 func eventsJSONL(events []map[string]string) string {
 	var lines []string
 	for _, event := range events {
-		parts := []string{}
-		for _, key := range []string{"type", "id", "commit", "service", "deploy", "name", "migration", "trace", "fingerprint", "record", "sql", "title", "status", "message", "query"} {
-			if value := event[key]; value != "" {
-				parts = append(parts, `"`+key+`":"`+value+`"`)
-			}
+		data, err := json.Marshal(event)
+		if err != nil {
+			panic(err)
 		}
-		lines = append(lines, "{"+strings.Join(parts, ",")+"}")
+		lines = append(lines, string(data))
 	}
 	return strings.Join(lines, "\n")
 }

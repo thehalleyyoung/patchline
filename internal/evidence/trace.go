@@ -300,7 +300,7 @@ func eventSemantics(eventType string, event map[string]json.RawMessage) (string,
 			return "", "", "", "", nil, fmt.Errorf("%s missing id", eventType)
 		}
 		subject := id
-		for _, field := range []string{"trace", "migration", "deploy", "commit", "service"} {
+		for _, field := range []string{"trace", "migration", "deploy", "commit", "service", "repair"} {
 			if value, ok := stringField(event, field); ok {
 				subject = value
 				if field == "service" && !strings.HasPrefix(subject, "service:") {
@@ -310,7 +310,7 @@ func eventSemantics(eventType string, event map[string]json.RawMessage) (string,
 			}
 		}
 		attrs := map[string]string{"kind": eventType}
-		for _, field := range []string{"name", "title", "status", "message", "query", "service"} {
+		for _, field := range []string{"name", "title", "status", "message", "query", "service", "owner", "labels", "repair", "url", "created_at", "updated_at", "resolved_at"} {
 			if value, ok := stringField(event, field); ok {
 				attrs[field] = value
 			}

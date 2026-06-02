@@ -206,7 +206,7 @@ func (b *builder) applyOperationalSignal(eventType string, event map[string]json
 		return line("%s missing id", eventType)
 	}
 	attrs := map[string]string{}
-	for _, field := range []string{"name", "title", "status", "message", "query", "service"} {
+	for _, field := range []string{"name", "title", "status", "message", "query", "service", "owner", "labels", "repair", "url", "created_at", "updated_at", "resolved_at"} {
 		if value, ok := stringField(event, field); ok {
 			attrs[field] = value
 		}
@@ -225,6 +225,7 @@ func (b *builder) applyOperationalSignal(eventType string, event map[string]json
 		{"deploy", provenance.KindDeploy},
 		{"migration", provenance.KindMigration},
 		{"trace", provenance.KindTrace},
+		{"repair", provenance.KindRepair},
 	} {
 		value, ok := stringField(event, link.field)
 		if !ok {
@@ -316,6 +317,9 @@ func allowedFields(eventType string) map[string]bool {
 	}
 	allowed := map[string]bool{}
 	for _, field := range append(fields[eventType], commonTraceFields...) {
+		allowed[field] = true
+	}
+	for _, field := range []string{"owner", "labels", "repair", "url", "created_at", "updated_at", "resolved_at"} {
 		allowed[field] = true
 	}
 	return allowed

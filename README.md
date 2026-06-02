@@ -373,6 +373,8 @@ go run ./cmd/patchline adapt-evidence otlp export.json --json
 go run ./cmd/patchline adapt-evidence postgres logical-decoding.json --json
 go run ./cmd/patchline adapt-evidence github deployments.json --json
 go run ./cmd/patchline adapt-evidence migration-runner migrations.json --json
+go run ./cmd/patchline adapt-evidence jira issues.json --json
+go run ./cmd/patchline adapt-evidence linear issues.json --json
 
 # Lint or replay richer repair artifacts if you already have them
 go run ./cmd/patchline lint-repair repair.json --json
@@ -380,6 +382,7 @@ go run ./cmd/patchline dry-run repair.json --store store.json --json
 ```
 
 The Datadog-style adapter recognizes deploy events, incidents, traces, logs, monitors, SLOs, and notebooks from exported JSON or exported IaC-shaped JSON without requiring Datadog API access. The OTLP adapter ingests OpenTelemetry collector `resourceSpans` and `resourceLogs` exports so traces and logs can join the same deterministic evidence graph.
+The Jira and Linear adapters normalize issue exports into incident evidence while preserving issue IDs, created/updated/resolved timestamps, owners, labels, URLs, and repair links when present.
 
 ## What deeper checks add
 
