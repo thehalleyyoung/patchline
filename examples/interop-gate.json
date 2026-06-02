@@ -1,0 +1,9 @@
+{
+  "version": "patchline.interop-gate/v1",
+  "claim": "Patchline interoperates with other code-analysis tooling by exporting its migration findings into a SARIF-style interchange document and importing them back, proving the mapping is lossless for the fields that matter — rule id, severity level, message, and file location — so a finding produced by Patchline can flow into any SARIF-consuming dashboard and return without distortion. The worker emits a SARIF-like document from native findings, parses it back into native form, and checks the round-trip is field-for-field identical, while a malformed interchange document that omits a required field is rejected by the validator. The gate proves the round-trip preserves every finding exactly and that an invalid interchange document is rejected.",
+  "real_repo": "patchline (self): SARIF-style cross-tool interoperability",
+  "findings": [
+    {"rule": "drop-column-no-backfill", "level": "error", "message": "Column dropped without backfill", "file": "migrations/001.sql"},
+    {"rule": "long-lock", "level": "warning", "message": "Migration may hold a long lock", "file": "migrations/002.sql"}
+  ]
+}
