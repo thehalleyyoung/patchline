@@ -1,0 +1,17 @@
+{
+  "version": "patchline.redaction-stability-gate/v1",
+  "claim": "Redacted analysis artifacts are stable across repeated runs and resume mode for bundles, SARIF, generated prompts, and comparison reports.",
+  "real_code": {
+    "repo": "lobsters/lobsters",
+    "ref": "3b80b47aa5aaba37ec44413e7d1dc96fcf1585b6",
+    "subpath": "db/migrate"
+  },
+  "stable_artifacts": [
+    "analysis-bundle/summary.sarif",
+    "analysis-bundle/compare.json",
+    "redacted-artifacts/prompts-and-generated/proposal/prompt.txt",
+    "redacted-artifacts/reports/compare/compare.json",
+    "redacted-artifacts/reports/baseline/baseline.sarif",
+    "redacted-artifacts/bundles/analysis-bundle/summary.sarif"
+  ]
+}

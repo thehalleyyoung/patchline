@@ -89,6 +89,8 @@ Run `make secret-scan-gate` to prove redacted reports, prompts, bundles, generat
 
 Run `make prompt-context-gate` to prove proposal prompts include only selected-risk evidence while reporting excluded context counts; see [docs/prompt-context-minimization.md](docs/prompt-context-minimization.md).
 
+Run `make redaction-stability-gate` to prove redacted bundles, SARIF, prompts, and compare reports stay byte-stable across repeated and resumed runs; see [docs/redaction-stability.md](docs/redaction-stability.md).
+
 Add `--redact` to write `analysis-bundle/` copies with stable redaction tokens for identifiers, literals, customer-like strings, and secret-like values while preserving joins and existing artifact hashes.
 
 Add `--ci` to write `ci/summary.md` plus upload snippets and code-quality artifacts for GitHub Actions, GitLab CI, and Bitbucket Pipelines: SARIF under `analysis-bundle/summary.sarif`, GitLab `ci/gl-code-quality-report.json`, and Bitbucket `ci/bitbucket-code-insights.json`.
@@ -190,6 +192,7 @@ make compatibility-gate
 make changelog-gate
 make secret-scan-gate
 make prompt-context-gate
+make redaction-stability-gate
 make minimizer-gate
 make recurrence-gate
 make corpus-release-gate

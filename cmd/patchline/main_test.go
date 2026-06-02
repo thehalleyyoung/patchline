@@ -168,6 +168,99 @@ func TestBundleRedactorRemovesCanaryValues(t *testing.T) {
 	}
 }
 
+func TestBundleRedactorStableAcrossInstancesAndFormats(t *testing.T) {
+	jsonData := []byte(`{"path":"db/migrate/PATCHLINE_STABILITY_SECRET_VALUE.sql","email":"patchline_stability@example.invalid","message":"quote 'PATCHLINE_STABILITY_LITERAL' and PATCHLINE_STABILITY_SECRET_VALUE"}` + "\n")
+	sarifData := []byte(`{"version":"2.1.0","runs":[{"results":[{"message":{"text":"PATCHLINE_STABILITY_SECRET_VALUE"},"locations":[{"physicalLocation":{"artifactLocation":{"uri":"db/migrate/PATCHLINE_STABILITY_SECRET_VALUE.sql"}}}]}]}]}` + "\n")
+	jsonlData := []byte(`{"message":"patchline_stability@example.invalid PATCHLINE_STABILITY_SECRET_VALUE"}` + "\n")
+	textData := []byte("prompt mentions patchline_stability@example.invalid and PATCHLINE_STABILITY_SECRET_VALUE\n")
+	cases := []struct {
+		name string
+		path string
+		data []byte
+	}{
+		{name: "json", path: "proposal.json", data: jsonData},
+		{name: "sarif", path: "summary.sarif", data: sarifData},
+		{name: "jsonl", path: "events.jsonl", data: jsonlData},
+		{name: "text", path: "prompt.txt", data: textData},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			first, err := newBundleRedactor().redactFileBytes(tc.path, tc.data)
+			if err != nil {
+				t.Fatal(err)
+			}
+			second, err := newBundleRedactor().redactFileBytes(tc.path, tc.data)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if string(first) != string(second) {
+				t.Fatalf("redaction should be stable across redactor instances\nfirst=%s\nsecond=%s", first, second)
+			}
+			for _, canary := range []string{"PATCHLINE_STABILITY_SECRET_VALUE", "PATCHLINE_STABILITY_LITERAL", "patchline_stability@example.invalid"} {
+				if strings.Contains(string(first), canary) {
+					t.Fatalf("redacted %s leaked %s:\n%s", tc.name, canary, first)
+				}
+			}
+			if !strings.Contains(string(first), "[redacted:") {
+				t.Fatalf("expected stable redaction token in %s:\n%s", tc.name, first)
+			}
+		})
+	}
+}
+
+func TestRepoAnalyzeRedactionStableAcrossResume(t *testing.T) {
+	root := t.TempDir()
+	writeMainTestFile(t, root, "db/migrate/PATCHLINE_STABILITY_SECRET_VALUE.sql", strings.Join([]string{
+		"-- contact patchline_stability@example.invalid",
+		"UPDATE PATCHLINE_STABILITY_CUSTOMERS",
+		"SET api_token = 'PATCHLINE_STABILITY_SECRET_VALUE'",
+		"WHERE id = 42;",
+	}, "\n"))
+	out := filepath.Join(t.TempDir(), "analysis")
+	args := []string{"repo", "analyze", root, "--stages", "inventory,baseline,propose,compare", "--proposal-kind", "all", "--budget", "files=4,lines=80,tokens=12000,changes=1", "--no-llm", "--redact", "--ci", "--out", out, "--json"}
+	if err := run(args); err != nil {
+		t.Fatalf("repo analyze redaction failed: %v", err)
+	}
+	surfaces := []string{
+		"analysis-bundle/summary.sarif",
+		"analysis-bundle/compare.json",
+		"redacted-artifacts/prompts-and-generated/proposal/prompt.txt",
+		"redacted-artifacts/reports/compare/compare.json",
+		"redacted-artifacts/bundles/analysis-bundle/summary.sarif",
+	}
+	before := map[string]string{}
+	for _, rel := range surfaces {
+		data, err := os.ReadFile(filepath.Join(out, rel))
+		if err != nil {
+			t.Fatalf("read %s: %v", rel, err)
+		}
+		text := string(data)
+		for _, canary := range []string{"PATCHLINE_STABILITY_SECRET_VALUE", "PATCHLINE_STABILITY_CUSTOMERS", "patchline_stability@example.invalid"} {
+			if strings.Contains(text, canary) {
+				t.Fatalf("%s leaked canary %s:\n%s", rel, canary, text)
+			}
+		}
+		if !strings.Contains(text, "[redacted:") {
+			t.Fatalf("expected redaction tokens in %s:\n%s", rel, text)
+		}
+		before[rel] = text
+	}
+	resumeArgs := append([]string(nil), args...)
+	resumeArgs = append(resumeArgs, "--resume")
+	if err := run(resumeArgs); err != nil {
+		t.Fatalf("repo analyze redaction resume failed: %v", err)
+	}
+	for _, rel := range surfaces {
+		data, err := os.ReadFile(filepath.Join(out, rel))
+		if err != nil {
+			t.Fatalf("read resumed %s: %v", rel, err)
+		}
+		if before[rel] != string(data) {
+			t.Fatalf("%s changed after resume\nbefore=%s\nafter=%s", rel, before[rel], data)
+		}
+	}
+}
+
 func TestContributorCheckPlanWritesExpectedSteps(t *testing.T) {
 	out := filepath.Join(t.TempDir(), "contributor")
 	if err := run([]string{"contributor", "check", "--root", ".", "--out", out, "--packages", "./cmd/patchline", "--gates", "gate,impact-gate", "--plan-only", "--json"}); err != nil {
