@@ -1,0 +1,16 @@
+{
+  "version": "patchline.index-coverage-gate/v1",
+  "claim": "Patchline flags a migration that drops an index a hot query still needs, so a schema change cannot silently turn an indexed lookup into a sequential scan in production. The worker models each hot query by the columns it filters on and each index by the columns it covers, then for a proposed DROP INDEX checks whether every hot query retains at least one covering index after the drop. The gate proves dropping an index that uniquely covers a hot login query is blocked while dropping an unused scratch index is allowed.",
+  "real_repo": "patchline (self): index-coverage analyzer",
+  "indexes": [
+    {"name": "idx_users_email", "cols": ["email"]},
+    {"name": "idx_users_email_status", "cols": ["email", "status"]},
+    {"name": "idx_scratch", "cols": ["scratch_col"]}
+  ],
+  "hot_queries": [
+    {"name": "login", "needs": ["email"]},
+    {"name": "active_by_status", "needs": ["email", "status"]}
+  ],
+  "drop_needed": "idx_users_email_status",
+  "drop_unused": "idx_scratch"
+}

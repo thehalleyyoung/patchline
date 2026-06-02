@@ -1,0 +1,22 @@
+{
+  "version": "patchline.schema-diff-gate/v1",
+  "claim": "Patchline computes a typed, minimal, reversible edit script between two schema snapshots so a reviewer sees exactly which columns are added, dropped, or altered, and can mechanically undo the change. The worker derives the canonical edit script from snapshot A to snapshot B, applies it to A to reproduce B, inverts it, applies the inverse to B to reproduce A, and checks minimality (no column touched twice, no alter whose before equals after). The gate proves the script is reversible in both directions and that a deliberately redundant script with a no-op alter and a duplicate touch is detected as non-minimal.",
+  "real_repo": "patchline (self): schema-diff edit-script synthesis",
+  "schema_a": [
+    {"name": "id", "type": "int", "nullable": false},
+    {"name": "email", "type": "text", "nullable": true},
+    {"name": "legacy", "type": "text", "nullable": true}
+  ],
+  "schema_b": [
+    {"name": "id", "type": "int", "nullable": false},
+    {"name": "email", "type": "text", "nullable": false},
+    {"name": "created_at", "type": "timestamp", "nullable": false}
+  ],
+  "redundant_script": [
+    {"op": "alter_column", "name": "id", "before": {"type": "int", "nullable": false}, "after": {"type": "int", "nullable": false}},
+    {"op": "drop_column", "name": "legacy", "before": {"type": "text", "nullable": true}},
+    {"op": "add_column", "name": "created_at", "after": {"type": "timestamp", "nullable": false}},
+    {"op": "alter_column", "name": "email", "before": {"type": "text", "nullable": true}, "after": {"type": "text", "nullable": false}},
+    {"op": "drop_column", "name": "created_at", "before": {"type": "timestamp", "nullable": false}}
+  ]
+}

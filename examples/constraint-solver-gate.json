@@ -1,0 +1,12 @@
+{
+  "version": "patchline.constraint-solver-gate/v1",
+  "claim": "Patchline discharges the obligations a migration generates — NOT NULL and foreign-key constraints — against concrete sample rows, returning a proof of satisfaction when every row complies and a precise counterexample row when one does not, so a reviewer never has to guess whether existing data can satisfy a new constraint. The worker evaluates each obligation row by row, reports satisfiable/unsatisfiable, and on failure returns the first violating row. The gate proves a satisfiable NOT NULL obligation is discharged, an unsatisfiable one yields the offending null row, a satisfiable FK obligation passes, and an FK violation yields the row whose value is outside the allowed set.",
+  "real_repo": "patchline (self): constraint-solver bridge",
+  "not_null_column": "email",
+  "good_rows": [{"id": 1, "email": "a@x.com"}, {"id": 2, "email": "b@x.com"}],
+  "bad_rows": [{"id": 3, "email": "c@x.com"}, {"id": 4, "email": null}],
+  "fk_column": "role",
+  "fk_allowed": ["admin", "user", "viewer"],
+  "fk_good_rows": [{"id": 1, "role": "admin"}, {"id": 2, "role": "user"}],
+  "fk_bad_rows": [{"id": 7, "role": "user"}, {"id": 8, "role": "ghost"}]
+}

@@ -389,6 +389,26 @@ Run `make interop-gate` to prove **cross-tool interop** — Patchline findings e
 
 Run `make dossier-gate` to certify the 1.0 **release-readiness dossier** — it audits the six-artifact **evidence chain** (example, worker, gate, doc, Makefile target, README mention) for every sampled capability and rejects any incomplete one; see [docs/dossier.md](docs/dossier.md).
 
+Run `make taint-tracker-gate` for **inter-procedural taint tracking** — it propagates untrusted request input across call boundaries to migration-affected columns, proves a multi-hop tainted path reaches a constrained column, and shows a sanitizer node cuts the flow; see [docs/taint-tracker.md](docs/taint-tracker.md).
+
+Run `make orm-normalizer-gate` to map **Django, Rails, SQLAlchemy, and Prisma** migrations to one **canonical IR** — equivalent operations across dialects normalize identically while an unknown dialect is rejected; see [docs/orm-normalizer.md](docs/orm-normalizer.md).
+
+Run `make schema-diff-gate` for a **typed, minimal, reversible** schema-diff engine — it emits an edit script taking snapshot A to B whose inverse restores A exactly, and rejects a non-minimal script with redundant ops; see [docs/schema-diff.md](docs/schema-diff.md).
+
+Run `make constraint-solver-gate` to discharge generated **NOT NULL / FK** obligations against sample rows — a satisfiable obligation is proven and an unsatisfiable one returns a concrete **counterexample** row; see [docs/constraint-solver.md](docs/constraint-solver.md).
+
+Run `make column-lineage-gate` to build a **column-lineage graph** tracing each column to the reads and writes that depend on it — a live column lists its consumers while an unreferenced column has none; see [docs/column-lineage.md](docs/column-lineage.md).
+
+Run `make backfill-completeness-gate` to prove a **backfill covers every pre-existing row** before a NOT NULL flip — a complete backfill is certified and a backfill missing one row is rejected with the uncovered ids; see [docs/backfill-completeness.md](docs/backfill-completeness.md).
+
+Run `make index-coverage-gate` to flag a migration that **drops an index a hot query still needs** — dropping a covering index used by a hot query is blocked while dropping an unused index is allowed; see [docs/index-coverage.md](docs/index-coverage.md).
+
+Run `make transaction-boundary-gate` to prove each DDL/DML step is **atomic or explicitly compensated** — a fully wrapped plan passes and a step left outside any transaction with no compensation is flagged; see [docs/transaction-boundary.md](docs/transaction-boundary.md).
+
+Run `make type-narrowing-gate` for a **type-narrowing safety checker** — widening conversions are allowed automatically while a narrowing change without a backing proof is rejected; see [docs/type-narrowing.md](docs/type-narrowing.md).
+
+Run `make dead-column-gate` to prove **no live code reads a column** before it may be dropped — a column with zero live reads is safe to drop while a still-read column is retained; see [docs/dead-column.md](docs/dead-column.md).
+
 Add `--redact` to write `analysis-bundle/` copies with stable redaction tokens for identifiers, literals, customer-like strings, and secret-like values while preserving joins and existing artifact hashes.
 
 Add `--ci` to write `ci/summary.md` plus upload snippets and code-quality artifacts for GitHub Actions, GitLab CI, and Bitbucket Pipelines: SARIF under `analysis-bundle/summary.sarif`, GitLab `ci/gl-code-quality-report.json`, and Bitbucket `ci/bitbucket-code-insights.json`.

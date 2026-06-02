@@ -1,0 +1,17 @@
+{
+  "version": "patchline.taint-tracker-gate/v1",
+  "claim": "Patchline tracks taint inter-procedurally, linking untrusted request inputs to migration-affected database columns across function-call boundaries so a column touched by a migration is flagged when any tainted value can reach a write to it, even when the value passes through several intermediate functions. The worker propagates taint forward over the call graph from declared sources, blocking propagation at any sanitized edge or sanitizer node, and reports which migration-affected sinks remain tainted. The gate proves a multi-hop tainted path reaches the migration-affected column, that inserting a sanitizer node cuts that flow, and that a sink whose only inbound path is sanitized stays clean.",
+  "real_repo": "patchline (self): inter-procedural taint tracking",
+  "sources": ["http_request.body"],
+  "sinks": ["users.email", "logs.line"],
+  "flows": [
+    {"from": "http_request.body", "to": "parse_payload", "sanitized": false},
+    {"from": "parse_payload", "to": "build_user", "sanitized": false},
+    {"from": "build_user", "to": "users.email", "sanitized": false},
+    {"from": "http_request.body", "to": "audit_log", "sanitized": true},
+    {"from": "audit_log", "to": "logs.line", "sanitized": false}
+  ],
+  "sanitize_node": "build_user",
+  "tainted_sink": "users.email",
+  "clean_sink": "logs.line"
+}

@@ -1,0 +1,8 @@
+{
+  "version": "patchline.type-narrowing-gate/v1",
+  "claim": "Patchline classifies every column type change as widening or narrowing and lets widening conversions through automatically while requiring a backing proof for any narrowing change, because widening always preserves existing values whereas narrowing can truncate or overflow them. The worker compares the representable width of the source and target types and allows a change when the target is at least as wide, or when a narrowing change carries an explicit proof obligation that existing values fit. The gate proves an int-to-bigint widening is allowed without a proof, a bigint-to-int narrowing without a proof is rejected, and the same narrowing with a discharged proof is allowed.",
+  "real_repo": "patchline (self): type-narrowing safety checker",
+  "widening_change": {"column": "amount", "from_width": 32, "to_width": 64, "proof": false},
+  "narrowing_change": {"column": "counter", "from_width": 64, "to_width": 32, "proof": false},
+  "narrowing_with_proof": {"column": "small_id", "from_width": 64, "to_width": 32, "proof": true}
+}

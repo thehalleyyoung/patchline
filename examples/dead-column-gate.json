@@ -1,0 +1,12 @@
+{
+  "version": "patchline.dead-column-gate/v1",
+  "claim": "Patchline proves no live code reads a column before a migration is allowed to drop it, so a DROP COLUMN cannot remove data that an active code path still depends on. The worker collects every code symbol that reads each column and declares a column safe to drop only when its live-read set is empty, otherwise it returns the readers that keep the column alive. The gate proves a column with zero live reads is certified droppable and a column still read by active code is retained with its readers reported.",
+  "real_repo": "patchline (self): dead-column detector",
+  "reads": [
+    {"symbol": "render_profile", "column": "users.email"},
+    {"symbol": "login", "column": "users.email"},
+    {"symbol": "signup", "column": "users.name"}
+  ],
+  "dead_column": "users.legacy_flag",
+  "live_column": "users.email"
+}

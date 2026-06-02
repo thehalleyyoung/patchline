@@ -1,0 +1,14 @@
+{
+  "version": "patchline.transaction-boundary-gate/v1",
+  "claim": "Patchline proves every DDL and DML step in a migration is either executed inside a transaction or carries an explicit compensating action, so a partial failure can always be rolled back or undone rather than leaving the schema half-migrated. The worker classifies each step as atomic when it names an enclosing transaction or declares a compensation, and reports any step that is neither. The gate proves a fully wrapped plan passes with no unguarded steps and that a plan containing one bare step outside any transaction with no compensation is flagged with that step identified.",
+  "real_repo": "patchline (self): transaction-boundary analyzer",
+  "safe_plan": [
+    {"id": "add_col", "kind": "DDL", "txn": "t1", "compensation": null},
+    {"id": "backfill", "kind": "DML", "txn": "t1", "compensation": null},
+    {"id": "create_index_concurrently", "kind": "DDL", "txn": null, "compensation": "drop_index_if_exists"}
+  ],
+  "unsafe_plan": [
+    {"id": "add_col", "kind": "DDL", "txn": "t1", "compensation": null},
+    {"id": "raw_update", "kind": "DML", "txn": null, "compensation": null}
+  ]
+}

@@ -1,0 +1,13 @@
+{
+  "version": "patchline.column-lineage-gate/v1",
+  "claim": "Patchline builds a column-lineage graph that traces every database column to the specific code symbols that read or write it, so before a migration constrains or removes a column a reviewer can see exactly which call sites depend on it. The worker scans declared code symbols, each annotated with the columns it reads and writes, and inverts that mapping into per-column consumer lists. The gate proves a live column reports its reader and writer symbols, that the consumer sets are accurate, and that a column referenced by no code has an empty consumer set and is therefore a removal candidate.",
+  "real_repo": "patchline (self): column-lineage graph",
+  "symbols": [
+    {"symbol": "render_profile", "reads": ["users.email", "users.name"], "writes": []},
+    {"symbol": "update_email", "reads": ["users.id"], "writes": ["users.email"]},
+    {"symbol": "signup", "reads": [], "writes": ["users.name", "users.id"]}
+  ],
+  "columns": ["users.email", "users.name", "users.id", "users.legacy_flag"],
+  "live_column": "users.email",
+  "unused_column": "users.legacy_flag"
+}

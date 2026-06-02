@@ -1,0 +1,12 @@
+{
+  "version": "patchline.orm-normalizer-gate/v1",
+  "claim": "Patchline normalizes migrations written for different ORMs — Django, Rails, SQLAlchemy, and Prisma — into a single canonical intermediate representation so that downstream analyses run once against one schema-change vocabulary instead of four dialect-specific parsers. The worker maps each dialect's operation verbs and type names onto a canonical {op, table, column, type, nullable} tuple, and verifies that operations expressing the same intent in different dialects normalize to byte-identical canonical tuples. The gate proves the four dialects converge on one canonical form for an equivalent add-not-null-column operation and that an unrecognized dialect is rejected rather than silently mis-normalized.",
+  "real_repo": "patchline (self): ORM-dialect normalization",
+  "operations": [
+    {"dialect": "django", "kind": "AddField", "table": "users", "field": "email", "ftype": "CharField", "null": false},
+    {"dialect": "rails", "kind": "add_column", "table": "users", "field": "email", "ftype": "string", "null": false},
+    {"dialect": "sqlalchemy", "kind": "add_column", "table": "users", "field": "email", "ftype": "String", "null": false},
+    {"dialect": "prisma", "kind": "field_added", "table": "users", "field": "email", "ftype": "String", "null": false}
+  ],
+  "unknown_operation": {"dialect": "handwritten-cobol", "kind": "ADD-FIELD", "table": "users", "field": "email", "ftype": "PIC", "null": false}
+}
