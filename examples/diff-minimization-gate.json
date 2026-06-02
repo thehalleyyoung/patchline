@@ -1,0 +1,12 @@
+{
+  "version": "patchline.diff-minimization-gate/v1",
+  "claim": "A generated intervention starts as a redundant bundle of components across four categories — tests, guards, instrumentation, and repair candidates — each covering some of the policy evidence a real finding requires. The workflow minimizes the bundle to the smallest subset that still covers every required evidence item, proves the minimized diff is 1-minimal (removing any remaining component drops coverage), and shows a real size reduction versus the full bundle while preserving full coverage and all four categories' contribution where applicable.",
+  "real_repo": {
+    "repo": "lobsters/lobsters",
+    "ref": "3b80b47aa5aaba37ec44413e7d1dc96fcf1585b6",
+    "subpath": "db/migrate"
+  },
+  "max_findings": 12,
+  "minimum_findings": 5,
+  "categories": ["test", "guard", "instrumentation", "repair-candidate"]
+}
