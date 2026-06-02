@@ -1,0 +1,24 @@
+{
+  "version": "patchline.release-notes-gate/v1",
+  "claim": "Patchline generates release notes that are grounded in reproducible evidence rather than prose: the notes embed public proof deltas computed by diffing the previous release's gate set against the gates actually present in the repository today, contributor recognition drawn from gate-backed data, and an explicit known-limitations ledger. The worker derives the added-gate delta from the live scripts directory, so the notes can never advertise a capability whose gate is absent. The gate proves every advertised new proof maps to a real gate script and that the recognition and limitations sections are present and non-empty.",
+  "real_repo": "patchline (self): proof delta computed against live scripts/*-gate.sh",
+  "release": "v0.25.0",
+  "previous_release_gates": [
+    "nosql-change-gate",
+    "data-pipeline-gate",
+    "infra-ordering-gate",
+    "schema-compat-gate",
+    "fixture-minimizer-gate",
+    "parser-dashboard-gate",
+    "onboarding-quest-gate"
+  ],
+  "recognition": [
+    {"handle": "alice", "highlight": "Shipped the schema-compatibility detector"},
+    {"handle": "bob", "highlight": "Built the examples gallery and issue-to-artifact pipeline"}
+  ],
+  "known_limitations": [
+    "Cross-version protobuf field-number reuse is not yet diffed.",
+    "Cross-file Helm/Argo ordering is not yet linked into one graph.",
+    "Dynamic SQL assembled at runtime is only partially recovered."
+  ]
+}
