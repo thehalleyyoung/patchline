@@ -24,6 +24,7 @@ type CompareReport struct {
 	ProposalHash    string           `json:"proposal_hash"`
 	Summary         CompareSummary   `json:"summary"`
 	Intervention    InterventionLoop `json:"intervention_loop"`
+	ReviewBadge     ReviewBadge      `json:"review_badge"`
 	RiskDeltas      []RiskDelta      `json:"risk_deltas,omitempty"`
 	GeneratedChecks []GeneratedCheck `json:"generated_checks,omitempty"`
 	NativeChecks    []Command        `json:"native_checks,omitempty"`
@@ -79,6 +80,14 @@ type ReviewItem struct {
 	Severity string `json:"severity"`
 	Path     string `json:"path,omitempty"`
 	Message  string `json:"message"`
+}
+
+type ReviewBadge struct {
+	Label      string   `json:"label"`
+	Status     string   `json:"status"`
+	Safe       bool     `json:"safe"`
+	Reasons    []string `json:"reasons,omitempty"`
+	ProofHoles []string `json:"proof_holes"`
 }
 
 type InterventionLoop struct {
@@ -154,6 +163,7 @@ func CompareWithOptions(baseline BaselineReport, proposal ProposalReport, opts C
 	} else {
 		report.Summary.InterventionRejected = 1
 	}
+	report.ReviewBadge = buildReviewBadge(baseline, report)
 	report.Review = reviewCompare(report)
 	report.Hash = compareHash(report)
 	report.Markdown = renderCompareMarkdown(report)
@@ -679,6 +689,97 @@ func generatedContent(artifacts []GeneratedArtifact, path string) string {
 	return ""
 }
 
+func buildReviewBadge(baseline BaselineReport, report CompareReport) ReviewBadge {
+	badge := ReviewBadge{
+		Label:      "NOT SAFE TO REVIEW",
+		Status:     "not-safe-to-review",
+		ProofHoles: compareProofHoles(baseline, report.Intervention.TargetRiskIDs),
+	}
+	if report.Summary.PatchlineChecksFailed > 0 {
+		badge.Reasons = append(badge.Reasons, "deterministic generated-artifact checks failed")
+	}
+	if report.Summary.NewHighRiskSQL > 0 {
+		badge.Reasons = append(badge.Reasons, "generated proposal introduces high-risk SQL")
+	}
+	if report.Summary.RiskBudgetRejected {
+		badge.Reasons = append(badge.Reasons, "generated SQL risk budget exceeds covered risks")
+	}
+	nativeOK, nativeReason := nativeChecksReviewable(report)
+	if !nativeOK {
+		badge.Reasons = append(badge.Reasons, nativeReason)
+	}
+	if len(badge.ProofHoles) == 0 {
+		badge.ProofHoles = []string{"none recorded for targeted risks"}
+	}
+	if len(badge.Reasons) == 0 {
+		badge.Label = "SAFE TO REVIEW"
+		badge.Status = "safe-to-review"
+		badge.Safe = true
+		badge.Reasons = []string{"deterministic checks passed; native checks passed or are explicitly unavailable; proof holes are listed"}
+	}
+	return badge
+}
+
+func nativeChecksReviewable(report CompareReport) (bool, string) {
+	if report.Summary.NativeChecksFailed > 0 {
+		return false, "native checks failed or timed out"
+	}
+	if len(report.NativeChecks) == 0 {
+		return true, "no native checks discovered"
+	}
+	for _, result := range report.NativeResults {
+		if result.Status == "skipped" && strings.TrimSpace(result.SkippedReason) == "" {
+			return false, "native checks were skipped without an explicit reason"
+		}
+	}
+	return true, "native checks passed or were explicitly unavailable"
+}
+
+func compareProofHoles(baseline BaselineReport, targetRiskIDs []string) []string {
+	targets := map[string]bool{}
+	for _, id := range targetRiskIDs {
+		targets[id] = true
+	}
+	if len(targets) == 0 {
+		for _, risk := range baseline.Risks {
+			targets[risk.ID] = true
+		}
+	}
+	var holes []string
+	for _, proof := range baseline.RepairProofs {
+		if !targets[proof.RiskID] {
+			continue
+		}
+		for _, hole := range proof.ProofHoles {
+			holes = append(holes, fmt.Sprintf("%s repair proof: %s", proof.RiskID, hole))
+		}
+		if proof.Status != "checked" && len(proof.ProofHoles) == 0 {
+			holes = append(holes, fmt.Sprintf("%s repair proof remains %s", proof.RiskID, proof.Status))
+		}
+	}
+	for _, check := range baseline.SymbolicChecks {
+		if !targets[check.RiskID] || check.Status == "pass" {
+			continue
+		}
+		holes = append(holes, fmt.Sprintf("%s symbolic %s %s: %s", check.RiskID, check.Property, check.Status, check.Reason))
+	}
+	for _, check := range baseline.PolicyChecks {
+		if !targets[check.RiskID] || check.Status == "pass" {
+			continue
+		}
+		if len(check.Missing) > 0 {
+			holes = append(holes, fmt.Sprintf("%s policy missing: %s", check.RiskID, strings.Join(check.Missing, ",")))
+		} else {
+			holes = append(holes, fmt.Sprintf("%s policy %s: %s", check.RiskID, check.Status, check.Policy))
+		}
+	}
+	holes = uniqueSortedStrings(holes)
+	if len(holes) > 20 {
+		holes = holes[:20]
+	}
+	return holes
+}
+
 func reviewCompare(report CompareReport) []ReviewItem {
 	var review []ReviewItem
 	if report.Summary.PatchlineChecksFailed > 0 {
@@ -733,6 +834,20 @@ func renderCompareMarkdown(report CompareReport) string {
 	fmt.Fprintf(&b, "| intervention loops | %d |\n", report.Summary.InterventionLoops)
 	fmt.Fprintf(&b, "| intervention accepted | %d |\n", report.Summary.InterventionAccepted)
 	fmt.Fprintf(&b, "| intervention rejected | %d |\n\n", report.Summary.InterventionRejected)
+	fmt.Fprintf(&b, "## Review badge\n\n")
+	fmt.Fprintf(&b, "- label: `%s`\n", report.ReviewBadge.Label)
+	fmt.Fprintf(&b, "- status: `%s`\n", report.ReviewBadge.Status)
+	fmt.Fprintf(&b, "- safe: `%t`\n", report.ReviewBadge.Safe)
+	if len(report.ReviewBadge.Reasons) > 0 {
+		fmt.Fprintf(&b, "- reasons: %s\n", strings.Join(report.ReviewBadge.Reasons, "; "))
+	}
+	if len(report.ReviewBadge.ProofHoles) > 0 {
+		fmt.Fprintf(&b, "\n### Listed proof holes\n\n")
+		for _, hole := range report.ReviewBadge.ProofHoles {
+			fmt.Fprintf(&b, "- %s\n", hole)
+		}
+		fmt.Fprintf(&b, "\n")
+	}
 	if report.Intervention.ID != "" {
 		fmt.Fprintf(&b, "## Intervention loop\n\n")
 		fmt.Fprintf(&b, "- id: `%s`\n", report.Intervention.ID)

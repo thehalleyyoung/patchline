@@ -1009,6 +1009,67 @@ DELETE FROM accounts;
 	if compare.Intervention.Status != "rejected-by-deterministic-checks" {
 		t.Fatalf("expected rejected intervention loop, got %#v", compare.Intervention)
 	}
+	if compare.ReviewBadge.Safe || compare.ReviewBadge.Status != "not-safe-to-review" {
+		t.Fatalf("expected unsafe review badge, got %#v", compare.ReviewBadge)
+	}
+}
+
+func TestCompareAddsSafeToReviewBadgeWithListedProofHoles(t *testing.T) {
+	baseline := BaselineReport{
+		Version: BaselineVersion,
+		Hash:    "baseline-hash",
+		Risks: []BaselineRisk{{
+			ID:        "risk:accounts",
+			Path:      "db/migrate/001.sql",
+			Kind:      "update",
+			Table:     "accounts",
+			Severity:  "high",
+			Score:     120,
+			Rationale: "baseline risk",
+		}},
+		NativeChecks: []Command{{Command: "go test ./...", Reason: "Go checks"}},
+		SymbolicChecks: []SymbolicCheck{{
+			ID:       "symbolic:scope",
+			RiskID:   "risk:accounts",
+			Property: "scope_preservation",
+			Status:   "warn",
+			Reason:   "row bound unavailable",
+		}},
+		PolicyChecks: []PolicyCheck{{
+			ID:      "policy:accounts",
+			RiskID:  "risk:accounts",
+			Policy:  "guard-rollback-approval-dryrun-test",
+			Status:  "fail",
+			Missing: []string{"approval"},
+		}},
+	}
+	baseline.Hash = baselineHash(baseline)
+	proposal := ProposalReport{
+		BaselineHash:  baseline.Hash,
+		OutputHash:    "proposal-hash",
+		TargetRiskIDs: []string{"risk:accounts"},
+		GeneratedFiles: []GeneratedFile{{
+			Path:    "patchline-proposals/tests/accounts.md",
+			Kind:    "tests",
+			RiskIDs: []string{"risk:accounts"},
+		}},
+		Generated: []GeneratedArtifact{{
+			Path:    "patchline-proposals/tests/accounts.md",
+			Kind:    "tests",
+			Content: "# Untrusted generated test\n\nSuggested assertions:\n",
+			RiskIDs: []string{"risk:accounts"},
+		}},
+	}
+	compare := Compare(baseline, proposal)
+	if !compare.ReviewBadge.Safe || compare.ReviewBadge.Status != "safe-to-review" {
+		t.Fatalf("expected safe review badge, got %#v", compare.ReviewBadge)
+	}
+	if len(compare.ReviewBadge.ProofHoles) == 0 || !strings.Contains(strings.Join(compare.ReviewBadge.ProofHoles, "\n"), "approval") {
+		t.Fatalf("expected listed proof holes, got %#v", compare.ReviewBadge.ProofHoles)
+	}
+	if !strings.Contains(compare.Markdown, "## Review badge") {
+		t.Fatalf("expected review badge in markdown: %s", compare.Markdown)
+	}
 }
 
 func TestCompareRunsSafeNativeChecks(t *testing.T) {

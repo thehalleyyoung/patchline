@@ -1,0 +1,5 @@
+{
+  "version": "patchline.safe-review-badge/v1",
+  "minimum_public_slices": 4,
+  "claim": "Compare emits a safe-to-review badge only when deterministic checks pass, native checks are passed or explicitly unavailable, and proof holes are listed."
+}

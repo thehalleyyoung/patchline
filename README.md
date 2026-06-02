@@ -175,6 +175,7 @@ make generated-provenance-gate
 make repair-manifest-schema-gate
 make generated-patch-minimization-gate
 make generated-risk-budget-gate
+make safe-review-badge-gate
 ```
 
 The demo downloads real GitHub project subpaths and writes:
@@ -284,6 +285,8 @@ The real-repo slice matrix is backed by `examples/real-repo-slices.json` and `ex
 `make generated-patch-minimization-gate` injects redundant generated proposal hunks into four public repo analyses and proves `repo proposal-minimize` removes them while preserving compare coverage and deterministic checks.
 
 `make generated-risk-budget-gate` mutates generated explain proposals on four public repo slices and proves compare rejects interventions whose new SQL risk budget exceeds covered risks.
+
+`make safe-review-badge-gate` checks four public repo slices and proves compare emits a safe-to-review badge only when deterministic checks pass, native checks are passed or explicitly unavailable, and proof holes are listed.
 
 Current default projects:
 
