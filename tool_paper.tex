@@ -893,6 +893,15 @@ positive-proof-plus-negative-control idiom, raising the catalog to more than 600
 \label{tab:frontier4}
 \end{table}
 
+\paragraph{Standard-scale certificate interchange.}
+The newest interoperability slice makes the standardization claim executable rather than aspirational:
+\tool{} includes PLCI/1, a line-oriented certificate interchange language with an ABNF grammar,
+canonical SHA-256 rule, real-code evidence digests, and independent Go, Rust, Python, and TypeScript
+checkers. Its gate accepts valid proof-carrying migration-safety certificates, rejects malformed
+verdicts, dangling evidence, hash mismatches, and bad file digests, and fails if any implementation
+disagrees with the others. This is deliberately small enough to audit yet strong enough to serve as the
+seed of a multi-tool certificate ecosystem.
+
 %======================================================================
 \section{Developer and Contributor Experience}
 %======================================================================

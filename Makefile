@@ -1893,6 +1893,9 @@ autonomy-certification-suite-gate:
 iso-track-certificate-standard-gate:
 	bash scripts/iso-track-certificate-standard-gate.sh
 
+certificate-interchange-language-gate:
+	bash scripts/certificate-interchange-language-gate.sh
+
 multi-impl-conformance-gate:
 	bash scripts/multi-impl-conformance-gate.sh
 
@@ -2039,4 +2042,3 @@ decade-impact-retrospective-gate:
 
 grand-unified-evidence-index-2-gate:
 	bash scripts/grand-unified-evidence-index-2-gate.sh
-

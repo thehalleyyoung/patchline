@@ -1,0 +1,17 @@
+{
+  "version": "patchline.certificate-interchange-language-gate/v1",
+  "claim": "Patchline ships PLCI/1, a formally specified certificate interchange language with executable grammar tests across Go, Rust, Python, and TypeScript checkers. The gate loads the ABNF grammar, runs every valid and invalid vector through four dependency-free implementations, verifies real file evidence against the Patchline repository, checks canonical SHA-256 agreement, and fails on any cross-language disagreement, so certificate interchange is proven against real code via `make certificate-interchange-language-gate`.",
+  "real_repo": "patchline (self): internal repair proof and CLI dispatch code",
+  "spec_dir": "specs/certificate-interchange/v1",
+  "grammar": "specs/certificate-interchange/v1/grammar.abnf",
+  "checkers": [
+    { "language": "go", "path": "tools/certlang/go-checker/main.go" },
+    { "language": "rust", "path": "tools/certlang/rust/check.rs" },
+    { "language": "python", "path": "tools/certlang/python/check.py" },
+    { "language": "typescript", "path": "tools/certlang/typescript/check.ts" }
+  ],
+  "vectors": {
+    "valid": 2,
+    "invalid": 15
+  }
+}

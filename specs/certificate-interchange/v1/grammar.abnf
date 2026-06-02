@@ -1,0 +1,41 @@
+; Patchline Certificate Interchange Language (PLCI/1)
+; Canonicalization: hash the UTF-8 bytes from the header through the final
+; obligation line, preserving LF line endings and excluding canonical-sha256
+; and END. The canonical-sha256 field is lowercase SHA-256 hex of those bytes.
+
+certificate = header LF certificate-id LF subject-repo LF subject-ref LF subject-path LF subject-sha256 LF issued-at LF producer LF verdict LF risk-bps LF 1*evidence-line 1*obligation-line canonical-sha256 LF end LF
+
+header = "PLCI/1"
+certificate-id = "certificate-id: " id
+subject-repo = "subject-repo: " repo
+subject-ref = "subject-ref: " ref
+subject-path = "subject-path: " path
+subject-sha256 = "subject-sha256: " sha256
+issued-at = "issued-at: " rfc3339
+producer = "producer: " producer-value
+verdict = "verdict: " verdict-value
+risk-bps = "risk-bps: " risk-bps-value
+evidence-line = "evidence: " id " type=" evidence-type " uri=" uri " sha256=" sha256 LF
+obligation-line = "obligation: " id " kind=" obligation-kind " status=" status " evidence=" id *("," id) " formula=" DQUOTE formula-text DQUOTE LF
+canonical-sha256 = "canonical-sha256: " sha256
+end = "END"
+
+verdict-value = "safe" / "guarded" / "blocked" / "unsupported"
+status = "checked" / "assumed" / "refuted" / "unsupported"
+evidence-type = "source" / "migration" / "report" / "telemetry" / "spec"
+obligation-kind = "scope" / "frame" / "invariant" / "rollback" / "evidence" / "interchange"
+
+id = lower 2*80(lower / DIGIT / "." / "-")
+lower = %x61-7A
+risk-bps-value = "0" / "10000" / nonzero-digit 0*3DIGIT
+nonzero-digit = %x31-39
+repo = 1*(ALPHA / DIGIT / "_" / "." / "-") "/" 1*(ALPHA / DIGIT / "_" / "." / "-")
+ref = 1*80(ALPHA / DIGIT / "_" / "." / "-" / "/")
+path = path-segment *("/" path-segment)
+path-segment = 1*(ALPHA / DIGIT / "_" / "." / "-")
+uri = "file:" path / "repo://" 1*(VCHAR) / "https://" 1*(VCHAR)
+sha256 = 64lower-hexdig
+lower-hexdig = DIGIT / %x61-66
+producer-value = 1*(VCHAR)
+formula-text = 1*(%x20-21 / %x23-7E)
+rfc3339 = 4DIGIT "-" 2DIGIT "-" 2DIGIT "T" 2DIGIT ":" 2DIGIT ":" 2DIGIT "Z"

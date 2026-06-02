@@ -1,0 +1,14 @@
+PLCI/1
+certificate-id: patchline.bad.path.v1
+subject-repo: thehalleyyoung/patchline
+subject-ref: 8e6e3fe
+subject-path: cmd/patchline/main go
+subject-sha256: 782130c1648f4da094396744349510a192fc1c21c9adf032eeb9fa42d9e5910b
+issued-at: 2026-06-02T00:00:00Z
+producer: patchline-certlang/1
+verdict: safe
+risk-bps: 40
+evidence: ev.cli type=source uri=file:cmd/patchline/main.go sha256=782130c1648f4da094396744349510a192fc1c21c9adf032eeb9fa42d9e5910b
+obligation: obl.dispatch kind=interchange status=checked evidence=ev.cli formula="subject paths must use grammar path segment characters"
+canonical-sha256: 05c062fc8b0f75142280754ea983d49d6c979893772996cf5f3990d101c040bd
+END
