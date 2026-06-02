@@ -1,0 +1,32 @@
+{
+  "version": "patchline.fp-adjudication-gate/v1",
+  "claim": "Patchline supports a false-positive adjudication workflow on blinded findings: three independent deterministic adjudicators (evidence, control-gap, operation) judge each blinded example as true or false positive, and the workflow reports pairwise Cohen's kappa, Fleiss-style overall agreement, and the majority-adjudicated false-positive rate on real repositories.",
+  "minimum_examples": 300,
+  "minimum_raters": 3,
+  "minimum_mean_kappa": 0.2,
+  "destructive_operations": [
+    "delete", "drop", "truncate", "update", "insert",
+    "drop_table", "drop_column", "remove_column", "alter",
+    "code-path:delete", "code-path:update", "code-path:drop_table", "code-path:remove_column"
+  ],
+  "slices": [
+    {
+      "repo": "lobsters/lobsters",
+      "ref": "3b80b47aa5aaba37ec44413e7d1dc96fcf1585b6",
+      "subpath": "db/migrate",
+      "ecosystem": "Ruby"
+    },
+    {
+      "repo": "apache/airflow",
+      "ref": "f72e4c417187335b3124a5cfe0766df32b5d6aba",
+      "subpath": "airflow-core/src/airflow/migrations/versions",
+      "ecosystem": "Python"
+    },
+    {
+      "repo": "bytebase/bytebase",
+      "ref": "0765652ea2dbdf8e93ae44bff5acafc1b97a92cc",
+      "subpath": "backend/migrator/migration",
+      "ecosystem": "Go"
+    }
+  ]
+}
