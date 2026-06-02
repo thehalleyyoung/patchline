@@ -1,6 +1,8 @@
 package migration_test
 
 import (
+	"os"
+	"path/filepath"
 	"testing"
 
 	"github.com/thehalleyyoung/patchline/internal/migration"
@@ -62,15 +64,51 @@ func TestExtractSourceSQLFindsORMAndMigrationFrameworks(t *testing.T) {
 	}
 }
 
+func TestExtractSourceSQLFindsORMWriteEffectsAcrossFrameworks(t *testing.T) {
+	root := t.TempDir()
+	writeFile(t, root, "active_record/invoices.rb", `Invoice.where(status: "open").update_all(status: "closed")`)
+	writeFile(t, root, "django/tasks.py", `Invoice.objects.filter(id=invoice_id).update(status="closed")`)
+	writeFile(t, root, "sqlalchemy/jobs.py", `session.query(Invoice).filter(Invoice.id == invoice_id).update({"status": "closed"})`)
+	writeFile(t, root, "prisma/worker.ts", `await prisma.invoice.updateMany({ where: { status: "open" }, data: { status: "closed" } })`)
+	writeFile(t, root, "typeorm/service.ts", `await getRepository(Invoice).update({ id }, { status: "closed" })`)
+	writeFile(t, root, "hibernate/InvoiceRepository.java", `@Modifying @Query("update Invoice i set i.status = :status where i.id = :id") int close(String status, long id);`)
+	writeFile(t, root, "gorm/job.go", `db.Model(&Invoice{}).Where("id = ?", invoiceID).Updates(map[string]any{"status": "closed"})`)
+
+	report, err := migration.ExtractSourceSQL(root)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, framework := range []string{"rails", "django", "sqlalchemy", "prisma", "typeorm", "hibernate", "gorm"} {
+		if report.Summary.Frameworks[framework] == 0 {
+			t.Fatalf("expected %s write-effect observations, frameworks=%#v observations=%#v", framework, report.Summary.Frameworks, report.Observations)
+		}
+		if !hasWriteEffect(report, framework, "update", "invoices") {
+			t.Fatalf("expected %s update write effect on invoices, observations=%#v", framework, report.Observations)
+		}
+	}
+}
+
 func TestExtractSourceSQLIgnoresPlainTextLookalikes(t *testing.T) {
 	report, err := migration.ExtractSourceSQL("../../examples/source-sql/go/service.go")
 	if err != nil {
 		t.Fatal(err)
 	}
+
 	for _, obs := range report.Observations {
 		if obs.SQL == "select a plan before deploying" {
 			t.Fatalf("plain English string should not be classified as SQL: %#v", obs)
 		}
+	}
+}
+
+func writeFile(t *testing.T, root, path, content string) {
+	t.Helper()
+	fullPath := filepath.Join(root, filepath.FromSlash(path))
+	if err := os.MkdirAll(filepath.Dir(fullPath), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(fullPath, []byte(content), 0o644); err != nil {
+		t.Fatal(err)
 	}
 }
 
@@ -89,6 +127,15 @@ func hasObservation(report migration.SourceSQLReport, kind, language, framework,
 			if framework == "" || obs.Framework == framework {
 				return true
 			}
+		}
+	}
+	return false
+}
+
+func hasWriteEffect(report migration.SourceSQLReport, framework, operation, table string) bool {
+	for _, obs := range report.Observations {
+		if obs.Kind == "orm_query" && obs.Framework == framework && obs.Operation == operation && obs.Table == table && obs.Effect != "" && obs.Risk != "" {
+			return true
 		}
 	}
 	return false

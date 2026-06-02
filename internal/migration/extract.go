@@ -491,7 +491,8 @@ func mayContainORMLine(line string) bool {
 	for _, marker := range []string{
 		".objects.", "prisma.", "getrepository(", ".createquerybuilder", "sequelize", "knex", "querybuilder(",
 		".where(", ".update(", ".destroy(", ".findall", ".findone", ".find_by", ".update_all", ".delete_all", ".destroy_all", "create_table", "drop_table",
-		"add_column", "remove_column", "op.", "context.", "db.",
+		"add_column", "remove_column", "op.", "context.", "db.", "db.session", "session.query", "session.add", "session.merge", "session.delete", "sqlalchemy", "entitymanager", "@query", "@modifying",
+		"createquery(", "createquerybuilder(", ".executeupdate", ".model(", ".table(", ".updates(", ".save(", ".delete(", ".create(",
 	} {
 		if strings.Contains(lower, marker) {
 			return true
@@ -512,7 +513,7 @@ func detectORMWindow(path string, profile sourceProfile, line int, text string) 
 			if detector.Migration {
 				kind = "migration_framework"
 			}
-			out = append(out, SourceSQLObservation{
+			obs := SourceSQLObservation{
 				Path:        path,
 				Language:    profile.Language,
 				Detector:    profile.Detector + "." + detector.Name,
@@ -523,10 +524,62 @@ func detectORMWindow(path string, profile sourceProfile, line int, text string) 
 				Table:       cleanIdentifier(table),
 				Confidence:  detector.Confidence,
 				SnippetHash: canonical.Hash(normalizeSourceContent(text)),
-			})
+			}
+			enrichORMObservation(&obs, text)
+			out = append(out, obs)
 		}
 	}
 	return out
+}
+
+func enrichORMObservation(obs *SourceSQLObservation, text string) {
+	operation := strings.ToLower(obs.Operation)
+	switch operation {
+	case "select":
+		obs.Risk = RiskLow
+		obs.Effect = "noop"
+	case "delete", "destroy", "destroy_all", "delete_all", "drop_table", "remove_column", "drop_column":
+		obs.Risk = RiskHigh
+		obs.Effect = "destructive"
+		obs.Reasons = append(obs.Reasons, "orm write effect can remove persistent data")
+	case "update", "update_all", "update_many", "updatemany", "save", "merge":
+		obs.Risk = RiskMedium
+		obs.Effect = "unknown"
+		obs.Reasons = append(obs.Reasons, "orm write effect mutates existing persistent records")
+	case "insert", "create", "bulk_create", "bulkcreate", "bulk_insert", "upsert", "update_or_create", "persist":
+		obs.Risk = RiskMedium
+		obs.Effect = "unknown"
+		obs.Reasons = append(obs.Reasons, "orm write effect creates persistent records")
+	default:
+		obs.Risk = RiskMedium
+		obs.Effect = "unknown"
+	}
+	if isORMWriteOperation(operation) && !hasORMScopedWriteMarker(strings.ToLower(text)) {
+		obs.Risk = RiskHigh
+		obs.Reasons = append(obs.Reasons, "orm write lacks an obvious scope marker in nearby source")
+	}
+	if obs.Framework != "" && isORMWriteOperation(operation) {
+		obs.Reasons = append(obs.Reasons, "framework="+obs.Framework)
+	}
+	sort.Strings(obs.Reasons)
+}
+
+func isORMWriteOperation(operation string) bool {
+	switch strings.ToLower(operation) {
+	case "update", "delete", "insert", "save", "merge", "persist", "upsert", "update_or_create", "bulk_create", "bulk_update":
+		return true
+	default:
+		return false
+	}
+}
+
+func hasORMScopedWriteMarker(lower string) bool {
+	for _, marker := range []string{".where", "where(", ".filter", "filter(", "find_by", "find(", "findone", "findunique", "limit(", " id", "_id", ".id", "primary_key"} {
+		if strings.Contains(lower, marker) {
+			return true
+		}
+	}
+	return false
 }
 
 type ormDetector struct {
@@ -540,7 +593,7 @@ type ormDetector struct {
 }
 
 var ormDetectors = []ormDetector{
-	{"rails-active-record", "rails", regexp.MustCompile(`\b([A-Z][A-Za-z0-9_]*)\.(where|find_by|update_all|delete_all|destroy_all|find_by_sql|exec_query)\b`), "medium", false, func(m []string) string { return modelToTable(m[1]) }, func(m []string, text string) string {
+	{"rails-active-record", "rails", regexp.MustCompile(`\b([A-Z][A-Za-z0-9_]*)\.(where|find_by|update|update_all|delete|delete_all|destroy|destroy_all|create|insert_all|upsert_all|find_by_sql|exec_query)\b`), "medium", false, func(m []string) string { return modelToTable(m[1]) }, func(m []string, text string) string {
 		if strings.Contains(text, ".update_all") {
 			return "update"
 		}
@@ -550,7 +603,7 @@ var ormDetectors = []ormDetector{
 		return ormOperation(m[2])
 	}},
 	{"rails-migration", "rails", regexp.MustCompile(`\b(create_table|drop_table|add_column|remove_column)\s+[:'"]([A-Za-z_][A-Za-z0-9_]*)`), "medium", true, func(m []string) string { return m[2] }, func(m []string, _ string) string { return m[1] }},
-	{"django-queryset", "django", regexp.MustCompile(`\b([A-Za-z_][A-Za-z0-9_]*)\.objects\.(filter|get|all|create|raw)\b`), "medium", false, func(m []string) string { return modelToTable(m[1]) }, func(m []string, text string) string {
+	{"django-queryset", "django", regexp.MustCompile(`\b([A-Za-z_][A-Za-z0-9_]*)\.objects\.(filter|get|all|create|bulk_create|bulk_update|update_or_create|raw)\b`), "medium", false, func(m []string) string { return modelToTable(m[1]) }, func(m []string, text string) string {
 		if strings.Contains(text, ".update(") {
 			return "update"
 		}
@@ -567,6 +620,17 @@ var ormDetectors = []ormDetector{
 	}, func(m []string, _ string) string { return m[1] }},
 	{"prisma-client", "prisma", regexp.MustCompile(`\bprisma\.([A-Za-z_][A-Za-z0-9_]*)\.(findMany|findUnique|findFirst|create|update|updateMany|delete|deleteMany|upsert)\b`), "medium", false, func(m []string) string { return modelToTable(m[1]) }, func(m []string, _ string) string { return ormOperation(m[2]) }},
 	{"typeorm", "typeorm", regexp.MustCompile(`\b(?:getRepository\((?:['"])?([A-Za-z_][A-Za-z0-9_]*)(?:['"])?\)|repository)\.(find|findOne|update|delete|save|createQueryBuilder)\b`), "low", false, func(m []string) string { return modelToTable(m[1]) }, func(m []string, _ string) string { return ormOperation(m[2]) }},
+	{"sqlalchemy-query", "sqlalchemy", regexp.MustCompile(`\b(?:db\.)?session\.query\(\s*([A-Z][A-Za-z0-9_]*)\s*\).*?\.(update|delete)\s*\(`), "medium", false, func(m []string) string { return modelToTable(m[1]) }, func(m []string, _ string) string { return ormOperation(m[2]) }},
+	{"sqlalchemy-session", "sqlalchemy", regexp.MustCompile(`\b(?:db\.)?session\.(add|delete|merge|bulk_insert_mappings|bulk_update_mappings)\s*\(\s*([A-Za-z_][A-Za-z0-9_]*)?`), "medium", false, func(m []string) string { return modelToTable(m[2]) }, func(m []string, _ string) string { return ormOperation(m[1]) }},
+	{"hibernate-entity-manager", "hibernate", regexp.MustCompile(`\b(?:entityManager|session)\.(persist|merge|remove|save|update|delete)\s*\(\s*([A-Za-z_][A-Za-z0-9_]*)`), "medium", false, func(m []string) string { return modelToTable(m[2]) }, func(m []string, _ string) string { return ormOperation(m[1]) }},
+	{"hibernate-query", "hibernate", regexp.MustCompile(`(?i)@Query\s*\(\s*(?:value\s*=\s*)?["']\s*(update|delete)\s+([A-Za-z_][A-Za-z0-9_]*)`), "medium", false, func(m []string) string { return modelToTable(m[2]) }, func(m []string, _ string) string { return ormOperation(m[1]) }},
+	{"gorm-chain", "gorm", regexp.MustCompile(`\b(?:db|tx|DB)\.(?:Model\(\s*&?([A-Za-z_][A-Za-z0-9_]*)(?:\{\})?\s*\)|Table\(\s*["']([A-Za-z_][A-Za-z0-9_]*)["']\s*\)).*?\.(Create|Save|Updates?|Delete)\b`), "medium", false, func(m []string) string {
+		if m[2] != "" {
+			return m[2]
+		}
+		return modelToTable(m[1])
+	}, func(m []string, _ string) string { return ormOperation(m[3]) }},
+	{"gorm-direct", "gorm", regexp.MustCompile(`\b(?:db|tx|DB)\.(Create|Save|Updates?|Delete)\s*\(\s*&?([A-Za-z_][A-Za-z0-9_]*)`), "medium", false, func(m []string) string { return modelToTable(m[2]) }, func(m []string, _ string) string { return ormOperation(m[1]) }},
 	{"sequelize", "sequelize", regexp.MustCompile(`\b([A-Z][A-Za-z0-9_]*)\.(findAll|findOne|update|destroy|create|bulkCreate)\b`), "medium", false, func(m []string) string { return modelToTable(m[1]) }, func(m []string, _ string) string { return ormOperation(m[2]) }},
 	{"knex", "knex", regexp.MustCompile(`\bknex(?:\.schema)?\.(createTable|dropTable|table)\s*\(\s*['"]([A-Za-z_][A-Za-z0-9_]*)|knex\s*\(\s*['"]([A-Za-z_][A-Za-z0-9_]*)`), "medium", false, func(m []string) string {
 		if len(m) > 3 && m[3] != "" {
@@ -790,11 +854,11 @@ func ormOperation(method string) string {
 	switch method {
 	case "find", "findone", "findall", "findmany", "findunique", "findfirst", "filter", "get", "all", "where", "raw", "fromsqlraw", "find_by", "find_by_sql":
 		return "select"
-	case "update", "updatemany", "update_all", "executesqlraw":
+	case "update", "updates", "updatemany", "update_all", "bulk_update", "bulk_update_mappings", "executesqlraw":
 		return "update"
 	case "delete", "deletemany", "delete_all", "destroy", "destroy_all", "remove":
 		return "delete"
-	case "create", "bulkcreate", "add", "save", "upsert":
+	case "create", "bulkcreate", "bulk_create", "bulk_insert_mappings", "add", "save", "upsert", "update_or_create", "persist", "merge":
 		return "insert"
 	default:
 		return method

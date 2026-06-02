@@ -1,0 +1,64 @@
+{
+  "version": "patchline.orm-write-effect-extraction/v1",
+  "claim": "ORM-aware write-effect extraction is validated on public Active Record, Django ORM, SQLAlchemy, Prisma, TypeORM, Hibernate/JPA, and GORM repository slices.",
+  "minimum_public_slices": 4,
+  "required_frameworks": ["django", "gorm", "hibernate", "prisma", "rails", "sqlalchemy", "typeorm"],
+  "slices": [
+    {
+      "id": "active-record-discourse-group-manager",
+      "framework": "rails",
+      "repo": "discourse/discourse",
+      "ref": "548e2ae46a190b128e1501feceef4b196403d9ef",
+      "url": "https://raw.githubusercontent.com/discourse/discourse/548e2ae46a190b128e1501feceef4b196403d9ef/lib/group_manager.rb",
+      "expect_operation": "update"
+    },
+    {
+      "id": "django-core-update-tests",
+      "framework": "django",
+      "repo": "django/django",
+      "ref": "9383fae0d55a553be3bda620db87fa9ee8a81478",
+      "url": "https://raw.githubusercontent.com/django/django/9383fae0d55a553be3bda620db87fa9ee8a81478/tests/update/tests.py",
+      "expect_operation": "update"
+    },
+    {
+      "id": "sqlalchemy-airflow-serialized-dag",
+      "framework": "sqlalchemy",
+      "repo": "apache/airflow",
+      "ref": "707e3168816bedc52f30a2e675af2dfc5b8cd4d8",
+      "url": "https://raw.githubusercontent.com/apache/airflow/707e3168816bedc52f30a2e675af2dfc5b8cd4d8/airflow-core/src/airflow/models/serialized_dag.py",
+      "expect_operation": "insert"
+    },
+    {
+      "id": "prisma-client-update-many",
+      "framework": "prisma",
+      "repo": "camero2734/Nico-and-the-Bots",
+      "ref": "f411d9fef911dc8535baf6cfe7f041bccc636237",
+      "url": "https://raw.githubusercontent.com/camero2734/Nico-and-the-Bots/f411d9fef911dc8535baf6cfe7f041bccc636237/app.ts",
+      "expect_operation": "update"
+    },
+    {
+      "id": "typeorm-issue-update",
+      "framework": "typeorm",
+      "repo": "typeorm/typeorm",
+      "ref": "d513f227337077dd6aa53ae890020cfa2bb165ae",
+      "url": "https://raw.githubusercontent.com/typeorm/typeorm/d513f227337077dd6aa53ae890020cfa2bb165ae/test/github-issues/1569/issue-1569.test.ts",
+      "expect_operation": "update"
+    },
+    {
+      "id": "hibernate-jpa-modifying-query",
+      "framework": "hibernate",
+      "repo": "Ilibed/social-network",
+      "ref": "5d796315b3c503d437567afb3cb896f5ec65fb9c",
+      "url": "https://raw.githubusercontent.com/Ilibed/social-network/5d796315b3c503d437567afb3cb896f5ec65fb9c/src/main/java/com/ilibed/user/UserRepository.java",
+      "expect_operation": "update"
+    },
+    {
+      "id": "gorm-hooks-update",
+      "framework": "gorm",
+      "repo": "go-gorm/gorm",
+      "ref": "d0ee5e2296150d691364c5f4f7f2b32abde04545",
+      "url": "https://raw.githubusercontent.com/go-gorm/gorm/d0ee5e2296150d691364c5f4f7f2b32abde04545/tests/hooks_test.go",
+      "expect_operation": "update"
+    }
+  ]
+}

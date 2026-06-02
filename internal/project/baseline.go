@@ -639,7 +639,7 @@ func isPersistentCodeObservation(obs migration.SourceSQLObservation) bool {
 
 func isPersistentWriteOperation(operation string) bool {
 	switch strings.ToLower(operation) {
-	case "update", "delete", "insert":
+	case "update", "delete", "insert", "save", "merge", "persist", "upsert", "update_or_create", "bulk_create", "bulk_update":
 		return true
 	default:
 		return false
