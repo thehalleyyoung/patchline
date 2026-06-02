@@ -1,0 +1,41 @@
+{
+  "version": "patchline.artifact-container-profile-gate/v1",
+  "claim": "Patchline provides a one-command artifact VM/container profile that rebuilds public results from pinned public repositories without relying on host-specific paths, shells, caches, credentials, or locally installed project dependencies.",
+  "one_command": "bash scripts/artifact-container-rebuild.sh",
+  "minimum_public_repos": 4,
+  "minimum_ranked_risks": 100,
+  "minimum_generated_files": 8,
+  "container": {
+    "dockerfile": "packaging/artifact/Dockerfile",
+    "image": "patchline-artifact-rebuild:local",
+    "run_command": "docker build -f packaging/artifact/Dockerfile -t patchline-artifact-rebuild:local . && docker run --rm patchline-artifact-rebuild:local",
+    "required_packages": ["ca-certificates", "curl", "git", "jq", "make", "z3"],
+    "workspace": "/workspace/patchline",
+    "results_dir": "/workspace/patchline/results/generated/artifact-container-rebuild",
+    "network": "required only for pinned public repository archive downloads"
+  },
+  "host_independence": {
+    "forbidden_path_prefixes": ["/Users/", "/home/", "/tmp/", "C:\\\\"],
+    "required_environment": [
+      "PATCHLINE_ARTIFACT_MODE=container",
+      "PATCHLINE_RESULTS_DIR=/workspace/patchline/results/generated/artifact-container-rebuild",
+      "PATCHLINE_DOWNLOAD_DIR=/workspace/patchline/results/generated/artifact-container-cache"
+    ],
+    "no_production_credentials": true,
+    "no_host_language_toolchains": true,
+    "no_host_database_services": true,
+    "no_absolute_host_paths": true
+  },
+  "public_results": {
+    "capstone_spec": "examples/capstone-demo-gate.json",
+    "required_outputs": [
+      "profile/artifact-container-profile.json",
+      "profile/rebuild-command.sh",
+      "profile/host-independence.json",
+      "public-results/capstone/session.md",
+      "public-results/capstone/summary.json",
+      "public-results/capstone/checksums.txt",
+      "rebuild-summary.json"
+    ]
+  }
+}

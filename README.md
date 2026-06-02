@@ -187,6 +187,8 @@ Run `make capstone-demo-gate` to regenerate the release-quality capstone demo wh
 
 Run `make artifact-evaluation-kit-gate` to regenerate the artifact-evaluation landing kit with reviewer roles, time budgets, expected outputs, and pass/fail criteria; see [docs/artifact-evaluation-kit.md](docs/artifact-evaluation-kit.md).
 
+Run `make artifact-container-profile-gate` to verify the one-command artifact VM/container profile that rebuilds public results without host-specific assumptions; see [docs/artifact-container-profile.md](docs/artifact-container-profile.md).
+
 Add `--redact` to write `analysis-bundle/` copies with stable redaction tokens for identifiers, literals, customer-like strings, and secret-like values while preserving joins and existing artifact hashes.
 
 Add `--ci` to write `ci/summary.md` plus upload snippets and code-quality artifacts for GitHub Actions, GitLab CI, and Bitbucket Pipelines: SARIF under `analysis-bundle/summary.sarif`, GitLab `ci/gl-code-quality-report.json`, and Bitbucket `ci/bitbucket-code-insights.json`.
