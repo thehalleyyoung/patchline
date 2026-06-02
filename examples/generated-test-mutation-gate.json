@@ -1,0 +1,11 @@
+{
+  "version": "patchline.generated-test-mutation-gate/v1",
+  "claim": "Generated reviewability tests are themselves tested by mutation: each test has an explicit oracle derived from a real repair-proof summary (the candidate must target the declared table and touch only its declared repair paths), and the gate mutates the candidate's assumptions to prove the test fails (kills the mutant) whenever an assumption is violated. The mutation score must be 1.0, and a tautological control test that asserts nothing must kill zero mutants.",
+  "real_repo": {
+    "repo": "lobsters/lobsters",
+    "ref": "3b80b47aa5aaba37ec44413e7d1dc96fcf1585b6",
+    "subpath": "db/migrate"
+  },
+  "minimum_tests": 10,
+  "mutations": ["m-wrong-table", "m-out-of-scope", "m-drop-precond"]
+}

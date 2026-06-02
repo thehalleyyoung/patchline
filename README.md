@@ -259,6 +259,8 @@ Run `make intervention-provenance-graph-gate` to build a provenance graph over e
 
 Run `make rejection-taxonomy-gate` to classify candidate data changes through a closed, deterministic rejection taxonomy — unsafe SQL, broad writes, missing rollback, and unbounded runtime — proving every category fires on real evidence while a synthetic safe candidate yields zero rejection codes; see [docs/rejection-taxonomy.md](docs/rejection-taxonomy.md).
 
+Run `make generated-test-mutation-gate` to mutation-test the generated reviewability tests themselves — proving each one fails when its stated assumption (target table, declared scope) is violated, for a mutation score of 1.0, while a tautological control test kills zero mutants; see [docs/generated-test-mutation.md](docs/generated-test-mutation.md).
+
 Add `--redact` to write `analysis-bundle/` copies with stable redaction tokens for identifiers, literals, customer-like strings, and secret-like values while preserving joins and existing artifact hashes.
 
 Add `--ci` to write `ci/summary.md` plus upload snippets and code-quality artifacts for GitHub Actions, GitLab CI, and Bitbucket Pipelines: SARIF under `analysis-bundle/summary.sarif`, GitLab `ci/gl-code-quality-report.json`, and Bitbucket `ci/bitbucket-code-insights.json`.
