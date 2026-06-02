@@ -377,6 +377,8 @@ Run `make symexec-gate` to run bounded **symbolic execution** of a migration gua
 
 Run `make modelcheck-gate` to **model check** a migration rollout state machine — a safe model satisfies the *never reach data_loss* invariant while a buggy model yields the shortest **counterexample** trace; see [docs/modelcheck.md](docs/modelcheck.md).
 
+Run `make causal-graph-gate` to build a **causal graph** of failure factors — it computes the true **root cause** ancestors of the failure, excludes a mere correlate with no path to failure, and rejects a cyclic graph; see [docs/causal-graph.md](docs/causal-graph.md).
+
 Add `--redact` to write `analysis-bundle/` copies with stable redaction tokens for identifiers, literals, customer-like strings, and secret-like values while preserving joins and existing artifact hashes.
 
 Add `--ci` to write `ci/summary.md` plus upload snippets and code-quality artifacts for GitHub Actions, GitLab CI, and Bitbucket Pipelines: SARIF under `analysis-bundle/summary.sarif`, GitLab `ci/gl-code-quality-report.json`, and Bitbucket `ci/bitbucket-code-insights.json`.

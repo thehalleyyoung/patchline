@@ -1,0 +1,17 @@
+{
+  "version": "patchline.causal-graph-gate/v1",
+  "claim": "Patchline represents migration-failure analysis as a causal graph rather than a flat list of correlates, computing the set of nodes that are genuine causal ancestors of the failure outcome so that root causes are separated from quantities that merely co-occur with failure, and it verifies the graph is acyclic before drawing any causal conclusion. The worker validates that the graph is a DAG, computes the transitive ancestors of the failure node as the root-cause set, and confirms that a node which is only correlated — present in the graph but with no directed path to the failure — is excluded from that set. The gate proves the true root causes are identified, the spurious correlate is excluded, and a cyclic graph is rejected.",
+  "real_repo": "patchline (self): causal-graph root-cause attribution",
+  "failure_node": "rollback",
+  "edges": [
+    {"from": "missing_backfill", "to": "null_violation"},
+    {"from": "null_violation", "to": "rollback"},
+    {"from": "long_lock", "to": "rollback"},
+    {"from": "deploy_time", "to": "team_oncall"}
+  ],
+  "correlate_node": "deploy_time",
+  "cyclic_edges": [
+    {"from": "a", "to": "b"},
+    {"from": "b", "to": "a"}
+  ]
+}
