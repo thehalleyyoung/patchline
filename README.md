@@ -176,6 +176,7 @@ make repair-manifest-schema-gate
 make generated-patch-minimization-gate
 make generated-risk-budget-gate
 make safe-review-badge-gate
+make intervention-replay-gate
 ```
 
 The demo downloads real GitHub project subpaths and writes:
@@ -287,6 +288,8 @@ The real-repo slice matrix is backed by `examples/real-repo-slices.json` and `ex
 `make generated-risk-budget-gate` mutates generated explain proposals on four public repo slices and proves compare rejects interventions whose new SQL risk budget exceeds covered risks.
 
 `make safe-review-badge-gate` checks four public repo slices and proves compare emits a safe-to-review badge only when deterministic checks pass, native checks are passed or explicitly unavailable, and proof holes are listed.
+
+`make intervention-replay-gate` replays generated interventions from four public repo analyses, hashing prompt context, generation output, applied diff, compare results, and replay metadata.
 
 Current default projects:
 

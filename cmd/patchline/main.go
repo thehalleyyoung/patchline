@@ -6,6 +6,7 @@ import (
 	"errors"
 	"flag"
 	"fmt"
+	"io/fs"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -406,6 +407,7 @@ Usage:
   patchline repo propose --from-report baseline-dir --proposal-kind tests|guards|instrumentation|repair|all [--budget files=N,lines=N,tokens=N,changes=N] [--no-llm] [--llm-command cmd] [--prompt-without-facts] [--out dir] [--json]
   patchline repo compare --before baseline-dir --after proposal-dir [--out dir] [--run-native-tests] [--json]
   patchline repo proposal-minimize --before baseline-dir --after proposal-dir [--out dir] [--json]
+  patchline repo replay --analysis analysis-dir [--out dir] [--json]
   patchline repo suppressions --baseline baseline-dir --suppressions suppressions.json [--out dir] [--json]
   patchline repo why-now --previous baseline-dir --current baseline-dir [--out dir] [--json]
   patchline repo changes --previous analysis-dir --current analysis-dir [--out dir] [--json]
@@ -501,7 +503,7 @@ Examples:
 
 func repoCommand(args []string) error {
 	if len(args) == 0 {
-		return errors.New("usage: patchline repo <doctor|fetch|analyze|inventory|baseline|propose|compare|proposal-minimize|suppressions|why-now|changes|notify-summary|minimize|recurrence> ...")
+		return errors.New("usage: patchline repo <doctor|fetch|analyze|inventory|baseline|propose|compare|proposal-minimize|replay|suppressions|why-now|changes|notify-summary|minimize|recurrence> ...")
 	}
 	switch args[0] {
 	case "doctor":
@@ -520,6 +522,8 @@ func repoCommand(args []string) error {
 		return repoCompare(args[1:])
 	case "proposal-minimize":
 		return repoProposalMinimize(args[1:])
+	case "replay":
+		return repoReplay(args[1:])
 	case "suppressions":
 		return repoSuppressions(args[1:])
 	case "why-now":
@@ -2599,6 +2603,237 @@ func repoProposalMinimize(args []string) error {
 		fmt.Printf("  out=%s\n", *outPath)
 	}
 	return nil
+}
+
+type repoReplayReport struct {
+	Version    string               `json:"version"`
+	Analysis   string               `json:"analysis"`
+	Artifacts  []repoReplayArtifact `json:"artifacts"`
+	PatchApply repoReplayPatchApply `json:"patch_apply"`
+	Hash       string               `json:"hash"`
+	Markdown   string               `json:"markdown,omitempty"`
+}
+
+type repoReplayArtifact struct {
+	Name  string `json:"name"`
+	Path  string `json:"path"`
+	Hash  string `json:"hash"`
+	Bytes int    `json:"bytes"`
+}
+
+type repoReplayPatchApply struct {
+	Status   string `json:"status"`
+	DiffPath string `json:"diff_path,omitempty"`
+	DiffHash string `json:"diff_hash,omitempty"`
+	LogHash  string `json:"log_hash,omitempty"`
+	Log      string `json:"log,omitempty"`
+}
+
+func repoReplay(args []string) error {
+	fs := flag.NewFlagSet("repo replay", flag.ContinueOnError)
+	fs.SetOutput(ioDiscard{})
+	analysisPath := fs.String("analysis", "", "repo analyze output directory")
+	outPath := fs.String("out", filepath.Join("results", "generated", "repo-replay"), "output directory")
+	jsonOut := fs.Bool("json", false, "emit JSON")
+	if err := fs.Parse(args); err != nil {
+		return err
+	}
+	if *analysisPath == "" {
+		return errors.New("usage: patchline repo replay --analysis analysis-dir [--out dir] [--json]")
+	}
+	report, err := buildRepoReplayReport(*analysisPath, *outPath)
+	if err != nil {
+		return err
+	}
+	if *outPath != "" {
+		if err := writeRepoReplayReport(*outPath, report); err != nil {
+			return err
+		}
+	}
+	if *jsonOut {
+		return writeJSON(os.Stdout, report)
+	}
+	fmt.Printf("repo replay artifacts=%d patch_apply=%s hash=%s\n", len(report.Artifacts), report.PatchApply.Status, report.Hash)
+	if *outPath != "" {
+		fmt.Printf("  out=%s\n", *outPath)
+	}
+	return nil
+}
+
+func buildRepoReplayReport(analysisPath, outPath string) (repoReplayReport, error) {
+	report := repoReplayReport{Version: "patchline.repo-replay/v1", Analysis: analysisPath}
+	candidates := []struct {
+		name string
+		path string
+	}{
+		{"source", filepath.Join(analysisPath, "fetch", "source.json")},
+		{"prompt_context", filepath.Join(analysisPath, "proposal", "prompt-context.json")},
+		{"prompt", filepath.Join(analysisPath, "proposal", "prompt.txt")},
+		{"generation_output", filepath.Join(analysisPath, "proposal", "proposal.json")},
+		{"generated_patch", filepath.Join(analysisPath, "proposal", "proposal.patch")},
+		{"compare_results", filepath.Join(analysisPath, "compare", "compare.json")},
+	}
+	for _, candidate := range candidates {
+		artifact, ok, err := replayArtifact(candidate.name, candidate.path)
+		if err != nil {
+			return repoReplayReport{}, err
+		}
+		if ok {
+			report.Artifacts = append(report.Artifacts, artifact)
+		}
+	}
+	report.PatchApply = replayApplyPatch(analysisPath, outPath)
+	if report.PatchApply.DiffPath != "" {
+		if artifact, ok, err := replayArtifact("applied_diff", report.PatchApply.DiffPath); err != nil {
+			return repoReplayReport{}, err
+		} else if ok {
+			report.Artifacts = append(report.Artifacts, artifact)
+		}
+	}
+	report.Hash = repoReplayHash(report)
+	report.Markdown = renderRepoReplayMarkdown(report)
+	return report, nil
+}
+
+func replayArtifact(name, path string) (repoReplayArtifact, bool, error) {
+	data, err := os.ReadFile(path)
+	if err != nil {
+		if errors.Is(err, os.ErrNotExist) {
+			return repoReplayArtifact{}, false, nil
+		}
+		return repoReplayArtifact{}, false, err
+	}
+	return repoReplayArtifact{Name: name, Path: filepath.ToSlash(path), Hash: "sha256:" + canonical.Hash(data), Bytes: len(data)}, true, nil
+}
+
+func replayApplyPatch(analysisPath, outPath string) repoReplayPatchApply {
+	patchPath := filepath.Join(analysisPath, "proposal", "proposal.patch")
+	absPatchPath, err := filepath.Abs(patchPath)
+	if err != nil {
+		absPatchPath = patchPath
+	}
+	source, err := loadSource(filepath.Join(analysisPath, "fetch", "source.json"))
+	if err != nil || source.ScannedRoot == "" || !fileExists(patchPath) {
+		return repoReplayPatchApply{Status: "unavailable", Log: "source metadata or proposal patch unavailable"}
+	}
+	tmp, err := os.MkdirTemp("", "patchline-replay-*")
+	if err != nil {
+		return repoReplayPatchApply{Status: "failed", Log: err.Error(), LogHash: canonical.Hash(err.Error())}
+	}
+	defer os.RemoveAll(tmp)
+	work := filepath.Join(tmp, "work")
+	if err := copyReplayTree(source.ScannedRoot, work); err != nil {
+		return repoReplayPatchApply{Status: "failed", Log: err.Error(), LogHash: canonical.Hash(err.Error())}
+	}
+	run := func(args ...string) (string, error) {
+		cmd := exec.Command("git", args...)
+		cmd.Dir = work
+		out, err := cmd.CombinedOutput()
+		return string(out), err
+	}
+	var logs []string
+	for _, args := range [][]string{
+		{"init", "--quiet"},
+		{"add", "-A"},
+		{"-c", "user.name=Patchline", "-c", "user.email=patchline@example.invalid", "commit", "--quiet", "--allow-empty", "-m", "replay baseline"},
+		{"apply", absPatchPath},
+		{"add", "-N", "--", "."},
+	} {
+		log, err := run(args...)
+		logs = append(logs, "$ git "+strings.Join(args, " ")+"\n"+log)
+		if err != nil {
+			joined := strings.Join(logs, "\n")
+			return repoReplayPatchApply{Status: "failed", Log: joined, LogHash: canonical.Hash(joined)}
+		}
+	}
+	diff, err := run("diff", "--binary")
+	logs = append(logs, "$ git diff --binary\n"+diff)
+	if err != nil {
+		joined := strings.Join(logs, "\n")
+		return repoReplayPatchApply{Status: "failed", Log: joined, LogHash: canonical.Hash(joined)}
+	}
+	diffPath := filepath.Join(outPath, "applied.diff")
+	if outPath != "" {
+		_ = os.MkdirAll(outPath, 0o755)
+		_ = os.WriteFile(diffPath, []byte(diff), 0o644)
+	}
+	return repoReplayPatchApply{Status: "applied", DiffPath: filepath.ToSlash(diffPath), DiffHash: "sha256:" + canonical.Hash(diff), LogHash: canonical.Hash(strings.Join(logs, "\n"))}
+}
+
+func copyReplayTree(src, dst string) error {
+	return filepath.WalkDir(src, func(path string, d fs.DirEntry, err error) error {
+		if err != nil {
+			return err
+		}
+		rel, err := filepath.Rel(src, path)
+		if err != nil {
+			return err
+		}
+		if rel == "." {
+			return os.MkdirAll(dst, 0o755)
+		}
+		if d.IsDir() && d.Name() == ".git" {
+			return filepath.SkipDir
+		}
+		target := filepath.Join(dst, rel)
+		if d.IsDir() {
+			return os.MkdirAll(target, 0o755)
+		}
+		info, err := d.Info()
+		if err != nil {
+			return err
+		}
+		if !info.Mode().IsRegular() {
+			return nil
+		}
+		data, err := os.ReadFile(path)
+		if err != nil {
+			return err
+		}
+		if err := os.MkdirAll(filepath.Dir(target), 0o755); err != nil {
+			return err
+		}
+		return os.WriteFile(target, data, info.Mode().Perm())
+	})
+}
+
+func repoReplayHash(report repoReplayReport) string {
+	copy := report
+	copy.Hash = ""
+	copy.Markdown = ""
+	return canonical.Hash(copy)
+}
+
+func renderRepoReplayMarkdown(report repoReplayReport) string {
+	var b strings.Builder
+	fmt.Fprintf(&b, "# Patchline generated intervention replay\n\n")
+	fmt.Fprintf(&b, "- analysis: `%s`\n", report.Analysis)
+	fmt.Fprintf(&b, "- patch_apply: `%s`\n", report.PatchApply.Status)
+	if report.PatchApply.DiffHash != "" {
+		fmt.Fprintf(&b, "- applied_diff_hash: `%s`\n", report.PatchApply.DiffHash)
+	}
+	fmt.Fprintf(&b, "- hash: `%s`\n\n", report.Hash)
+	fmt.Fprintf(&b, "## Replay artifacts\n\n| artifact | hash | bytes |\n| --- | --- | ---: |\n")
+	for _, artifact := range report.Artifacts {
+		fmt.Fprintf(&b, "| %s | `%s` | %d |\n", artifact.Name, artifact.Hash, artifact.Bytes)
+	}
+	return b.String()
+}
+
+func writeRepoReplayReport(outDir string, report repoReplayReport) error {
+	if err := os.MkdirAll(outDir, 0o755); err != nil {
+		return err
+	}
+	copy := report
+	copy.Markdown = ""
+	data, err := json.MarshalIndent(copy, "", "  ")
+	if err != nil {
+		return err
+	}
+	if err := os.WriteFile(filepath.Join(outDir, "replay.json"), append(data, '\n'), 0o644); err != nil {
+		return err
+	}
+	return os.WriteFile(filepath.Join(outDir, "replay.md"), []byte(report.Markdown), 0o644)
 }
 
 func repoSuppressions(args []string) error {

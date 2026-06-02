@@ -1,0 +1,6 @@
+{
+  "version": "patchline.intervention-replay/v1",
+  "minimum_public_slices": 4,
+  "required_artifacts": ["prompt_context", "prompt", "generation_output", "generated_patch", "applied_diff", "compare_results"],
+  "claim": "Generated intervention replay reproduces prompt context, generation output, applied diff, compare results, and content hashes from real repo analyses."
+}
