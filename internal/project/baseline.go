@@ -19,6 +19,13 @@ import (
 
 const BaselineVersion = "patchline.repo-baseline/v1"
 
+var (
+	blastFKInlinePattern = regexp.MustCompile(`(?is)\b(?:foreign\s+key\s*\([^)]+\)\s*)?references\s+["'\[]?([A-Za-z_][A-Za-z0-9_.$-]*)`)
+	blastFKAlterPattern  = regexp.MustCompile(`(?is)\balter\s+table\s+(?:if\s+exists\s+)?["'\[]?([A-Za-z_][A-Za-z0-9_.$-]*)[^;]*?\breferences\s+["'\[]?([A-Za-z_][A-Za-z0-9_.$-]*)`)
+	blastCreateTablePat  = regexp.MustCompile(`(?is)\bcreate\s+table\s+(?:if\s+not\s+exists\s+)?["'\[]?([A-Za-z_][A-Za-z0-9_.$-]*)`)
+	blastQueryTablePat   = regexp.MustCompile(`(?is)\b(?:from|join|update|into|delete\s+from)\s+["'\[]?([A-Za-z_][A-Za-z0-9_.$-]*)`)
+)
+
 type BaselineReport struct {
 	Version         string                    `json:"version"`
 	InventoryRoot   string                    `json:"inventory_root"`
@@ -41,6 +48,7 @@ type BaselineReport struct {
 	PrivacyHazards  []PrivacyHazard           `json:"data_retention_privacy_hazards,omitempty"`
 	Invariants      []InvariantCandidate      `json:"invariant_candidates,omitempty"`
 	TraceLinks      []TraceCodeLink           `json:"trace_code_links,omitempty"`
+	BlastRadius     []BlastRadiusEstimate     `json:"blast_radius_estimates,omitempty"`
 	PolicyChecks    []PolicyCheck             `json:"policy_checks,omitempty"`
 	RepairProofs    []RepairProofSummary      `json:"repair_proof_summaries,omitempty"`
 	NativeChecks    []Command                 `json:"native_checks,omitempty"`
@@ -100,6 +108,10 @@ type BaselineSummary struct {
 	TraceLinkCausal     int `json:"trace_links_causal"`
 	TraceLinkTemporal   int `json:"trace_links_temporal"`
 	TraceLinkInferred   int `json:"trace_links_inferred"`
+	BlastRadius         int `json:"blast_radius_estimates"`
+	BlastRadiusHigh     int `json:"blast_radius_high"`
+	BlastRadiusMedium   int `json:"blast_radius_medium"`
+	BlastRadiusLow      int `json:"blast_radius_low"`
 	PolicyChecks        int `json:"policy_checks"`
 	PolicyPassed        int `json:"policy_passed"`
 	PolicyWarnings      int `json:"policy_warnings"`
@@ -225,6 +237,24 @@ type TraceCodeLink struct {
 	Time        string       `json:"time,omitempty"`
 	Evidence    []string     `json:"evidence,omitempty"`
 	Rationale   string       `json:"rationale"`
+}
+
+type BlastRadiusEstimate struct {
+	ID              string       `json:"id"`
+	RiskID          string       `json:"risk_id"`
+	Table           string       `json:"table"`
+	Level           string       `json:"level"`
+	Score           int          `json:"score"`
+	TableCentrality int          `json:"table_centrality"`
+	FKReachability  int          `json:"foreign_key_reachability"`
+	CodePathFanout  int          `json:"code_path_fanout"`
+	QueryUsage      int          `json:"query_usage"`
+	AffectedTables  []string     `json:"affected_tables,omitempty"`
+	SourcePaths     []string     `json:"source_paths,omitempty"`
+	QueryPaths      []string     `json:"query_paths,omitempty"`
+	Evidence        []string     `json:"evidence,omitempty"`
+	Identifiers     []Identifier `json:"identifiers,omitempty"`
+	Rationale       string       `json:"rationale"`
 }
 
 type ScoreFactor struct {
@@ -406,6 +436,7 @@ func Baseline(inv Inventory, facts []Fact, intakeReport intake.Report) BaselineR
 	report.PrivacyHazards = buildPrivacyHazards(report.Risks, report.Provenance, facts, intakeReport)
 	report.Invariants = buildInvariantCandidates(inv.Root, facts, intakeReport)
 	report.TraceLinks = buildTraceCodeLinks(inv.Root, report.Risks, report.Provenance, facts, intakeReport)
+	report.BlastRadius = buildBlastRadiusEstimates(inv.Root, report.Risks, report.Provenance, facts, intakeReport)
 	report.PolicyChecks = buildPolicyChecks(report.Risks, report.Provenance, report.SymbolicChecks)
 	report.RepairProofs = buildRepairProofSummaries(report.Risks, report.Provenance, report.AbstractEffects, report.SymbolicChecks)
 	report.Summary = BaselineSummary{
@@ -460,6 +491,10 @@ func Baseline(inv Inventory, facts []Fact, intakeReport intake.Report) BaselineR
 		TraceLinkCausal:     countTraceLinkConfidence(report.TraceLinks, "causal"),
 		TraceLinkTemporal:   countTraceLinkConfidence(report.TraceLinks, "temporal"),
 		TraceLinkInferred:   countTraceLinkConfidence(report.TraceLinks, "inferred"),
+		BlastRadius:         len(report.BlastRadius),
+		BlastRadiusHigh:     countBlastRadiusLevel(report.BlastRadius, "high"),
+		BlastRadiusMedium:   countBlastRadiusLevel(report.BlastRadius, "medium"),
+		BlastRadiusLow:      countBlastRadiusLevel(report.BlastRadius, "low"),
 		PolicyChecks:        len(report.PolicyChecks),
 		PolicyPassed:        countPolicyStatus(report.PolicyChecks, "pass"),
 		PolicyWarnings:      countPolicyStatus(report.PolicyChecks, "warn"),
@@ -4158,6 +4193,323 @@ func countTraceLinkConfidence(links []TraceCodeLink, confidence string) int {
 	return count
 }
 
+func buildBlastRadiusEstimates(inventoryRoot string, risks []BaselineRisk, slices []ProvenanceSlice, facts []Fact, intakeReport intake.Report) []BlastRadiusEstimate {
+	root := firstNonEmpty(inventoryRoot, intakeReport.Source.ScannedRoot, intakeReport.Source.Input)
+	tableFacts := blastFactsByTable(root, facts)
+	queryPaths := blastQueryPathsByTable(root, facts)
+	fkGraph := blastForeignKeyGraph(root, facts)
+	sliceByRisk := map[string]ProvenanceSlice{}
+	for _, slice := range slices {
+		sliceByRisk[slice.RiskID] = slice
+	}
+	var out []BlastRadiusEstimate
+	seen := map[string]bool{}
+	for _, risk := range risks {
+		table := normalizeBlastTable(firstNonEmpty(risk.Table, firstIdentifierValue(risk.Identifiers, "table"), firstIdentifierValue(risk.Identifiers, "model")))
+		if table == "" {
+			continue
+		}
+		slice := sliceByRisk[risk.ID]
+		affected := blastReachableTables(table, fkGraph, 2)
+		centrality := len(uniqueStrings(append(tableFacts[table], queryPaths[table]...)))
+		sourcePaths := blastSourcePathsForRisk(table, risk, slice, tableFacts)
+		queryUsage := len(queryPaths[table])
+		fanout := len(sourcePaths)
+		score := blastRadiusScore(risk, centrality, len(affected), fanout, queryUsage)
+		estimate := BlastRadiusEstimate{
+			ID:              "blast:" + canonical.Hash(strings.Join([]string{risk.ID, table, strings.Join(affected, ",")}, "\x00"))[:16],
+			RiskID:          risk.ID,
+			Table:           table,
+			Level:           blastRadiusLevel(score),
+			Score:           score,
+			TableCentrality: centrality,
+			FKReachability:  len(affected),
+			CodePathFanout:  fanout,
+			QueryUsage:      queryUsage,
+			AffectedTables:  affected,
+			SourcePaths:     sourcePaths,
+			QueryPaths:      capStrings(queryPaths[table], 12),
+			Evidence:        blastRadiusEvidence(risk, slice, affected, sourcePaths, queryPaths[table]),
+			Identifiers:     uniqueIdentifiers(append(risk.Identifiers, Identifier{Kind: "table", Value: table})),
+			Rationale:       "approximate blast radius combines table centrality, foreign-key reachability, code-path fanout, and observed query usage; it is a prioritization estimate, not a concrete row-count claim",
+		}
+		key := estimate.RiskID + "\x00" + estimate.Table
+		if seen[key] {
+			continue
+		}
+		seen[key] = true
+		out = append(out, estimate)
+	}
+	sort.Slice(out, func(i, j int) bool {
+		if out[i].Score != out[j].Score {
+			return out[i].Score > out[j].Score
+		}
+		if out[i].Table != out[j].Table {
+			return out[i].Table < out[j].Table
+		}
+		return out[i].RiskID < out[j].RiskID
+	})
+	if len(out) > 200 {
+		out = out[:200]
+	}
+	return out
+}
+
+func blastFactsByTable(root string, facts []Fact) map[string][]string {
+	out := map[string][]string{}
+	for _, fact := range facts {
+		if fact.Path == "" {
+			continue
+		}
+		text := fact.Path + "\n" + fact.Rationale + "\n" + fact.Properties["kind"] + "\n" + fact.Properties["table"] + "\n" + fact.Properties["value_preview"]
+		if fact.Kind == "file" || fact.Kind == "source_sql_hint" || fact.Kind == "schema_evolution" || fact.Kind == "field_evidence" {
+			text += "\n" + textForBoundary(root, fact.Path)
+		}
+		for _, table := range blastTablesFromText(text, fact.Identifiers) {
+			out[table] = append(out[table], fact.Path)
+		}
+	}
+	for table, paths := range out {
+		out[table] = uniqueSortedStrings(paths)
+	}
+	return out
+}
+
+func blastQueryPathsByTable(root string, facts []Fact) map[string][]string {
+	out := map[string][]string{}
+	for _, fact := range facts {
+		if fact.Path == "" {
+			continue
+		}
+		text := fact.Path + "\n" + fact.Rationale + "\n" + fact.Properties["value_preview"]
+		if fact.Kind == "file" || fact.Kind == "source_sql_hint" || fact.Kind == "field_evidence" || fact.Kind == "schema_evolution" {
+			text += "\n" + textForBoundary(root, fact.Path)
+		}
+		if !containsAny(strings.ToLower(text), "select ", " join ", " update ", " delete from ", " insert into ", " from ") {
+			continue
+		}
+		for _, match := range blastQueryTablePat.FindAllStringSubmatch(text, -1) {
+			if len(match) > 1 {
+				table := normalizeBlastTable(match[1])
+				if table != "" {
+					out[table] = append(out[table], fact.Path)
+				}
+			}
+		}
+		for _, id := range fact.Identifiers {
+			if id.Kind == "table" {
+				table := normalizeBlastTable(id.Value)
+				if table != "" {
+					out[table] = append(out[table], fact.Path)
+				}
+			}
+		}
+	}
+	for table, paths := range out {
+		out[table] = uniqueSortedStrings(paths)
+	}
+	return out
+}
+
+func blastForeignKeyGraph(root string, facts []Fact) map[string][]string {
+	graph := map[string][]string{}
+	for _, fact := range facts {
+		if fact.Path == "" {
+			continue
+		}
+		text := textForBoundary(root, fact.Path)
+		if text == "" || !containsAny(strings.ToLower(text), "foreign key", "references") {
+			continue
+		}
+		currentTable := ""
+		if table := normalizeBlastTable(fact.Properties["table"]); table != "" {
+			currentTable = table
+		}
+		if currentTable == "" {
+			for _, match := range blastCreateTablePat.FindAllStringSubmatch(text, -1) {
+				if len(match) > 1 {
+					currentTable = normalizeBlastTable(match[1])
+					break
+				}
+			}
+		}
+		for _, match := range blastFKAlterPattern.FindAllStringSubmatch(text, -1) {
+			if len(match) > 2 {
+				blastAddUndirectedEdge(graph, normalizeBlastTable(match[1]), normalizeBlastTable(match[2]))
+			}
+		}
+		if currentTable != "" {
+			for _, match := range blastFKInlinePattern.FindAllStringSubmatch(text, -1) {
+				if len(match) > 1 {
+					blastAddUndirectedEdge(graph, currentTable, normalizeBlastTable(match[1]))
+				}
+			}
+		}
+	}
+	for table, related := range graph {
+		graph[table] = uniqueSortedStrings(related)
+	}
+	return graph
+}
+
+func blastAddUndirectedEdge(graph map[string][]string, left, right string) {
+	if left == "" || right == "" || left == right {
+		return
+	}
+	graph[left] = append(graph[left], right)
+	graph[right] = append(graph[right], left)
+}
+
+func blastReachableTables(table string, graph map[string][]string, depth int) []string {
+	table = normalizeBlastTable(table)
+	if table == "" || depth <= 0 {
+		return nil
+	}
+	seen := map[string]bool{table: true}
+	frontier := []string{table}
+	var out []string
+	for level := 0; level < depth && len(frontier) > 0; level++ {
+		var next []string
+		for _, current := range frontier {
+			for _, related := range graph[current] {
+				if seen[related] {
+					continue
+				}
+				seen[related] = true
+				out = append(out, related)
+				next = append(next, related)
+			}
+		}
+		frontier = next
+	}
+	return capStrings(uniqueSortedStrings(out), 20)
+}
+
+func blastTablesFromText(text string, ids []Identifier) []string {
+	var tables []string
+	for _, id := range ids {
+		if id.Kind == "table" || id.Kind == "model" {
+			table := normalizeBlastTable(id.Value)
+			if table != "" {
+				tables = append(tables, table)
+			}
+		}
+	}
+	for _, match := range identifierSQLTablePattern.FindAllStringSubmatch(text, -1) {
+		if len(match) > 1 {
+			table := normalizeBlastTable(match[1])
+			if table != "" {
+				tables = append(tables, table)
+			}
+		}
+	}
+	for _, match := range blastQueryTablePat.FindAllStringSubmatch(text, -1) {
+		if len(match) > 1 {
+			table := normalizeBlastTable(match[1])
+			if table != "" {
+				tables = append(tables, table)
+			}
+		}
+	}
+	return uniqueSortedStrings(tables)
+}
+
+func blastSourcePathsForRisk(table string, risk BaselineRisk, slice ProvenanceSlice, tableFacts map[string][]string) []string {
+	var paths []string
+	if risk.Path != "" {
+		paths = append(paths, risk.Path)
+	}
+	paths = append(paths, slice.SourcePaths...)
+	paths = append(paths, tableFacts[table]...)
+	var codePaths []string
+	for _, path := range uniqueSortedStrings(paths) {
+		if hasCodeLikeExtension(path) || isMigrationLikePath(path) {
+			codePaths = append(codePaths, path)
+		}
+	}
+	return capStrings(uniqueSortedStrings(codePaths), 20)
+}
+
+func blastRadiusScore(risk BaselineRisk, centrality, reachability, fanout, usage int) int {
+	score := 10
+	switch risk.Severity {
+	case "critical":
+		score += 35
+	case "high":
+		score += 25
+	case "medium":
+		score += 15
+	default:
+		score += 5
+	}
+	score += minInt(centrality*3, 24)
+	score += minInt(reachability*8, 24)
+	score += minInt(fanout*4, 20)
+	score += minInt(usage*3, 18)
+	if riskHasFactor(risk, "broad-write") || riskHasFactor(risk, "destructive-effect") || riskHasFactor(risk, "destructive-code-path") {
+		score += 10
+	}
+	if score > 100 {
+		return 100
+	}
+	return score
+}
+
+func blastRadiusLevel(score int) string {
+	switch {
+	case score >= 70:
+		return "high"
+	case score >= 40:
+		return "medium"
+	default:
+		return "low"
+	}
+}
+
+func blastRadiusEvidence(risk BaselineRisk, slice ProvenanceSlice, affected, sourcePaths, queryPaths []string) []string {
+	var evidence []string
+	if risk.Path != "" {
+		evidence = append(evidence, "risk path: "+risk.Path)
+	}
+	if slice.ID != "" {
+		evidence = append(evidence, "provenance slice: "+slice.ID)
+	}
+	if len(affected) > 0 {
+		evidence = append(evidence, "foreign-key reachable tables: "+strings.Join(affected, ", "))
+	}
+	if len(sourcePaths) > 0 {
+		evidence = append(evidence, fmt.Sprintf("code/source paths: %d", len(sourcePaths)))
+	}
+	if len(queryPaths) > 0 {
+		evidence = append(evidence, fmt.Sprintf("query usage paths: %d", len(queryPaths)))
+	}
+	return capStrings(uniqueSortedStrings(evidence), 10)
+}
+
+func normalizeBlastTable(value string) string {
+	value = normalizeProjectIdentifierValue("table", value)
+	value = strings.Trim(value, "`")
+	value = strings.Trim(value, `"'[]`)
+	if strings.Contains(value, ".") {
+		parts := strings.Split(value, ".")
+		value = parts[len(parts)-1]
+	}
+	if isSQLIdentifierStopword(value) {
+		return ""
+	}
+	return value
+}
+
+func countBlastRadiusLevel(estimates []BlastRadiusEstimate, level string) int {
+	var count int
+	for _, estimate := range estimates {
+		if estimate.Level == level {
+			count++
+		}
+	}
+	return count
+}
+
 func buildPolicyChecks(risks []BaselineRisk, slices []ProvenanceSlice, symbolic []SymbolicCheck) []PolicyCheck {
 	sliceByRisk := map[string]ProvenanceSlice{}
 	for _, slice := range slices {
@@ -4665,6 +5017,10 @@ func renderBaselineMarkdown(report BaselineReport) string {
 	fmt.Fprintf(&b, "| trace links causal | %d |\n", report.Summary.TraceLinkCausal)
 	fmt.Fprintf(&b, "| trace links temporal | %d |\n", report.Summary.TraceLinkTemporal)
 	fmt.Fprintf(&b, "| trace links inferred | %d |\n", report.Summary.TraceLinkInferred)
+	fmt.Fprintf(&b, "| blast-radius estimates | %d |\n", report.Summary.BlastRadius)
+	fmt.Fprintf(&b, "| blast radius high | %d |\n", report.Summary.BlastRadiusHigh)
+	fmt.Fprintf(&b, "| blast radius medium | %d |\n", report.Summary.BlastRadiusMedium)
+	fmt.Fprintf(&b, "| blast radius low | %d |\n", report.Summary.BlastRadiusLow)
 	fmt.Fprintf(&b, "| policy checks | %d |\n", report.Summary.PolicyChecks)
 	fmt.Fprintf(&b, "| policy passed | %d |\n", report.Summary.PolicyPassed)
 	fmt.Fprintf(&b, "| policy warnings | %d |\n", report.Summary.PolicyWarnings)
@@ -4786,6 +5142,14 @@ func renderBaselineMarkdown(report BaselineReport) string {
 		limit := minInt(len(report.TraceLinks), 25)
 		for _, item := range report.TraceLinks[:limit] {
 			fmt.Fprintf(&b, "| %s | %s | %s | %s | `%s` | %s |\n", item.Confidence, item.Kind, item.SourcePath, item.CodePath, item.RiskID, strings.Join(item.Signals, ", "))
+		}
+		fmt.Fprintf(&b, "\n")
+	}
+	if len(report.BlastRadius) > 0 {
+		fmt.Fprintf(&b, "## Blast-radius estimates\n\n| level | score | risk | table | centrality | fk reach | fanout | query usage |\n| --- | ---: | --- | --- | ---: | ---: | ---: | ---: |\n")
+		limit := minInt(len(report.BlastRadius), 25)
+		for _, item := range report.BlastRadius[:limit] {
+			fmt.Fprintf(&b, "| %s | %d | `%s` | %s | %d | %d | %d | %d |\n", item.Level, item.Score, item.RiskID, item.Table, item.TableCentrality, item.FKReachability, item.CodePathFanout, item.QueryUsage)
 		}
 		fmt.Fprintf(&b, "\n")
 	}

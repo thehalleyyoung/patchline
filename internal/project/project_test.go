@@ -1113,6 +1113,42 @@ func TestBaselineBuildsTraceToCodeLinks(t *testing.T) {
 	}
 }
 
+func TestBaselineEstimatesBlastRadius(t *testing.T) {
+	root := t.TempDir()
+	writeFile(t, root, "db/migrate/001_schema.sql", `
+CREATE TABLE users (id int PRIMARY KEY);
+CREATE TABLE accounts (id int PRIMARY KEY, user_id int REFERENCES users(id));
+CREATE TABLE invoices (id int PRIMARY KEY, account_id int REFERENCES accounts(id));
+ALTER TABLE payments ADD CONSTRAINT payments_account_fk FOREIGN KEY (account_id) REFERENCES accounts(id);
+UPDATE accounts SET status = 'disabled';
+`)
+	writeFile(t, root, "app/models/account.rb", "class Account < ApplicationRecord\n  has_many :invoices\nend\n")
+	writeFile(t, root, "app/jobs/account_backfill_worker.rb", "class AccountBackfillWorker\n  def perform\n    Account.connection.execute(\"SELECT * FROM accounts JOIN invoices ON invoices.account_id = accounts.id\")\n    Account.update_all(status: 'active')\n  end\nend\n")
+	writeFile(t, root, "reports/account_usage.sql", "SELECT accounts.id, invoices.id FROM accounts JOIN invoices ON invoices.account_id = accounts.id;")
+	inv, err := InventoryPath(InventoryOptions{Path: root})
+	if err != nil {
+		t.Fatal(err)
+	}
+	intakeReport, err := intake.Run(context.Background(), intake.Options{Path: root})
+	if err != nil {
+		t.Fatal(err)
+	}
+	baseline := Baseline(inv, inv.Facts, intakeReport)
+	if baseline.Summary.BlastRadius == 0 || baseline.Summary.BlastRadiusHigh == 0 {
+		t.Fatalf("expected high blast-radius estimates: summary=%#v estimates=%#v", baseline.Summary, baseline.BlastRadius)
+	}
+	estimate, ok := blastEstimateForTable(baseline.BlastRadius, "accounts")
+	if !ok {
+		t.Fatalf("missing accounts blast-radius estimate in %#v", baseline.BlastRadius)
+	}
+	if estimate.FKReachability < 2 || estimate.CodePathFanout < 2 || estimate.QueryUsage < 2 || estimate.TableCentrality < 2 {
+		t.Fatalf("expected reachability/fanout/query/centrality evidence, got %#v", estimate)
+	}
+	if !strings.Contains(baseline.Markdown, "Blast-radius estimates") {
+		t.Fatalf("expected blast-radius section in markdown:\n%s", baseline.Markdown)
+	}
+}
+
 func TestCompareClassifiesGeneratedPrivacyHazards(t *testing.T) {
 	baseline := BaselineReport{
 		Version: BaselineVersion,
@@ -1621,6 +1657,15 @@ func hasTraceLinkKind(items []TraceCodeLink, kind string) bool {
 		}
 	}
 	return false
+}
+
+func blastEstimateForTable(items []BlastRadiusEstimate, table string) (BlastRadiusEstimate, bool) {
+	for _, item := range items {
+		if item.Table == table {
+			return item, true
+		}
+	}
+	return BlastRadiusEstimate{}, false
 }
 
 func hasFieldEvidence(facts []Fact, field, preview string) bool {
