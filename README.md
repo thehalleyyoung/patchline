@@ -263,6 +263,8 @@ Run `make generated-test-mutation-gate` to mutation-test the generated reviewabi
 
 Run `make guard-effectiveness-gate` to simulate generated migration guards against synthetic before/after datasets derived from the real public schema — proving the guard allows only bounded-safe changes, blocks every broad change, and fails closed on missing or unknown table metadata, while a no-op control guard scores strictly lower; see [docs/guard-effectiveness.md](docs/guard-effectiveness.md).
 
+Run `make intervention-budget-tuning-gate` to sweep the generated-intervention budget over files, lines, tokens, and changes — proving risk coverage rises monotonically with budget, zero budget covers nothing, full budget covers everything, and each dimension has a diminishing-returns knee that recommends a setting; see [docs/intervention-budget-tuning.md](docs/intervention-budget-tuning.md).
+
 Add `--redact` to write `analysis-bundle/` copies with stable redaction tokens for identifiers, literals, customer-like strings, and secret-like values while preserving joins and existing artifact hashes.
 
 Add `--ci` to write `ci/summary.md` plus upload snippets and code-quality artifacts for GitHub Actions, GitLab CI, and Bitbucket Pipelines: SARIF under `analysis-bundle/summary.sarif`, GitLab `ci/gl-code-quality-report.json`, and Bitbucket `ci/bitbucket-code-insights.json`.

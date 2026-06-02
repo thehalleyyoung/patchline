@@ -1,0 +1,11 @@
+{
+  "version": "patchline.intervention-budget-tuning-gate/v1",
+  "claim": "Generated interventions are bounded by a budget over four dimensions: file count, line count, token count, and change count. This study sweeps each dimension across budget levels (0/20/40/60/80/100% of the cost of covering every risk) and measures how many real ranked risks a highest-score-first generator can cover. It proves coverage is monotonic non-decreasing in budget, that zero budget covers nothing and full budget covers everything, and that each dimension has a diminishing-returns knee so maintainers can choose a budget with evidence.",
+  "real_repo": {
+    "repo": "lobsters/lobsters",
+    "ref": "3b80b47aa5aaba37ec44413e7d1dc96fcf1585b6",
+    "subpath": "db/migrate"
+  },
+  "minimum_risks": 50,
+  "dimensions": ["files", "lines", "tokens", "changes"]
+}
