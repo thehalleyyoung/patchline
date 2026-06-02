@@ -363,6 +363,8 @@ Run `make leaderboard-gate` to build a **benchmark leaderboard** comparing relea
 
 Run `make case-bundle-gate` to assemble an archival **case-study bundle** of deep narrative studies plus dozens of **lightweight** worked examples — deep studies must carry a sufficiently detailed narrative and a shallow one is rejected; see [docs/case-bundle.md](docs/case-bundle.md).
 
+Run `make eval-matrix-gate` to build a best-paper **evaluation matrix** mapping novelty, rigor, impact, reproducibility, and limitations to concrete backing artifacts — every criterion must resolve to a real file and an empty one is reported **unsupported**; see [docs/eval-matrix.md](docs/eval-matrix.md).
+
 Add `--redact` to write `analysis-bundle/` copies with stable redaction tokens for identifiers, literals, customer-like strings, and secret-like values while preserving joins and existing artifact hashes.
 
 Add `--ci` to write `ci/summary.md` plus upload snippets and code-quality artifacts for GitHub Actions, GitLab CI, and Bitbucket Pipelines: SARIF under `analysis-bundle/summary.sarif`, GitLab `ci/gl-code-quality-report.json`, and Bitbucket `ci/bitbucket-code-insights.json`.

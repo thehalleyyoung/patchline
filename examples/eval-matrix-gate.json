@@ -1,0 +1,13 @@
+{
+  "version": "patchline.eval-matrix-gate/v1",
+  "claim": "Patchline self-assesses against the criteria a best-paper committee actually uses — novelty, rigor, impact, reproducibility, and limitations — by building an evaluation matrix that maps each criterion to concrete backing artifacts in the repository rather than to prose assertions, and it refuses to mark a criterion as supported unless at least one artifact backs it. The worker scores each criterion as supported only when backing artifacts exist, and surfaces any criterion left unsupported so reviewers can see exactly where the evidence is thin. The gate proves every required criterion in the real matrix is backed by at least one artifact while a deliberately empty criterion is reported as unsupported.",
+  "real_repo": "patchline (self): best-paper evaluation matrix",
+  "criteria": [
+    {"name": "novelty", "artifacts": ["docs/proof-hole-graph.md", "docs/explainable-ranking.md"]},
+    {"name": "rigor", "artifacts": ["docs/uncertainty-calibration.md", "scripts/canonical-json-gate.sh"]},
+    {"name": "impact", "artifacts": ["docs/leaderboard.md", "docs/case-bundle.md"]},
+    {"name": "reproducibility", "artifacts": ["docs/rc-rehearsal.md", "docs/claim-freeze.md"]},
+    {"name": "limitations", "artifacts": ["docs/error-taxonomy.md"]}
+  ],
+  "negative_control": {"name": "future-work", "artifacts": []}
+}
