@@ -195,6 +195,8 @@ Run `make artifact-container-profile-gate` to verify the one-command artifact VM
 
 Run `make artifact-badges-gate` to regenerate artifact badges for reusable, available, functional, and reproducible evidence with gate-backed justifications; see [docs/artifact-badges.md](docs/artifact-badges.md).
 
+Run `make paper-appendix-gate` to render claims, limitations, figures, tables, and reproduction commands from current generated artifacts; see [docs/paper-appendix.md](docs/paper-appendix.md).
+
 Add `--redact` to write `analysis-bundle/` copies with stable redaction tokens for identifiers, literals, customer-like strings, and secret-like values while preserving joins and existing artifact hashes.
 
 Add `--ci` to write `ci/summary.md` plus upload snippets and code-quality artifacts for GitHub Actions, GitLab CI, and Bitbucket Pipelines: SARIF under `analysis-bundle/summary.sarif`, GitLab `ci/gl-code-quality-report.json`, and Bitbucket `ci/bitbucket-code-insights.json`.

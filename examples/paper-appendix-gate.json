@@ -1,0 +1,35 @@
+{
+  "version": "patchline.paper-appendix-gate/v1",
+  "claim": "Patchline can render a paper appendix from current generated artifacts, including claims, limitations, figures, tables, and reproduction commands, while keeping every section tied to regenerated public-code evidence.",
+  "minimum_public_repos": 4,
+  "minimum_claims": 6,
+  "minimum_limitations": 8,
+  "minimum_figures": 5,
+  "minimum_tables": 5,
+  "minimum_reproduction_commands": 5,
+  "evidence_profile_spec": "examples/artifact-container-profile-gate.json",
+  "required_sections": [
+    "Claims",
+    "Limitations",
+    "Figures",
+    "Tables",
+    "Reproduction commands"
+  ],
+  "required_tables": [
+    "artifact-summary",
+    "risk-taxonomy",
+    "claim-status",
+    "limitation-categories",
+    "reproduction-commands"
+  ],
+  "required_outputs": [
+    "appendix.md",
+    "appendix.json",
+    "tables/artifact-summary.md",
+    "tables/risk-taxonomy.md",
+    "tables/claim-status.md",
+    "tables/limitation-categories.md",
+    "tables/reproduction-commands.md",
+    "evidence/artifact-container-rebuild/rebuild-summary.json"
+  ]
+}
