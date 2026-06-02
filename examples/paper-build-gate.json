@@ -1,0 +1,15 @@
+{
+  "version": "patchline.paper-build-gate/v1",
+  "claim": "Patchline builds paper-ready LaTeX artifacts directly from generated gate data, turning the live catalog of capabilities into a compiled table, a figure, an appendix, and a list of artifact links rather than hand-maintained prose that can drift from the implementation. The worker reads a manifest of gate names, verifies each has a backing gate script and documentation file, emits a LaTeX table of capabilities with a bar-style figure and an appendix, and the pipeline compiles the result with pdflatex into a PDF. The gate proves every referenced artifact exists, the generated LaTeX compiles to a non-empty PDF, and the table contains a row for every manifest entry.",
+  "real_repo": "patchline (self): LaTeX paper fragments generated from the gate catalog",
+  "gates": [
+    "dataflow-summary",
+    "query-shape",
+    "rollback-check",
+    "lock-duration",
+    "tenant-risk",
+    "privacy-impact",
+    "uncertainty-calibration",
+    "explainable-ranking"
+  ]
+}
