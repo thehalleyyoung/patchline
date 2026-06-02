@@ -1,0 +1,11 @@
+{
+  "version": "patchline.intervention-regression-archive-gate/v1",
+  "claim": "Generated interventions are archived per release with their safety, completeness, and uncertainty scores, so that regressions between versions cannot slip in silently. The gate snapshots two releases from the real analysis, diffs them by intervention, and flags any intervention whose safety or completeness drops or whose uncertainty rises. It proves there are no unexpected regressions across faithful releases, that the archive is deterministic, and that an injected safety drop is detected by the regression detector.",
+  "real_repo": {
+    "repo": "lobsters/lobsters",
+    "ref": "3b80b47aa5aaba37ec44413e7d1dc96fcf1585b6",
+    "subpath": "db/migrate"
+  },
+  "minimum_interventions": 20,
+  "regression_signals": ["safety_drop", "completeness_drop", "uncertainty_rise"]
+}

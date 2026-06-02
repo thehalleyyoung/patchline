@@ -267,6 +267,8 @@ Run `make intervention-budget-tuning-gate` to sweep the generated-intervention b
 
 Run `make intervention-scorecard-gate` to emit a reviewer scorecard for every intervention that keeps usefulness, safety, completeness, and uncertainty as four separate axes — proving the axes are separable, all scores fall in [0,1], and no card overclaims completeness while proof holes remain open; see [docs/intervention-scorecard.md](docs/intervention-scorecard.md).
 
+Run `make intervention-regression-archive-gate` to archive every generated intervention per release with its safety, completeness, and uncertainty scores — proving no release silently regresses an intervention (lower safety/completeness or higher uncertainty), with a negative control that detects an injected regression; see [docs/intervention-regression-archive.md](docs/intervention-regression-archive.md).
+
 Add `--redact` to write `analysis-bundle/` copies with stable redaction tokens for identifiers, literals, customer-like strings, and secret-like values while preserving joins and existing artifact hashes.
 
 Add `--ci` to write `ci/summary.md` plus upload snippets and code-quality artifacts for GitHub Actions, GitLab CI, and Bitbucket Pipelines: SARIF under `analysis-bundle/summary.sarif`, GitLab `ci/gl-code-quality-report.json`, and Bitbucket `ci/bitbucket-code-insights.json`.
