@@ -117,6 +117,9 @@ Run `plugins list` or `plugins probe <path>` to inspect the deterministic parser
 
 Run `golden-fixture generate --github owner/repo --ref <sha> --subpath <path> --out <dir>` to turn a real-repo slice into a tiny deterministic Go test without vendoring the full repository; see [docs/golden-fixtures.md](docs/golden-fixtures.md).
 
+<details>
+<summary><strong>Full verification catalog</strong> — 230+ reproducible <code>make &lt;name&gt;-gate</code> checks, each with a positive proof and a negative control on real public-repo data (click to expand)</summary>
+
 Run `make fuzz-coverage-gate` to execute the parser, fact normalization, redaction, SQL analysis, archive extraction, and report-loading fuzz seed suite plus a short stress pass and real-repo slice proof; see [docs/fuzzing.md](docs/fuzzing.md).
 
 Run `make performance-budget-gate` to benchmark large-repo, monorepo, generated-bundle, and four-repo matrix analyses against explicit wall-clock and artifact-size budgets; see [docs/performance-budgets.md](docs/performance-budgets.md).
@@ -518,6 +521,8 @@ Run `make ecosystem-certification-gate` for an extension certification mark back
 Run `make reproducibility-vault-gate` for a vault that **snapshot**s toolchain, corpus, and results per release, rejecting an incomplete snapshot; see [docs/reproducibility-vault.md](docs/reproducibility-vault.md).
 Run `make community-impact-report-gate` for an impact report tying stars, adopters, and prevented incidents to **gate-backed evidence**, rejecting an unbacked metric; see [docs/community-impact-report.md](docs/community-impact-report.md).
 Run `make vision-dossier-gate` for a 2.0 vision dossier proving sustained **novelty**, rigor, adoption, and reproducibility, each gate-backed, rejecting an incomplete dossier; see [docs/vision-dossier.md](docs/vision-dossier.md).
+
+</details>
 
 Add `--redact` to write `analysis-bundle/` copies with stable redaction tokens for identifiers, literals, customer-like strings, and secret-like values while preserving joins and existing artifact hashes.
 
