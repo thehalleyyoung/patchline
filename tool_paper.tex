@@ -1,0 +1,993 @@
+\documentclass[11pt]{article}
+
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
+\usepackage{lmodern}
+\usepackage[margin=1in]{geometry}
+\usepackage{booktabs}
+\usepackage{longtable}
+\usepackage{array}
+\usepackage{xcolor}
+\usepackage{hyperref}
+\usepackage{enumitem}
+\usepackage{caption}
+\usepackage{titlesec}
+
+\hypersetup{
+  colorlinks=true,
+  linkcolor=blue!55!black,
+  urlcolor=blue!55!black,
+  citecolor=blue!55!black
+}
+
+\newcommand{\tool}{\textsc{Patchline}}
+\newcommand{\code}[1]{\texttt{#1}}
+\newcommand{\gate}[1]{\texttt{make #1}}
+
+\titleformat{\section}{\normalfont\Large\bfseries}{\thesection}{0.6em}{}
+\titleformat{\subsection}{\normalfont\large\bfseries}{\thesubsection}{0.6em}{}
+
+\title{\textbf{\tool: Deterministic, Provenance-Carrying Analysis of\\
+Data-Change Risk Across the Polyglot Software Stack}}
+
+\author{The \tool{} Project}
+\date{\today}
+
+\begin{document}
+\maketitle
+
+\begin{abstract}
+\noindent
+Schema migrations, NoSQL change scripts, data-pipeline jobs, and serialization-schema edits are
+among the highest-risk changes a team ships: they can silently destroy data, break running consumers,
+or race a deploy, and they are poorly served by the linters and code-scanners built for ordinary
+source code. We present \tool, a \emph{deterministic, non-AI-first} analyzer that treats the
+data-change surface of a real repository as a first-class object. \tool{} fetches a project
+reproducibly from any of several source hosts, inventories what is actually present, derives a
+project-native \emph{fact layer} with full provenance, ranks data-change risks, and---only when asked,
+and only within an explicit budget---generates bounded interventions that are quarantined and then
+\emph{deterministically re-analyzed and rejected} if they do not improve the evidence. Critically,
+every capability in \tool{} is backed by a reproducible \emph{gate}: a script that proves the
+capability against real, pinned public code and fails loudly on drift. \tool{} currently ships 159
+such gates over 116 documented capabilities, spanning relational migrations across nine ecosystems,
+five NoSQL engines, four data-pipeline frameworks, protobuf/Avro schema compatibility,
+infrastructure/data ordering, and a research-grade evaluation methodology that includes blinded
+false-positive adjudication, seeded false-negative recall, ablations, standardized effect sizes, and
+severity calibration against independent danger evidence. We describe \tool's design principles,
+architecture, breadth of analysis, intervention-safety model, runtime/observability evidence
+integration, and reproducibility methodology, and we report results on real repositories including
+\code{lobsters/lobsters}, \code{apache/avro}, \code{helm/charts}, and a multi-framework lakehouse.
+\end{abstract}
+
+\tableofcontents
+\bigskip
+
+%======================================================================
+\section{Introduction}
+%======================================================================
+
+A surprising fraction of serious production incidents originate not in application logic but in
+\emph{data changes}: a migration that drops a column still read by an old replica, a NoSQL cleanup
+script that truncates the wrong keyspace, a Spark job that overwrites a warehouse table, an Avro
+field added without a default that breaks every stored record, or a migration Job that runs before
+the deploy that depends on it. These changes share three properties that make them dangerous and
+hard to review:
+
+\begin{enumerate}[leftmargin=1.4em]
+  \item \textbf{They are destructive and often irreversible.} Unlike a logic bug, a dropped table or
+  an overwritten partition cannot be rolled back by reverting a commit.
+  \item \textbf{They are polyglot and cross-cutting.} The relevant evidence is spread across SQL,
+  ORM models, framework migration runners, Kubernetes and Helm manifests, Terraform, pipeline code,
+  serialization schemas, CI configuration, and operational notes.
+  \item \textbf{They are poorly served by existing tooling.} Code scanners look for injection and
+  secrets; SQL linters check a single statement's style; AI assistants will happily generate a
+  migration but cannot \emph{prove} it is safe.
+\end{enumerate}
+
+\tool{} is built on a deliberately contrarian thesis: for data-change risk, a \emph{deterministic}
+analyzer that carries provenance and refuses to over-claim is more useful, more reviewable, and more
+publishable than an AI-first generator. \tool{} does not require labeled data, a bespoke schema
+format, or a model API key. You point it at the files a team already has---a GitHub (or GitLab,
+Bitbucket, SourceHut, Mercurial, or Fossil) repository, a migration directory, a service source
+tree, a telemetry export, or an incident note---and it inventories what is there, links the clues,
+ranks the risks, and prints the next commands that can run immediately.
+
+\paragraph{Contributions.} This paper makes the following contributions:
+\begin{enumerate}[leftmargin=1.4em]
+  \item A \textbf{deterministic, provenance-carrying fact layer} for data-change risk that is derived
+  from real repositories without pre-authored schemas (Section~\ref{sec:facts}).
+  \item A \textbf{breadth of analysis} that unifies relational migrations (nine ecosystems), NoSQL
+  changes (five engines), data pipelines (four frameworks), protobuf/Avro schema compatibility, and
+  infrastructure/data ordering under one fact model (Section~\ref{sec:breadth}).
+  \item A \textbf{bounded-intervention-with-deterministic-rejection} model that quarantines generated
+  code and re-analyzes it, proving that plausible-but-unsafe changes are rejected before they can be
+  trusted (Section~\ref{sec:intervention}).
+  \item A \textbf{runtime and observability evidence} layer that scores findings on independent
+  static-risk and observed-runtime axes using OpenTelemetry, Datadog-style, and Prometheus/Grafana
+  exports (Section~\ref{sec:runtime}).
+  \item A \textbf{gate-backed reproducibility and evaluation methodology}---159 gates, blinded
+  false-positive adjudication, seeded false-negative recall, ablations, standardized effect sizes,
+  and severity calibration---designed for artifact evaluation and best-paper-grade rigor
+  (Sections~\ref{sec:repro}--\ref{sec:eval}).
+\end{enumerate}
+
+\paragraph{A motivating scenario.} Consider a team shipping a routine-looking pull request: a Rails
+migration that removes a deprecated column, a companion dbt model switched to
+\code{materialized='table'}, and a Helm chart that adds a migration \code{Job}. Reviewed in isolation,
+each diff looks benign. Reviewed together, they encode a latent incident: the column is still read by a
+canary replica, the dbt change silently drops and recreates a warehouse table, and the migration
+\code{Job} carries no Helm hook, so it may run \emph{after} the deploy that assumes the new shape. No
+single existing tool sees all three. A code scanner ignores all of them; a SQL linter sees only the
+\code{ALTER TABLE}; an AI assistant might rewrite the migration but cannot prove the ordering is safe.
+\tool{} ingests the whole slice, emits a uniform fact for each hazard with provenance, ranks them by
+blast radius, classifies the \code{Job} as \emph{unordered}, and prints the exact follow-up commands---
+without executing anything and without claiming the migration is ``fixed.'' This scenario recurs, in
+different ecosystems, throughout the evaluation.
+
+\paragraph{Why determinism, now.} The prevailing direction in program-repair research is to let a
+large model propose and the test suite filter. That loop is powerful for logic bugs with strong
+oracles, but it is a poor fit for destructive data changes, where the oracle is weak (you cannot
+``test'' a \code{DROP} in production), the cost of a wrong answer is catastrophic and irreversible, and
+reviewers must \emph{audit} the reasoning rather than trust a confidence score. \tool{} therefore
+inverts the loop: a deterministic analyzer produces auditable evidence first, and generation is a
+bounded, quarantined, re-checked afterthought. The remainder of this paper argues---and gate-proves
+against real public code---that this inversion is both more useful in practice and more rigorous as a
+research artifact.
+
+%======================================================================
+\section{Design Principles}
+%======================================================================
+
+\tool's design is governed by five principles that recur throughout the system.
+
+\paragraph{P1: Determinism over cleverness.} Every analysis is a pure function of pinned inputs.
+Given the same archive hash, parser version, and configuration, \tool{} produces byte-identical
+outputs. This makes results cacheable, diff-able across releases, and trustworthy as evidence.
+
+\paragraph{P2: Provenance is mandatory.} Every fact records where it came from: the source host, the
+resolved commit, the file, and the textual signal that produced it. A finding without provenance is
+not emitted.
+
+\paragraph{P3: Conservative by construction.} \tool{} prefers a false negative to a confident false
+positive. Detectors are \emph{signal-gated}: a NoSQL rule only fires when an engine-specific signal
+confirms the file targets that engine, so prose mentioning ``drop the plan'' is never misclassified
+as a \code{DROP}.
+
+\paragraph{P4: Never over-claim.} \tool{} does not claim to ``repair'' a database. It surfaces risk,
+generates \emph{reviewable} guards and tests, quarantines them, and re-checks them. Generated code is
+non-executable and unapplied unless a human explicitly opts in to allowlisted safe checks.
+
+\paragraph{P5: Everything is gated.} A capability that is not proven against real, pinned public code
+by a reproducible gate does not count. Documentation, claims, figures, and release notes are all
+checked against generated evidence; drift fails the build.
+
+%======================================================================
+\section{System Architecture}
+%======================================================================
+
+\tool{} is a single Go binary organized as a pipeline of stages, each of which writes deterministic
+artifacts consumed by the next stage and by the gate layer.
+
+\begin{longtable}{>{\raggedright\arraybackslash}p{2.3cm}>{\raggedright\arraybackslash}p{8.2cm}>{\raggedright\arraybackslash}p{3.4cm}}
+\toprule
+\textbf{Stage} & \textbf{Responsibility} & \textbf{Key artifacts} \\
+\midrule
+\endhead
+\code{fetch} & Reproducibly resolve and download a source slice from GitHub, GitLab, Bitbucket,
+SourceHut, a local path, an archive URL, or a Mercurial/Fossil working tree; record provenance and a
+content-addressed archive hash. & \code{source.json} \\
+\code{inventory} & Scan the slice; detect languages, frameworks, migration systems, package
+boundaries; emit the fact layer. & \code{inventory.json}, \code{facts.jsonl}, \code{project-map.md} \\
+\code{intake} & Normalize heterogeneous inputs (logs, telemetry, incident notes) into the same fact
+vocabulary. & \code{intake} artifacts \\
+\code{baseline} & Rank data-change risks; estimate blast radius; minimize proof holes; link
+trace-to-code evidence. & \code{baseline.json}, \code{baseline.sarif} \\
+\code{propose} & Generate bounded interventions (guards, tests) within an explicit budget; quarantine
+them as untrusted artifacts. & \code{proposal.patch}, \code{patchline-proposals/} \\
+\code{compare} & Deterministically re-analyze proposed changes; accept or reject by evidence delta. &
+\code{compare.json} \\
+\code{deep} & Optional deeper semantic passes (dataflow, lock duration, tenant boundaries). & deep
+analysis reports \\
+\bottomrule
+\end{longtable}
+
+\noindent
+A cross-cutting \emph{gate layer} sits beside the pipeline. Each gate is a self-contained script that
+(a) validates a versioned example specification, (b) checks that the relevant documentation and the
+README still describe the capability, (c) runs the capability against real pinned code, (d) asserts
+machine-checkable invariants on the output, and (e) writes a \code{gate-summary.json}. The repository
+currently ships \textbf{159 gates}, \textbf{116 capability documents}, and \textbf{92 example
+specifications}, with a single analyzer core of roughly 2{,}900 lines of Go.
+
+\paragraph{Resumability and offline operation.} \code{repo analyze --resume} reuses existing fetch,
+inventory, intake, baseline, proposal, and compare artifacts while changing later settings, and
+\code{repo offline} validates cached inputs and generated reports without any network access---a
+prerequisite for restricted artifact-evaluation environments.
+
+\subsection{Artifact contract}
+Every stage writes a stable set of files so that downstream stages, gates, and reviewers can rely on
+their presence and shape. Table~\ref{tab:artifacts} summarizes the contract; the determinism
+principle (P1) means each file is byte-stable for fixed inputs, which is what allows the
+\emph{redaction-stability} and \emph{reproducibility-report} gates to assert byte-equality across
+repeated and resumed runs.
+
+\begin{longtable}{>{\raggedright\arraybackslash}p{3.4cm}>{\raggedright\arraybackslash}p{10.6cm}}
+\toprule
+\textbf{Artifact} & \textbf{Contents} \\
+\midrule
+\endhead
+\code{source.json} & Source host, VCS kind, resolved commit, archive SHA-256, fetch timestamp, tool
+version, cache metadata. \\
+\code{inventory.json} & Languages, frameworks, migration systems and roots, package boundaries, and
+all derived data-change surfaces. \\
+\code{facts.jsonl} & One provenance-carrying fact per line; the canonical machine-readable evidence
+stream. \\
+\code{project-map.md} & Human-readable map of the scanned slice. \\
+\code{baseline.json} / \code{.sarif} & Ranked risks, invariant candidates, privacy/lock hazards,
+blast-radius estimates, proof-hole minimizations, and trace-to-code links; SARIF for IDE/CI ingest. \\
+\code{prompt-context.json}, \code{prompt.txt} & The exact, minimized evidence sent to a generator,
+plus excluded-context counts. \\
+\code{proposal.patch}, \code{patchline-proposals/} & Generated, quarantined, non-executable
+artifacts. \\
+\code{compare.json} & Per-intervention accept/reject decision with the evidence delta that justified
+it. \\
+\code{commands.md} & A copy/paste maintainer report with one-command and staged equivalents. \\
+\bottomrule
+\caption{The deterministic artifact contract. Each file is byte-stable for fixed inputs.}
+\label{tab:artifacts}
+\end{longtable}
+
+%======================================================================
+\section{The Project-Native Fact Layer}
+\label{sec:facts}
+%======================================================================
+
+The core abstraction in \tool{} is the \emph{fact}: a small, provenance-carrying record with a kind,
+a path, a confidence, a human-readable rationale, a set of typed identifiers, and a property map.
+Facts are emitted as newline-delimited JSON (\code{facts.jsonl}) so they can be grepped, diffed, and
+loaded into downstream tools without a database.
+
+\begin{quote}\small
+\code{\{"kind":"nosql\_change","path":"schema/001\_drop.cql","confidence":"observed",}\\
+\code{"identifiers":[\{"kind":"nosql\_engine","value":"cassandra"\}],}\\
+\code{"properties":\{"engine":"cassandra","operation":"dropTable","destructive":"true"\}\}}
+\end{quote}
+
+\noindent
+Three properties of the fact layer matter for the rest of the paper:
+
+\begin{itemize}[leftmargin=1.4em]
+  \item \textbf{No pre-authored schema.} \tool{} infers schema evolution directly from migration and
+  source text; it does not require the user to first declare a \tool-specific schema. A bare
+  \code{DROP TABLE legacy\_sessions;} yields a \code{schema\_evolution} fact with
+  \code{operation=drop\_table} and the affected table as a typed identifier.
+  \item \textbf{Uniform vocabulary across surfaces.} Relational, NoSQL, pipeline, schema, and
+  infrastructure detectors all emit facts in the same shape, so a reviewer (or a ranking model, or a
+  paper table) can reason over them uniformly.
+  \item \textbf{Searchable destructiveness.} Destructive operations carry an explicit
+  \code{destructive=true} (or \code{breaking=true}) property, making the highest-risk subset a single
+  grep away.
+\end{itemize}
+
+\paragraph{Sources and reproducibility.} The \code{fetch} stage records the source host, the kind of
+version-control system (including Mercurial and Fossil working trees, which are content-addressed when
+no native binary is available), the resolved commit, and a SHA-256 archive hash. This is what makes
+P1 (determinism) and P2 (provenance) concrete: a baseline computed today can be re-derived byte-for-
+byte from the recorded provenance.
+
+%======================================================================
+\section{Breadth of Data-Change Analysis}
+\label{sec:breadth}
+%======================================================================
+
+\tool's distinguishing feature is that it treats \emph{every} place data changes destructively as a
+first-class surface, not just relational migrations. Each surface below is signal-gated (P3), emits
+uniform facts, and is proven against real public code by a dedicated gate.
+
+\subsection{Relational migrations across nine ecosystems}
+\tool{} detects migration systems and their \emph{native commands} for Rails, Django, Alembic,
+Prisma, TypeORM, Liquibase, Flyway, EF Core, and Go migrators, and additionally Laravel, Ecto,
+Diesel, Sequelize, Knex, Doctrine, and Rails multi-database setups. Crucially, each detection maps to
+the project-native command a maintainer would actually run (e.g.\ \code{php artisan migrate},
+\code{mix ecto.migrate}, \code{diesel migration run}), so the output is actionable rather than
+abstract. The multi-ecosystem detector is proven on the real \code{laravel/laravel} repository and a
+seven-framework unit matrix.
+
+\subsection{NoSQL change detection across five engines}
+Destructive data changes in NoSQL stores look nothing like \code{DROP TABLE}. \tool{} recognizes
+schema-change and data-migration operations for MongoDB, Cassandra, Elasticsearch, Redis, and
+DynamoDB (Table~\ref{tab:nosql}), each gated by an engine-specific signal and each tagged with a
+destructive flag. The detector is proven on a real Cassandra repository
+(\code{laaksomavrick/twitter-go}) that contains \code{DROP KEYSPACE} and \code{DROP TABLE} operations,
+plus a five-engine unit matrix with an explicit no-false-positive test over prose.
+
+\begin{table}[h]\centering\small
+\caption{NoSQL engines and representative destructive operations flagged by \tool.}
+\label{tab:nosql}
+\begin{tabular}{>{\raggedright\arraybackslash}p{2.6cm}>{\raggedright\arraybackslash}p{4.2cm}>{\raggedright\arraybackslash}p{6.0cm}}
+\toprule
+\textbf{Engine} & \textbf{Signal} & \textbf{Destructive operations} \\
+\midrule
+MongoDB & \code{db.<coll>}, migrate-mongo & drop, dropDatabase, deleteMany, \$unset, renameCollection \\
+Cassandra & \code{.cql}, \code{KEYSPACE} & DROP KEYSPACE, DROP TABLE, TRUNCATE, ALTER\ldots DROP \\
+Elasticsearch & \code{\_bulk}, \code{\_mapping} & index DELETE, \_delete\_by\_query, bulk delete \\
+Redis & \code{redis-cli}, \code{.redis} & FLUSHALL, FLUSHDB, DEL, RENAME \\
+DynamoDB & \code{dynamodb} & delete-table, batch DeleteRequest \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\subsection{Data-pipeline repair evidence across four frameworks}
+Data also moves and reshapes through orchestration and compute frameworks. \tool{} records
+data-pipeline changes for Airflow DAGs (backfills, dagrun resets, embedded destructive SQL), dbt
+models (full-refresh and \code{materialized='table'}), Spark jobs (\code{.mode("overwrite")},
+\code{saveAsTable}), and Kafka consumers (offset resets). The detector is proven on a real
+multi-framework lakehouse repository (\code{harrydevforlife/building-lakehouse}) that combines Airflow
+orchestration, dbt transforms, and Spark overwrite writes, alongside a four-framework unit matrix.
+
+\subsection{Schema-registry and protobuf/Avro compatibility}
+Serialized data outlives the code that wrote it. \tool{} inspects protobuf (\code{.proto}) and Avro
+(\code{.avsc}) schemas, flagging proto2 \code{required} fields (which cannot be removed safely),
+messages lacking \code{reserved} declarations (tag-reuse hazard), and Avro record fields without
+defaults (which break backward/forward compatibility). It is proven on the real \code{apache/avro}
+repository, which contains both Avro fields without defaults and proto2 required fields, with a
+no-false-positive rule ensuring ordinary JSON is never mistaken for an Avro schema.
+
+\subsection{Infrastructure/data ordering}
+A migration that races its deploy is a classic outage. \tool{} performs a derived cross-fact analysis
+that correlates deploy-ordering markers (Helm hooks, Argo sync-waves, \code{initContainers},
+Terraform \code{depends\_on}/waits) with the migration and database jobs on the same manifest, and
+classifies each data-change job as \emph{sequenced} (ordered by an explicit marker) or
+\emph{unordered} (able to race the rollout). On the real \code{helm/charts} repository, \tool{}
+classifies well-known charts such as Kong and Anchore as sequencing their migration jobs with Helm
+pre/post-upgrade hooks, while other database jobs run unordered.
+
+\subsection{Monorepo package boundaries}
+\tool{} detects package boundaries for Bazel, Pants, Nx, Turborepo, Maven, Gradle, and Go workspaces,
+with a no-false-positive rule that ignores build files outside a workspace. This scopes data-change
+analysis to the right package in a large monorepo; it is proven on the real \code{vercel/turbo}
+example workspace.
+
+\paragraph{Summary.} Table~\ref{tab:breadth} consolidates the surfaces, the fact kinds they emit, and
+the real repository each is proven against.
+
+\begin{table}[h]\centering\small
+\caption{Data-change surfaces, emitted fact kinds, and the real repository each is proven on.}
+\label{tab:breadth}
+\begin{tabular}{>{\raggedright\arraybackslash}p{3.2cm}>{\raggedright\arraybackslash}p{4.6cm}>{\raggedright\arraybackslash}p{4.8cm}}
+\toprule
+\textbf{Surface} & \textbf{Fact kinds} & \textbf{Real-repo proof} \\
+\midrule
+Relational migrations & \code{schema\_evolution}, \code{migration\_root} & \code{laravel/laravel}, \code{lobsters/lobsters} \\
+NoSQL changes & \code{nosql\_change} & \code{laaksomavrick/twitter-go} \\
+Data pipelines & \code{data\_pipeline\_change} & \code{harrydevforlife/building-lakehouse} \\
+Schema compatibility & \code{schema\_compatibility} & \code{apache/avro} \\
+Infra/data ordering & \code{infra\_data\_ordering} & \code{helm/charts} \\
+Package boundaries & \code{package\_boundary} & \code{vercel/turbo} \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+%======================================================================
+\section{Bounded Interventions and Deterministic Rejection}
+\label{sec:intervention}
+%======================================================================
+
+\tool{} can generate interventions---typically guards and tests that make a risky data change safer to
+review---but it does so under strict constraints that embody principles P4 and P1.
+
+\paragraph{Budgets.} Generation is bounded by an explicit budget
+\code{files=N,lines=N,tokens=N,changes=N}. \code{changes} limits how many ranked risks are targeted,
+\code{files} limits generated artifacts, \code{lines} bounds each artifact, and \code{tokens} caps
+approximate generated output. This makes generation auditable and prevents unbounded edits.
+
+\paragraph{Quarantine.} Generated artifacts are written under \code{patchline-proposals/} as
+\emph{untrusted}, non-executable files. They are never applied to the working tree and are skipped
+from native test execution unless the user explicitly passes \code{--run-native-tests}, which itself
+only enables an allowlist of safe checks.
+
+\paragraph{Deterministic rejection.} The \code{compare} stage re-analyzes a proposal and accepts it
+only if the evidence improves (safety up, completeness up, uncertainty down) without regressions. A
+generated diff that is \emph{plausible but unsafe} is rejected before it can be trusted, and the
+repository ships gates that demonstrate exactly this: plausible generated diffs being rejected by
+deterministic re-analysis, and a per-release regression archive that detects an injected safety drop
+via a negative control.
+
+\paragraph{Generator-agnostic.} A local or hosted generator can be plugged in with
+\code{--llm-command '<cmd>'}; \tool{} sends the prompt on stdin and stores the output as an untrusted
+artifact for deterministic compare. \code{--no-llm} disables generation entirely and rejects any
+generator command, enabling fully template-only, reproducible analysis---the mode used by every gate
+in this paper.
+
+\paragraph{The accept/reject decision.} Table~\ref{tab:compare} makes the compare contract precise.
+Each proposed artifact is scored on the same fact-derived axes as the baseline, and the decision is a
+pure function of the evidence delta---never of a model's self-reported confidence. An artifact that
+adds a guard but also removes a provenance link, weakens an invariant, or introduces a new destructive
+fact is rejected, and the rejecting axis is recorded so the decision is auditable.
+
+\begin{table}[h]\centering\small
+\caption{The deterministic compare contract: an artifact is accepted only if no axis regresses.}
+\label{tab:compare}
+\begin{tabular}{>{\raggedright\arraybackslash}p{3.2cm}>{\raggedright\arraybackslash}p{6.4cm}>{\raggedright\arraybackslash}p{3.4cm}}
+\toprule
+\textbf{Axis} & \textbf{Accept requires} & \textbf{On regression} \\
+\midrule
+Safety & no new destructive or breaking facts & reject \\
+Completeness & provenance and coverage preserved or improved & reject \\
+Uncertainty & proof holes not widened & reject \\
+Budget & within \code{files/lines/tokens/changes} & reject \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\noindent
+This is the mechanism behind \tool's central safety claim: generation cannot make the artifact
+\emph{worse} without being caught, because the same deterministic analyzer that produced the baseline
+is the judge of every proposal, and its verdict is reproducible byte-for-byte.
+
+%======================================================================
+\section{Runtime and Observability Evidence}
+\label{sec:runtime}
+%======================================================================
+
+Static risk is necessary but not sufficient; a high-severity finding that never executes in
+production is different from one implicated in an incident. \tool{} scores every finding on two
+\emph{independent} axes---static risk and observed runtime---and integrates real observability
+formats to populate the runtime axis:
+
+\begin{itemize}[leftmargin=1.4em]
+  \item \textbf{OpenTelemetry (OTLP):} generates valid OTLP traces from a baseline, linking each
+  data-change span back to a finding by id and table for offline replay.
+  \item \textbf{Datadog-style timelines:} reconstructs an incident timeline (deploy marker, APM
+  spans, logs, monitor alert) with verified \emph{deploy $<$ span $<$ log $<$ alert} ordering and
+  correlation coverage.
+  \item \textbf{Prometheus/Grafana:} emits and re-ingests a Prometheus range export and a Grafana
+  dashboard (SLO burn, error-rate, latency), correlating observed SLO breaches back to high-severity
+  findings.
+\end{itemize}
+
+\noindent
+A \emph{confidence-quadrant} model then separates confirmed incidents (high static risk, high runtime
+evidence) from unconfirmed static risk (high static, low runtime), and reports a divergence metric.
+This is the antithesis of an AI assistant's single opaque confidence number: the two axes are
+independently sourced and independently auditable.
+
+\subsection{Performance and scale}
+\tool{} is engineered to keep the inner analysis loop fast enough to run inside CI on every pull
+request and across a large public corpus in a gate sweep. The analyzer is a single statically linked
+Go binary with no runtime services. A pinned-slice inventory analysis over the \code{lobsters}
+\code{db/migrate} directory completes in well under a second on a developer laptop, and a local-path
+inventory pass---the hot path exercised repeatedly by the delta-debugging fixture minimizer---runs in
+a few hundred milliseconds, which is what makes oracle-guided minimization practical. Fetches are
+content-addressed and cached, so repeated and resumed runs avoid redundant downloads entirely; the
+\code{--resume} path reuses prior fetch, inventory, baseline, proposal, and compare artifacts, and the
+\code{offline} mode validates cached inputs with no network at all. Because every artifact is
+byte-stable for fixed inputs (P1), incremental and parallel corpus execution can safely cache and
+shard by repository without risking nondeterministic diffs. The build itself is kept honest by a
+performance-budget gate that fails if the hot analysis path regresses beyond a documented threshold.
+
+%======================================================================
+\section{Reproducibility and the Gate Methodology}
+\label{sec:repro}
+%======================================================================
+
+The gate methodology is \tool's central engineering and scientific contribution. A gate is not a unit
+test; it is an executable claim about real code.
+
+\paragraph{Anatomy of a gate.} Each gate (a) validates a versioned, human-readable example
+specification whose \code{claim} field states what is being proven in prose; (b) verifies that the
+capability's documentation and the README still describe it, so docs cannot silently drift from
+behavior; (c) downloads a pinned public repository slice and runs the real analyzer with
+\code{--no-llm}; (d) asserts machine-checkable invariants on the output (e.g.\ ``at least five
+destructive changes,'' ``the five-engine unit matrix passes,'' ``the minimized fixture still
+triggers''); and (e) writes a \code{gate-summary.json} for downstream aggregation.
+
+\paragraph{Robustness.} \tool{} ships a parser quality dashboard that unifies, per ecosystem, the
+emitted fact kinds, the real-repo proof gate, the documented known gaps, and a fuzz-seed corpus of
+malformed and high-byte inputs that the analyzer must process \emph{without a single crash}. In the
+current build, all six ecosystems carry a real-repository proof and the full fuzz corpus survives.
+
+\paragraph{Minimal reproductions.} For every supported ecosystem, \tool{} ships a delta-debugging
+fixture minimizer that uses the real analyzer as an \emph{oracle} to reduce a seed input to the
+smallest fixture that still reproduces a destructive finding, and then proves the result is
+\emph{1-minimal} (removing any remaining line drops the target). A real Cassandra migration from
+\code{laaksomavrick/twitter-go} is reduced from 17 lines to a single line that still triggers the
+destructive \code{nosql\_change} fact (Table~\ref{tab:min}).
+
+\begin{table}[h]\centering\small
+\caption{Fixture minimization results. Each minimized fixture is 1-minimal under the analyzer oracle.}
+\label{tab:min}
+\begin{tabular}{lrrl}
+\toprule
+\textbf{Ecosystem} & \textbf{Seed lines} & \textbf{Minimized} & \textbf{1-minimal} \\
+\midrule
+Cassandra (real repo) & 17 & 1 & yes \\
+SQL & 7 & 1 & yes \\
+Spark pipeline & 6 & 2 & yes \\
+Avro schema & 9 & 2 & yes \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\paragraph{Drift protection.} Beyond behavior, gates protect the \emph{narrative}: claims-to-evidence
+mapping, a limitations ledger, a camera-ready checklist that blocks release when claims, figures,
+tables, or docs drift from generated evidence, and a changelog discipline gate that requires every
+user-visible feature to link to a public proof repository and a reproducing gate.
+
+%======================================================================
+\section{Evaluation Methodology}
+\label{sec:eval}
+%======================================================================
+
+\tool{} treats evaluation as a first-class, reproducible subsystem rather than a one-off table. The
+following gate-backed studies run on real downloaded baselines.
+
+\paragraph{Blinded false-positive adjudication.} A three-rater, blinded adjudication of findings
+reports Cohen's $\kappa$, three-way agreement, and the majority-adjudicated false-positive rate. This
+provides an inter-rater-reliability story that reviewers expect from an empirical claim.
+
+\paragraph{Seeded false-negative recall.} Known public-incident hazard analogues are seeded into a
+real migration layout; \tool{} then measures detection recall and surfaces the false negatives it
+under-escalates or misses, cross-validated on real repository migrations.
+
+\paragraph{Ablations and effect sizes.} An ablation study removes provenance links, cross-file
+context, generated guards, runtime traces, and risk budgets one at a time on a real baseline and
+reports each signal's measured contribution to the ranking. A companion study reports standardized
+Cohen's $d$ effect sizes for risk density and hazard-class severity across ecosystem, repository
+size, and migration framework strata.
+
+\paragraph{Severity calibration.} Severity is validated against \emph{independent} danger evidence---
+incident/cause clusters, rollback/fix migrations, and recurrences---and the calibration lift is
+reported across real repositories. This guards against a severity score that is internally consistent
+but externally meaningless.
+
+\paragraph{Stratification.} Repositories and migrations are stratified by ecosystem (balanced across
+nine migrators), repository size (small apps, medium services, monorepos, infrastructure-heavy), and
+migration age and change type (recent vs.\ old, schema-only vs.\ backfill-heavy), with a representative
+real download proven from each stratum. Longitudinal reruns over multiple historical commits per
+repository summarize risk/evidence deltas over time.
+
+\paragraph{Baselines.} \tool's value over weaker baselines is made concrete through side-by-side
+examples in which \tool{} links cross-file repair clues that grep-only and SQL-only baselines miss.
+Table~\ref{tab:baselines} contrasts the three approaches on the capabilities that matter for safe
+data-change review.
+
+\begin{table}[h]\centering\small
+\caption{Capability comparison against common lightweight baselines.}
+\label{tab:baselines}
+\begin{tabular}{>{\raggedright\arraybackslash}p{5.4cm}ccc}
+\toprule
+\textbf{Capability} & \textbf{grep-only} & \textbf{SQL-linter} & \textbf{\tool} \\
+\midrule
+Destructive DDL detection & partial & yes & yes \\
+NoSQL / pipeline / schema surfaces & no & no & yes \\
+Cross-file provenance links & no & no & yes \\
+Derived infra/data ordering & no & no & yes \\
+Blast-radius \& proof-hole ranking & no & no & yes \\
+Runtime-trace corroboration & no & no & yes \\
+Bounded, quarantined interventions & no & no & yes \\
+Deterministic, byte-stable artifacts & no & partial & yes \\
+Real-repo proof gates & no & no & yes \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\paragraph{Headline measured results.} Table~\ref{tab:results} consolidates the principal quantitative
+results that recur throughout the paper, each regenerated by a gate against a pinned public slice.
+
+\begin{table}[h]\centering\small
+\caption{Headline results, each reproduced by a \code{make} gate target.}
+\label{tab:results}
+\begin{tabular}{>{\raggedright\arraybackslash}p{6.6cm}>{\raggedright\arraybackslash}p{6.4cm}}
+\toprule
+\textbf{Result} & \textbf{Evidence} \\
+\midrule
+158 files / 328 ranked risks / 100 provenance slices & \code{lobsters/lobsters} \code{db/migrate} \\
+8 review artifacts, 0 failed deterministic checks & same run, bounded budget \\
+9 Cassandra changes incl.\ destructive drops & \code{laaksomavrick/twitter-go} \\
+17 $\rightarrow$ 1 line, 1-minimal reproduction & delta-debugging oracle \\
+3 pipeline frameworks in one repo & \code{harrydevforlife/building-lakehouse} \\
+10 sequenced / 3 unordered data jobs & \code{helm/charts} \\
+dozens of schema-evolution hazards & \code{apache/avro} \\
+6/6 ecosystems fuzz-clean (0 crashes) & parser dashboard corpus \\
+159 gates / 116 docs / 92 examples & repository inventory \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+%======================================================================
+\section{Developer and Contributor Experience}
+%======================================================================
+
+A research artifact only earns stars if it is pleasant to extend. \tool{} ships a scaffolder
+(\code{scripts/new-ecosystem.sh}) that generates the example specification, worker script, gate
+script, and documentation stub for a new ecosystem following the established pattern, and an
+\emph{onboarding quest}---a six-step path from scaffold to a passing real-repo gate that a
+contributor can complete in under one hour. A dedicated gate proves the scaffolder emits valid,
+runnable artifacts and that the quest narrative stays in sync with the required steps. \tool{} also
+exposes deterministic plugin interfaces (parser, fact extractor, linker, ranker, proposal generator,
+compare check, report renderer) and a \code{golden-fixture} command that turns a real-repo slice into
+a tiny deterministic Go test without vendoring the full repository.
+
+%======================================================================
+\section{Case Studies}
+%======================================================================
+
+\paragraph{\code{lobsters/lobsters} (Rails, \code{db/migrate}).} On a pinned commit, \tool{} scans 158
+files and surfaces 328 ranked data-change risks with 100 provenance slices, generating 8 review
+artifacts with zero deterministic checks failed. This is the headline landing demo and is itself
+gate-protected so the README's numbers cannot drift.
+
+\paragraph{\code{apache/avro} (schema compatibility).} \tool{} flags dozens of Avro record fields
+without defaults and multiple proto2 required fields as schema-evolution hazards, demonstrating that
+the same risk lens applies to serialization schemas, not just databases.
+
+\paragraph{\code{helm/charts} (infra/data ordering).} \tool{} classifies ten migration/database jobs
+as sequenced by explicit Helm hooks (including Kong and Anchore migrations) and three as unordered,
+showing that ordering risk is recoverable from real infrastructure manifests.
+
+\paragraph{\code{harrydevforlife/building-lakehouse} (pipelines).} A single repository exercises three
+pipeline frameworks at once---Airflow backfills, dbt table materializations, and Spark overwrite
+writes---and \tool{} records the destructive operations across all three as uniform pipeline facts.
+
+\paragraph{\code{laaksomavrick/twitter-go} (NoSQL + minimization).} \tool{} detects nine Cassandra
+changes including destructive \code{DROP KEYSPACE}/\code{DROP TABLE}, then delta-debugs a real
+migration to a 1-minimal reproduction.
+
+%======================================================================
+\section{Related Work}
+%======================================================================
+
+\tool{} sits at the intersection of several tool families but is distinguished from each.
+\emph{Migration linters} (e.g.\ online-schema-change advisors, framework-specific guards) typically
+check a single statement or a single ecosystem; \tool{} unifies nine relational ecosystems with NoSQL,
+pipelines, schemas, and infrastructure under one fact model. \emph{Code scanners} target injection,
+secrets, and CWE classes in application code; \tool{} targets the orthogonal axis of destructive data
+change and carries provenance for each finding. \emph{Observability platforms} show what happened at
+runtime but do not statically rank data-change risk; \tool{} integrates their export formats to
+populate an independent runtime-evidence axis. \emph{AI coding assistants} generate migrations and
+guards but cannot prove safety; \tool{} treats generation as bounded, quarantined, and subject to
+deterministic rejection. Finally, \tool's \emph{gate methodology}---executable claims against pinned
+public code with drift protection---is a reproducibility contribution in its own right.
+Table~\ref{tab:related} summarizes the positioning.
+
+\begin{table}[h]\centering\small
+\caption{Positioning of \tool{} relative to neighboring tool families.}
+\label{tab:related}
+\begin{tabular}{>{\raggedright\arraybackslash}p{3.0cm}cccc}
+\toprule
+\textbf{Property} & \textbf{Migr.\ linter} & \textbf{Code scanner} & \textbf{Observability} & \textbf{\tool} \\
+\midrule
+Polyglot data surfaces & no & no & no & yes \\
+Provenance per finding & partial & partial & yes & yes \\
+Static risk ranking & partial & yes & no & yes \\
+Runtime corroboration & no & no & yes & yes \\
+Safe generation & no & no & no & yes \\
+Reproducible proof gates & no & no & no & yes \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+%======================================================================
+\section{Threats to Validity}
+%======================================================================
+
+\paragraph{Construct validity.} \tool{} operationalizes ``data-change risk'' as a ranked set of facts
+with explicit destructiveness and blast-radius properties rather than as a single ground-truth label.
+To keep this construct honest, severity is calibrated against \emph{independent} danger evidence
+(incident clusters, rollback/fix migrations, recurrences) rather than against \tool's own score, and
+the calibration lift is reported. The blinded three-rater false-positive adjudication, with Cohen's
+$\kappa$ and three-way agreement, further guards against a definition of ``risk'' that only \tool{}
+agrees with.
+
+\paragraph{Internal validity.} Because every artifact is byte-stable for fixed inputs and every claim
+is regenerated by a gate against a pinned commit, the results reported here are not subject to
+run-to-run variance or silent environmental drift; a regression in code, documentation, or an upstream
+ref fails the corresponding gate loudly. The ablation study isolates each signal's contribution by
+removing provenance links, cross-file context, generated guards, runtime traces, and risk budgets one
+at a time, so the reported value of each component is measured rather than asserted.
+
+\paragraph{External validity.} The evaluation deliberately spans nine relational ecosystems plus
+NoSQL, pipeline, schema, and infrastructure surfaces, and stratifies by ecosystem, repository size,
+and migration age/change type with a real download proven from each stratum. This breadth mitigates,
+but does not eliminate, the risk that results are specific to the chosen public repositories;
+longitudinal reruns over multiple historical commits per repository test temporal stability.
+
+\paragraph{Known blind spots.} The seeded false-negative study explicitly measures what \tool{} misses
+by injecting known public-incident hazard analogues into real layouts and reporting recall, and the
+limitations ledger (Section~\ref{sec:limits}) publishes the documented heuristic boundaries rather
+than hiding them.
+
+%======================================================================
+\section{Limitations}
+\label{sec:limits}
+%======================================================================
+
+\tool{} is deliberately conservative and therefore has documented blind spots, which it publishes in a
+limitations ledger rather than hiding. Dynamic SQL assembled at runtime is only partially recovered;
+vendor-specific NoSQL aggregation pipelines are matched heuristically rather than fully parsed;
+dynamically generated DAGs and templated SQL are detected only when literals are present; cross-file
+Helm/Argo dependencies are not yet linked into a single ordering graph; and per-message protobuf
+field-number uniqueness is not yet diffed across versions. Source provenance for very large monorepos
+fetched over Mercurial/Fossil without a native binary is approximated by content hashing. \tool{}
+ranks and explains risk; it does not certify a migration as safe, and it intentionally avoids
+full-repair claims.
+
+%======================================================================
+\section{Discussion}
+%======================================================================
+
+\paragraph{Why a fact layer instead of a model.} A recurring question is why \tool{} does not simply
+fine-tune a model to classify risky diffs. The answer is auditability. A reviewer approving a
+destructive migration must be able to see \emph{why} a change was flagged, trace it to a specific line,
+and reproduce the judgment tomorrow. A fact---kind, path, rationale, typed identifiers, destructiveness
+flag---is a unit of explanation, not just a unit of classification. The uniform envelope also means
+that adding a new surface (say, a sixth NoSQL engine) extends coverage without changing how ranking,
+diffing, or reporting work, which is what keeps the system tractable as breadth grows.
+
+\paragraph{Why gates instead of unit tests.} Unit tests pin behavior against fixtures the author
+chose; gates pin behavior against \emph{real, pinned public repositories} the author did not control,
+and additionally assert that the documentation and README still describe the behavior. This catches a
+class of failures unit tests cannot: silent capability drift, documentation that overstates the tool,
+and upstream changes that invalidate a claim. The cost is that gates are heavier and require network
+access to a pinned slice; \tool{} mitigates this with content-addressed caching and an offline mode so
+that gate sweeps are fast and repeatable.
+
+\paragraph{Generalization beyond data changes.} While \tool{} targets data-change risk, the
+architecture---deterministic stages, a provenance-carrying fact layer, bounded quarantined generation,
+and gate-backed claims---is domain-agnostic. The plugin interfaces (parser, fact extractor, linker,
+ranker, proposal generator, compare check, report renderer) make it plausible to retarget the same
+machinery at other high-stakes, weak-oracle domains such as access-control changes or feature-flag
+rollouts. We leave such retargeting to future work but note that nothing in the core couples it to
+databases specifically.
+
+\paragraph{On the cost of conservatism.} Principle P3 (conservative by construction) means \tool{}
+accepts false negatives to avoid confident false positives. This is the right trade for a tool whose
+output gates a human reviewer's attention: a noisy analyzer is quickly ignored, whereas a quiet,
+high-precision analyzer that occasionally misses a hazard still raises the floor on review quality. The
+seeded false-negative study exists precisely to keep this trade visible and measurable rather than
+implicit.
+
+%======================================================================
+\section{Future Work}
+%======================================================================
+
+Several extensions follow naturally from \tool's architecture. First, the cross-file infrastructure
+ordering analysis currently classifies each data job independently; linking Helm hooks, Argo
+sync-waves, and \code{initContainers} into a single repository-wide ordering graph would let \tool{}
+detect ordering hazards that span multiple manifests rather than only per-job markers. Second, schema
+compatibility is presently evaluated within a single revision; diffing protobuf and Avro schemas
+\emph{across} versions---tracking field-number reuse, type narrowing, and default changes over a commit
+range---would turn the static schema lens into a true compatibility checker. Third, the runtime axis
+ingests exported telemetry; a streaming mode that correlates live traces against the static baseline in
+near-real-time would tighten the confirmed-incident quadrant. Fourth, the plugin interfaces invite
+retargeting the deterministic-fact-plus-gate methodology at adjacent weak-oracle domains such as
+access-control and feature-flag changes. Finally, the evaluation harness is positioned to grow into a
+public, longitudinal leaderboard that reruns the full gate suite across an expanding corpus of pinned
+public repositories, turning reproducibility from a property of this paper into an ongoing community
+benchmark.
+
+%======================================================================
+\section{Conclusion}
+%======================================================================
+
+\tool{} demonstrates that the highest-risk changes teams ship---destructive, polyglot, cross-cutting
+data changes---can be analyzed \emph{deterministically}, with full provenance, across relational,
+NoSQL, pipeline, schema, and infrastructure surfaces, and that generation can be made safe by bounding
+it, quarantining it, and deterministically rejecting it. Just as important, \tool{} shows that
+\emph{every} such claim can be made reproducible: 159 gates prove the system against real, pinned
+public code and fail loudly on drift, and a research-grade evaluation methodology---blinded
+adjudication, seeded recall, ablations, effect sizes, and severity calibration---turns the artifact
+into evidence. We believe this combination of breadth, safety, and gate-backed reproducibility is a
+template for trustworthy program-analysis artifacts.
+
+\paragraph{Availability.} \tool{} is a single Go binary with no required external services. Every
+result in this paper is regenerated by a \code{make} target against pinned public repositories.
+
+%======================================================================
+\appendix
+\section{A Worked End-to-End Example}
+\label{app:worked}
+%======================================================================
+
+To make the pipeline concrete, we walk through a single invocation against a pinned slice of the
+\code{lobsters/lobsters} Rails application. The command requests the full pipeline with a bounded
+budget and template-only generation:
+
+\begin{quote}\small\ttfamily
+go run ./cmd/patchline repo analyze \textbackslash\\
+\hspace*{1em}--github lobsters/lobsters \textbackslash\\
+\hspace*{1em}--ref 3b80b47aa5aaba37ec44413e7d1dc96fcf1585b6 \textbackslash\\
+\hspace*{1em}--subpath db/migrate \textbackslash\\
+\hspace*{1em}--stages inventory,baseline,propose,compare \textbackslash\\
+\hspace*{1em}--proposal-kind all \textbackslash\\
+\hspace*{1em}--budget files=8,lines=100,tokens=12000,changes=2 \textbackslash\\
+\hspace*{1em}--no-llm --out results/generated/landing-demo --json
+\end{quote}
+
+\noindent
+\textbf{Fetch.} \tool{} resolves the pinned commit, downloads the \code{db/migrate} slice, and writes
+\code{source.json} recording the GitHub host, the resolved 40-character commit, and the archive
+SHA-256. Because the commit is pinned, every subsequent run is reproducible.
+
+\noindent
+\textbf{Inventory.} \tool{} scans 158 files, identifies the Rails migration system and its native
+command, and emits the fact stream. Schema-evolution facts are derived directly from the migration
+bodies---no pre-authored schema is required---so an \code{ALTER TABLE \dots\ DROP COLUMN} becomes a
+\code{schema\_evolution} fact carrying the table and column as typed identifiers.
+
+\noindent
+\textbf{Baseline.} \tool{} ranks 328 data-change risks, attaches 100 provenance slices, estimates
+blast radius, and minimizes proof holes. The output is written both as \code{baseline.json} and as
+\code{baseline.sarif} for IDE and CI ingestion.
+
+\noindent
+\textbf{Propose and compare.} Within the budget, \tool{} generates 8 review artifacts (guards and
+tests) under \code{patchline-proposals/}, all non-executable. The \code{compare} stage re-analyzes
+them; in this run zero deterministic checks fail, and the accept/reject decision for each artifact is
+recorded with its evidence delta. The headline numbers---158 files, 328 risks, 100 provenance slices,
+8 artifacts, 0 failed checks---are themselves asserted by the \code{landing-readme-gate} so the
+README cannot drift from reality.
+
+\section{Fact Schema Reference}
+\label{app:schema}
+
+Every fact shares the schema in Table~\ref{tab:factschema}. Detectors differ only in the \code{kind}
+and the \code{properties} they populate; the uniform envelope is what allows ranking, diffing, and
+tabulation to be detector-agnostic.
+
+\begin{longtable}{>{\raggedright\arraybackslash}p{2.8cm}>{\raggedright\arraybackslash}p{11.2cm}}
+\toprule
+\textbf{Field} & \textbf{Meaning} \\
+\midrule
+\endhead
+\code{version} & Fact schema version, enabling forward-compatible evolution. \\
+\code{id} & Stable content-derived identifier for cross-referencing (e.g.\ from a trace span). \\
+\code{kind} & The detector category, e.g.\ \code{schema\_evolution}, \code{nosql\_change},
+\code{data\_pipeline\_change}, \code{schema\_compatibility}, \code{infra\_data\_ordering}. \\
+\code{path} & Repository-relative path of the evidence. \\
+\code{confidence} & \code{observed} for directly matched signals, \code{derived} for cross-fact
+inferences. \\
+\code{rationale} & Human-readable justification; the basis of \tool's explainability. \\
+\code{identifiers} & Typed identifiers (table, model, engine, operation, job, \dots) for linking. \\
+\code{properties} & Detector-specific key/values, including the \code{destructive} or \code{breaking}
+flag. \\
+\bottomrule
+\caption{The uniform fact envelope shared by all detectors.}
+\label{tab:factschema}
+\end{longtable}
+
+\section{Detector Rule Catalog}
+\label{app:rules}
+
+Tables~\ref{tab:pipelinerules}--\ref{tab:schemarules} list representative rules for the
+pipeline and schema-compatibility detectors. Each rule is signal-gated (P3): the framework or format
+signal must match before any rule is evaluated, which is what keeps prose and unrelated code from
+being misclassified.
+
+\begin{table}[h]\centering\small
+\caption{Data-pipeline detector: signals and representative operations.}
+\label{tab:pipelinerules}
+\begin{tabular}{>{\raggedright\arraybackslash}p{2.2cm}>{\raggedright\arraybackslash}p{4.6cm}>{\raggedright\arraybackslash}p{6.0cm}}
+\toprule
+\textbf{Framework} & \textbf{Signal} & \textbf{Destructive operations} \\
+\midrule
+Airflow & \code{from airflow}, \code{DAG(} & embedded DROP/TRUNCATE, backfill,
+\code{clear\_task\_instances}, dagrun reset \\
+dbt & \code{\{\{ config(}, \code{\{\{ ref(} & \code{--full-refresh}, \code{materialized='table'} \\
+Spark & \code{pyspark}, \code{SparkSession} & \code{.mode("overwrite")}, \code{saveAsTable},
+\code{insertInto} \\
+Kafka & \code{KafkaConsumer}, \code{@KafkaListener} & \code{auto.offset.reset},
+\code{seekToBeginning}, \code{--reset-offsets} \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\begin{table}[h]\centering\small
+\caption{Schema-compatibility detector: formats and breaking risks.}
+\label{tab:schemarules}
+\begin{tabular}{>{\raggedright\arraybackslash}p{2.2cm}>{\raggedright\arraybackslash}p{4.6cm}>{\raggedright\arraybackslash}p{6.0cm}}
+\toprule
+\textbf{Format} & \textbf{Inspected} & \textbf{Breaking risk} \\
+\midrule
+protobuf & message fields, syntax level & proto2 \code{required} field; message with no
+\code{reserved} \\
+Avro & record fields & field without a \code{default} \\
+registry & \code{buf.yaml}, \code{buf.gen.yaml} & compatibility-policy presence \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\section{Infrastructure/Data Ordering Markers}
+\label{app:ordering}
+
+The ordering analysis (Section~\ref{sec:breadth}) treats the markers in Table~\ref{tab:ordering} as
+evidence that a data-change job is sequenced relative to its rollout. A migration or database job
+co-located with any such marker is classified \emph{sequenced}; one with none is \emph{unordered}.
+
+\begin{table}[h]\centering\small
+\caption{Deploy-ordering markers correlated with migration/database jobs.}
+\label{tab:ordering}
+\begin{tabular}{>{\raggedright\arraybackslash}p{6.0cm}>{\raggedright\arraybackslash}p{6.0cm}}
+\toprule
+\textbf{Marker} & \textbf{Source} \\
+\midrule
+\code{helm.sh/hook} (pre/post-install, pre/post-upgrade) & Helm \\
+\code{argocd.argoproj.io/sync-wave} & Argo CD \\
+\code{initContainers}, \code{depends-on} & Kubernetes \\
+\code{depends\_on}, \code{wait = true}, \code{atomic = true} & Terraform / Helm provider \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\section{Selected Gate Catalog}
+\label{app:gates}
+
+\tool{} ships 159 gates; Table~\ref{tab:gatecatalog} lists a representative selection grouped by
+theme to convey the breadth of what is proven against real, pinned public code. Each gate is a single
+\code{make} target.
+
+\begin{longtable}{>{\raggedright\arraybackslash}p{3.4cm}>{\raggedright\arraybackslash}p{10.6cm}}
+\toprule
+\textbf{Theme} & \textbf{Representative gates} \\
+\midrule
+\endhead
+Source breadth & \code{mercurial-fossil-source-gate}, \code{monorepo-boundary-gate} \\
+Migration breadth & \code{multi-ecosystem-migration-gate}, \code{nosql-change-gate},
+\code{data-pipeline-gate}, \code{schema-compat-gate}, \code{infra-ordering-gate} \\
+Intervention safety & \code{generated-code-quarantine-gate}, \code{rejected-generated-gate},
+\code{intervention-regression-archive-gate}, \code{reviewability-examples-gate} \\
+Runtime evidence & \code{otel-trace-gen-gate}, \code{datadog-timeline-gate}, \code{prom-grafana-gate},
+\code{runtime-confidence-gate} \\
+Evaluation rigor & \code{fp-adjudication-gate}, \code{fn-discovery-gate}, \code{ablation-study-gate},
+\code{effect-size-strata-gate}, \code{severity-calibration-gate} \\
+Stratification & \code{ecosystem-balanced-benchmark-gate}, \code{repository-size-stratification-gate},
+\code{migration-age-stratification-gate}, \code{longitudinal-public-reruns-gate} \\
+Security \& privacy & \code{secret-scan-gate}, \code{archive-security-gate}, \code{threat-model-gate},
+\code{redaction-stability-gate}, \code{privacy-metrics-gate}, \code{supply-chain-provenance-gate} \\
+Robustness \& DX & \code{fuzz-coverage-gate}, \code{parser-dashboard-gate},
+\code{fixture-minimizer-gate}, \code{onboarding-quest-gate}, \code{performance-budget-gate} \\
+Artifact \& paper & \code{reviewer-walkthrough-gate}, \code{artifact-evaluation-kit-gate},
+\code{paper-figures-gate}, \code{paper-appendix-gate}, \code{camera-ready-checklist-gate} \\
+\bottomrule
+\caption{A representative selection from the 159-gate catalog, grouped by theme.}
+\label{tab:gatecatalog}
+\end{longtable}
+
+\section{Security and Privacy Model}
+\label{app:security}
+
+Because \tool{} ingests \emph{untrusted} repositories and archives, it carries an explicit threat
+model that is itself gate-verified. Archive extraction defends against path traversal, symlink
+escape, malformed archives, and archive bombs, while still extracting pinned public GitHub archives
+through a content-addressed cache. Generated proposal files are non-executable, unapplied, and
+excluded from native execution unless the user explicitly enables an allowlist of safe checks.
+Redaction is byte-stable across repeated and resumed runs, secret-scanning proves that redacted
+reports, prompts, bundles, and CI artifacts do not leak deterministic canary values, and an aggregate
+privacy-metrics mode emits source-free risk trends with salted cohort identifiers so results can be
+shared without raw evidence. Binaries, release archives, and public-corpus downloads carry
+deterministic provenance and sorted checksums.
+
+\section{Reproduction Guide}
+\label{app:repro}
+
+Every claim in this paper is regenerated by a \code{make} target. To reproduce the breadth results of
+Section~\ref{sec:breadth} against pinned public repositories:
+
+\begin{quote}\small\ttfamily
+make multi-ecosystem-migration-gate \quad\# Laravel + 7-framework matrix\\
+make nosql-change-gate \hspace{3.05em}\# Cassandra DROP on twitter-go + 5-engine matrix\\
+make data-pipeline-gate \hspace{2.4em}\# Airflow+dbt+Spark on building-lakehouse\\
+make schema-compat-gate \hspace{2.4em}\# Avro + protobuf on apache/avro\\
+make infra-ordering-gate \hspace{2.0em}\# Kong/Anchore sequencing on helm/charts\\
+make fixture-minimizer-gate \hspace{0.7em}\# 1-minimal reproductions per ecosystem\\
+make parser-dashboard-gate \hspace{1.1em}\# coverage + fuzz robustness dashboard
+\end{quote}
+
+\noindent
+Each target downloads only the pinned slice it needs, runs the real analyzer with \code{--no-llm},
+asserts its invariants, and writes a \code{gate-summary.json}. A failing assertion---whether from a
+code regression, a documentation drift, or a changed upstream ref---fails the target loudly, which is
+precisely the property that makes the artifact trustworthy.
+
+\end{document}
