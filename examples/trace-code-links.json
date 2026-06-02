@@ -1,0 +1,32 @@
+{
+  "version": "patchline.trace-code-links/v1",
+  "claim": "Trace-to-code linking is validated on public OpenTelemetry, Datadog-style tracing, structured-log, and incident/documentation slices from repositories not designed for Patchline.",
+  "minimum_public_repos": 4,
+  "required_kinds": ["opentelemetry", "datadog", "structured_log", "incident_timeline"],
+  "slices": [
+    {
+      "id": "otel-go-http-instrumentation",
+      "repo": "open-telemetry/opentelemetry-go-contrib",
+      "ref": "9ab3fe3a32844af0be9d906e85dcd8e5feefe97c",
+      "subpath": "instrumentation/net/http/otelhttp"
+    },
+    {
+      "id": "datadog-go-http-instrumentation",
+      "repo": "DataDog/dd-trace-go",
+      "ref": "03b1a1fe6b7820843ae599eca9f826816e5ecdec",
+      "subpath": "contrib/net/http"
+    },
+    {
+      "id": "terraform-rpcapi-telemetry",
+      "repo": "hashicorp/terraform",
+      "ref": "581ffab924bb71871e34b6198767202799957c36",
+      "subpath": "internal/rpcapi"
+    },
+    {
+      "id": "kibana-otel-log-appender",
+      "repo": "elastic/kibana",
+      "ref": "316d5dfcfa703a6a13fc9845159ba60bb3271e7c",
+      "subpath": "src/core/packages/logging/server-internal/src/appenders/otel"
+    }
+  ]
+}

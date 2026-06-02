@@ -40,6 +40,7 @@ type BaselineReport struct {
 	LockHazards     []LockHazard              `json:"lock_concurrency_hazards,omitempty"`
 	PrivacyHazards  []PrivacyHazard           `json:"data_retention_privacy_hazards,omitempty"`
 	Invariants      []InvariantCandidate      `json:"invariant_candidates,omitempty"`
+	TraceLinks      []TraceCodeLink           `json:"trace_code_links,omitempty"`
 	PolicyChecks    []PolicyCheck             `json:"policy_checks,omitempty"`
 	RepairProofs    []RepairProofSummary      `json:"repair_proof_summaries,omitempty"`
 	NativeChecks    []Command                 `json:"native_checks,omitempty"`
@@ -94,6 +95,11 @@ type BaselineSummary struct {
 	InvariantTests      int `json:"invariants_from_tests"`
 	InvariantValidation int `json:"invariants_from_validations"`
 	InvariantFixtures   int `json:"invariants_from_fixtures"`
+	TraceCodeLinks      int `json:"trace_code_links"`
+	TraceLinkExact      int `json:"trace_links_exact"`
+	TraceLinkCausal     int `json:"trace_links_causal"`
+	TraceLinkTemporal   int `json:"trace_links_temporal"`
+	TraceLinkInferred   int `json:"trace_links_inferred"`
 	PolicyChecks        int `json:"policy_checks"`
 	PolicyPassed        int `json:"policy_passed"`
 	PolicyWarnings      int `json:"policy_warnings"`
@@ -203,6 +209,21 @@ type InvariantCandidate struct {
 	Confidence  string       `json:"confidence"`
 	Evidence    []string     `json:"evidence,omitempty"`
 	Identifiers []Identifier `json:"identifiers,omitempty"`
+	Rationale   string       `json:"rationale"`
+}
+
+type TraceCodeLink struct {
+	ID          string       `json:"id"`
+	SourcePath  string       `json:"source_path"`
+	CodePath    string       `json:"code_path,omitempty"`
+	RiskID      string       `json:"risk_id,omitempty"`
+	Kind        string       `json:"kind"`
+	Relation    string       `json:"relation"`
+	Confidence  string       `json:"confidence"`
+	Signals     []string     `json:"signals,omitempty"`
+	Identifiers []Identifier `json:"identifiers,omitempty"`
+	Time        string       `json:"time,omitempty"`
+	Evidence    []string     `json:"evidence,omitempty"`
 	Rationale   string       `json:"rationale"`
 }
 
@@ -384,6 +405,7 @@ func Baseline(inv Inventory, facts []Fact, intakeReport intake.Report) BaselineR
 	report.LockHazards = buildLockHazards(report.Risks, report.Provenance, facts, intakeReport)
 	report.PrivacyHazards = buildPrivacyHazards(report.Risks, report.Provenance, facts, intakeReport)
 	report.Invariants = buildInvariantCandidates(inv.Root, facts, intakeReport)
+	report.TraceLinks = buildTraceCodeLinks(inv.Root, report.Risks, report.Provenance, facts, intakeReport)
 	report.PolicyChecks = buildPolicyChecks(report.Risks, report.Provenance, report.SymbolicChecks)
 	report.RepairProofs = buildRepairProofSummaries(report.Risks, report.Provenance, report.AbstractEffects, report.SymbolicChecks)
 	report.Summary = BaselineSummary{
@@ -433,6 +455,11 @@ func Baseline(inv Inventory, facts []Fact, intakeReport intake.Report) BaselineR
 		InvariantTests:      countInvariantSource(report.Invariants, "test"),
 		InvariantValidation: countInvariantSource(report.Invariants, "validation"),
 		InvariantFixtures:   countInvariantSource(report.Invariants, "fixture"),
+		TraceCodeLinks:      len(report.TraceLinks),
+		TraceLinkExact:      countTraceLinkConfidence(report.TraceLinks, "exact"),
+		TraceLinkCausal:     countTraceLinkConfidence(report.TraceLinks, "causal"),
+		TraceLinkTemporal:   countTraceLinkConfidence(report.TraceLinks, "temporal"),
+		TraceLinkInferred:   countTraceLinkConfidence(report.TraceLinks, "inferred"),
 		PolicyChecks:        len(report.PolicyChecks),
 		PolicyPassed:        countPolicyStatus(report.PolicyChecks, "pass"),
 		PolicyWarnings:      countPolicyStatus(report.PolicyChecks, "warn"),
@@ -3377,6 +3404,15 @@ func removeString(values []string, target string) []string {
 	return out
 }
 
+func containsString(values []string, target string) bool {
+	for _, value := range values {
+		if value == target {
+			return true
+		}
+	}
+	return false
+}
+
 func buildInvariantCandidates(inventoryRoot string, facts []Fact, intakeReport intake.Report) []InvariantCandidate {
 	root := firstNonEmpty(inventoryRoot, intakeReport.Source.ScannedRoot, intakeReport.Source.Input)
 	seen := map[string]bool{}
@@ -3834,6 +3870,288 @@ func countInvariantSource(items []InvariantCandidate, source string) int {
 	var count int
 	for _, item := range items {
 		if item.Source == source {
+			count++
+		}
+	}
+	return count
+}
+
+func buildTraceCodeLinks(inventoryRoot string, risks []BaselineRisk, slices []ProvenanceSlice, facts []Fact, intakeReport intake.Report) []TraceCodeLink {
+	root := firstNonEmpty(inventoryRoot, intakeReport.Source.ScannedRoot, intakeReport.Source.Input)
+	codeFacts := traceCodeFacts(facts)
+	traceFacts := traceEvidenceFacts(facts)
+	sliceByPath := provenanceByCodePath(slices)
+	riskByID := map[string]BaselineRisk{}
+	for _, risk := range risks {
+		riskByID[risk.ID] = risk
+	}
+	seen := map[string]bool{}
+	var out []TraceCodeLink
+	for _, traceFact := range traceFacts {
+		traceText := traceFactText(root, traceFact)
+		traceIDs := uniqueIdentifiers(append(append([]Identifier{}, traceFact.Identifiers...), identifiersFromText(traceText)...))
+		kind, signals := traceEvidenceKind(traceFact, traceText)
+		for _, codeFact := range codeFacts {
+			codeText := traceFactText(root, codeFact)
+			codeIDs := uniqueIdentifiers(append(append([]Identifier{}, codeFact.Identifiers...), identifiersFromText(codeText)...))
+			shared := sharedIdentifiers(traceIDs, codeIDs)
+			pathSignals := tracePathSignals(traceText, codeFact.Path)
+			if len(shared) == 0 && len(pathSignals) == 0 {
+				continue
+			}
+			confidence := traceLinkConfidence(kind, shared, pathSignals, traceFact, codeFact)
+			riskID := firstRiskForCodePath(sliceByPath[codeFact.Path], riskByID)
+			signalsOut := uniqueStrings(append(append([]string{}, signals...), pathSignals...))
+			link := TraceCodeLink{
+				ID:          "trace-link:" + canonical.Hash(strings.Join([]string{traceFact.ID, codeFact.ID, codeFact.Path, confidence}, "\x00"))[:16],
+				SourcePath:  traceFact.Path,
+				CodePath:    codeFact.Path,
+				RiskID:      riskID,
+				Kind:        kind,
+				Relation:    "observability-evidence-to-code",
+				Confidence:  confidence,
+				Signals:     signalsOut,
+				Identifiers: shared,
+				Time:        traceTimeSignal(traceFact, traceText),
+				Evidence:    traceLinkEvidence(traceFact, codeFact, shared, signalsOut),
+				Rationale:   traceLinkRationale(kind, confidence),
+			}
+			addTraceCodeLink(&out, seen, link)
+		}
+		if len(out) > 700 {
+			break
+		}
+	}
+	sort.Slice(out, func(i, j int) bool {
+		if out[i].Confidence != out[j].Confidence {
+			return traceLinkConfidenceRank(out[i].Confidence) > traceLinkConfidenceRank(out[j].Confidence)
+		}
+		if out[i].Kind != out[j].Kind {
+			return out[i].Kind < out[j].Kind
+		}
+		if out[i].SourcePath != out[j].SourcePath {
+			return out[i].SourcePath < out[j].SourcePath
+		}
+		return out[i].CodePath < out[j].CodePath
+	})
+	if len(out) > 500 {
+		out = out[:500]
+	}
+	return out
+}
+
+func addTraceCodeLink(out *[]TraceCodeLink, seen map[string]bool, link TraceCodeLink) bool {
+	key := link.SourcePath + "\x00" + link.CodePath + "\x00" + link.Kind + "\x00" + strings.Join(identifierKeys(link.Identifiers), ",")
+	if seen[key] {
+		return false
+	}
+	seen[key] = true
+	*out = append(*out, link)
+	return true
+}
+
+func traceCodeFacts(facts []Fact) []Fact {
+	var out []Fact
+	for _, fact := range facts {
+		lower := strings.ToLower(fact.Kind + " " + fact.Path)
+		if fact.Path == "" {
+			continue
+		}
+		if fact.Kind == "file" || fact.Kind == "source_sql_hint" || fact.Kind == "schema_evolution" || containsAny(lower, "source", "migration", "model", "job", "worker") {
+			if hasCodeLikeExtension(fact.Path) || fact.Kind == "schema_evolution" || fact.Kind == "source_sql_hint" {
+				out = append(out, fact)
+			}
+		}
+	}
+	return out
+}
+
+func traceEvidenceFacts(facts []Fact) []Fact {
+	var out []Fact
+	for _, fact := range facts {
+		if fact.Path == "" {
+			continue
+		}
+		lower := strings.ToLower(fact.Kind + " " + fact.Path + " " + fact.Rationale + " " + fact.Properties["field"] + " " + fact.Properties["value_preview"])
+		if fact.Kind == "evidence_export" || fact.Kind == "operational_doc" || fact.Kind == "field_evidence" || fact.Kind == "file" {
+			if containsAny(lower, "trace", "span", "otel", "opentelemetry", "datadog", "dd.", "deploy", "deployment", "incident", "timeline", "log", "structured", "service", "resource", "operation_name", "trace_id", "span_id", "commit") {
+				out = append(out, fact)
+			}
+		}
+	}
+	return out
+}
+
+func traceFactText(root string, fact Fact) string {
+	var parts []string
+	parts = append(parts, fact.Kind, fact.Path, fact.Rationale)
+	for key, value := range fact.Properties {
+		parts = append(parts, key, value)
+	}
+	if text := textForBoundary(root, fact.Path); text != "" {
+		parts = append(parts, text)
+	}
+	return strings.Join(parts, "\n")
+}
+
+func traceEvidenceKind(fact Fact, text string) (string, []string) {
+	lower := strings.ToLower(fact.Path + " " + fact.Kind + " " + fact.Rationale + " " + text)
+	checks := []struct {
+		Kind   string
+		Tokens []string
+	}{
+		{"opentelemetry", []string{"opentelemetry", "otel", "resource_spans", "resourcespans", "scope_spans", "scopespans", "resource.attributes"}},
+		{"datadog", []string{"datadog", "dd.", "ddtrace", "\"traces\"", "resource_name"}},
+		{"structured_log", []string{".log", "level=", "msg=", "logger", "structured", "jsonl", "trace_id", "request_id"}},
+		{"incident_timeline", []string{"incident", "postmortem", "timeline", "outage", "sev", "error"}},
+		{"deploy_marker", []string{"deploy", "deployment", "commit", "release", "sha"}},
+	}
+	var signals []string
+	for _, check := range checks {
+		for _, token := range check.Tokens {
+			if strings.Contains(lower, token) {
+				if !containsString(signals, check.Kind) {
+					signals = append(signals, check.Kind)
+				}
+				break
+			}
+		}
+	}
+	if len(signals) == 0 {
+		return "observability_evidence", nil
+	}
+	return signals[0], signals
+}
+
+func tracePathSignals(text, codePath string) []string {
+	if text == "" || codePath == "" {
+		return nil
+	}
+	lower := strings.ToLower(text)
+	path := strings.ToLower(filepath.ToSlash(codePath))
+	base := strings.ToLower(strings.TrimSuffix(filepath.Base(path), filepath.Ext(path)))
+	var signals []string
+	if path != "" && strings.Contains(lower, path) {
+		signals = append(signals, "code-path-exact")
+	}
+	if base != "" && len(base) > 3 && strings.Contains(lower, base) {
+		signals = append(signals, "code-symbol-or-file")
+	}
+	return uniqueStrings(signals)
+}
+
+func traceLinkConfidence(kind string, shared []Identifier, pathSignals []string, traceFact, codeFact Fact) string {
+	if containsAny(strings.Join(pathSignals, " "), "code-path-exact") {
+		return "exact"
+	}
+	for _, id := range shared {
+		if id.Kind == "commit" || id.Kind == "endpoint" || id.Kind == "job" || id.Kind == "queue" {
+			return "causal"
+		}
+	}
+	if len(shared) > 0 {
+		return "inferred"
+	}
+	if kind == "deploy_marker" || kind == "incident_timeline" || traceFact.Path == codeFact.Path {
+		return "temporal"
+	}
+	return "inferred"
+}
+
+func traceTimeSignal(fact Fact, text string) string {
+	for _, id := range append(append([]Identifier{}, fact.Identifiers...), identifiersFromText(text)...) {
+		if id.Kind == "timestamp" || id.Kind == "date" {
+			return id.Value
+		}
+	}
+	return ""
+}
+
+func traceLinkEvidence(traceFact, codeFact Fact, shared []Identifier, signals []string) []string {
+	var evidence []string
+	evidence = append(evidence, "observability fact: "+traceFact.ID)
+	evidence = append(evidence, "code fact: "+codeFact.ID)
+	if len(shared) > 0 {
+		var ids []string
+		for _, id := range shared {
+			ids = append(ids, id.Kind+":"+id.Value)
+		}
+		evidence = append(evidence, "shared identifiers: "+strings.Join(uniqueSortedStrings(ids), ", "))
+	}
+	if len(signals) > 0 {
+		evidence = append(evidence, "signals: "+strings.Join(signals, ", "))
+	}
+	return capStrings(uniqueSortedStrings(evidence), 8)
+}
+
+func traceLinkRationale(kind, confidence string) string {
+	return "links " + kind + " evidence to code using deterministic shared identifiers, path mentions, deploy markers, incident timelines, or structured log fields at " + confidence + " confidence"
+}
+
+func provenanceByCodePath(slices []ProvenanceSlice) map[string][]ProvenanceSlice {
+	out := map[string][]ProvenanceSlice{}
+	for _, slice := range slices {
+		if slice.MigrationPath != "" {
+			out[slice.MigrationPath] = append(out[slice.MigrationPath], slice)
+		}
+		for _, path := range slice.SourcePaths {
+			out[path] = append(out[path], slice)
+		}
+		for _, path := range slice.IncidentPaths {
+			out[path] = append(out[path], slice)
+		}
+	}
+	return out
+}
+
+func firstRiskForCodePath(slices []ProvenanceSlice, risks map[string]BaselineRisk) string {
+	for _, slice := range slices {
+		if _, ok := risks[slice.RiskID]; ok {
+			return slice.RiskID
+		}
+	}
+	return ""
+}
+
+func hasCodeLikeExtension(path string) bool {
+	lower := strings.ToLower(path)
+	for _, suffix := range []string{".go", ".py", ".rb", ".js", ".ts", ".tsx", ".jsx", ".java", ".kt", ".cs", ".php", ".rs", ".sql", ".prisma"} {
+		if strings.HasSuffix(lower, suffix) {
+			return true
+		}
+	}
+	return false
+}
+
+func identifierKeys(ids []Identifier) []string {
+	var keys []string
+	for _, id := range ids {
+		if key := canonicalIdentifier(id.Kind, id.Value); key != "" {
+			keys = append(keys, key)
+		}
+	}
+	return uniqueSortedStrings(keys)
+}
+
+func traceLinkConfidenceRank(confidence string) int {
+	switch confidence {
+	case "exact":
+		return 4
+	case "causal":
+		return 3
+	case "temporal":
+		return 2
+	case "inferred":
+		return 1
+	default:
+		return 0
+	}
+}
+
+func countTraceLinkConfidence(links []TraceCodeLink, confidence string) int {
+	var count int
+	for _, link := range links {
+		if link.Confidence == confidence {
 			count++
 		}
 	}
@@ -4342,6 +4660,11 @@ func renderBaselineMarkdown(report BaselineReport) string {
 	fmt.Fprintf(&b, "| invariants from tests | %d |\n", report.Summary.InvariantTests)
 	fmt.Fprintf(&b, "| invariants from validations | %d |\n", report.Summary.InvariantValidation)
 	fmt.Fprintf(&b, "| invariants from fixtures | %d |\n", report.Summary.InvariantFixtures)
+	fmt.Fprintf(&b, "| trace-to-code links | %d |\n", report.Summary.TraceCodeLinks)
+	fmt.Fprintf(&b, "| trace links exact | %d |\n", report.Summary.TraceLinkExact)
+	fmt.Fprintf(&b, "| trace links causal | %d |\n", report.Summary.TraceLinkCausal)
+	fmt.Fprintf(&b, "| trace links temporal | %d |\n", report.Summary.TraceLinkTemporal)
+	fmt.Fprintf(&b, "| trace links inferred | %d |\n", report.Summary.TraceLinkInferred)
 	fmt.Fprintf(&b, "| policy checks | %d |\n", report.Summary.PolicyChecks)
 	fmt.Fprintf(&b, "| policy passed | %d |\n", report.Summary.PolicyPassed)
 	fmt.Fprintf(&b, "| policy warnings | %d |\n", report.Summary.PolicyWarnings)
@@ -4455,6 +4778,14 @@ func renderBaselineMarkdown(report BaselineReport) string {
 		limit := minInt(len(report.Invariants), 25)
 		for _, item := range report.Invariants[:limit] {
 			fmt.Fprintf(&b, "| %s | %s | %s | %s | %s | `%s` |\n", item.Source, item.Kind, item.Table, item.Column, item.Path, item.Expression)
+		}
+		fmt.Fprintf(&b, "\n")
+	}
+	if len(report.TraceLinks) > 0 {
+		fmt.Fprintf(&b, "## Trace-to-code links\n\n| confidence | kind | source | code | risk | signals |\n| --- | --- | --- | --- | --- | --- |\n")
+		limit := minInt(len(report.TraceLinks), 25)
+		for _, item := range report.TraceLinks[:limit] {
+			fmt.Fprintf(&b, "| %s | %s | %s | %s | `%s` | %s |\n", item.Confidence, item.Kind, item.SourcePath, item.CodePath, item.RiskID, strings.Join(item.Signals, ", "))
 		}
 		fmt.Fprintf(&b, "\n")
 	}

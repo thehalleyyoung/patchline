@@ -1082,6 +1082,37 @@ func TestBaselineMinesInvariantCandidates(t *testing.T) {
 	}
 }
 
+func TestBaselineBuildsTraceToCodeLinks(t *testing.T) {
+	root := t.TempDir()
+	writeFile(t, root, "app/jobs/account_backfill_worker.rb", "class AccountBackfillWorker\n  def perform\n    Account.where(active: true).update_all(flagged: true)\n  end\nend\n")
+	writeFile(t, root, "db/migrate/001_accounts.sql", "UPDATE accounts SET flagged = true;")
+	writeFile(t, root, "observability/otel.json", `{"resourceSpans":[{"resource":{"attributes":[{"key":"service.name","value":{"stringValue":"billing"}}]},"scopeSpans":[{"spans":[{"traceId":"abc","spanId":"def","name":"AccountBackfillWorker perform","attributes":[{"key":"code.filepath","value":{"stringValue":"app/jobs/account_backfill_worker.rb"}},{"key":"db.system","value":{"stringValue":"postgresql"}},{"key":"db.sql.table","value":{"stringValue":"accounts"}}]}]}]}]}`)
+	writeFile(t, root, "observability/datadog.json", `{"traces":[[{"trace_id":"123","span_id":"456","service":"billing","resource":"AccountBackfillWorker","meta":{"code.filepath":"app/jobs/account_backfill_worker.rb","db.table":"accounts"}}]]}`)
+	writeFile(t, root, "logs/app.log", `time=2025-01-02T03:04:05Z level=error service=billing job=AccountBackfillWorker trace_id=abc table=accounts deploy=prod-20250102`)
+	writeFile(t, root, "docs/deploy.md", "Deployment prod-20250102 commit abc123 ran AccountBackfillWorker for accounts.")
+	writeFile(t, root, "docs/incident-42.md", "Incident 42 timeline: 2025-01-02T03:04:05Z deploy prod-20250102 AccountBackfillWorker updated accounts.")
+	inv, err := InventoryPath(InventoryOptions{Path: root})
+	if err != nil {
+		t.Fatal(err)
+	}
+	intakeReport, err := intake.Run(context.Background(), intake.Options{Path: root})
+	if err != nil {
+		t.Fatal(err)
+	}
+	baseline := Baseline(inv, inv.Facts, intakeReport)
+	if baseline.Summary.TraceCodeLinks == 0 || baseline.Summary.TraceLinkExact == 0 {
+		t.Fatalf("expected exact trace-to-code links: summary=%#v links=%#v", baseline.Summary, baseline.TraceLinks)
+	}
+	for _, want := range []string{"opentelemetry", "datadog", "structured_log", "deploy_marker", "incident_timeline"} {
+		if !hasTraceLinkKind(baseline.TraceLinks, want) {
+			t.Fatalf("missing trace link kind %q in %#v", want, baseline.TraceLinks)
+		}
+	}
+	if !strings.Contains(baseline.Markdown, "Trace-to-code links") {
+		t.Fatalf("expected trace links in markdown:\n%s", baseline.Markdown)
+	}
+}
+
 func TestCompareClassifiesGeneratedPrivacyHazards(t *testing.T) {
 	baseline := BaselineReport{
 		Version: BaselineVersion,
@@ -1575,6 +1606,15 @@ func hasPrivacyHazardMarker(hazards []PrivacyHazard, marker string) bool {
 }
 
 func hasInvariantKind(items []InvariantCandidate, kind string) bool {
+	for _, item := range items {
+		if item.Kind == kind {
+			return true
+		}
+	}
+	return false
+}
+
+func hasTraceLinkKind(items []TraceCodeLink, kind string) bool {
 	for _, item := range items {
 		if item.Kind == kind {
 			return true
