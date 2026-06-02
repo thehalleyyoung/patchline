@@ -203,6 +203,8 @@ Run `make artifact-release-manifest-gate` to generate the deterministic artifact
 
 Run `make rebuttal-response-workspace-gate` to generate a public rebuttal-response workspace linking likely reviewer concerns to evidence and limitations; see [docs/rebuttal-response-workspace.md](docs/rebuttal-response-workspace.md).
 
+Run `make camera-ready-checklist-gate` to block camera-ready release when claims, figures, tables, or docs drift from generated evidence; see [docs/camera-ready-checklist.md](docs/camera-ready-checklist.md).
+
 Add `--redact` to write `analysis-bundle/` copies with stable redaction tokens for identifiers, literals, customer-like strings, and secret-like values while preserving joins and existing artifact hashes.
 
 Add `--ci` to write `ci/summary.md` plus upload snippets and code-quality artifacts for GitHub Actions, GitLab CI, and Bitbucket Pipelines: SARIF under `analysis-bundle/summary.sarif`, GitLab `ci/gl-code-quality-report.json`, and Bitbucket `ci/bitbucket-code-insights.json`.

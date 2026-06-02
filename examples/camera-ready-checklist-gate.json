@@ -1,0 +1,25 @@
+{
+  "version": "patchline.camera-ready-checklist-gate/v1",
+  "claim": "Patchline blocks camera-ready release when claims, figures, tables, documentation, or release metadata drift from regenerated public-code evidence.",
+  "minimum_checks": 10,
+  "minimum_public_repos": 4,
+  "minimum_claims": 6,
+  "minimum_figures": 5,
+  "minimum_tables": 5,
+  "rebuttal_spec": "examples/rebuttal-response-workspace-gate.json",
+  "required_docs": [
+    "README.md",
+    "docs/paper-appendix.md",
+    "docs/artifact-release-manifest.md",
+    "docs/rebuttal-response-workspace.md",
+    "docs/capstone-demo.md"
+  ],
+  "required_outputs": [
+    "camera-ready-checklist.json",
+    "camera-ready-checklist.md",
+    "drift-policy.json",
+    "evidence/rebuttal-workspace/rebuttal-workspace.json",
+    "evidence/rebuttal-workspace/evidence/paper-appendix/appendix.json",
+    "evidence/rebuttal-workspace/evidence/release-manifest/artifact-release-manifest.json"
+  ]
+}
