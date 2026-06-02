@@ -234,9 +234,9 @@ func checkGeneratedArtifacts(artifacts []GeneratedArtifact) []GeneratedCheck {
 				check.Findings = append(check.Findings, "explain proposal lacks explain and row-count checks")
 			}
 		case "repair":
-			if !strings.Contains(lower, `"scope"`) || !strings.Contains(lower, `"rollback"`) || !strings.Contains(lower, `"postconditions"`) {
+			if findings := validateRepairManifest(artifact.Content); len(findings) > 0 {
 				check.Status = "fail"
-				check.Findings = append(check.Findings, "repair manifest lacks scope, rollback, or postconditions")
+				check.Findings = append(check.Findings, findings...)
 			}
 		case "tests":
 			if !strings.Contains(lower, "suggested assertions") {
@@ -253,6 +253,93 @@ func checkGeneratedArtifacts(artifacts []GeneratedArtifact) []GeneratedCheck {
 	}
 	sort.Slice(checks, func(i, j int) bool { return checks[i].Path < checks[j].Path })
 	return checks
+}
+
+type repairManifestCheck struct {
+	Version            string                    `json:"version"`
+	Trust              string                    `json:"trust"`
+	RiskID             string                    `json:"risk_id"`
+	Source             string                    `json:"source"`
+	Scope              repairManifestScope       `json:"scope"`
+	Preconditions      []string                  `json:"preconditions"`
+	Postconditions     []string                  `json:"postconditions"`
+	Rollback           repairManifestRollback    `json:"rollback"`
+	ValidationCommands []Command                 `json:"validation_commands"`
+	OwnerReview        repairManifestOwnerReview `json:"owner_review"`
+}
+
+type repairManifestScope struct {
+	Table string `json:"table"`
+	Where string `json:"where"`
+}
+
+type repairManifestRollback struct {
+	Required bool     `json:"required"`
+	Strategy string   `json:"strategy"`
+	Steps    []string `json:"steps"`
+}
+
+type repairManifestOwnerReview struct {
+	Required bool   `json:"required"`
+	Status   string `json:"status"`
+	Owner    string `json:"owner"`
+}
+
+func validateRepairManifest(content string) []string {
+	var manifest repairManifestCheck
+	if err := json.Unmarshal([]byte(content), &manifest); err != nil {
+		return []string{"repair manifest is not valid JSON"}
+	}
+	var findings []string
+	if manifest.Version != "patchline.generated-repair/v1" {
+		findings = append(findings, "repair manifest version is missing or unsupported")
+	}
+	if manifest.Trust != "untrusted-generated-proposal" {
+		findings = append(findings, "repair manifest must mark itself untrusted")
+	}
+	if strings.TrimSpace(manifest.RiskID) == "" || strings.TrimSpace(manifest.Source) == "" {
+		findings = append(findings, "repair manifest lacks risk_id or source")
+	}
+	if strings.TrimSpace(manifest.Scope.Table) == "" || strings.TrimSpace(manifest.Scope.Where) == "" {
+		findings = append(findings, "repair manifest scope must include table and where")
+	}
+	if len(nonEmptyStrings(manifest.Preconditions)) == 0 {
+		findings = append(findings, "repair manifest lacks machine-checkable preconditions")
+	}
+	if len(nonEmptyStrings(manifest.Postconditions)) == 0 {
+		findings = append(findings, "repair manifest lacks machine-checkable postconditions")
+	}
+	if !manifest.Rollback.Required || strings.TrimSpace(manifest.Rollback.Strategy) == "" || len(nonEmptyStrings(manifest.Rollback.Steps)) == 0 {
+		findings = append(findings, "repair manifest rollback must be required with strategy and steps")
+	}
+	if len(manifest.ValidationCommands) == 0 {
+		findings = append(findings, "repair manifest lacks validation commands")
+	}
+	for _, command := range manifest.ValidationCommands {
+		if strings.TrimSpace(command.Command) == "" || strings.TrimSpace(command.Reason) == "" {
+			findings = append(findings, "repair manifest validation commands need command and reason")
+			break
+		}
+	}
+	switch manifest.OwnerReview.Status {
+	case "pending", "approved", "rejected":
+	default:
+		findings = append(findings, "repair manifest owner review status must be pending, approved, or rejected")
+	}
+	if !manifest.OwnerReview.Required || strings.TrimSpace(manifest.OwnerReview.Owner) == "" {
+		findings = append(findings, "repair manifest owner review must be required and name an owner")
+	}
+	return findings
+}
+
+func nonEmptyStrings(values []string) []string {
+	var out []string
+	for _, value := range values {
+		if strings.TrimSpace(value) != "" {
+			out = append(out, value)
+		}
+	}
+	return out
 }
 
 func guardHasRollbackStatement(content string) bool {

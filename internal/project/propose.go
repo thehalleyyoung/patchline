@@ -785,7 +785,23 @@ func renderRepairProposal(risk ProposalRiskContext) string {
 			"only scoped rows changed",
 			"native tests and Patchline re-analysis pass",
 		},
-		"rollback": map[string]any{"required": true, "strategy": "snapshot-or-inverse-migration"},
+		"rollback": map[string]any{
+			"required": true,
+			"strategy": "snapshot-or-inverse-migration",
+			"steps": []string{
+				"capture a pre-change snapshot or inverse migration before applying",
+				"restore only rows matching the reviewed scope predicate if validation fails",
+				"rerun validation commands after rollback",
+			},
+		},
+		"validation_commands": []Command{
+			{Command: "patchline repo compare --before <baseline-report> --after <proposal-report>", Reason: "re-run deterministic generated-artifact checks"},
+		},
+		"owner_review": map[string]any{
+			"required": true,
+			"status":   "pending",
+			"owner":    "data-change-owner",
+		},
 	}
 	data, _ := json.MarshalIndent(value, "", "  ")
 	return string(append(data, '\n'))

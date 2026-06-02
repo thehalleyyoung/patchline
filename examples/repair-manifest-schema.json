@@ -1,0 +1,17 @@
+{
+  "version": "patchline.repair-manifest-schema/v1",
+  "minimum_public_slices": 4,
+  "required_fields": [
+    "scope.table",
+    "scope.where",
+    "preconditions",
+    "postconditions",
+    "rollback.required",
+    "rollback.strategy",
+    "rollback.steps",
+    "validation_commands",
+    "owner_review.required",
+    "owner_review.status",
+    "owner_review.owner"
+  ]
+}

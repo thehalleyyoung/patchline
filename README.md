@@ -172,6 +172,7 @@ make language-test-placement-gate
 make guard-mutation-gate
 make native-sandbox-profile-gate
 make generated-provenance-gate
+make repair-manifest-schema-gate
 ```
 
 The demo downloads real GitHub project subpaths and writes:
@@ -275,6 +276,8 @@ The real-repo slice matrix is backed by `examples/real-repo-slices.json` and `ex
 `make native-sandbox-profile-gate` checks Go, Node, Python, and Ruby public repositories and proves discovered native tests carry network-off sandbox profiles with isolated HOME/cache/temp write scopes.
 
 `make generated-provenance-gate` checks four public repo slices and proves generated patches cite risk IDs, fact hashes, and sanitized evidence paths.
+
+`make repair-manifest-schema-gate` generates repair manifests for four public repo slices and checks machine-readable scope, preconditions, postconditions, rollback steps, validation commands, and owner review status.
 
 Current default projects:
 

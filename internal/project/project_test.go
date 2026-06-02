@@ -887,6 +887,36 @@ ROLLBACK;
 	}
 }
 
+func TestCompareChecksRepairManifestSchema(t *testing.T) {
+	risk := ProposalRiskContext{
+		ID:            "risk:accounts",
+		Path:          "db/migrate/001.sql",
+		Table:         "accounts",
+		FactHashes:    []string{"sha256:abc123def4567890"},
+		EvidencePaths: []string{"db/migrate/001.sql"},
+	}
+	valid := GeneratedArtifact{Path: "patchline-proposals/repair/risk.json", Kind: "repair", Content: renderRepairProposal(risk), RiskIDs: []string{risk.ID}}
+	checks := checkGeneratedArtifacts([]GeneratedArtifact{valid})
+	if len(checks) != 1 || checks[0].Status != "pass" {
+		t.Fatalf("expected valid repair manifest to pass, got %#v", checks)
+	}
+	var manifest map[string]any
+	if err := json.Unmarshal([]byte(valid.Content), &manifest); err != nil {
+		t.Fatal(err)
+	}
+	delete(manifest, "validation_commands")
+	data, err := json.Marshal(manifest)
+	if err != nil {
+		t.Fatal(err)
+	}
+	mutated := valid
+	mutated.Content = string(data)
+	checks = checkGeneratedArtifacts([]GeneratedArtifact{mutated})
+	if len(checks) != 1 || checks[0].Status != "fail" || !strings.Contains(strings.Join(checks[0].Findings, "\n"), "validation commands") {
+		t.Fatalf("expected missing validation commands to fail, got %#v", checks)
+	}
+}
+
 func TestCompareRunsSafeNativeChecks(t *testing.T) {
 	root := t.TempDir()
 	writeFile(t, root, "go.mod", "module example.com/nativecheck\n\ngo 1.22\n")
