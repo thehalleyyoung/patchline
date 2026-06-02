@@ -457,6 +457,7 @@ Usage:
   patchline repo taxonomy --analyses analysis-dir[,analysis-dir...] [--out dir] [--json]
   patchline repo qualitative-notes --analyses analysis-dir[,analysis-dir...] [--out dir] [--json]
   patchline repo cross-file-examples --analyses analysis-dir[,analysis-dir...] [--out dir] [--json]
+  patchline repo rejected-generated --analyses analysis-dir[,analysis-dir...] [--out dir] [--json]
   patchline intake <path> [--out results/generated/intake] [--json]
   patchline intake --github owner/repo [--ref ref] [--subpath path] [--out results/generated/intake] [--json]
   patchline semantics-contract [--json]
@@ -597,6 +598,8 @@ func repoCommand(args []string) error {
 		return repoQualitativeNotes(args[1:])
 	case "cross-file-examples":
 		return repoCrossFileExamples(args[1:])
+	case "rejected-generated":
+		return repoRejectedGenerated(args[1:])
 	default:
 		return fmt.Errorf("unknown repo subcommand %q", args[0])
 	}
@@ -884,6 +887,46 @@ type repoCrossFileComparison struct {
 	PatchlineEvidenceLinks int `json:"patchline_evidence_links"`
 	GrepOnlyMatches        int `json:"grep_only_matches"`
 	SQLOnlyRankedRisks     int `json:"sql_only_ranked_risks"`
+}
+
+type repoRejectedGeneratedReport struct {
+	Version  string                         `json:"version"`
+	Summary  repoRejectedGeneratedSummary   `json:"summary"`
+	Examples []repoRejectedGeneratedExample `json:"examples"`
+	Corpus   []repoTaxonomyRepo             `json:"corpus"`
+	Hash     string                         `json:"hash"`
+	Markdown string                         `json:"markdown,omitempty"`
+}
+
+type repoRejectedGeneratedSummary struct {
+	Analyses                 int `json:"analyses"`
+	PublicRepos              int `json:"public_repos"`
+	Examples                 int `json:"examples"`
+	RejectedInterventions    int `json:"rejected_interventions"`
+	PlausibleDiffs           int `json:"plausible_diffs"`
+	DeterministicRejections  int `json:"deterministic_rejections"`
+	HighRiskGeneratedSQL     int `json:"high_risk_generated_sql"`
+	FailedGeneratedChecks    int `json:"failed_generated_checks"`
+	QuarantinedGeneratedCode int `json:"quarantined_generated_code"`
+}
+
+type repoRejectedGeneratedExample struct {
+	ID                     string   `json:"id"`
+	Repo                   string   `json:"repo"`
+	Ref                    string   `json:"ref,omitempty"`
+	Subpath                string   `json:"subpath,omitempty"`
+	GeneratedPath          string   `json:"generated_path"`
+	GeneratedKind          string   `json:"generated_kind"`
+	RiskIDs                []string `json:"risk_ids,omitempty"`
+	LooksUsefulBecause     string   `json:"looks_useful_because"`
+	NormalDiffAppearance   string   `json:"normal_diff_appearance"`
+	DeterministicRejection string   `json:"deterministic_rejection"`
+	RejectedStatus         string   `json:"rejected_status"`
+	ReviewBadge            string   `json:"review_badge"`
+	FailedFindings         []string `json:"failed_findings"`
+	ContentExcerpt         []string `json:"content_excerpt"`
+	RequiredNextActions    []string `json:"required_next_actions"`
+	MaintainerAction       string   `json:"maintainer_action"`
 }
 
 type repoAnalyzeCIArtifacts struct {
@@ -7812,6 +7855,242 @@ func markdownEscapePipes(value string) string {
 }
 
 func repoCrossFileExamplesHash(report repoCrossFileExamplesReport) string {
+	copy := report
+	copy.Hash = ""
+	copy.Markdown = ""
+	return canonical.Hash(copy)
+}
+
+func repoRejectedGenerated(args []string) error {
+	fs := flag.NewFlagSet("repo rejected-generated", flag.ContinueOnError)
+	fs.SetOutput(ioDiscard{})
+	analysesValue := fs.String("analyses", "", "comma-separated repo analyze output directories")
+	outPath := fs.String("out", filepath.Join("results", "generated", "repo-rejected-generated"), "output directory")
+	jsonOut := fs.Bool("json", false, "emit JSON")
+	if err := fs.Parse(args); err != nil {
+		return err
+	}
+	if *analysesValue == "" || fs.NArg() != 0 {
+		return errors.New("usage: patchline repo rejected-generated --analyses analysis-dir[,analysis-dir...] [--out dir] [--json]")
+	}
+	report, err := buildRepoRejectedGeneratedReport(splitNonEmpty(*analysesValue, ","))
+	if err != nil {
+		return err
+	}
+	if err := writeRepoRejectedGeneratedReport(*outPath, report); err != nil {
+		return err
+	}
+	if *jsonOut {
+		return writeJSON(os.Stdout, report)
+	}
+	fmt.Printf("repo rejected-generated examples=%d rejected=%d repos=%d hash=%s\n", report.Summary.Examples, report.Summary.RejectedInterventions, report.Summary.PublicRepos, report.Hash)
+	fmt.Printf("  out=%s\n", *outPath)
+	return nil
+}
+
+func buildRepoRejectedGeneratedReport(analyses []string) (repoRejectedGeneratedReport, error) {
+	if len(analyses) == 0 {
+		return repoRejectedGeneratedReport{}, errors.New("at least one analysis directory is required")
+	}
+	report := repoRejectedGeneratedReport{Version: "patchline.repo-rejected-generated/v1"}
+	repos := map[string]bool{}
+	for _, analysis := range analyses {
+		analyze, err := loadRepoAnalyzeReport(filepath.Join(analysis, "analyze.json"))
+		if err != nil {
+			return repoRejectedGeneratedReport{}, err
+		}
+		proposal, err := project.LoadProposal(filepath.Join(analysis, "proposal"))
+		if err != nil {
+			return repoRejectedGeneratedReport{}, err
+		}
+		compare, err := loadCompareReport(filepath.Join(analysis, "compare", "compare.json"))
+		if err != nil {
+			return repoRejectedGeneratedReport{}, err
+		}
+		repo := firstNonEmpty(analyze.Input, analyze.Source.Input)
+		repos[repo] = true
+		report.Corpus = append(report.Corpus, repoTaxonomyRepo{Repo: repo, Ref: analyze.Source.ResolvedCommit, Subpath: analyze.Subpath})
+		if compare.Summary.InterventionRejected > 0 {
+			report.Summary.RejectedInterventions += compare.Summary.InterventionRejected
+		}
+		report.Summary.FailedGeneratedChecks += compare.Summary.PatchlineChecksFailed
+		if compare.Quarantine.Status == "enforced" {
+			report.Summary.QuarantinedGeneratedCode += compare.Summary.GeneratedFiles
+		}
+		report.Examples = append(report.Examples, rejectedGeneratedExamplesForAnalysis(analysis, repo, analyze, proposal, compare)...)
+	}
+	sort.Slice(report.Examples, func(i, j int) bool {
+		if report.Examples[i].Repo != report.Examples[j].Repo {
+			return report.Examples[i].Repo < report.Examples[j].Repo
+		}
+		return report.Examples[i].GeneratedPath < report.Examples[j].GeneratedPath
+	})
+	report.Summary.Analyses = len(analyses)
+	report.Summary.PublicRepos = len(repos)
+	report.Summary.Examples = len(report.Examples)
+	report.Summary.PlausibleDiffs = len(report.Examples)
+	for _, example := range report.Examples {
+		if len(example.FailedFindings) > 0 {
+			report.Summary.DeterministicRejections++
+		}
+		for _, finding := range example.FailedFindings {
+			if strings.Contains(strings.ToLower(finding), "high-risk sql") {
+				report.Summary.HighRiskGeneratedSQL++
+				break
+			}
+		}
+	}
+	report.Hash = repoRejectedGeneratedHash(report)
+	report.Markdown = renderRepoRejectedGeneratedMarkdown(report)
+	return report, nil
+}
+
+func rejectedGeneratedExamplesForAnalysis(analysis, repo string, analyze repoAnalyzeReport, proposal project.ProposalReport, compare project.CompareReport) []repoRejectedGeneratedExample {
+	if compare.Summary.InterventionRejected == 0 && compare.Summary.PatchlineChecksFailed == 0 {
+		return nil
+	}
+	checks := map[string]project.GeneratedCheck{}
+	for _, check := range compare.GeneratedChecks {
+		if check.Status == "fail" {
+			checks[check.Path] = check
+		}
+	}
+	var examples []repoRejectedGeneratedExample
+	for _, file := range proposal.GeneratedFiles {
+		check, ok := checks[file.Path]
+		if !ok {
+			continue
+		}
+		content := readGeneratedExcerpt(filepath.Join(analysis, "proposal"), file.Path)
+		example := repoRejectedGeneratedExample{
+			Repo:                   repo,
+			Ref:                    analyze.Source.ResolvedCommit,
+			Subpath:                analyze.Subpath,
+			GeneratedPath:          file.Path,
+			GeneratedKind:          file.Kind,
+			RiskIDs:                append([]string(nil), file.RiskIDs...),
+			LooksUsefulBecause:     rejectedLooksUseful(file, content),
+			NormalDiffAppearance:   fmt.Sprintf("A normal code-review diff would show a generated `%s` artifact with concrete SQL or review instructions under `%s`.", file.Kind, file.Path),
+			DeterministicRejection: strings.Join(check.Findings, "; "),
+			RejectedStatus:         compare.Intervention.Status,
+			ReviewBadge:            compare.ReviewBadge.Status,
+			FailedFindings:         append([]string(nil), check.Findings...),
+			ContentExcerpt:         content,
+			RequiredNextActions:    append([]string(nil), compare.Intervention.RequiredNextActions...),
+			MaintainerAction:       rejectedMaintainerAction(check.Findings),
+		}
+		example.ID = "rejected-generated:" + canonical.Hash(strings.Join([]string{repo, example.Ref, example.Subpath, example.GeneratedPath, strings.Join(example.FailedFindings, "\x00")}, "\x00"))[:16]
+		examples = append(examples, example)
+	}
+	return examples
+}
+
+func readGeneratedExcerpt(proposalDir, path string) []string {
+	data, err := os.ReadFile(filepath.Join(proposalDir, filepath.FromSlash(path)))
+	if err != nil {
+		return nil
+	}
+	lines := strings.Split(strings.TrimSpace(string(data)), "\n")
+	var out []string
+	for _, line := range lines {
+		line = strings.TrimSpace(line)
+		if line == "" {
+			continue
+		}
+		if len(line) > 160 {
+			line = line[:157] + "..."
+		}
+		out = append(out, line)
+		if len(out) >= 8 {
+			break
+		}
+	}
+	return out
+}
+
+func rejectedLooksUseful(file project.GeneratedFile, excerpt []string) string {
+	lower := strings.ToLower(strings.Join(excerpt, "\n"))
+	switch {
+	case strings.Contains(lower, "where") || strings.Contains(lower, "rollback") || strings.Contains(lower, "explain"):
+		return "It appears to add concrete review mechanics such as a predicate, rollback note, or explain/count check."
+	case strings.Contains(lower, "update") || strings.Contains(lower, "delete") || strings.Contains(lower, "insert"):
+		return "It appears to take direct action on the affected data, which can look helpful in a repair diff."
+	default:
+		return fmt.Sprintf("It is a generated `%s` artifact attached to targeted risk IDs, so a reviewer could mistake it for scoped repair work.", file.Kind)
+	}
+}
+
+func rejectedMaintainerAction(findings []string) string {
+	joined := strings.ToLower(strings.Join(findings, " "))
+	switch {
+	case strings.Contains(joined, "high-risk sql"):
+		return "Discard or rewrite the generated artifact; it introduces high-risk SQL and must be re-analyzed before review."
+	case strings.Contains(joined, "untrusted"):
+		return "Require the artifact to label itself untrusted and keep it quarantined until deterministic checks pass."
+	case strings.Contains(joined, "rollback"):
+		return "Require rollback, row-count, and fail-closed evidence before treating the artifact as reviewable."
+	default:
+		return "Reject the generated artifact until every deterministic finding is fixed and compare is rerun."
+	}
+}
+
+func writeRepoRejectedGeneratedReport(outDir string, report repoRejectedGeneratedReport) error {
+	if err := os.MkdirAll(outDir, 0o755); err != nil {
+		return err
+	}
+	copy := report
+	copy.Markdown = ""
+	data, err := json.MarshalIndent(copy, "", "  ")
+	if err != nil {
+		return err
+	}
+	if err := os.WriteFile(filepath.Join(outDir, "rejected-generated.json"), append(data, '\n'), 0o644); err != nil {
+		return err
+	}
+	return os.WriteFile(filepath.Join(outDir, "rejected-generated.md"), []byte(report.Markdown), 0o644)
+}
+
+func renderRepoRejectedGeneratedMarkdown(report repoRejectedGeneratedReport) string {
+	var b strings.Builder
+	fmt.Fprintf(&b, "# Patchline rejected generated-code examples\n\n")
+	fmt.Fprintf(&b, "- analyses: `%d`\n", report.Summary.Analyses)
+	fmt.Fprintf(&b, "- public repos: `%d`\n", report.Summary.PublicRepos)
+	fmt.Fprintf(&b, "- examples: `%d`\n", report.Summary.Examples)
+	fmt.Fprintf(&b, "- rejected interventions: `%d`\n", report.Summary.RejectedInterventions)
+	fmt.Fprintf(&b, "- high-risk generated SQL examples: `%d`\n", report.Summary.HighRiskGeneratedSQL)
+	fmt.Fprintf(&b, "- hash: `%s`\n\n", report.Hash)
+	fmt.Fprintf(&b, "## Corpus coverage\n\n")
+	for _, repo := range report.Corpus {
+		fmt.Fprintf(&b, "- `%s` `%s` `%s`\n", repo.Repo, repo.Subpath, repo.Ref)
+	}
+	fmt.Fprintf(&b, "\n## Rejected examples\n\n")
+	for _, example := range report.Examples {
+		fmt.Fprintf(&b, "### %s `%s`\n\n", example.Repo, example.ID)
+		fmt.Fprintf(&b, "- generated path: `%s`\n", example.GeneratedPath)
+		fmt.Fprintf(&b, "- rejected status: `%s`\n", example.RejectedStatus)
+		fmt.Fprintf(&b, "- review badge: `%s`\n", example.ReviewBadge)
+		fmt.Fprintf(&b, "- looks useful because: %s\n", example.LooksUsefulBecause)
+		fmt.Fprintf(&b, "- normal diff appearance: %s\n", example.NormalDiffAppearance)
+		fmt.Fprintf(&b, "- deterministic rejection: %s\n", example.DeterministicRejection)
+		fmt.Fprintf(&b, "- maintainer action: %s\n", example.MaintainerAction)
+		if len(example.ContentExcerpt) > 0 {
+			fmt.Fprintf(&b, "- content excerpt:\n")
+			for _, line := range example.ContentExcerpt {
+				fmt.Fprintf(&b, "  - `%s`\n", strings.ReplaceAll(line, "`", "'"))
+			}
+		}
+		if len(example.RequiredNextActions) > 0 {
+			fmt.Fprintf(&b, "- required next actions:\n")
+			for _, action := range example.RequiredNextActions {
+				fmt.Fprintf(&b, "  - %s\n", action)
+			}
+		}
+		fmt.Fprintf(&b, "\n")
+	}
+	return b.String()
+}
+
+func repoRejectedGeneratedHash(report repoRejectedGeneratedReport) string {
 	copy := report
 	copy.Hash = ""
 	copy.Markdown = ""

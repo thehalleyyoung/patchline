@@ -1,0 +1,43 @@
+{
+  "version": "patchline.rejected-generated-gate/v1",
+  "claim": "Patchline rejects plausible generated code that would look useful in a normal code-review diff when deterministic re-analysis finds unsafe generated SQL or failed generated-artifact checks.",
+  "generator": "deterministic local llm-command fixture emitting plausible unsafe SQL",
+  "required_fields": [
+    "looks_useful_because",
+    "normal_diff_appearance",
+    "deterministic_rejection",
+    "rejected_status",
+    "failed_findings",
+    "content_excerpt",
+    "required_next_actions",
+    "maintainer_action"
+  ],
+  "minimum_public_repos": 4,
+  "minimum_examples": 4,
+  "real_code": [
+    {
+      "id": "lobsters-rails-migrations",
+      "repo": "lobsters/lobsters",
+      "ref": "3b80b47aa5aaba37ec44413e7d1dc96fcf1585b6",
+      "subpath": "db/migrate"
+    },
+    {
+      "id": "forem-rails-migrations",
+      "repo": "forem/forem",
+      "ref": "9c5509c3aeecd4a86a8950206fa937ebcbc2f8d1",
+      "subpath": "db/migrate"
+    },
+    {
+      "id": "mastodon-rails-migrations",
+      "repo": "mastodon/mastodon",
+      "ref": "facb552c9cdbe8a2ebff0b94ebf2c9e9ec385347",
+      "subpath": "db/migrate"
+    },
+    {
+      "id": "grafana-go-migrations",
+      "repo": "grafana/grafana",
+      "ref": "a54b2e1e9aaf979938813f6ed9e44de569fe1105",
+      "subpath": "pkg/services/sqlstore/migrations"
+    }
+  ]
+}

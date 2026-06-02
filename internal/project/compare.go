@@ -280,20 +280,20 @@ func checkGeneratedArtifacts(artifacts []GeneratedArtifact) []GeneratedCheck {
 			check.Status = "warn"
 			check.Findings = append(check.Findings, "artifact does not clearly label itself untrusted")
 		}
+		sqlReport, sqlErr := migration.AnalyzeBytes(artifact.Path, []byte(artifact.Content))
+		if sqlErr == nil {
+			for _, statement := range sqlReport.Statements {
+				if generatedMutationRisk(statement) {
+					check.Status = "fail"
+					check.Findings = append(check.Findings, fmt.Sprintf("generated artifact contains %s-risk SQL: %s", statement.Risk, statement.Fingerprint))
+				}
+			}
+		}
 		switch artifact.Kind {
 		case "guards":
 			if !strings.Contains(lower, "select 1 from") || !strings.Contains(lower, "count(*)") || !guardHasRollbackStatement(artifact.Content) {
 				check.Status = "fail"
 				check.Findings = append(check.Findings, "guard does not fail closed with table existence, row count, and rollback checks")
-			}
-			sqlReport, err := migration.AnalyzeBytes(artifact.Path, []byte(artifact.Content))
-			if err == nil {
-				for _, statement := range sqlReport.Statements {
-					if generatedMutationRisk(statement) {
-						check.Status = "fail"
-						check.Findings = append(check.Findings, fmt.Sprintf("generated guard contains %s-risk SQL: %s", statement.Risk, statement.Fingerprint))
-					}
-				}
 			}
 		case "explain":
 			if !strings.Contains(lower, "explain") || !strings.Contains(lower, "count(*)") {

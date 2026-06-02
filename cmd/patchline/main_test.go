@@ -330,6 +330,37 @@ func TestRepoCrossFileExamplesShowBaselinesMissRepairClues(t *testing.T) {
 	}
 }
 
+func TestRepoRejectedGeneratedExamplesExplainPlausibleRejectedCode(t *testing.T) {
+	root := t.TempDir()
+	writeMainTestFile(t, root, "db/migrate/001_update_accounts.sql", "UPDATE accounts SET status = 'active';\n")
+	outAnalysis := filepath.Join(t.TempDir(), "analysis")
+	llmCommand := `printf "%s\n" "-- Plausible generated repair for reviewer" "UPDATE accounts SET status = 'active';"`
+	if err := run([]string{"repo", "analyze", root, "--stages", "inventory,baseline,propose,compare", "--proposal-kind", "guards", "--budget", "files=3,lines=80,tokens=4000,changes=2", "--llm-command", llmCommand, "--out", outAnalysis, "--json"}); err != nil {
+		t.Fatalf("analysis failed: %v", err)
+	}
+	out := filepath.Join(t.TempDir(), "rejected")
+	if err := run([]string{"repo", "rejected-generated", "--analyses", outAnalysis, "--out", out, "--json"}); err != nil {
+		t.Fatalf("rejected generated examples failed: %v", err)
+	}
+	var report repoRejectedGeneratedReport
+	readMainTestJSON(t, filepath.Join(out, "rejected-generated.json"), &report)
+	if report.Version != "patchline.repo-rejected-generated/v1" || report.Summary.Examples == 0 || report.Summary.RejectedInterventions == 0 || report.Summary.HighRiskGeneratedSQL == 0 || report.Hash == "" {
+		t.Fatalf("unexpected rejected-generated report: %#v", report)
+	}
+	for _, example := range report.Examples {
+		if example.LooksUsefulBecause == "" || example.NormalDiffAppearance == "" || example.DeterministicRejection == "" || example.RejectedStatus != "rejected-by-deterministic-checks" || example.MaintainerAction == "" || len(example.ContentExcerpt) == 0 {
+			t.Fatalf("example missing rejection explanation fields: %#v", example)
+		}
+	}
+	markdown, err := os.ReadFile(filepath.Join(out, "rejected-generated.md"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(string(markdown), "rejected generated-code examples") || !strings.Contains(string(markdown), "looks useful because") || !strings.Contains(string(markdown), "deterministic rejection") {
+		t.Fatalf("expected rejected-generated markdown, got:\n%s", string(markdown))
+	}
+}
+
 func TestGoldenFixtureGenerateCommand(t *testing.T) {
 	root := t.TempDir()
 	writeMainTestFile(t, root, "db/migrate/001_delete_events.sql", "DELETE FROM account_events;\n")
