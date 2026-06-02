@@ -79,6 +79,8 @@ Run `make performance-budget-gate` to benchmark large-repo, monorepo, generated-
 
 Add `--trace` to `repo analyze` to write structured JSONL spans and logs for long runs under `diagnostics/`; run `make diagnostics-gate` to prove the trace contract on four public repo slices. See [docs/diagnostics.md](docs/diagnostics.md).
 
+Run `patchline contributor check` before a PR to execute formatting checks, focused Go tests, fast gates, ignored-roadmap hygiene, and forbidden-reference scans in one report; see [docs/contributor-check.md](docs/contributor-check.md).
+
 Add `--redact` to write `analysis-bundle/` copies with stable redaction tokens for identifiers, literals, customer-like strings, and secret-like values while preserving joins and existing artifact hashes.
 
 Add `--ci` to write `ci/summary.md` plus upload snippets and code-quality artifacts for GitHub Actions, GitLab CI, and Bitbucket Pipelines: SARIF under `analysis-bundle/summary.sarif`, GitLab `ci/gl-code-quality-report.json`, and Bitbucket `ci/bitbucket-code-insights.json`.

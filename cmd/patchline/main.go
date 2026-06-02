@@ -103,6 +103,8 @@ func run(args []string) error {
 		return pluginsCommand(args[1:])
 	case "golden-fixture":
 		return goldenFixtureCommand(args[1:])
+	case "contributor":
+		return contributorCommand(args[1:])
 	case "semantics-contract":
 		return semanticsContract(hasFlag(args[1:], "--json"))
 	case "semantics-audit":
@@ -418,6 +420,7 @@ Usage:
   patchline plugins list [--json]
   patchline plugins probe [<path>|--github owner/repo] [--ref ref] [--subpath path] [--out dir] [--download-dir dir] [--json]
   patchline golden-fixture generate [<path>|--github owner/repo] [--ref ref] [--subpath path] --out dir [--max-files n] [--json]
+  patchline contributor check [--root path] [--out dir] [--packages pkg[,pkg...]] [--gates target[,target...]] [--plan-only] [--json]
   patchline repo doctor [<path>|--github owner/repo] [--ref ref] [--subpath path] [--out dir] [--download-dir dir] [--json]
   patchline repo fetch <owner/repo|github-url|path|archive> [--ref ref] [--subpath path] [--out dir] [--download-dir dir] [--json]
   patchline repo analyze [<path>|--github owner/repo] [--ref ref] [--subpath path] [--stages inventory,baseline,propose,compare,deep] [--proposal-kind tests|guards|instrumentation|repair|all] [--budget files=N,lines=N,tokens=N,changes=N] [--ci] [--redact] [--resume] [--trace] [--no-llm] [--llm-command cmd] [--prompt-without-facts] [--out dir] [--json]
@@ -2054,6 +2057,416 @@ func goldenFixtureGenerate(args []string) error {
 	}
 	fmt.Printf("golden fixture id=%s selected=%d/%d risks=%d test=%s hash=%s\n", report.ID, report.Summary.SelectedFiles, report.Summary.OriginalFilesScanned, report.Expectations.RankedRisks, report.Outputs["test"], report.Hash)
 	return nil
+}
+
+type contributorCheckReport struct {
+	Version  string                  `json:"version"`
+	Root     string                  `json:"root"`
+	OutDir   string                  `json:"out_dir"`
+	Mode     string                  `json:"mode"`
+	Packages []string                `json:"packages"`
+	Gates    []string                `json:"gates"`
+	Steps    []contributorCheckStep  `json:"steps"`
+	Summary  contributorCheckSummary `json:"summary"`
+	Hash     string                  `json:"hash"`
+}
+
+type contributorCheckStep struct {
+	ID         string   `json:"id"`
+	Name       string   `json:"name"`
+	Kind       string   `json:"kind"`
+	Command    []string `json:"command,omitempty"`
+	Status     string   `json:"status"`
+	DurationMS int64    `json:"duration_ms,omitempty"`
+	StdoutPath string   `json:"stdout_path,omitempty"`
+	StderrPath string   `json:"stderr_path,omitempty"`
+	OutputHash string   `json:"output_hash,omitempty"`
+	Error      string   `json:"error,omitempty"`
+}
+
+type contributorCheckSummary struct {
+	Steps       int  `json:"steps"`
+	Passed      int  `json:"passed"`
+	Failed      int  `json:"failed"`
+	Planned     int  `json:"planned"`
+	FocusedTest bool `json:"focused_test"`
+	FastGates   int  `json:"fast_gates"`
+	Success     bool `json:"success"`
+}
+
+func contributorCommand(args []string) error {
+	if len(args) == 0 {
+		return errors.New("usage: patchline contributor check [--root path] [--out dir] [--packages pkg[,pkg...]] [--gates target[,target...]] [--plan-only] [--json]")
+	}
+	switch args[0] {
+	case "check":
+		return contributorCheck(args[1:])
+	default:
+		return errors.New("usage: patchline contributor check [--root path] [--out dir] [--packages pkg[,pkg...]] [--gates target[,target...]] [--plan-only] [--json]")
+	}
+}
+
+func contributorCheck(args []string) error {
+	fs := flag.NewFlagSet("contributor check", flag.ContinueOnError)
+	fs.SetOutput(ioDiscard{})
+	root := fs.String("root", ".", "repository root")
+	outDir := fs.String("out", "results/generated/contributor-check", "output directory")
+	packagesRaw := fs.String("packages", "", "comma-separated Go packages to test")
+	gatesRaw := fs.String("gates", "gate,impact-gate", "comma-separated fast make targets to run")
+	planOnly := fs.Bool("plan-only", false, "write the contributor check plan without executing commands")
+	jsonOut := fs.Bool("json", false, "emit JSON")
+	if err := fs.Parse(args); err != nil {
+		return err
+	}
+	if fs.NArg() != 0 {
+		return errors.New("usage: patchline contributor check [--root path] [--out dir] [--packages pkg[,pkg...]] [--gates target[,target...]] [--plan-only] [--json]")
+	}
+	absRoot, err := filepath.Abs(*root)
+	if err != nil {
+		return err
+	}
+	packages := splitContributorList(*packagesRaw)
+	if len(packages) == 0 {
+		packages = inferContributorPackages(absRoot)
+	}
+	gates := splitContributorList(*gatesRaw)
+	absOut := *outDir
+	if !filepath.IsAbs(absOut) {
+		absOut = filepath.Join(absRoot, absOut)
+	}
+	report := buildContributorCheckReport(absRoot, absOut, packages, gates, *planOnly)
+	if *planOnly {
+		for i := range report.Steps {
+			report.Steps[i].Status = "planned"
+		}
+	} else {
+		runContributorCheckReport(&report)
+	}
+	finalizeContributorCheckReport(&report)
+	if err := writeContributorCheckReport(report); err != nil {
+		return err
+	}
+	if *jsonOut {
+		if err := writeJSON(os.Stdout, report); err != nil {
+			return err
+		}
+	} else {
+		fmt.Printf("contributor check %s: %d passed, %d failed, %d planned\n", reportStatusWord(report.Summary.Success), report.Summary.Passed, report.Summary.Failed, report.Summary.Planned)
+	}
+	if !report.Summary.Success {
+		return codedError{code: 3, err: fmt.Errorf("contributor check failed: %d failed steps", report.Summary.Failed)}
+	}
+	return nil
+}
+
+func buildContributorCheckReport(root, outDir string, packages, gates []string, planOnly bool) contributorCheckReport {
+	mode := "run"
+	if planOnly {
+		mode = "plan"
+	}
+	steps := []contributorCheckStep{
+		{ID: "roadmap-ignore", Name: "Checking ignored private roadmap", Kind: "hygiene", Command: []string{"git", "check-ignore", "-v", "100_STEPS.md"}, Status: "pending"},
+		{ID: "forbidden-doc-refs", Name: "Scanning tracked documentation for private roadmap references", Kind: "scan", Command: []string{"patchline-internal", "forbidden-markdown-scan"}, Status: "pending"},
+		{ID: "gofmt", Name: "Checking Go formatting", Kind: "format", Command: []string{"gofmt", "-l", "<tracked-and-untracked-go-files>"}, Status: "pending"},
+		{ID: "diff-check", Name: "Checking patch whitespace", Kind: "format", Command: []string{"git", "diff", "--check"}, Status: "pending"},
+		{ID: "focused-go-tests", Name: "Running focused Go tests", Kind: "test", Command: append([]string{"go", "test"}, packages...), Status: "pending"},
+	}
+	for _, gate := range gates {
+		steps = append(steps, contributorCheckStep{ID: "fast-gate-" + safeContributorID(gate), Name: "Running fast gate " + gate, Kind: "gate", Command: []string{"make", gate}, Status: "pending"})
+	}
+	return contributorCheckReport{Version: "patchline.contributor-check/v1", Root: filepath.ToSlash(root), OutDir: filepath.ToSlash(outDir), Mode: mode, Packages: packages, Gates: gates, Steps: steps}
+}
+
+func runContributorCheckReport(report *contributorCheckReport) {
+	for i := range report.Steps {
+		step := &report.Steps[i]
+		start := time.Now()
+		stdout, stderr, err := runContributorStep(filepath.FromSlash(report.Root), *step)
+		step.DurationMS = time.Since(start).Milliseconds()
+		step.StdoutPath, step.StderrPath = writeContributorStepLogs(filepath.FromSlash(report.OutDir), step.ID, stdout, stderr)
+		step.OutputHash = canonical.Hash(struct {
+			Stdout string `json:"stdout"`
+			Stderr string `json:"stderr"`
+		}{stdout, stderr})
+		if err != nil {
+			step.Status = "failed"
+			step.Error = err.Error()
+		} else {
+			step.Status = "passed"
+		}
+	}
+}
+
+func runContributorStep(root string, step contributorCheckStep) (string, string, error) {
+	switch step.ID {
+	case "forbidden-doc-refs":
+		matches, err := scanContributorForbiddenRefs(root)
+		if err != nil {
+			return "", "", err
+		}
+		if len(matches) > 0 {
+			return strings.Join(matches, "\n") + "\n", "", fmt.Errorf("found %d forbidden private-roadmap references in tracked documentation", len(matches))
+		}
+		return "no forbidden private-roadmap references found\n", "", nil
+	case "gofmt":
+		files, err := contributorGoFiles(root)
+		if err != nil {
+			return "", "", err
+		}
+		if len(files) == 0 {
+			return "no Go files found\n", "", nil
+		}
+		stdout, stderr, err := runContributorExternal(root, append([]string{"gofmt", "-l"}, files...))
+		if err != nil {
+			return stdout, stderr, err
+		}
+		if strings.TrimSpace(stdout) != "" {
+			return stdout, stderr, errors.New("gofmt reported unformatted files")
+		}
+		return stdout, stderr, nil
+	case "roadmap-ignore":
+		stdout, stderr, err := runContributorExternal(root, step.Command)
+		if err != nil {
+			return stdout, stderr, err
+		}
+		if !strings.Contains(stdout, "100_STEPS.md") {
+			return stdout, stderr, errors.New("100_STEPS.md is not ignored")
+		}
+		return stdout, stderr, nil
+	default:
+		return runContributorExternal(root, step.Command)
+	}
+}
+
+func runContributorExternal(root string, command []string) (string, string, error) {
+	if len(command) == 0 {
+		return "", "", errors.New("empty contributor command")
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Minute)
+	defer cancel()
+	cmd := exec.CommandContext(ctx, command[0], command[1:]...)
+	cmd.Dir = root
+	var stdout, stderr strings.Builder
+	cmd.Stdout = &stdout
+	cmd.Stderr = &stderr
+	err := cmd.Run()
+	if ctx.Err() == context.DeadlineExceeded {
+		return stdout.String(), stderr.String(), fmt.Errorf("command timed out: %s", strings.Join(command, " "))
+	}
+	if err != nil {
+		return stdout.String(), stderr.String(), fmt.Errorf("%s failed: %w", strings.Join(command, " "), err)
+	}
+	return stdout.String(), stderr.String(), nil
+}
+
+func writeContributorStepLogs(outDir, stepID, stdout, stderr string) (string, string) {
+	logDir := filepath.Join(outDir, "logs")
+	_ = os.MkdirAll(logDir, 0o755)
+	stdoutPath := filepath.Join(logDir, stepID+".stdout")
+	stderrPath := filepath.Join(logDir, stepID+".stderr")
+	_ = os.WriteFile(stdoutPath, []byte(stdout), 0o644)
+	_ = os.WriteFile(stderrPath, []byte(stderr), 0o644)
+	return filepath.ToSlash(stdoutPath), filepath.ToSlash(stderrPath)
+}
+
+func finalizeContributorCheckReport(report *contributorCheckReport) {
+	report.Summary = contributorCheckSummary{Steps: len(report.Steps), FastGates: len(report.Gates), FocusedTest: len(report.Packages) > 0, Success: true}
+	for _, step := range report.Steps {
+		switch step.Status {
+		case "passed":
+			report.Summary.Passed++
+		case "failed":
+			report.Summary.Failed++
+			report.Summary.Success = false
+		case "planned":
+			report.Summary.Planned++
+		default:
+			report.Summary.Success = false
+		}
+	}
+	report.Hash = canonical.Hash(struct {
+		Version  string                  `json:"version"`
+		Root     string                  `json:"root"`
+		Mode     string                  `json:"mode"`
+		Packages []string                `json:"packages"`
+		Gates    []string                `json:"gates"`
+		Steps    []contributorCheckStep  `json:"steps"`
+		Summary  contributorCheckSummary `json:"summary"`
+	}{report.Version, report.Root, report.Mode, report.Packages, report.Gates, report.Steps, report.Summary})
+}
+
+func writeContributorCheckReport(report contributorCheckReport) error {
+	outDir := filepath.FromSlash(report.OutDir)
+	if err := os.MkdirAll(outDir, 0o755); err != nil {
+		return err
+	}
+	data, err := json.MarshalIndent(report, "", "  ")
+	if err != nil {
+		return err
+	}
+	if err := os.WriteFile(filepath.Join(outDir, "contributor-check.json"), append(data, '\n'), 0o644); err != nil {
+		return err
+	}
+	var b strings.Builder
+	fmt.Fprintf(&b, "# Patchline contributor check\n\n")
+	fmt.Fprintf(&b, "- root: `%s`\n", report.Root)
+	fmt.Fprintf(&b, "- mode: `%s`\n", report.Mode)
+	fmt.Fprintf(&b, "- packages: `%s`\n", strings.Join(report.Packages, ","))
+	fmt.Fprintf(&b, "- gates: `%s`\n", strings.Join(report.Gates, ","))
+	fmt.Fprintf(&b, "- summary: `%d passed, %d failed, %d planned`\n\n", report.Summary.Passed, report.Summary.Failed, report.Summary.Planned)
+	fmt.Fprintf(&b, "| step | kind | status | command |\n| --- | --- | --- | --- |\n")
+	for _, step := range report.Steps {
+		fmt.Fprintf(&b, "| %s | %s | %s | `%s` |\n", step.ID, step.Kind, step.Status, strings.Join(step.Command, " "))
+	}
+	return os.WriteFile(filepath.Join(outDir, "contributor-check.md"), []byte(b.String()), 0o644)
+}
+
+func splitContributorList(raw string) []string {
+	var out []string
+	for _, part := range strings.Split(raw, ",") {
+		value := strings.TrimSpace(part)
+		if value != "" {
+			out = append(out, value)
+		}
+	}
+	return out
+}
+
+func inferContributorPackages(root string) []string {
+	files := contributorChangedGoFiles(root)
+	if len(files) == 0 {
+		return []string{"./cmd/patchline"}
+	}
+	seen := map[string]bool{}
+	var packages []string
+	for _, file := range files {
+		dir := filepath.Dir(filepath.ToSlash(file))
+		pkg := "."
+		if dir != "." {
+			pkg = "./" + strings.TrimPrefix(dir, "./")
+		}
+		if !seen[pkg] {
+			seen[pkg] = true
+			packages = append(packages, pkg)
+		}
+	}
+	sort.Strings(packages)
+	return packages
+}
+
+func contributorChangedGoFiles(root string) []string {
+	commands := [][]string{
+		{"git", "diff", "--name-only", "--", "*.go"},
+		{"git", "diff", "--cached", "--name-only", "--", "*.go"},
+		{"git", "ls-files", "--others", "--exclude-standard", "--", "*.go"},
+	}
+	seen := map[string]bool{}
+	var files []string
+	for _, command := range commands {
+		stdout, _, err := runContributorExternal(root, command)
+		if err != nil {
+			continue
+		}
+		for _, line := range strings.Split(stdout, "\n") {
+			line = strings.TrimSpace(line)
+			if line == "" || seen[line] {
+				continue
+			}
+			seen[line] = true
+			files = append(files, line)
+		}
+	}
+	sort.Strings(files)
+	return files
+}
+
+func contributorGoFiles(root string) ([]string, error) {
+	var files []string
+	err := filepath.WalkDir(root, func(path string, entry fs.DirEntry, err error) error {
+		if err != nil {
+			return err
+		}
+		if entry.IsDir() {
+			switch entry.Name() {
+			case ".git", "results", "vendor":
+				return filepath.SkipDir
+			}
+			return nil
+		}
+		if !strings.HasSuffix(entry.Name(), ".go") {
+			return nil
+		}
+		rel, err := filepath.Rel(root, path)
+		if err != nil {
+			return err
+		}
+		files = append(files, filepath.ToSlash(rel))
+		return nil
+	})
+	sort.Strings(files)
+	return files, err
+}
+
+func scanContributorForbiddenRefs(root string) ([]string, error) {
+	forbidden := []string{"100_STEPS", "100_steps", "NEWEST_PLAN", "NEW_PLAN"}
+	excluded := map[string]bool{"100_STEPS.md": true, "NEWEST_PLAN.md": true, "NEW_PLAN.md": true}
+	var matches []string
+	err := filepath.WalkDir(root, func(path string, entry fs.DirEntry, err error) error {
+		if err != nil {
+			return err
+		}
+		if entry.IsDir() {
+			switch entry.Name() {
+			case ".git", "results", "vendor":
+				return filepath.SkipDir
+			}
+			return nil
+		}
+		if !strings.HasSuffix(strings.ToLower(entry.Name()), ".md") || excluded[entry.Name()] {
+			return nil
+		}
+		data, err := os.ReadFile(path)
+		if err != nil {
+			return err
+		}
+		rel, err := filepath.Rel(root, path)
+		if err != nil {
+			return err
+		}
+		for i, line := range strings.Split(string(data), "\n") {
+			for _, term := range forbidden {
+				if strings.Contains(line, term) {
+					matches = append(matches, fmt.Sprintf("%s:%d:%s", filepath.ToSlash(rel), i+1, term))
+				}
+			}
+		}
+		return nil
+	})
+	return matches, err
+}
+
+func safeContributorID(value string) string {
+	var b strings.Builder
+	lastDash := false
+	for _, r := range strings.ToLower(value) {
+		if (r >= 'a' && r <= 'z') || (r >= '0' && r <= '9') {
+			b.WriteRune(r)
+			lastDash = false
+			continue
+		}
+		if !lastDash && b.Len() > 0 {
+			b.WriteByte('-')
+			lastDash = true
+		}
+	}
+	return strings.Trim(b.String(), "-")
+}
+
+func reportStatusWord(success bool) string {
+	if success {
+		return "passed"
+	}
+	return "failed"
 }
 
 func parseAnalyzeStages(value string) ([]string, error) {

@@ -150,6 +150,67 @@ func TestRepoAnalyzeTraceFlushesDiagnosticsOnError(t *testing.T) {
 	}
 }
 
+func TestContributorCheckPlanWritesExpectedSteps(t *testing.T) {
+	out := filepath.Join(t.TempDir(), "contributor")
+	if err := run([]string{"contributor", "check", "--root", ".", "--out", out, "--packages", "./cmd/patchline", "--gates", "gate,impact-gate", "--plan-only", "--json"}); err != nil {
+		t.Fatalf("contributor check plan failed: %v", err)
+	}
+	var report contributorCheckReport
+	readMainTestJSON(t, filepath.Join(out, "contributor-check.json"), &report)
+	if report.Version != "patchline.contributor-check/v1" || report.Mode != "plan" || report.Summary.Planned != 7 || report.Summary.FastGates != 2 || !report.Summary.Success {
+		t.Fatalf("unexpected contributor plan: %#v", report)
+	}
+	for _, id := range []string{"roadmap-ignore", "forbidden-doc-refs", "gofmt", "diff-check", "focused-go-tests", "fast-gate-gate", "fast-gate-impact-gate"} {
+		if !contributorTestHasStep(report, id) {
+			t.Fatalf("expected step %s in %#v", id, report.Steps)
+		}
+	}
+}
+
+func TestContributorForbiddenRefScannerIgnoresPrivateRoadmapOnly(t *testing.T) {
+	root := t.TempDir()
+	writeMainTestFile(t, root, "100_STEPS.md", "100_STEPS is intentionally private here\n")
+	writeMainTestFile(t, root, "docs/ok.md", "ordinary docs\n")
+	matches, err := scanContributorForbiddenRefs(root)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(matches) != 0 {
+		t.Fatalf("expected no matches, got %#v", matches)
+	}
+	writeMainTestFile(t, root, "docs/bad.md", "do not mention 100_STEPS in tracked docs\n")
+	matches, err = scanContributorForbiddenRefs(root)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(matches) != 1 || !strings.Contains(matches[0], "docs/bad.md") {
+		t.Fatalf("unexpected matches: %#v", matches)
+	}
+}
+
+func TestContributorCheckReportsFailures(t *testing.T) {
+	root := initMainTestGitRepo(t)
+	writeMainTestFile(t, root, ".gitignore", "100_STEPS.md\n")
+	writeMainTestFile(t, root, "go.mod", "module example.test/contributor\n\ngo 1.22\n")
+	writeMainTestFile(t, root, "bad.go", "package main\n\nfunc  main(){}\n")
+	writeMainTestFile(t, root, "100_STEPS.md", "ignored roadmap\n")
+	runMainTestGit(t, root, "add", ".gitignore", "go.mod", "bad.go")
+	runMainTestGit(t, root, "commit", "-m", "fixture")
+	out := filepath.Join(t.TempDir(), "contributor")
+	err := run([]string{"contributor", "check", "--root", root, "--out", out, "--packages", ".", "--gates", "", "--json"})
+	if err == nil {
+		t.Fatal("expected contributor check to fail on gofmt")
+	}
+	var report contributorCheckReport
+	readMainTestJSON(t, filepath.Join(out, "contributor-check.json"), &report)
+	if report.Summary.Failed == 0 || report.Summary.Success {
+		t.Fatalf("expected failed contributor report: %#v", report.Summary)
+	}
+	if !contributorTestStepFailed(report, "gofmt") {
+		t.Fatalf("expected gofmt failure in %#v", report.Steps)
+	}
+}
+
 func TestOnePositionalWithFlagsAllowsFlagsAfterPath(t *testing.T) {
 	pos, flags, err := onePositionalWithFlags([]string{"django/django", "--subpath", "django/contrib/auth/migrations", "--json"}, map[string]bool{"--json": true})
 	if err != nil {
@@ -161,6 +222,24 @@ func TestOnePositionalWithFlagsAllowsFlagsAfterPath(t *testing.T) {
 	if len(flags) != 3 || flags[0] != "--subpath" || flags[1] != "django/contrib/auth/migrations" || flags[2] != "--json" {
 		t.Fatalf("unexpected flags %#v", flags)
 	}
+}
+
+func contributorTestHasStep(report contributorCheckReport, id string) bool {
+	for _, step := range report.Steps {
+		if step.ID == id {
+			return true
+		}
+	}
+	return false
+}
+
+func contributorTestStepFailed(report contributorCheckReport, id string) bool {
+	for _, step := range report.Steps {
+		if step.ID == id && step.Status == "failed" {
+			return true
+		}
+	}
+	return false
 }
 
 func TestDBDryRunRejectsNonLocalDSN(t *testing.T) {
