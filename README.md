@@ -51,6 +51,9 @@ go run ./cmd/patchline repo compare \
   --before results/generated/repos/django-auth-baseline \
   --after results/generated/repos/django-auth-proposal \
   --out results/generated/repos/django-auth-compare
+
+go run ./cmd/patchline repo hook pre-commit --root . --json
+go run ./cmd/patchline repo hook pre-push --root . --base origin/main --json
 ```
 
 Quickstart writes `quickstart.json`, `quickstart.md`, and `commands.sh` with exactly three copy/paste commands plus expected artifacts. Doctor writes `doctor.json` and `doctor.md` with tool availability, cache state, scanned files, facts, and safe native checks before analysis. Fetch writes `source.json` with source provenance, resolved GitHub commit, archive hash, timestamp, tool version, and cache metadata. Inventory writes `inventory.json`, `inventory.md`, `facts.jsonl`, and `project-map.md`. Baseline writes `baseline.json`, `baseline.md`, and `baseline.sarif`, including ranked risks, invariant candidates, privacy/lock hazards, blast-radius estimates, proof-hole minimizations, and trace-to-code links from OpenTelemetry, Datadog-style exports, structured logs, deploy markers, and incident timelines. Propose writes `prompt-context.json`, `prompt.txt`, `proposal.patch`, `proposal.json`, and generated untrusted artifacts under `patchline-proposals/`. Compare writes `compare.json` and `compare.md`. Triage writes `triage/triage.json` and `triage/triage.md`, also copied into `analysis-bundle/`, grouping findings by maintainer owner surface.
@@ -68,6 +71,8 @@ Add `--redact` to write `analysis-bundle/` copies with stable redaction tokens f
 Add `--ci` to write `ci/summary.md` plus upload snippets and code-quality artifacts for GitHub Actions, GitLab CI, and Bitbucket Pipelines: SARIF under `analysis-bundle/summary.sarif`, GitLab `ci/gl-code-quality-report.json`, and Bitbucket `ci/bitbucket-code-insights.json`.
 
 For pull requests, `repo pr-comment --base <baseline> --head <baseline>` writes a Markdown body that includes only new or changed data-risk findings; the composite GitHub Action can post that body when `comment-on-pr: "true"` and a pull-request token are provided.
+
+For local developer hooks, `repo hook pre-commit` scans staged files from the git index and `repo hook pre-push` scans branch deltas from a base ref. Both modes mirror only changed local files into a scratch scan tree and report finding deltas without downloading external repositories.
 
 For example, with an OpenAI key already exported as `OPENAI_API_KEY` or `openai_api_key`, you can pass a command that reads Patchline's prompt from stdin and writes generated text to stdout:
 

@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -62,6 +63,65 @@ func TestDBDryRunRejectsNonLocalDSN(t *testing.T) {
 	err := dbDryRun(manifest, []string{"--dialect", "postgres", "--dsn", "postgres://user:secret@prod-db.example.com/app", "--json"}, true)
 	if err == nil || !strings.Contains(err.Error(), "refusing non-local database target") {
 		t.Fatalf("expected non-local DSN rejection, got %v", err)
+	}
+}
+
+func TestRepoHookPreCommitScansOnlyStagedChangedFiles(t *testing.T) {
+	root := initMainTestGitRepo(t)
+	writeMainTestFile(t, root, "db/migrate/001_backfill.sql", "UPDATE accounts SET status = 'active';\n")
+	runMainTestGit(t, root, "add", "db/migrate/001_backfill.sql")
+
+	report, err := buildRepoHookReport("pre-commit", root, "", filepath.Join(t.TempDir(), "hook"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if report.Version != "patchline.repo-hook/v1" || report.Mode != "pre-commit" || report.Network || report.Summary.NetworkOperations != 0 {
+		t.Fatalf("unexpected hook report metadata: %#v", report)
+	}
+	if report.Summary.ChangedFiles != 1 || report.Summary.ScannedFiles != 1 || report.Summary.RankedRisks == 0 {
+		t.Fatalf("expected staged changed-file risks: %#v", report.Summary)
+	}
+	if len(report.FindingDeltas) == 0 || report.FindingDeltas[0].Path != "db/migrate/001_backfill.sql" {
+		t.Fatalf("expected finding delta mapped to repo-relative staged file: %#v", report.FindingDeltas)
+	}
+}
+
+func TestRepoHookPrePushScansBranchDelta(t *testing.T) {
+	root := initMainTestGitRepo(t)
+	writeMainTestFile(t, root, "db/migrate/001_create_accounts.sql", "CREATE TABLE accounts(id int);\n")
+	runMainTestGit(t, root, "add", ".")
+	runMainTestGit(t, root, "commit", "-m", "initial")
+	writeMainTestFile(t, root, "db/migrate/002_delete_accounts.sql", "DELETE FROM accounts;\n")
+	runMainTestGit(t, root, "add", ".")
+	runMainTestGit(t, root, "commit", "-m", "delete accounts")
+
+	report, err := buildRepoHookReport("pre-push", root, "HEAD~1", filepath.Join(t.TempDir(), "hook"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if report.Mode != "pre-push" || report.Base != "HEAD~1" || report.Network {
+		t.Fatalf("unexpected pre-push report metadata: %#v", report)
+	}
+	if report.Summary.ChangedFiles != 1 || report.Summary.RankedRisks == 0 || report.FindingDeltas[0].Path != "db/migrate/002_delete_accounts.sql" {
+		t.Fatalf("expected branch delta finding: summary=%#v deltas=%#v", report.Summary, report.FindingDeltas)
+	}
+}
+
+func initMainTestGitRepo(t *testing.T) string {
+	t.Helper()
+	root := t.TempDir()
+	runMainTestGit(t, root, "init")
+	runMainTestGit(t, root, "config", "user.email", "patchline@example.com")
+	runMainTestGit(t, root, "config", "user.name", "Patchline Test")
+	return root
+}
+
+func runMainTestGit(t *testing.T, root string, args ...string) {
+	t.Helper()
+	cmd := exec.Command("git", append([]string{"-C", root}, args...)...)
+	output, err := cmd.CombinedOutput()
+	if err != nil {
+		t.Fatalf("git %s failed: %v\n%s", strings.Join(args, " "), err, string(output))
 	}
 }
 

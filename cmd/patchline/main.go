@@ -417,7 +417,8 @@ Usage:
   patchline repo suppressions --baseline baseline-dir --suppressions suppressions.json [--out dir] [--json]
   patchline repo why-now --previous baseline-dir --current baseline-dir [--out dir] [--json]
   patchline repo changes --previous analysis-dir --current analysis-dir [--out dir] [--json]
-  patchline repo pr-comment --base baseline-dir --head baseline-dir [--max-findings N] [--out dir] [--json]
+  patchline repo hook <pre-commit|pre-push> [--root repo] [--base ref] [--out dir] [--json]
+  patchline repo pr-comment --base baseline-dir --head baseline-dir [--max-findings n] [--out dir] [--json]
   patchline repo notify-summary --analysis analysis-dir [--bundle-link url] [--out dir] [--json]
   patchline repo minimize --analysis analysis-dir [--out dir] [--json]
   patchline repo recurrence --analyses analysis-dir[,analysis-dir...] [--out dir] [--json]
@@ -511,7 +512,7 @@ Examples:
 
 func repoCommand(args []string) error {
 	if len(args) == 0 {
-		return errors.New("usage: patchline repo <doctor|fetch|analyze|inventory|baseline|propose|compare|proposal-minimize|replay|suppressions|why-now|changes|notify-summary|minimize|recurrence> ...")
+		return errors.New("usage: patchline repo <doctor|fetch|analyze|inventory|baseline|propose|compare|proposal-minimize|replay|suppressions|why-now|changes|hook|notify-summary|minimize|recurrence> ...")
 	}
 	switch args[0] {
 	case "doctor":
@@ -538,6 +539,8 @@ func repoCommand(args []string) error {
 		return repoWhyNow(args[1:])
 	case "changes":
 		return repoChanges(args[1:])
+	case "hook":
+		return repoHook(args[1:])
 	case "pr-comment":
 		return repoPRComment(args[1:])
 	case "notify-summary":
@@ -603,6 +606,50 @@ type repoAnalyzeCIArtifacts struct {
 	ArtifactName          string `json:"artifact_name,omitempty"`
 	CodeScanningTool      string `json:"code_scanning_tool,omitempty"`
 	GitHubStepSummary     bool   `json:"github_step_summary"`
+}
+
+type repoHookReport struct {
+	Version       string                 `json:"version"`
+	Mode          string                 `json:"mode"`
+	Root          string                 `json:"root"`
+	Base          string                 `json:"base,omitempty"`
+	Network       bool                   `json:"network"`
+	ChangedFiles  []repoHookChangedFile  `json:"changed_files"`
+	Summary       repoHookSummary        `json:"summary"`
+	FindingDeltas []repoHookFindingDelta `json:"finding_deltas,omitempty"`
+	Outputs       map[string]string      `json:"outputs,omitempty"`
+	Hash          string                 `json:"hash"`
+	Markdown      string                 `json:"markdown,omitempty"`
+}
+
+type repoHookChangedFile struct {
+	Path   string `json:"path"`
+	Bytes  int    `json:"bytes"`
+	Source string `json:"source"`
+}
+
+type repoHookSummary struct {
+	ChangedFiles      int `json:"changed_files"`
+	ScannedFiles      int `json:"scanned_files"`
+	Facts             int `json:"facts"`
+	RankedRisks       int `json:"ranked_risks"`
+	HighRisks         int `json:"high_risks"`
+	MediumRisks       int `json:"medium_risks"`
+	Infrastructure    int `json:"infrastructure_findings"`
+	NetworkOperations int `json:"network_operations"`
+}
+
+type repoHookFindingDelta struct {
+	Status      string `json:"status"`
+	StableID    string `json:"stable_id,omitempty"`
+	RiskID      string `json:"risk_id"`
+	Path        string `json:"path"`
+	Kind        string `json:"kind"`
+	Severity    string `json:"severity"`
+	Score       int    `json:"score"`
+	Table       string `json:"table,omitempty"`
+	Rationale   string `json:"rationale"`
+	NextCommand string `json:"next_command,omitempty"`
 }
 
 type gitlabCodeQualityIssue struct {
@@ -3659,6 +3706,346 @@ func repoChanges(args []string) error {
 		fmt.Printf("  out=%s\n", *outPath)
 	}
 	return nil
+}
+
+func repoHook(args []string) error {
+	if len(args) == 0 {
+		return errors.New("usage: patchline repo hook <pre-commit|pre-push> [--root repo] [--base ref] [--out dir] [--json]")
+	}
+	mode := args[0]
+	if mode != "pre-commit" && mode != "pre-push" {
+		return fmt.Errorf("repo hook mode must be pre-commit or pre-push, got %q", mode)
+	}
+	fs := flag.NewFlagSet("repo hook "+mode, flag.ContinueOnError)
+	fs.SetOutput(ioDiscard{})
+	root := fs.String("root", ".", "local git repository root")
+	base := fs.String("base", "", "base ref for pre-push diffs")
+	outPath := fs.String("out", "", "output directory")
+	jsonOut := fs.Bool("json", false, "emit JSON")
+	if err := fs.Parse(args[1:]); err != nil {
+		return err
+	}
+	if fs.NArg() != 0 {
+		return errors.New("usage: patchline repo hook <pre-commit|pre-push> [--root repo] [--base ref] [--out dir] [--json]")
+	}
+	report, err := buildRepoHookReport(mode, *root, *base, *outPath)
+	if err != nil {
+		return err
+	}
+	if *outPath != "" {
+		if err := writeRepoHookReport(*outPath, report); err != nil {
+			return err
+		}
+	}
+	if *jsonOut {
+		return writeJSON(os.Stdout, report)
+	}
+	fmt.Printf("repo hook mode=%s changed=%d scanned=%d risks=%d high=%d network=%t hash=%s\n",
+		report.Mode,
+		report.Summary.ChangedFiles,
+		report.Summary.ScannedFiles,
+		report.Summary.RankedRisks,
+		report.Summary.HighRisks,
+		report.Network,
+		report.Hash,
+	)
+	if *outPath != "" {
+		fmt.Printf("  out=%s\n", *outPath)
+	}
+	return nil
+}
+
+func buildRepoHookReport(mode, root, base, outPath string) (repoHookReport, error) {
+	repoRoot, err := gitRepoRoot(root)
+	if err != nil {
+		return repoHookReport{}, err
+	}
+	changed, resolvedBase, err := repoHookChangedPaths(repoRoot, mode, base)
+	if err != nil {
+		return repoHookReport{}, err
+	}
+	requestedOut := outPath != ""
+	if outPath == "" {
+		outPath, err = os.MkdirTemp("", "patchline-repo-hook-*")
+		if err != nil {
+			return repoHookReport{}, err
+		}
+		defer os.RemoveAll(outPath)
+	}
+	scratch := filepath.Join(outPath, "changed-files")
+	if err := os.RemoveAll(scratch); err != nil {
+		return repoHookReport{}, err
+	}
+	if err := os.MkdirAll(scratch, 0o755); err != nil {
+		return repoHookReport{}, err
+	}
+	report := repoHookReport{
+		Version: "patchline.repo-hook/v1",
+		Mode:    mode,
+		Root:    filepath.ToSlash(repoRoot),
+		Base:    resolvedBase,
+		Network: false,
+		Outputs: map[string]string{},
+	}
+	if requestedOut {
+		report.Outputs["changed_files"] = filepath.ToSlash(scratch)
+	}
+	for _, rel := range changed {
+		size, err := mirrorRepoHookFile(repoRoot, scratch, rel, mode)
+		if err != nil {
+			return repoHookReport{}, err
+		}
+		report.ChangedFiles = append(report.ChangedFiles, repoHookChangedFile{Path: rel, Bytes: size, Source: hookSource(mode)})
+	}
+	var inv project.Inventory
+	var intakeReport intake.Report
+	var baseline project.BaselineReport
+	if len(report.ChangedFiles) > 0 {
+		inv, err = project.InventoryPath(project.InventoryOptions{Path: scratch})
+		if err != nil {
+			return repoHookReport{}, err
+		}
+		intakeReport, err = intake.Run(context.Background(), intake.Options{Path: scratch})
+		if err != nil {
+			return repoHookReport{}, err
+		}
+		baseline = project.Baseline(inv, inv.Facts, intakeReport)
+		for i := range baseline.Risks {
+			remapBaselineRiskPath(&baseline.Risks[i], scratch)
+		}
+		if requestedOut {
+			inventoryOut := filepath.Join(outPath, "inventory")
+			intakeOut := filepath.Join(outPath, "intake")
+			baselineOut := filepath.Join(outPath, "baseline")
+			if err := project.WriteInventory(inventoryOut, inv); err != nil {
+				return repoHookReport{}, err
+			}
+			if err := intake.WriteReport(intakeOut, intakeReport); err != nil {
+				return repoHookReport{}, err
+			}
+			if err := project.WriteBaseline(baselineOut, baseline); err != nil {
+				return repoHookReport{}, err
+			}
+			report.Outputs["inventory"] = filepath.ToSlash(inventoryOut)
+			report.Outputs["intake"] = filepath.ToSlash(intakeOut)
+			report.Outputs["baseline"] = filepath.ToSlash(baselineOut)
+		}
+	}
+	report.Summary = repoHookSummary{
+		ChangedFiles:      len(report.ChangedFiles),
+		ScannedFiles:      inv.FilesScanned,
+		Facts:             len(inv.Facts),
+		RankedRisks:       len(baseline.Risks),
+		HighRisks:         countHookRisksBySeverity(baseline.Risks, "high"),
+		MediumRisks:       countHookRisksBySeverity(baseline.Risks, "medium"),
+		Infrastructure:    baseline.Summary.InfraFindings,
+		NetworkOperations: 0,
+	}
+	report.FindingDeltas = hookFindingDeltas(baseline.Risks)
+	report.Hash = repoHookHash(report)
+	report.Markdown = renderRepoHookMarkdown(report)
+	return report, nil
+}
+
+func gitRepoRoot(root string) (string, error) {
+	if strings.TrimSpace(root) == "" {
+		root = "."
+	}
+	output, err := runGit(root, "rev-parse", "--show-toplevel")
+	if err != nil {
+		return "", err
+	}
+	resolved := strings.TrimSpace(string(output))
+	if resolved == "" {
+		return "", fmt.Errorf("%s is not inside a git repository", root)
+	}
+	return filepath.Abs(resolved)
+}
+
+func repoHookChangedPaths(root, mode, base string) ([]string, string, error) {
+	var output []byte
+	var err error
+	resolvedBase := strings.TrimSpace(base)
+	switch mode {
+	case "pre-commit":
+		output, err = runGit(root, "diff", "--cached", "--name-only", "--diff-filter=ACMR", "-z")
+	case "pre-push":
+		if resolvedBase == "" {
+			resolvedBase = defaultPrePushBase(root)
+		}
+		if resolvedBase == "" {
+			return nil, "", fmt.Errorf("pre-push mode needs --base when no upstream or HEAD~1 exists")
+		}
+		output, err = runGit(root, "diff", "--name-only", "--diff-filter=ACMR", "-z", resolvedBase+"...HEAD")
+		if err != nil {
+			output, err = runGit(root, "diff", "--name-only", "--diff-filter=ACMR", "-z", resolvedBase, "HEAD")
+		}
+	default:
+		return nil, "", fmt.Errorf("unsupported hook mode %q", mode)
+	}
+	if err != nil {
+		return nil, "", err
+	}
+	return safeGitPaths(output), resolvedBase, nil
+}
+
+func defaultPrePushBase(root string) string {
+	if _, err := runGit(root, "rev-parse", "--verify", "@{upstream}"); err == nil {
+		return "@{upstream}"
+	}
+	if _, err := runGit(root, "rev-parse", "--verify", "HEAD~1"); err == nil {
+		return "HEAD~1"
+	}
+	return ""
+}
+
+func runGit(root string, args ...string) ([]byte, error) {
+	cmd := exec.Command("git", append([]string{"-C", root}, args...)...)
+	output, err := cmd.CombinedOutput()
+	if err != nil {
+		return nil, fmt.Errorf("git %s: %w: %s", strings.Join(args, " "), err, strings.TrimSpace(string(output)))
+	}
+	return output, nil
+}
+
+func safeGitPaths(data []byte) []string {
+	seen := map[string]bool{}
+	var out []string
+	for _, raw := range strings.Split(string(data), "\x00") {
+		rel := filepath.ToSlash(strings.TrimSpace(raw))
+		if rel == "" || filepath.IsAbs(rel) || strings.HasPrefix(rel, "../") || strings.Contains(rel, "/../") || rel == ".." {
+			continue
+		}
+		if !seen[rel] {
+			seen[rel] = true
+			out = append(out, rel)
+		}
+	}
+	sort.Strings(out)
+	return out
+}
+
+func mirrorRepoHookFile(repoRoot, scratch, rel, mode string) (int, error) {
+	dst := filepath.Join(scratch, filepath.FromSlash(rel))
+	if err := os.MkdirAll(filepath.Dir(dst), 0o755); err != nil {
+		return 0, err
+	}
+	var data []byte
+	var err error
+	if mode == "pre-commit" {
+		data, err = runGit(repoRoot, "show", ":"+rel)
+	} else {
+		src := filepath.Join(repoRoot, filepath.FromSlash(rel))
+		info, statErr := os.Lstat(src)
+		if statErr != nil {
+			return 0, statErr
+		}
+		if info.IsDir() || info.Mode()&os.ModeSymlink != 0 {
+			return 0, fmt.Errorf("refusing to mirror non-regular changed path %s", rel)
+		}
+		data, err = os.ReadFile(src)
+	}
+	if err != nil {
+		return 0, err
+	}
+	if err := os.WriteFile(dst, data, 0o644); err != nil {
+		return 0, err
+	}
+	return len(data), nil
+}
+
+func hookSource(mode string) string {
+	if mode == "pre-commit" {
+		return "git-index"
+	}
+	return "working-tree"
+}
+
+func remapBaselineRiskPath(risk *project.BaselineRisk, scratch string) {
+	prefix := filepath.ToSlash(scratch) + "/"
+	risk.Path = strings.TrimPrefix(filepath.ToSlash(risk.Path), prefix)
+	if risk.NextCommand != "" {
+		risk.NextCommand = strings.ReplaceAll(risk.NextCommand, filepath.ToSlash(scratch)+"/", "")
+	}
+}
+
+func countHookRisksBySeverity(risks []project.BaselineRisk, severity string) int {
+	count := 0
+	for _, risk := range risks {
+		if risk.Severity == severity {
+			count++
+		}
+	}
+	return count
+}
+
+func hookFindingDeltas(risks []project.BaselineRisk) []repoHookFindingDelta {
+	var out []repoHookFindingDelta
+	for _, risk := range risks {
+		out = append(out, repoHookFindingDelta{
+			Status:      "changed-file",
+			StableID:    risk.StableID,
+			RiskID:      risk.ID,
+			Path:        risk.Path,
+			Kind:        risk.Kind,
+			Severity:    risk.Severity,
+			Score:       risk.Score,
+			Table:       risk.Table,
+			Rationale:   risk.Rationale,
+			NextCommand: risk.NextCommand,
+		})
+	}
+	sort.Slice(out, func(i, j int) bool {
+		if out[i].Score != out[j].Score {
+			return out[i].Score > out[j].Score
+		}
+		return out[i].RiskID < out[j].RiskID
+	})
+	return out
+}
+
+func writeRepoHookReport(outDir string, report repoHookReport) error {
+	if err := os.MkdirAll(outDir, 0o755); err != nil {
+		return err
+	}
+	copy := report
+	copy.Markdown = ""
+	data, err := json.MarshalIndent(copy, "", "  ")
+	if err != nil {
+		return err
+	}
+	if err := os.WriteFile(filepath.Join(outDir, "hook.json"), append(data, '\n'), 0o644); err != nil {
+		return err
+	}
+	return os.WriteFile(filepath.Join(outDir, "hook.md"), []byte(report.Markdown), 0o644)
+}
+
+func repoHookHash(report repoHookReport) string {
+	copy := report
+	copy.Hash = ""
+	copy.Markdown = ""
+	return canonical.Hash(copy)
+}
+
+func renderRepoHookMarkdown(report repoHookReport) string {
+	var b strings.Builder
+	fmt.Fprintf(&b, "## Patchline %s hook delta\n\n", report.Mode)
+	fmt.Fprintf(&b, "Local-only hook scan: no external repository downloads or network operations are used.\n\n")
+	fmt.Fprintf(&b, "| metric | count |\n| --- | ---: |\n")
+	fmt.Fprintf(&b, "| changed files | %d |\n", report.Summary.ChangedFiles)
+	fmt.Fprintf(&b, "| scanned files | %d |\n", report.Summary.ScannedFiles)
+	fmt.Fprintf(&b, "| ranked risks | %d |\n", report.Summary.RankedRisks)
+	fmt.Fprintf(&b, "| high risks | %d |\n", report.Summary.HighRisks)
+	fmt.Fprintf(&b, "| network operations | %d |\n\n", report.Summary.NetworkOperations)
+	if len(report.FindingDeltas) == 0 {
+		fmt.Fprintf(&b, "No data-risk findings were detected in changed files.\n")
+		return b.String()
+	}
+	fmt.Fprintf(&b, "| severity | score | path | kind | table | rationale |\n| --- | ---: | --- | --- | --- | --- |\n")
+	for _, finding := range report.FindingDeltas {
+		fmt.Fprintf(&b, "| %s | %d | `%s` | %s | %s | %s |\n", finding.Severity, finding.Score, finding.Path, finding.Kind, finding.Table, finding.Rationale)
+	}
+	return b.String()
 }
 
 func buildChangesReport(previousPath, currentPath string) (changesReport, error) {
