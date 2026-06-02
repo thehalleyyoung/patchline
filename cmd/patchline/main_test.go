@@ -74,6 +74,82 @@ func TestGoldenFixtureGenerateCommand(t *testing.T) {
 	}
 }
 
+func TestRepoAnalyzeTraceWritesDiagnostics(t *testing.T) {
+	root := t.TempDir()
+	writeMainTestFile(t, root, "db/migrate/001_backfill.sql", "UPDATE accounts SET status = 'active';\n")
+	out := filepath.Join(t.TempDir(), "analysis")
+	if err := run([]string{"repo", "analyze", root, "--stages", "inventory,baseline,propose,compare,deep", "--proposal-kind", "all", "--budget", "files=2,lines=60,tokens=4000,changes=1", "--no-llm", "--trace", "--out", out, "--json"}); err != nil {
+		t.Fatalf("repo analyze trace failed: %v", err)
+	}
+	for _, rel := range []string{"diagnostics/events.jsonl", "diagnostics/summary.json", "analyze.json", "analyze.md"} {
+		if stat, err := os.Stat(filepath.Join(out, rel)); err != nil || stat.Size() == 0 {
+			t.Fatalf("expected %s to be written, stat=%#v err=%v", rel, stat, err)
+		}
+	}
+	var summary struct {
+		Version     string `json:"version"`
+		Spans       int    `json:"spans"`
+		Logs        int    `json:"logs"`
+		FailedSpans int    `json:"failed_spans"`
+		EventsPath  string `json:"events_path"`
+	}
+	readMainTestJSON(t, filepath.Join(out, "diagnostics/summary.json"), &summary)
+	if summary.Version != "patchline.diagnostics/v1" || summary.Spans < 8 || summary.Logs < 2 || summary.FailedSpans != 0 || summary.EventsPath == "" {
+		t.Fatalf("unexpected diagnostics summary: %#v", summary)
+	}
+	eventsData, err := os.ReadFile(filepath.Join(out, "diagnostics/events.jsonl"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	events := string(eventsData)
+	for _, name := range []string{`"name":"repo.analyze"`, `"name":"inventory"`, `"name":"intake"`, `"name":"baseline"`, `"name":"proposal"`, `"name":"compare"`, `"name":"triage"`, `"name":"analysis-bundle"`} {
+		if !strings.Contains(events, name) {
+			t.Fatalf("expected diagnostics event %s in:\n%s", name, events)
+		}
+	}
+	var analyze struct {
+		Outputs     map[string]string `json:"outputs"`
+		Diagnostics struct {
+			SummaryPath string `json:"summary_path"`
+			FailedSpans int    `json:"failed_spans"`
+		} `json:"diagnostics"`
+	}
+	readMainTestJSON(t, filepath.Join(out, "analyze.json"), &analyze)
+	if analyze.Outputs["diagnostics"] == "" || analyze.Diagnostics.SummaryPath == "" || analyze.Diagnostics.FailedSpans != 0 {
+		t.Fatalf("expected diagnostics in analyze report: %#v", analyze)
+	}
+	markdown, err := os.ReadFile(filepath.Join(out, "analyze.md"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(string(markdown), "diagnostics") {
+		t.Fatalf("expected diagnostics summary in analyze markdown:\n%s", string(markdown))
+	}
+}
+
+func TestRepoAnalyzeTraceFlushesDiagnosticsOnError(t *testing.T) {
+	out := filepath.Join(t.TempDir(), "analysis")
+	missing := filepath.Join(t.TempDir(), "missing")
+	err := run([]string{"repo", "analyze", missing, "--stages", "inventory", "--trace", "--out", out, "--json"})
+	if err == nil {
+		t.Fatal("expected missing input to fail")
+	}
+	var summary struct {
+		FailedSpans int `json:"failed_spans"`
+	}
+	readMainTestJSON(t, filepath.Join(out, "diagnostics/summary.json"), &summary)
+	if summary.FailedSpans == 0 {
+		t.Fatalf("expected failed span summary, got %#v", summary)
+	}
+	eventsData, err := os.ReadFile(filepath.Join(out, "diagnostics/events.jsonl"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(string(eventsData), `"status":"error"`) {
+		t.Fatalf("expected error span in diagnostics:\n%s", string(eventsData))
+	}
+}
+
 func TestOnePositionalWithFlagsAllowsFlagsAfterPath(t *testing.T) {
 	pos, flags, err := onePositionalWithFlags([]string{"django/django", "--subpath", "django/contrib/auth/migrations", "--json"}, map[string]bool{"--json": true})
 	if err != nil {
@@ -684,5 +760,16 @@ func writeMainTestFile(t *testing.T, root, rel, content string) {
 	}
 	if err := os.WriteFile(path, []byte(content), 0o644); err != nil {
 		t.Fatal(err)
+	}
+}
+
+func readMainTestJSON(t *testing.T, path string, target any) {
+	t.Helper()
+	data, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := json.Unmarshal(data, target); err != nil {
+		t.Fatalf("failed to decode %s: %v\n%s", path, err, string(data))
 	}
 }

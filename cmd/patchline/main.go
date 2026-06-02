@@ -27,6 +27,7 @@ import (
 	"github.com/thehalleyyoung/patchline/internal/canonical"
 	"github.com/thehalleyyoung/patchline/internal/dbdryrun"
 	"github.com/thehalleyyoung/patchline/internal/demo"
+	"github.com/thehalleyyoung/patchline/internal/diagnostics"
 	"github.com/thehalleyyoung/patchline/internal/effects"
 	"github.com/thehalleyyoung/patchline/internal/evidence"
 	"github.com/thehalleyyoung/patchline/internal/gate"
@@ -419,7 +420,7 @@ Usage:
   patchline golden-fixture generate [<path>|--github owner/repo] [--ref ref] [--subpath path] --out dir [--max-files n] [--json]
   patchline repo doctor [<path>|--github owner/repo] [--ref ref] [--subpath path] [--out dir] [--download-dir dir] [--json]
   patchline repo fetch <owner/repo|github-url|path|archive> [--ref ref] [--subpath path] [--out dir] [--download-dir dir] [--json]
-  patchline repo analyze [<path>|--github owner/repo] [--ref ref] [--subpath path] [--stages inventory,baseline,propose,compare,deep] [--proposal-kind tests|guards|instrumentation|repair|all] [--budget files=N,lines=N,tokens=N,changes=N] [--ci] [--redact] [--resume] [--no-llm] [--llm-command cmd] [--prompt-without-facts] [--out dir] [--json]
+  patchline repo analyze [<path>|--github owner/repo] [--ref ref] [--subpath path] [--stages inventory,baseline,propose,compare,deep] [--proposal-kind tests|guards|instrumentation|repair|all] [--budget files=N,lines=N,tokens=N,changes=N] [--ci] [--redact] [--resume] [--trace] [--no-llm] [--llm-command cmd] [--prompt-without-facts] [--out dir] [--json]
   patchline repo inventory <path> [--out dir] [--full] [--json]
   patchline repo baseline --inventory inventory-dir --intake intake-dir [--out dir] [--json]
   patchline repo propose --from-report baseline-dir --proposal-kind tests|guards|instrumentation|repair|all [--budget files=N,lines=N,tokens=N,changes=N] [--no-llm] [--llm-command cmd] [--prompt-without-facts] [--out dir] [--json]
@@ -582,6 +583,7 @@ type repoAnalyzeReport struct {
 	Resume       bool                   `json:"resume"`
 	ReusedStages []string               `json:"reused_stages,omitempty"`
 	Redact       bool                   `json:"redact"`
+	Diagnostics  *diagnostics.Summary   `json:"diagnostics,omitempty"`
 	Summary      repoAnalyzeSummary     `json:"summary"`
 	DeepAnalysis repoAnalyzeDeepSummary `json:"deep_analysis,omitempty"`
 	NextCommands []project.Command      `json:"next_commands,omitempty"`
@@ -1118,7 +1120,7 @@ type recurrenceOccurrence struct {
 	Score    int    `json:"score"`
 }
 
-func repoAnalyze(args []string) error {
+func repoAnalyze(args []string) (err error) {
 	fs := flag.NewFlagSet("repo analyze", flag.ContinueOnError)
 	fs.SetOutput(ioDiscard{})
 	githubRepo := fs.String("github", "", "GitHub owner/repo to fetch and analyze")
@@ -1136,9 +1138,10 @@ func repoAnalyze(args []string) error {
 	resume := fs.Bool("resume", false, "reuse existing fetch, inventory, intake, baseline, proposal, and compare artifacts when present")
 	redact := fs.Bool("redact", false, "write stable-token redacted analysis-bundle artifacts")
 	ciMode := fs.Bool("ci", false, "write CI metadata for SARIF upload and analysis-bundle artifact storage")
+	traceMode := fs.Bool("trace", false, "write structured diagnostic logs and trace spans")
 	runNativeTests := fs.Bool("run-native-tests", false, "run safe allowlisted native test commands during compare")
 	jsonOut := fs.Bool("json", false, "emit JSON")
-	input, flagArgs, err := onePositionalWithFlags(args, map[string]bool{"--ci": true, "--json": true, "--no-llm": true, "--prompt-without-facts": true, "--redact": true, "--resume": true, "--run-native-tests": true})
+	input, flagArgs, err := onePositionalWithFlags(args, map[string]bool{"--ci": true, "--json": true, "--no-llm": true, "--prompt-without-facts": true, "--redact": true, "--resume": true, "--run-native-tests": true, "--trace": true})
 	if err != nil {
 		return err
 	}
@@ -1149,7 +1152,7 @@ func repoAnalyze(args []string) error {
 		input = *githubRepo
 	}
 	if input == "" || fs.NArg() != 0 {
-		return errors.New("usage: patchline repo analyze [<path>|--github owner/repo] [--ref ref] [--subpath path] [--stages inventory,baseline,propose,compare,deep] [--proposal-kind kind] [--budget files=N,lines=N,tokens=N,changes=N] [--ci] [--redact] [--resume] [--no-llm] [--llm-command cmd] [--out dir] [--json]")
+		return errors.New("usage: patchline repo analyze [<path>|--github owner/repo] [--ref ref] [--subpath path] [--stages inventory,baseline,propose,compare,deep] [--proposal-kind kind] [--budget files=N,lines=N,tokens=N,changes=N] [--ci] [--redact] [--resume] [--trace] [--no-llm] [--llm-command cmd] [--out dir] [--json]")
 	}
 	stages, err := parseAnalyzeStages(*stagesValue)
 	if err != nil {
@@ -1157,6 +1160,21 @@ func repoAnalyze(args []string) error {
 	}
 	if err := os.MkdirAll(*outPath, 0o755); err != nil {
 		return err
+	}
+	diag := diagnostics.New(filepath.Join(*outPath, "diagnostics"), *traceMode)
+	rootSpan := diag.StartSpan("repo.analyze", map[string]any{"input": input, "subpath": *subpath, "stages": strings.Join(stages, ","), "ci": *ciMode, "resume": *resume, "redact": *redact})
+	diagnosticsWritten := false
+	defer func() {
+		if diag.Enabled() && !diagnosticsWritten {
+			rootSpan.End(err, nil)
+			_, writeErr := diag.Write()
+			if err == nil && writeErr != nil {
+				err = writeErr
+			}
+		}
+	}()
+	if diag.Enabled() {
+		diag.Log("analyze.start", "repo analysis started", map[string]any{"input": input, "out": *outPath})
 	}
 
 	report := repoAnalyzeReport{
@@ -1169,25 +1187,33 @@ func repoAnalyze(args []string) error {
 		Resume:  *resume,
 		Redact:  *redact,
 	}
+	if diag.Enabled() {
+		report.Outputs["diagnostics"] = filepath.Join(*outPath, "diagnostics")
+	}
 	stageSet := analyzeStageSet(stages)
 	scanRoot := input
 	if *githubRepo != "" {
 		fetchOut := filepath.Join(*outPath, "fetch")
+		span := rootSpan.Child("fetch", map[string]any{"repo": *githubRepo, "ref": *ref, "subpath": *subpath, "resume": *resume})
 		if *resume && fileExists(filepath.Join(fetchOut, "source.json")) {
 			source, err := loadSource(filepath.Join(fetchOut, "source.json"))
 			if err != nil {
+				span.End(err, nil)
 				return err
 			}
 			report.Source = source
 			report.ReusedStages = append(report.ReusedStages, "fetch")
 			scanRoot = source.ScannedRoot
+			span.End(nil, map[string]any{"reused": true, "scanned_root": scanRoot})
 		} else {
 			fetchResult, err := project.Fetch(context.Background(), project.FetchOptions{Input: *githubRepo, Ref: *ref, Subpath: *subpath, OutDir: fetchOut, DownloadDir: *downloadDir})
 			if err != nil {
+				span.End(err, nil)
 				return err
 			}
 			report.Source = fetchResult.Source
 			scanRoot = fetchResult.Source.ScannedRoot
+			span.End(nil, map[string]any{"reused": false, "scanned_root": scanRoot, "archive_hash": fetchResult.Source.ArchiveHash})
 		}
 		report.Outputs["fetch"] = fetchOut
 	}
@@ -1200,59 +1226,75 @@ func repoAnalyze(args []string) error {
 
 	if analyzeNeeds(stageSet, "inventory") {
 		inventoryOut := filepath.Join(*outPath, "inventory")
+		span := rootSpan.Child("inventory", map[string]any{"path": scanRoot, "resume": *resume})
 		if *resume && fileExists(filepath.Join(inventoryOut, "inventory.json")) {
 			inv, _, err = project.LoadInventory(inventoryOut)
 			if err != nil {
+				span.End(err, nil)
 				return err
 			}
 			report.ReusedStages = append(report.ReusedStages, "inventory")
 		} else {
 			inv, err = project.InventoryPath(project.InventoryOptions{Path: scanRoot})
 			if err != nil {
+				span.End(err, nil)
 				return err
 			}
 			if err := project.WriteInventory(inventoryOut, inv); err != nil {
+				span.End(err, nil)
 				return err
 			}
 		}
 		report.Outputs["inventory"] = inventoryOut
 		report.Summary.FilesScanned = inv.FilesScanned
 		report.Summary.Facts = len(inv.Facts)
+		span.End(nil, map[string]any{"files_scanned": inv.FilesScanned, "facts": len(inv.Facts), "reused": stringSliceContains(report.ReusedStages, "inventory")})
 	}
 	if analyzeNeeds(stageSet, "baseline") {
 		if inv.Root == "" {
+			span := rootSpan.Child("inventory.implicit", map[string]any{"path": scanRoot})
 			inv, err = project.InventoryPath(project.InventoryOptions{Path: scanRoot})
 			if err != nil {
+				span.End(err, nil)
 				return err
 			}
+			span.End(nil, map[string]any{"files_scanned": inv.FilesScanned, "facts": len(inv.Facts)})
 		}
 		intakeOut := filepath.Join(*outPath, "intake")
+		intakeSpan := rootSpan.Child("intake", map[string]any{"path": scanRoot, "resume": *resume})
 		if *resume && fileExists(filepath.Join(intakeOut, "summary.json")) {
 			intakeReport, err = project.LoadIntakeReport(intakeOut)
 			if err != nil {
+				intakeSpan.End(err, nil)
 				return err
 			}
 			report.ReusedStages = append(report.ReusedStages, "intake")
 		} else {
 			intakeReport, err = intake.Run(context.Background(), intake.Options{Path: scanRoot})
 			if err != nil {
+				intakeSpan.End(err, nil)
 				return err
 			}
 			if err := intake.WriteReport(intakeOut, intakeReport); err != nil {
+				intakeSpan.End(err, nil)
 				return err
 			}
 		}
 		report.Outputs["intake"] = intakeOut
+		intakeSpan.End(nil, map[string]any{"files_scanned": intakeReport.Summary.FilesScanned, "sql_findings": len(intakeReport.SQL), "problem_candidates": intakeReport.Summary.ProblemCandidates, "reused": stringSliceContains(report.ReusedStages, "intake")})
 		baselineOut := filepath.Join(*outPath, "baseline")
+		baselineSpan := rootSpan.Child("baseline", map[string]any{"inventory_root": inv.Root, "resume": *resume})
 		if *resume && fileExists(filepath.Join(baselineOut, "baseline.json")) {
 			baseline, err = project.LoadBaseline(baselineOut)
 			if err != nil {
+				baselineSpan.End(err, nil)
 				return err
 			}
 			report.ReusedStages = append(report.ReusedStages, "baseline")
 		} else {
 			baseline = project.Baseline(inv, inv.Facts, intakeReport)
 			if err := project.WriteBaseline(baselineOut, baseline); err != nil {
+				baselineSpan.End(err, nil)
 				return err
 			}
 		}
@@ -1264,6 +1306,7 @@ func repoAnalyze(args []string) error {
 		report.Summary.RepairProofSummaries = baseline.Summary.RepairProofs
 		report.Summary.Infrastructure = baseline.Summary.InfraFindings
 		report.Summary.BaselineHash = baseline.Hash
+		deepSpan := rootSpan.Child("deep-summary", map[string]any{"requested": stageSet["deep"]})
 		report.DeepAnalysis = repoAnalyzeDeepSummary{
 			AbstractEffects:        baseline.Summary.AbstractEffects,
 			SymbolicChecks:         baseline.Summary.SymbolicChecks,
@@ -1272,22 +1315,28 @@ func repoAnalyze(args []string) error {
 			RepairProofRefuted:     baseline.Summary.RepairProofRefuted,
 			AblationSensitiveRisks: baseline.Summary.AblationSensitive,
 		}
+		deepSpan.End(nil, map[string]any{"abstract_effects": report.DeepAnalysis.AbstractEffects, "symbolic_checks": report.DeepAnalysis.SymbolicChecks, "temporal_windows": report.DeepAnalysis.TemporalWindows, "recurrences": report.DeepAnalysis.Recurrences})
 		report.NextCommands = append(report.NextCommands, baseline.NativeChecks...)
+		baselineSpan.End(nil, map[string]any{"ranked_risks": baseline.Summary.RankedRisks, "policy_checks": baseline.Summary.PolicyChecks, "provenance_slices": baseline.Summary.ProvenanceSlices, "reused": stringSliceContains(report.ReusedStages, "baseline")})
 	}
 	if analyzeNeeds(stageSet, "propose") {
 		proposalOut := filepath.Join(*outPath, "proposal")
+		proposalSpan := rootSpan.Child("proposal", map[string]any{"kind": *proposalKind, "budget": *budget, "resume": *resume, "no_llm": *noLLM})
 		if *resume && fileExists(filepath.Join(proposalOut, "proposal.json")) {
 			proposal, err = project.LoadProposal(proposalOut)
 			if err != nil {
+				proposalSpan.End(err, nil)
 				return err
 			}
 			report.ReusedStages = append(report.ReusedStages, "proposal")
 		} else {
 			proposal, err = project.Propose(project.ProposalOptions{BaselinePath: filepath.Join(*outPath, "baseline"), Kind: *proposalKind, OutDir: proposalOut, LLMCommand: *llmCommand, NoLLM: *noLLM, PromptNoFacts: *promptNoFacts, Budget: *budget, BudgetRisks: *budgetRisks})
 			if err != nil {
+				proposalSpan.End(err, nil)
 				return err
 			}
 			if err := project.WriteProposal(proposalOut, proposal); err != nil {
+				proposalSpan.End(err, nil)
 				return err
 			}
 		}
@@ -1297,6 +1346,7 @@ func repoAnalyze(args []string) error {
 		report.Summary.DeterministicOnly = proposal.Deterministic
 		report.Summary.ScopeBudget = proposal.ScopeBudget.Raw
 		report.Summary.ProposalHash = proposal.OutputHash
+		proposalSpan.End(nil, map[string]any{"generated_files": len(proposal.GeneratedFiles), "generator": proposal.Generator, "deterministic": proposal.Deterministic, "reused": stringSliceContains(report.ReusedStages, "proposal")})
 	}
 	if analyzeNeeds(stageSet, "compare") {
 		if baseline.Hash == "" {
@@ -1312,15 +1362,18 @@ func repoAnalyze(args []string) error {
 			}
 		}
 		compareOut := filepath.Join(*outPath, "compare")
+		compareSpan := rootSpan.Child("compare", map[string]any{"run_native_tests": *runNativeTests, "resume": *resume})
 		if *resume && fileExists(filepath.Join(compareOut, "compare.json")) {
 			compare, err = loadCompareReport(filepath.Join(compareOut, "compare.json"))
 			if err != nil {
+				compareSpan.End(err, nil)
 				return err
 			}
 			report.ReusedStages = append(report.ReusedStages, "compare")
 		} else {
 			compare = project.CompareWithOptions(baseline, proposal, project.CompareOptions{RunNativeTests: *runNativeTests})
 			if err := project.WriteCompare(compareOut, compare); err != nil {
+				compareSpan.End(err, nil)
 				return err
 			}
 		}
@@ -1329,20 +1382,27 @@ func repoAnalyze(args []string) error {
 		report.Summary.CompareChecksFailed = compare.Summary.PatchlineChecksFailed
 		report.Summary.NativeChecksSkipped = compare.Summary.NativeChecksSkipped
 		report.Summary.CompareHash = compare.Hash
+		compareSpan.End(nil, map[string]any{"intervention_loops": compare.Summary.InterventionLoops, "checks_failed": compare.Summary.PatchlineChecksFailed, "native_skipped": compare.Summary.NativeChecksSkipped, "reused": stringSliceContains(report.ReusedStages, "compare")})
 	}
 	if baseline.Hash != "" {
+		triageSpan := rootSpan.Child("triage", map[string]any{"baseline_hash": baseline.Hash})
 		triage := buildMaintainerTriage(baseline, proposal, compare)
 		triageOut := filepath.Join(*outPath, "triage")
 		if err := writeMaintainerTriage(triageOut, triage); err != nil {
+			triageSpan.End(err, nil)
 			return err
 		}
 		report.Outputs["triage"] = triageOut
+		triageSpan.End(nil, map[string]any{"groups": len(triage.Groups), "owner_routes": triage.Summary.OwnerRoutes})
 	}
 	report.Outputs["analysis_bundle"] = filepath.Join(*outPath, "analysis-bundle")
 	report.CommandsPath = filepath.Join(*outPath, "commands.md")
 	report.Outputs["commands"] = report.CommandsPath
 	if err := writeCopyCommandsReport(*outPath, report, *githubRepo != "", *ref, *proposalKind, *llmCommand, *budget, *noLLM, *promptNoFacts, *redact, *ciMode); err != nil {
 		return err
+	}
+	if diag.Enabled() {
+		diag.Log("analyze.outputs", "analysis outputs prepared", map[string]any{"outputs": len(report.Outputs)})
 	}
 	report.Hash = canonical.Hash(struct {
 		Version      string                 `json:"version"`
@@ -1361,12 +1421,17 @@ func repoAnalyze(args []string) error {
 	if err := writeRepoAnalyzeReport(*outPath, report); err != nil {
 		return err
 	}
+	bundleSpan := rootSpan.Child("analysis-bundle", map[string]any{"redact": *redact})
 	if err := writeAnalysisBundle(*outPath, report); err != nil {
+		bundleSpan.End(err, nil)
 		return err
 	}
+	bundleSpan.End(nil, map[string]any{"bundle": report.Outputs["analysis_bundle"]})
 	if report.CI {
+		ciSpan := rootSpan.Child("ci-artifacts", nil)
 		ciArtifacts, err := writeRepoAnalyzeCIArtifacts(*outPath, report)
 		if err != nil {
+			ciSpan.End(err, nil)
 			return err
 		}
 		report.CIArtifacts = ciArtifacts
@@ -1385,9 +1450,38 @@ func repoAnalyze(args []string) error {
 			Summary      repoAnalyzeSummary     `json:"summary"`
 		}{report.Version, report.Input, report.Subpath, report.Stages, report.Outputs, report.CI, report.CIArtifacts, report.CommandsPath, report.Resume, report.Redact, report.Summary})
 		if err := writeRepoAnalyzeReport(*outPath, report); err != nil {
+			ciSpan.End(err, nil)
 			return err
 		}
 		if err := writeAnalysisBundle(*outPath, report); err != nil {
+			ciSpan.End(err, nil)
+			return err
+		}
+		ciSpan.End(nil, map[string]any{"summary": ciArtifacts.SummaryPath})
+	}
+	if diag.Enabled() {
+		rootSpan.End(nil, map[string]any{"ranked_risks": report.Summary.RankedRisks, "generated_files": report.Summary.GeneratedFiles})
+		diagSummary, err := diag.Write()
+		if err != nil {
+			return err
+		}
+		diagnosticsWritten = true
+		report.Diagnostics = &diagSummary
+		report.Outputs["diagnostics"] = filepath.Join(*outPath, "diagnostics")
+		report.Hash = canonical.Hash(struct {
+			Version      string               `json:"version"`
+			Input        string               `json:"input"`
+			Subpath      string               `json:"subpath,omitempty"`
+			Stages       []string             `json:"stages"`
+			Outputs      map[string]string    `json:"outputs"`
+			CI           bool                 `json:"ci"`
+			Diagnostics  *diagnostics.Summary `json:"diagnostics,omitempty"`
+			CommandsPath string               `json:"commands_path,omitempty"`
+			Resume       bool                 `json:"resume"`
+			Redact       bool                 `json:"redact"`
+			Summary      repoAnalyzeSummary   `json:"summary"`
+		}{report.Version, report.Input, report.Subpath, report.Stages, report.Outputs, report.CI, report.Diagnostics, report.CommandsPath, report.Resume, report.Redact, report.Summary})
+		if err := writeRepoAnalyzeReport(*outPath, report); err != nil {
 			return err
 		}
 	}
@@ -2014,6 +2108,15 @@ func analyzeNeeds(stages map[string]bool, stage string) bool {
 	}
 }
 
+func stringSliceContains(values []string, target string) bool {
+	for _, value := range values {
+		if value == target {
+			return true
+		}
+	}
+	return false
+}
+
 func writeRepoAnalyzeReport(outDir string, report repoAnalyzeReport) error {
 	data, err := json.MarshalIndent(report, "", "  ")
 	if err != nil {
@@ -2034,6 +2137,9 @@ func writeRepoAnalyzeReport(outDir string, report repoAnalyzeReport) error {
 	}
 	if report.CommandsPath != "" {
 		fmt.Fprintf(&b, "- commands: `%s`\n", report.CommandsPath)
+	}
+	if report.Diagnostics != nil && report.Diagnostics.SummaryPath != "" {
+		fmt.Fprintf(&b, "- diagnostics: `%s` (%d spans, %d logs, %d failed spans)\n", report.Diagnostics.SummaryPath, report.Diagnostics.Spans, report.Diagnostics.Logs, report.Diagnostics.FailedSpans)
 	}
 	if len(report.ReusedStages) > 0 {
 		fmt.Fprintf(&b, "- reused_stages: `%s`\n", strings.Join(report.ReusedStages, ","))
