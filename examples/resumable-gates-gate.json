@@ -1,0 +1,7 @@
+{
+  "version": "patchline.resumable-gates-gate/v1",
+  "claim": "Patchline gates are resumable: when a long public-repository sweep is interrupted, the completed per-repository analyses are preserved and a resume run picks up exactly where it left off rather than recomputing everything. The worker simulates an interruption partway through a corpus, persists a completion marker for each finished repository, and then resumes; the resume run skips every already-completed repository, processes only the remainder, and ends with the full corpus complete. The gate proves that the interrupted run completes a strict prefix, that the resume run recomputes none of the preserved work, and that the union is the whole corpus exactly once.",
+  "real_repo": "patchline (self): corpus completion markers preserved across an interruption",
+  "repos": ["repo-a", "repo-b", "repo-c", "repo-d", "repo-e"],
+  "interrupt_after": 2
+}

@@ -313,6 +313,8 @@ Run `make incremental-cache-gate` to verify **incremental analysis caching** key
 
 Run `make parallel-corpus-gate` to run a public corpus concurrently with **deterministic output ordering** and per-repo **failure isolation** — results collate by repo identity despite out-of-order completion, and one failing repo never aborts the rest; see [docs/parallel-corpus.md](docs/parallel-corpus.md).
 
+Run `make resumable-gates-gate` to verify **resumable** gates — an **interrupt**ed corpus sweep preserves completed analyses, and a resume run recomputes none of them while finishing the remainder, so every repo is processed exactly once; see [docs/resumable-gates.md](docs/resumable-gates.md).
+
 Add `--redact` to write `analysis-bundle/` copies with stable redaction tokens for identifiers, literals, customer-like strings, and secret-like values while preserving joins and existing artifact hashes.
 
 Add `--ci` to write `ci/summary.md` plus upload snippets and code-quality artifacts for GitHub Actions, GitLab CI, and Bitbucket Pipelines: SARIF under `analysis-bundle/summary.sarif`, GitLab `ci/gl-code-quality-report.json`, and Bitbucket `ci/bitbucket-code-insights.json`.
