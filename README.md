@@ -347,6 +347,8 @@ Run `make proof-hole-graph-gate` to compute the **minimum-cost** evidence set th
 
 Run `make pattern-mining-gate` to mine recurring migration **failure mode**s across repositories — a mode seen in many repos becomes a **recurring pattern** ranked by prevalence while a one-off incident is excluded; see [docs/pattern-mining.md](docs/pattern-mining.md).
 
+Run `make explainable-ranking-gate` to produce an **explainable ranking** that decomposes each score into per-signal contributions — removing the dominant signal flips the ranking, proving the cited factor was **load-bearing**; see [docs/explainable-ranking.md](docs/explainable-ranking.md).
+
 Add `--redact` to write `analysis-bundle/` copies with stable redaction tokens for identifiers, literals, customer-like strings, and secret-like values while preserving joins and existing artifact hashes.
 
 Add `--ci` to write `ci/summary.md` plus upload snippets and code-quality artifacts for GitHub Actions, GitLab CI, and Bitbucket Pipelines: SARIF under `analysis-bundle/summary.sarif`, GitLab `ci/gl-code-quality-report.json`, and Bitbucket `ci/bitbucket-code-insights.json`.

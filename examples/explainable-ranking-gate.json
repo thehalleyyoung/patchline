@@ -1,0 +1,11 @@
+{
+  "version": "patchline.explainable-ranking-gate/v1",
+  "claim": "Patchline produces explainable ranking reports that decompose each risk's score into the weighted contribution of every signal, so that a reviewer can see exactly why one finding outranks another and can verify the explanation is faithful by removing a signal and watching the ranking change. The worker scores each item as the weighted sum of its signals, ranks the items, attributes the score to per-signal contributions that sum back to the total, and re-ranks with the dominant signal removed to demonstrate it was load-bearing. The gate proves the top item is correct, the per-signal contributions sum to the score, and removing the dominant signal flips the ranking.",
+  "real_repo": "patchline (self): explainable weighted ranking over signals",
+  "weights": {"blast_radius": 0.5, "lock_risk": 0.3, "reversibility": 0.2},
+  "dominant_signal": "blast_radius",
+  "items": [
+    {"id": "X", "signals": {"blast_radius": 0.9, "lock_risk": 0.2, "reversibility": 0.1}},
+    {"id": "Y", "signals": {"blast_radius": 0.1, "lock_risk": 0.9, "reversibility": 0.9}}
+  ]
+}
