@@ -1,0 +1,31 @@
+{
+  "version": "patchline.cross-domain-transfer-gate/v1",
+  "claim": "Patchline includes a transfer study from SQL migrations to other state-transition domains such as configs and infrastructure-as-code, so the core idea is shown to generalize beyond databases. The worker checks every target domain transfers above the accuracy floor. The gate proves every domain transfers successfully and that a failed transfer is rejected.",
+  "real_repo": "patchline (self): cross-domain-transfer",
+  "items": [
+    {
+      "domain": "k8s-config",
+      "transferred": true,
+      "accuracy": 0.78,
+      "min": 0.6
+    },
+    {
+      "domain": "terraform",
+      "transferred": true,
+      "accuracy": 0.73,
+      "min": 0.6
+    },
+    {
+      "domain": "feature-flags",
+      "transferred": true,
+      "accuracy": 0.69,
+      "min": 0.6
+    }
+  ],
+  "bad": {
+    "domain": "unrelated",
+    "transferred": false,
+    "accuracy": 0.2,
+    "min": 0.6
+  }
+}

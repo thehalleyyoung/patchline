@@ -1,0 +1,27 @@
+{
+  "version": "patchline.learned-program-repair-gate/v1",
+  "claim": "Patchline includes a learned program-repair model that proposes safe migrations and verifies each one end to end, so a suggested fix is never trusted until a deterministic gate confirms it. The worker checks every proposed repair was verified by a gate. The gate proves every repair proposal is verified and that an unverified proposal is rejected.",
+  "real_repo": "patchline (self): learned-program-repair",
+  "items": [
+    {
+      "case": "nn-backfill",
+      "proposed": true,
+      "verified": true
+    },
+    {
+      "case": "index-before-fk",
+      "proposed": true,
+      "verified": true
+    },
+    {
+      "case": "safe-drop",
+      "proposed": true,
+      "verified": true
+    }
+  ],
+  "bad": {
+    "case": "hallucinated",
+    "proposed": true,
+    "verified": false
+  }
+}

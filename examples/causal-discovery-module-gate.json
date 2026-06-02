@@ -1,0 +1,27 @@
+{
+  "version": "patchline.causal-discovery-module-gate/v1",
+  "claim": "Patchline adds a causal-discovery module inferring which schema patterns cause incidents from observational data, so risk attribution rests on causal evidence rather than mere correlation. The worker checks every inferred causal edge carries supporting evidence. The gate proves every causal edge is evidence-backed and that a spurious correlation is rejected.",
+  "real_repo": "patchline (self): causal-discovery-module",
+  "items": [
+    {
+      "pattern": "not-null-no-default",
+      "incident": "deploy-failure",
+      "causal_evidence": "intervention-study-7"
+    },
+    {
+      "pattern": "long-lock",
+      "incident": "timeout-storm",
+      "causal_evidence": "ab-lock-2026"
+    },
+    {
+      "pattern": "unindexed-fk",
+      "incident": "slow-query",
+      "causal_evidence": "explain-plan-12"
+    }
+  ],
+  "bad": {
+    "pattern": "friday-deploys",
+    "incident": "any",
+    "causal_evidence": ""
+  }
+}

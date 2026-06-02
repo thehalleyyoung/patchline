@@ -1,0 +1,27 @@
+{
+  "version": "patchline.reviewer-action-model-gate/v1",
+  "claim": "Patchline adds a theory-of-mind reviewer model that predicts which findings a given reviewer will act on, so findings can be ordered to match a reviewer's behavior. The worker checks the model's prediction matches the observed action on every case. The gate proves predictions match observed actions and that a mispredicted case is rejected.",
+  "real_repo": "patchline (self): reviewer-action-model",
+  "items": [
+    {
+      "finding": "f1",
+      "predicted": "act",
+      "actual": "act"
+    },
+    {
+      "finding": "f2",
+      "predicted": "ignore",
+      "actual": "ignore"
+    },
+    {
+      "finding": "f3",
+      "predicted": "act",
+      "actual": "act"
+    }
+  ],
+  "bad": {
+    "finding": "f9",
+    "predicted": "act",
+    "actual": "ignore"
+  }
+}

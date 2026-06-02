@@ -1,0 +1,31 @@
+{
+  "version": "patchline.replication-leaderboard-gate/v1",
+  "claim": "Patchline adds a research-replication leaderboard inviting external teams to beat the published numbers, so the claims are openly contestable on a shared scoreboard. The worker checks every leaderboard entry reproduced the protocol and scored at or above the published baseline. The gate proves every entry is reproduced and valid and that an unreproduced entry is rejected.",
+  "real_repo": "patchline (self): replication-leaderboard",
+  "items": [
+    {
+      "team": "lab-a",
+      "reproduced": true,
+      "score": 0.96,
+      "baseline": 0.95
+    },
+    {
+      "team": "lab-b",
+      "reproduced": true,
+      "score": 0.95,
+      "baseline": 0.95
+    },
+    {
+      "team": "lab-c",
+      "reproduced": true,
+      "score": 0.97,
+      "baseline": 0.95
+    }
+  ],
+  "bad": {
+    "team": "claim-only",
+    "reproduced": false,
+    "score": 0.99,
+    "baseline": 0.95
+  }
+}

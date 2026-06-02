@@ -1,0 +1,27 @@
+{
+  "version": "patchline.backfill-formal-synthesis-gate/v1",
+  "claim": "Patchline adds a formal-synthesis engine generating provably-correct backfills from invariants at scale, so a backfill is constructed to establish its invariant rather than hand-written and hoped-for. The worker checks every synthesized backfill establishes its invariant. The gate proves every synthesized backfill establishes the invariant and that a no-op backfill is rejected.",
+  "real_repo": "patchline (self): backfill-formal-synthesis",
+  "items": [
+    {
+      "invariant": "amount>=0",
+      "synthesized": true,
+      "establishes_invariant": true
+    },
+    {
+      "invariant": "status in set",
+      "synthesized": true,
+      "establishes_invariant": true
+    },
+    {
+      "invariant": "fk not null",
+      "synthesized": true,
+      "establishes_invariant": true
+    }
+  ],
+  "bad": {
+    "invariant": "amount>=0",
+    "synthesized": true,
+    "establishes_invariant": false
+  }
+}

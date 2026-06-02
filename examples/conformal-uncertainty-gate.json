@@ -1,0 +1,27 @@
+{
+  "version": "patchline.conformal-uncertainty-gate/v1",
+  "claim": "Patchline adds an uncertainty-quantification layer with conformal-prediction coverage guarantees, so its prediction sets contain the truth at the promised rate. The worker checks every prediction set's empirical coverage meets the target. The gate proves every set meets coverage and that an undercovering set is rejected.",
+  "real_repo": "patchline (self): conformal-uncertainty",
+  "items": [
+    {
+      "set": "hazard-class",
+      "coverage": 0.93,
+      "target": 0.9
+    },
+    {
+      "set": "severity",
+      "coverage": 0.91,
+      "target": 0.9
+    },
+    {
+      "set": "repair-kind",
+      "coverage": 0.95,
+      "target": 0.9
+    }
+  ],
+  "bad": {
+    "set": "overconfident",
+    "coverage": 0.6,
+    "target": 0.9
+  }
+}

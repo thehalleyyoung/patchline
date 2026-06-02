@@ -1,0 +1,27 @@
+{
+  "version": "patchline.neurosymbolic-explanations-gate/v1",
+  "claim": "Patchline adds a neurosymbolic explanation generator producing proofs a developer can read and trust, so each finding comes with a human-readable, machine-checked justification. The worker checks every explanation is both readable and machine-checked. The gate proves every explanation is readable and checked and that an unproven explanation is rejected.",
+  "real_repo": "patchline (self): neurosymbolic-explanations",
+  "items": [
+    {
+      "finding": "nn-no-default",
+      "proof_readable": true,
+      "machine_checked": true
+    },
+    {
+      "finding": "destructive-drop",
+      "proof_readable": true,
+      "machine_checked": true
+    },
+    {
+      "finding": "unindexed-fk",
+      "proof_readable": true,
+      "machine_checked": true
+    }
+  ],
+  "bad": {
+    "finding": "opaque",
+    "proof_readable": false,
+    "machine_checked": false
+  }
+}

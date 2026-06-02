@@ -1,0 +1,27 @@
+{
+  "version": "patchline.active-learning-loop-gate/v1",
+  "claim": "Patchline runs an active-learning loop that queries reviewers only on maximally-informative cases, so human labeling effort concentrates where it changes the model most. The worker checks every queried case clears the informativeness threshold. The gate proves every queried case is informative enough and that a low-information query is rejected.",
+  "real_repo": "patchline (self): active-learning-loop",
+  "items": [
+    {
+      "case": "ambiguous-lock",
+      "informativeness": 0.82,
+      "threshold": 0.5
+    },
+    {
+      "case": "borderline-drop",
+      "informativeness": 0.71,
+      "threshold": 0.5
+    },
+    {
+      "case": "novel-pattern",
+      "informativeness": 0.9,
+      "threshold": 0.5
+    }
+  ],
+  "bad": {
+    "case": "obvious",
+    "informativeness": 0.05,
+    "threshold": 0.5
+  }
+}

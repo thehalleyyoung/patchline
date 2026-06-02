@@ -1,0 +1,23 @@
+{
+  "version": "patchline.incident-simulation-env-gate/v1",
+  "claim": "Patchline adds a simulation environment generating synthetic incident timelines for counterfactual study, so 'what if this migration shipped' can be explored without a real outage. The worker checks every simulated timeline is internally valid. The gate proves every simulated timeline is valid and that a malformed timeline is rejected.",
+  "real_repo": "patchline (self): incident-simulation-env",
+  "items": [
+    {
+      "scenario": "lock-storm",
+      "timeline_valid": true
+    },
+    {
+      "scenario": "backfill-gap",
+      "timeline_valid": true
+    },
+    {
+      "scenario": "cutover-race",
+      "timeline_valid": true
+    }
+  ],
+  "bad": {
+    "scenario": "inconsistent",
+    "timeline_valid": false
+  }
+}

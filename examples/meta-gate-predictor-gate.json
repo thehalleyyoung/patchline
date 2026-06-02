@@ -1,0 +1,27 @@
+{
+  "version": "patchline.meta-gate-predictor-gate/v1",
+  "claim": "Patchline adds a meta-gate that learns to predict which gate will fire from cheap features, so expensive gates can be skipped when a cheap predictor is confident. The worker checks the meta-gate's prediction matches the actually-firing gate. The gate proves predictions match reality and that a mispredicted case is rejected.",
+  "real_repo": "patchline (self): meta-gate-predictor",
+  "items": [
+    {
+      "gate": "lock-duration",
+      "predicted": "fire",
+      "actual": "fire"
+    },
+    {
+      "gate": "index-coverage",
+      "predicted": "pass",
+      "actual": "pass"
+    },
+    {
+      "gate": "backfill",
+      "predicted": "fire",
+      "actual": "fire"
+    }
+  ],
+  "bad": {
+    "gate": "wrong",
+    "predicted": "pass",
+    "actual": "fire"
+  }
+}

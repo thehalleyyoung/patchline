@@ -1,0 +1,23 @@
+{
+  "version": "patchline.fm-assisted-extractor-gate/v1",
+  "claim": "Patchline adds a foundation-model-assisted extractor whose every extraction is verified deterministically, so the model's speed is gained without trusting its output blindly. The worker checks every extraction passed deterministic verification. The gate proves every extraction is deterministically verified and that an unverified extraction is rejected.",
+  "real_repo": "patchline (self): fm-assisted-extractor",
+  "items": [
+    {
+      "field": "table-name",
+      "verified_deterministic": true
+    },
+    {
+      "field": "column-type",
+      "verified_deterministic": true
+    },
+    {
+      "field": "constraint",
+      "verified_deterministic": true
+    }
+  ],
+  "bad": {
+    "field": "guessed",
+    "verified_deterministic": false
+  }
+}

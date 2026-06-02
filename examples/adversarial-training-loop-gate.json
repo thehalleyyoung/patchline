@@ -1,0 +1,27 @@
+{
+  "version": "patchline.adversarial-training-loop-gate/v1",
+  "claim": "Patchline adds an adversarial-training loop hardening the learned components against evasions, so each round leaves the model more robust than the last. The worker checks every training round both improved and remained robust. The gate proves every round hardens the model and that a robustness regression is rejected.",
+  "real_repo": "patchline (self): adversarial-training-loop",
+  "items": [
+    {
+      "round": 1,
+      "robust_after": true,
+      "improved": true
+    },
+    {
+      "round": 2,
+      "robust_after": true,
+      "improved": true
+    },
+    {
+      "round": 3,
+      "robust_after": true,
+      "improved": true
+    }
+  ],
+  "bad": {
+    "round": 4,
+    "robust_after": false,
+    "improved": false
+  }
+}

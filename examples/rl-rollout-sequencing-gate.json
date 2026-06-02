@@ -1,0 +1,31 @@
+{
+  "version": "patchline.rl-rollout-sequencing-gate/v1",
+  "claim": "Patchline adds a reinforcement-learning policy for safe rollout sequencing with a safety-constrained objective, so the learned ordering optimizes speed only within hard safety limits. The worker checks every rollout is safe and beats the baseline reward. The gate proves every rollout is safe and improved and that an unsafe rollout is rejected.",
+  "real_repo": "patchline (self): rl-rollout-sequencing",
+  "items": [
+    {
+      "rollout": "seq-a",
+      "safe": true,
+      "reward": 0.81,
+      "baseline": 0.5
+    },
+    {
+      "rollout": "seq-b",
+      "safe": true,
+      "reward": 0.74,
+      "baseline": 0.5
+    },
+    {
+      "rollout": "seq-c",
+      "safe": true,
+      "reward": 0.9,
+      "baseline": 0.5
+    }
+  ],
+  "bad": {
+    "rollout": "reckless",
+    "safe": false,
+    "reward": 0.99,
+    "baseline": 0.5
+  }
+}

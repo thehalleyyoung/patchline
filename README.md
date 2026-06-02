@@ -571,6 +571,26 @@ Run `make admin-analytics-dashboard-gate` for an admin dashboard tying findings 
 Run `make soc2-controls-map-gate` for a SOC2-style controls map where each **control** is automated, rejecting a manually-only control; see [docs/soc2-controls-map.md](docs/soc2-controls-map.md).
 Run `make break-glass-override-gate` for a **break-glass** migration-freeze workflow with full override provenance, rejecting an unlogged override; see [docs/break-glass-override.md](docs/break-glass-override.md).
 Run `make reproducibility-portal-gate` for a customer-facing portal exposing every verdict's **evidence chain**, rejecting a chain-less verdict; see [docs/reproducibility-portal.md](docs/reproducibility-portal.md).
+Run `make learned-program-repair-gate` for a learned program-repair model that proposes and **verifies** safe migrations, rejecting an unverified proposal; see [docs/learned-program-repair.md](docs/learned-program-repair.md).
+Run `make active-learning-loop-gate` for an active-learning loop querying reviewers only on maximally-**informative** cases, rejecting a low-information query; see [docs/active-learning-loop.md](docs/active-learning-loop.md).
+Run `make fm-assisted-extractor-gate` for a foundation-model extractor with **deterministic** verification of every extraction, rejecting an unverified one; see [docs/fm-assisted-extractor.md](docs/fm-assisted-extractor.md).
+Run `make causal-discovery-module-gate` for a **causal**-discovery module inferring incident-causing patterns, rejecting a spurious correlation; see [docs/causal-discovery-module.md](docs/causal-discovery-module.md).
+Run `make backfill-formal-synthesis-gate` for a formal-synthesis engine generating **provably-correct** backfills from invariants, rejecting a no-op backfill; see [docs/backfill-formal-synthesis.md](docs/backfill-formal-synthesis.md).
+Run `make multi-agent-debate-gate` for a multi-agent debate harness with a proven **tie-break** rule, rejecting an unresolved case; see [docs/multi-agent-debate.md](docs/multi-agent-debate.md).
+Run `make conformal-uncertainty-gate` for an uncertainty layer with conformal-prediction **coverage** guarantees, rejecting an undercovering set; see [docs/conformal-uncertainty.md](docs/conformal-uncertainty.md).
+Run `make cross-domain-transfer-gate` for a transfer study to other **state-transition** domains, rejecting a failed transfer; see [docs/cross-domain-transfer.md](docs/cross-domain-transfer.md).
+Run `make rl-rollout-sequencing-gate` for an RL rollout-sequencing policy with a **safety-constrained** objective, rejecting an unsafe rollout; see [docs/rl-rollout-sequencing.md](docs/rl-rollout-sequencing.md).
+Run `make neurosymbolic-explanations-gate` for a neurosymbolic explanation generator producing readable, checked **proof**s, rejecting an unproven explanation; see [docs/neurosymbolic-explanations.md](docs/neurosymbolic-explanations.md).
+Run `make hazard-benchmark-generator-gate` for an automated generator synthesizing **novel** valid hazards, rejecting an invalid or duplicate one; see [docs/hazard-benchmark-generator.md](docs/hazard-benchmark-generator.md).
+Run `make reviewer-action-model-gate` for a reviewer model that **predict**s which findings a reviewer acts on, rejecting a mispredicted case; see [docs/reviewer-action-model.md](docs/reviewer-action-model.md).
+Run `make continual-learning-eval-gate` for a continual-learning evaluation guarding against catastrophic **forgetting**, rejecting a forgetting release; see [docs/continual-learning-eval.md](docs/continual-learning-eval.md).
+Run `make data-valuation-analysis-gate` for a data-**valuation** analysis keeping only positive-value examples, rejecting a negative-value one; see [docs/data-valuation-analysis.md](docs/data-valuation-analysis.md).
+Run `make adversarial-training-loop-gate` for an adversarial-training loop **hardening** learned components, rejecting a robustness regression; see [docs/adversarial-training-loop.md](docs/adversarial-training-loop.md).
+Run `make interpretability-probe-gate` for a mechanistic-**interpretability** probe explaining internal features, rejecting an opaque feature; see [docs/interpretability-probe.md](docs/interpretability-probe.md).
+Run `make cross-lingual-comments-gate` for cross-lingual comment analysis on **non-English** codebases, rejecting a failed-language extraction; see [docs/cross-lingual-comments.md](docs/cross-lingual-comments.md).
+Run `make incident-simulation-env-gate` for a simulation environment generating **counterfactual** incident timelines, rejecting a malformed timeline; see [docs/incident-simulation-env.md](docs/incident-simulation-env.md).
+Run `make meta-gate-predictor-gate` for a meta-gate that **predict**s which gate fires from cheap features, rejecting a mispredicted case; see [docs/meta-gate-predictor.md](docs/meta-gate-predictor.md).
+Run `make replication-leaderboard-gate` for a research-replication **leaderboard** of external reproductions, rejecting an unreproduced entry; see [docs/replication-leaderboard.md](docs/replication-leaderboard.md).
 
 </details>
 

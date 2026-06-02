@@ -1,0 +1,27 @@
+{
+  "version": "patchline.cross-lingual-comments-gate/v1",
+  "claim": "Patchline adds cross-lingual code-comment analysis improving extraction on non-English codebases, so intent encoded in non-English comments is not lost. The worker checks extraction succeeds for every supported language. The gate proves extraction works across languages and that a failed-language extraction is rejected.",
+  "real_repo": "patchline (self): cross-lingual-comments",
+  "items": [
+    {
+      "lang": "zh",
+      "extraction_ok": true
+    },
+    {
+      "lang": "ja",
+      "extraction_ok": true
+    },
+    {
+      "lang": "es",
+      "extraction_ok": true
+    },
+    {
+      "lang": "de",
+      "extraction_ok": true
+    }
+  ],
+  "bad": {
+    "lang": "unsupported",
+    "extraction_ok": false
+  }
+}

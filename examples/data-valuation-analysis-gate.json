@@ -1,0 +1,23 @@
+{
+  "version": "patchline.data-valuation-analysis-gate/v1",
+  "claim": "Patchline adds a data-valuation analysis identifying which corpus examples most improve accuracy, so curation effort targets the highest-value data. The worker checks every retained example has positive valuation. The gate proves every retained example adds value and that a negative-value example is rejected.",
+  "real_repo": "patchline (self): data-valuation-analysis",
+  "items": [
+    {
+      "example": "ex-rename-loss",
+      "shapley": 0.031
+    },
+    {
+      "example": "ex-lock-storm",
+      "shapley": 0.024
+    },
+    {
+      "example": "ex-fk-index",
+      "shapley": 0.018
+    }
+  ],
+  "bad": {
+    "example": "ex-noise",
+    "shapley": -0.02
+  }
+}

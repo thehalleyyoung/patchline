@@ -1,0 +1,27 @@
+{
+  "version": "patchline.multi-agent-debate-gate/v1",
+  "claim": "Patchline adds a multi-agent debate harness for ambiguous verdicts with a proven tie-break rule, so contested cases resolve deterministically rather than by coin flip. The worker checks every ambiguous case was resolved with the tie-break rule applied. The gate proves every ambiguous case resolves deterministically and that an unresolved case is rejected.",
+  "real_repo": "patchline (self): multi-agent-debate",
+  "items": [
+    {
+      "case": "lock-vs-safe",
+      "resolved": true,
+      "tiebreak_applied": true
+    },
+    {
+      "case": "drop-vs-deprecate",
+      "resolved": true,
+      "tiebreak_applied": true
+    },
+    {
+      "case": "type-narrowing",
+      "resolved": true,
+      "tiebreak_applied": true
+    }
+  ],
+  "bad": {
+    "case": "deadlock",
+    "resolved": false,
+    "tiebreak_applied": false
+  }
+}

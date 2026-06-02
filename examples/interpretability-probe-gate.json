@@ -1,0 +1,23 @@
+{
+  "version": "patchline.interpretability-probe-gate/v1",
+  "claim": "Patchline adds a mechanistic-interpretability probe explaining the learned risk model's internal features, so the model's reasoning is inspectable rather than a black box. The worker checks every probed feature has a recorded explanation. The gate proves every internal feature is explained and that an opaque feature is rejected.",
+  "real_repo": "patchline (self): interpretability-probe",
+  "items": [
+    {
+      "feature": "lock-duration-neuron",
+      "explained": true
+    },
+    {
+      "feature": "null-default-head",
+      "explained": true
+    },
+    {
+      "feature": "fk-index-circuit",
+      "explained": true
+    }
+  ],
+  "bad": {
+    "feature": "unknown-7",
+    "explained": false
+  }
+}

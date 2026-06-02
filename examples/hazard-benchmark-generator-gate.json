@@ -1,0 +1,27 @@
+{
+  "version": "patchline.hazard-benchmark-generator-gate/v1",
+  "claim": "Patchline adds an automated benchmark-generator that synthesizes novel hazards beyond the existing taxonomy, so the benchmark keeps growing in difficulty rather than memorizing fixed cases. The worker checks every generated hazard is novel and valid. The gate proves every generated hazard is novel and valid and that an invalid or duplicate hazard is rejected.",
+  "real_repo": "patchline (self): hazard-benchmark-generator",
+  "items": [
+    {
+      "hazard": "chained-rename-loss",
+      "novel": true,
+      "valid": true
+    },
+    {
+      "hazard": "partial-unique-race",
+      "novel": true,
+      "valid": true
+    },
+    {
+      "hazard": "enum-shrink-orphan",
+      "novel": true,
+      "valid": true
+    }
+  ],
+  "bad": {
+    "hazard": "malformed",
+    "novel": false,
+    "valid": false
+  }
+}
