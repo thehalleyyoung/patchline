@@ -71,6 +71,8 @@ Run `repo offline --analysis <analysis-dir>` in restricted environments to valid
 
 Run `plugins list` or `plugins probe <path>` to inspect the deterministic parser, fact extractor, linker, ranker, proposal generator, compare check, and report renderer interfaces described in [docs/plugin-interfaces.md](docs/plugin-interfaces.md).
 
+Run `golden-fixture generate --github owner/repo --ref <sha> --subpath <path> --out <dir>` to turn a real-repo slice into a tiny deterministic Go test without vendoring the full repository; see [docs/golden-fixtures.md](docs/golden-fixtures.md).
+
 Add `--redact` to write `analysis-bundle/` copies with stable redaction tokens for identifiers, literals, customer-like strings, and secret-like values while preserving joins and existing artifact hashes.
 
 Add `--ci` to write `ci/summary.md` plus upload snippets and code-quality artifacts for GitHub Actions, GitLab CI, and Bitbucket Pipelines: SARIF under `analysis-bundle/summary.sarif`, GitLab `ci/gl-code-quality-report.json`, and Bitbucket `ci/bitbucket-code-insights.json`.

@@ -30,6 +30,7 @@ import (
 	"github.com/thehalleyyoung/patchline/internal/effects"
 	"github.com/thehalleyyoung/patchline/internal/evidence"
 	"github.com/thehalleyyoung/patchline/internal/gate"
+	"github.com/thehalleyyoung/patchline/internal/goldenfixture"
 	"github.com/thehalleyyoung/patchline/internal/historical"
 	"github.com/thehalleyyoung/patchline/internal/intake"
 	"github.com/thehalleyyoung/patchline/internal/invariant"
@@ -99,6 +100,8 @@ func run(args []string) error {
 		return repoCommand(args[1:])
 	case "plugins":
 		return pluginsCommand(args[1:])
+	case "golden-fixture":
+		return goldenFixtureCommand(args[1:])
 	case "semantics-contract":
 		return semanticsContract(hasFlag(args[1:], "--json"))
 	case "semantics-audit":
@@ -413,6 +416,7 @@ Usage:
   patchline quickstart --github owner/repo --subpath path [--ref ref] [--out dir] [--json]
   patchline plugins list [--json]
   patchline plugins probe [<path>|--github owner/repo] [--ref ref] [--subpath path] [--out dir] [--download-dir dir] [--json]
+  patchline golden-fixture generate [<path>|--github owner/repo] [--ref ref] [--subpath path] --out dir [--max-files n] [--json]
   patchline repo doctor [<path>|--github owner/repo] [--ref ref] [--subpath path] [--out dir] [--download-dir dir] [--json]
   patchline repo fetch <owner/repo|github-url|path|archive> [--ref ref] [--subpath path] [--out dir] [--download-dir dir] [--json]
   patchline repo analyze [<path>|--github owner/repo] [--ref ref] [--subpath path] [--stages inventory,baseline,propose,compare,deep] [--proposal-kind tests|guards|instrumentation|repair|all] [--budget files=N,lines=N,tokens=N,changes=N] [--ci] [--redact] [--resume] [--no-llm] [--llm-command cmd] [--prompt-without-facts] [--out dir] [--json]
@@ -1891,6 +1895,70 @@ func pluginsProbe(args []string) error {
 		return writeJSON(os.Stdout, report)
 	}
 	fmt.Printf("plugins probe input=%s plugins=%d files=%d risks=%d generated=%d checks=%d rendered=%d hash=%s\n", report.Input, len(report.Catalog.Plugins), report.Summary.FilesScanned, report.Summary.RankedRisks, report.Summary.GeneratedFiles, report.Summary.GeneratedChecks, report.Summary.RenderedReports, report.Hash)
+	return nil
+}
+
+func goldenFixtureCommand(args []string) error {
+	if len(args) == 0 {
+		return errors.New("usage: patchline golden-fixture generate [<path>|--github owner/repo] --out dir [--json]")
+	}
+	switch args[0] {
+	case "generate":
+		return goldenFixtureGenerate(args[1:])
+	default:
+		return fmt.Errorf("unknown golden-fixture subcommand %q", args[0])
+	}
+}
+
+func goldenFixtureGenerate(args []string) error {
+	fs := flag.NewFlagSet("golden-fixture generate", flag.ContinueOnError)
+	fs.SetOutput(ioDiscard{})
+	githubRepo := fs.String("github", "", "GitHub owner/repo")
+	ref := fs.String("ref", "", "GitHub ref")
+	subpath := fs.String("subpath", "", "source subpath")
+	outPath := fs.String("out", "", "output directory")
+	downloadDir := fs.String("download-dir", "", "download cache directory")
+	packageName := fs.String("package", "goldenfixture", "generated Go package name")
+	testName := fs.String("test-name", "", "generated test function name")
+	maxFiles := fs.Int("max-files", 3, "maximum embedded source files")
+	maxFileBytes := fs.Int64("max-file-bytes", 24*1024, "maximum bytes per embedded file")
+	maxTotalBytes := fs.Int64("max-total-bytes", 48*1024, "maximum total embedded source bytes")
+	minRisks := fs.Int("min-ranked-risks", 1, "minimum ranked risks the generated fixture must preserve")
+	jsonOut := fs.Bool("json", false, "print JSON")
+	positional, flagArgs, err := onePositionalWithFlags(args, map[string]bool{"--json": true})
+	if err != nil {
+		return err
+	}
+	if err := fs.Parse(flagArgs); err != nil {
+		return err
+	}
+	if *githubRepo == "" && positional == "" {
+		return errors.New("usage: patchline golden-fixture generate [<path>|--github owner/repo] --out dir [--json]")
+	}
+	if *outPath == "" {
+		return errors.New("patchline golden-fixture generate requires --out")
+	}
+	report, err := goldenfixture.Generate(context.Background(), goldenfixture.Options{
+		Path:           positional,
+		GitHub:         *githubRepo,
+		Ref:            *ref,
+		Subpath:        *subpath,
+		DownloadDir:    *downloadDir,
+		OutDir:         *outPath,
+		PackageName:    *packageName,
+		TestName:       *testName,
+		MaxFiles:       *maxFiles,
+		MaxFileBytes:   *maxFileBytes,
+		MaxTotalBytes:  *maxTotalBytes,
+		MinRankedRisks: *minRisks,
+	})
+	if err != nil {
+		return err
+	}
+	if *jsonOut {
+		return writeJSON(os.Stdout, report)
+	}
+	fmt.Printf("golden fixture id=%s selected=%d/%d risks=%d test=%s hash=%s\n", report.ID, report.Summary.SelectedFiles, report.Summary.OriginalFilesScanned, report.Expectations.RankedRisks, report.Outputs["test"], report.Hash)
 	return nil
 }
 

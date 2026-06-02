@@ -54,6 +54,26 @@ func TestPluginsListAndProbeCommands(t *testing.T) {
 	}
 }
 
+func TestGoldenFixtureGenerateCommand(t *testing.T) {
+	root := t.TempDir()
+	writeMainTestFile(t, root, "db/migrate/001_delete_events.sql", "DELETE FROM account_events;\n")
+	writeMainTestFile(t, root, "db/migrate/002_backfill.sql", "UPDATE accounts SET status = 'active';\n")
+	out := filepath.Join(t.TempDir(), "golden")
+	if err := run([]string{"golden-fixture", "generate", root, "--out", out, "--max-files", "2", "--json"}); err != nil {
+		t.Fatalf("golden fixture generation failed: %v", err)
+	}
+	for _, rel := range []string{"generated_golden_test.go", "go.mod", "golden-fixture.json", "golden-fixture.md"} {
+		if stat, err := os.Stat(filepath.Join(out, rel)); err != nil || stat.Size() == 0 {
+			t.Fatalf("expected %s to be written, stat=%#v err=%v", rel, stat, err)
+		}
+	}
+	cmd := exec.Command("go", "test", ".")
+	cmd.Dir = out
+	if output, err := cmd.CombinedOutput(); err != nil {
+		t.Fatalf("generated fixture test failed: %v\n%s", err, string(output))
+	}
+}
+
 func TestOnePositionalWithFlagsAllowsFlagsAfterPath(t *testing.T) {
 	pos, flags, err := onePositionalWithFlags([]string{"django/django", "--subpath", "django/contrib/auth/migrations", "--json"}, map[string]bool{"--json": true})
 	if err != nil {
