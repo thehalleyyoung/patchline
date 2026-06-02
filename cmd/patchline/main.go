@@ -14,6 +14,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"regexp"
+	"runtime"
 	"sort"
 	"strconv"
 	"strings"
@@ -222,6 +223,11 @@ func run(args []string) error {
 			return errors.New("usage: patchline verify-artifact <attestation.json> --artifact artifact.json [--json]")
 		}
 		return verifyArtifact(args[1], args[2:], hasFlag(args[2:], "--json"))
+	case "supply-chain":
+		if len(args) < 2 || args[1] != "provenance" {
+			return errors.New("usage: patchline supply-chain provenance --artifact kind=path [--subject subject] [--source ref] [--command command] [--out provenance.json] [--json]")
+		}
+		return supplyChainProvenance(args[2:], hasFlag(args[2:], "--json"))
 	case "generate-sql":
 		if len(args) < 2 {
 			return errors.New("usage: patchline generate-sql <manifest.json> [--json]")
@@ -9228,6 +9234,292 @@ func verifyArtifact(attestationPath string, args []string, jsonOut bool) error {
 		return verifyErr
 	}
 	return nil
+}
+
+type repeatFlag []string
+
+func (r *repeatFlag) String() string {
+	return strings.Join(*r, ",")
+}
+
+func (r *repeatFlag) Set(value string) error {
+	if strings.TrimSpace(value) == "" {
+		return errors.New("empty repeated flag value")
+	}
+	*r = append(*r, value)
+	return nil
+}
+
+type supplyChainProvenanceReport struct {
+	Version      string                  `json:"version"`
+	Subject      string                  `json:"subject"`
+	Tool         supplyChainTool         `json:"tool"`
+	SourceRefs   []string                `json:"source_refs,omitempty"`
+	Commands     []string                `json:"commands,omitempty"`
+	Artifacts    []supplyChainArtifact   `json:"artifacts"`
+	Summary      supplyChainSummary      `json:"summary"`
+	Verification supplyChainVerification `json:"verification"`
+	ReportHash   string                  `json:"report_hash"`
+}
+
+type supplyChainTool struct {
+	Name      string `json:"name"`
+	GoOS      string `json:"goos"`
+	GoArch    string `json:"goarch"`
+	GoVersion string `json:"go_version"`
+	GitCommit string `json:"git_commit,omitempty"`
+}
+
+type supplyChainArtifact struct {
+	Kind      string `json:"kind"`
+	Path      string `json:"path"`
+	SHA256    string `json:"sha256"`
+	Bytes     int64  `json:"bytes"`
+	Files     int    `json:"files"`
+	Directory bool   `json:"directory,omitempty"`
+}
+
+type supplyChainSummary struct {
+	Artifacts             int   `json:"artifacts"`
+	Binaries              int   `json:"binaries"`
+	ReleaseArchives       int   `json:"release_archives"`
+	ExperimentArtifacts   int   `json:"generated_experiment_artifacts"`
+	PublicCorpusDownloads int   `json:"public_corpus_downloads"`
+	Directories           int   `json:"directories"`
+	Bytes                 int64 `json:"bytes"`
+}
+
+type supplyChainVerification struct {
+	RequiredKinds []string `json:"required_kinds"`
+	MissingKinds  []string `json:"missing_kinds,omitempty"`
+	Complete      bool     `json:"complete"`
+}
+
+func supplyChainProvenance(args []string, jsonOut bool) error {
+	fs := flag.NewFlagSet("supply-chain provenance", flag.ContinueOnError)
+	fs.SetOutput(io.Discard)
+	subject := fs.String("subject", "patchline-supply-chain", "subject name")
+	outPath := fs.String("out", "", "path to write provenance JSON")
+	fs.Bool("json", false, "emit JSON")
+	var artifacts repeatFlag
+	var sources repeatFlag
+	var commands repeatFlag
+	fs.Var(&artifacts, "artifact", "artifact as kind=path; repeatable")
+	fs.Var(&sources, "source", "source ref or material descriptor; repeatable")
+	fs.Var(&commands, "command", "reproduction/build command; repeatable")
+	if err := fs.Parse(args); err != nil {
+		return err
+	}
+	if len(artifacts) == 0 {
+		return errors.New("supply-chain provenance requires at least one --artifact kind=path")
+	}
+	report := supplyChainProvenanceReport{
+		Version:    "patchline.supply-chain-provenance/v1",
+		Subject:    *subject,
+		SourceRefs: sortedNonEmptyStrings(sources),
+		Commands:   sortedNonEmptyStrings(commands),
+		Tool: supplyChainTool{
+			Name:      "patchline",
+			GoOS:      runtime.GOOS,
+			GoArch:    runtime.GOARCH,
+			GoVersion: runtime.Version(),
+			GitCommit: currentGitCommit(),
+		},
+	}
+	for _, spec := range artifacts {
+		artifact, err := buildSupplyChainArtifact(spec)
+		if err != nil {
+			return err
+		}
+		report.Artifacts = append(report.Artifacts, artifact)
+	}
+	sort.Slice(report.Artifacts, func(i, j int) bool {
+		if report.Artifacts[i].Kind != report.Artifacts[j].Kind {
+			return report.Artifacts[i].Kind < report.Artifacts[j].Kind
+		}
+		return report.Artifacts[i].Path < report.Artifacts[j].Path
+	})
+	report.Summary = summarizeSupplyChainArtifacts(report.Artifacts)
+	report.Verification = verifySupplyChainKinds(report.Artifacts)
+	report.ReportHash = canonical.Hash(struct {
+		Version      string                  `json:"version"`
+		Subject      string                  `json:"subject"`
+		Tool         supplyChainTool         `json:"tool"`
+		SourceRefs   []string                `json:"source_refs,omitempty"`
+		Commands     []string                `json:"commands,omitempty"`
+		Artifacts    []supplyChainArtifact   `json:"artifacts"`
+		Summary      supplyChainSummary      `json:"summary"`
+		Verification supplyChainVerification `json:"verification"`
+	}{
+		Version:      report.Version,
+		Subject:      report.Subject,
+		Tool:         report.Tool,
+		SourceRefs:   report.SourceRefs,
+		Commands:     report.Commands,
+		Artifacts:    report.Artifacts,
+		Summary:      report.Summary,
+		Verification: report.Verification,
+	})
+	if *outPath != "" {
+		if err := os.MkdirAll(filepath.Dir(*outPath), 0o755); err != nil {
+			return err
+		}
+		file, err := os.Create(*outPath)
+		if err != nil {
+			return err
+		}
+		if err := writeJSON(file, report); err != nil {
+			file.Close()
+			return err
+		}
+		if err := file.Close(); err != nil {
+			return err
+		}
+	}
+	if jsonOut || *outPath == "" {
+		return writeJSON(os.Stdout, report)
+	}
+	fmt.Printf("supply-chain provenance wrote %s artifacts=%d complete=%t hash=%s\n", *outPath, report.Summary.Artifacts, report.Verification.Complete, report.ReportHash)
+	return nil
+}
+
+func buildSupplyChainArtifact(spec string) (supplyChainArtifact, error) {
+	kind, path, ok := strings.Cut(spec, "=")
+	kind = strings.TrimSpace(kind)
+	path = strings.TrimSpace(path)
+	if !ok || kind == "" || path == "" {
+		return supplyChainArtifact{}, fmt.Errorf("invalid artifact %q: expected kind=path", spec)
+	}
+	info, err := os.Stat(path)
+	if err != nil {
+		return supplyChainArtifact{}, err
+	}
+	hash, bytes, files, err := artifactDigest(path, info)
+	if err != nil {
+		return supplyChainArtifact{}, err
+	}
+	return supplyChainArtifact{
+		Kind:      kind,
+		Path:      filepath.ToSlash(path),
+		SHA256:    "sha256:" + hash,
+		Bytes:     bytes,
+		Files:     files,
+		Directory: info.IsDir(),
+	}, nil
+}
+
+func artifactDigest(path string, info os.FileInfo) (string, int64, int, error) {
+	if !info.IsDir() {
+		hash, err := fileSHA256(path)
+		if err != nil {
+			return "", 0, 0, err
+		}
+		return hash, info.Size(), 1, nil
+	}
+	type row struct {
+		Rel    string
+		SHA256 string
+		Bytes  int64
+	}
+	var rows []row
+	var total int64
+	if err := filepath.WalkDir(path, func(item string, entry fs.DirEntry, err error) error {
+		if err != nil {
+			return err
+		}
+		if entry.IsDir() {
+			return nil
+		}
+		info, err := entry.Info()
+		if err != nil {
+			return err
+		}
+		hash, err := fileSHA256(item)
+		if err != nil {
+			return err
+		}
+		rel, err := filepath.Rel(path, item)
+		if err != nil {
+			return err
+		}
+		rows = append(rows, row{Rel: filepath.ToSlash(rel), SHA256: hash, Bytes: info.Size()})
+		total += info.Size()
+		return nil
+	}); err != nil {
+		return "", 0, 0, err
+	}
+	sort.Slice(rows, func(i, j int) bool { return rows[i].Rel < rows[j].Rel })
+	return canonical.Hash(rows), total, len(rows), nil
+}
+
+func fileSHA256(path string) (string, error) {
+	file, err := os.Open(path)
+	if err != nil {
+		return "", err
+	}
+	defer file.Close()
+	sum := sha256.New()
+	if _, err := io.Copy(sum, file); err != nil {
+		return "", err
+	}
+	return hex.EncodeToString(sum.Sum(nil)), nil
+}
+
+func summarizeSupplyChainArtifacts(artifacts []supplyChainArtifact) supplyChainSummary {
+	var summary supplyChainSummary
+	summary.Artifacts = len(artifacts)
+	for _, artifact := range artifacts {
+		summary.Bytes += artifact.Bytes
+		if artifact.Directory {
+			summary.Directories++
+		}
+		switch artifact.Kind {
+		case "binary":
+			summary.Binaries++
+		case "release_archive":
+			summary.ReleaseArchives++
+		case "generated_experiment_artifact":
+			summary.ExperimentArtifacts++
+		case "public_corpus_download":
+			summary.PublicCorpusDownloads++
+		}
+	}
+	return summary
+}
+
+func verifySupplyChainKinds(artifacts []supplyChainArtifact) supplyChainVerification {
+	required := []string{"binary", "release_archive", "generated_experiment_artifact", "public_corpus_download"}
+	present := map[string]bool{}
+	for _, artifact := range artifacts {
+		present[artifact.Kind] = true
+	}
+	var missing []string
+	for _, kind := range required {
+		if !present[kind] {
+			missing = append(missing, kind)
+		}
+	}
+	return supplyChainVerification{RequiredKinds: required, MissingKinds: missing, Complete: len(missing) == 0}
+}
+
+func sortedNonEmptyStrings(values []string) []string {
+	var out []string
+	for _, value := range values {
+		if strings.TrimSpace(value) != "" {
+			out = append(out, strings.TrimSpace(value))
+		}
+	}
+	sort.Strings(out)
+	return out
+}
+
+func currentGitCommit() string {
+	cmd := exec.Command("git", "rev-parse", "HEAD")
+	output, err := cmd.Output()
+	if err != nil {
+		return ""
+	}
+	return strings.TrimSpace(string(output))
 }
 
 func generateSQL(path string, jsonOut bool) error {

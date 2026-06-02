@@ -107,4 +107,11 @@ jq -s \
   }' "$files_jsonl" > "$report_path"
 
 jq -e '.ok == true' "$report_path" >/dev/null
+go run ./cmd/patchline supply-chain provenance \
+  --subject "patchline-public-corpus-downloads" \
+  --source "manifest=$(relative_path "$sources")" \
+  --source "manifest_sha256=$source_hash" \
+  --command "bash scripts/fetch-public-corpus.sh" \
+  --artifact "public_corpus_download=$out_dir" \
+  --out "$report_dir/download-provenance.json" > "$report_dir/download-provenance.log"
 echo "public corpus fetch report $(relative_path "$report_path")"

@@ -261,6 +261,50 @@ func TestRepoAnalyzeRedactionStableAcrossResume(t *testing.T) {
 	}
 }
 
+func TestSupplyChainProvenanceCommandCoversRequiredArtifactKinds(t *testing.T) {
+	root := t.TempDir()
+	binary := filepath.Join(root, "bin", "patchline")
+	release := filepath.Join(root, "release", "patchline.tar.gz")
+	experimentDir := filepath.Join(root, "experiment")
+	corpus := filepath.Join(root, "corpus", "lobsters.tar.gz")
+	writeMainTestFile(t, root, "bin/patchline", "binary bytes\n")
+	writeMainTestFile(t, root, "release/patchline.tar.gz", "archive bytes\n")
+	writeMainTestFile(t, root, "experiment/proposal/proposal.json", `{"version":"patchline.proposal/v1"}`+"\n")
+	writeMainTestFile(t, root, "experiment/analysis-bundle/summary.sarif", `{"version":"2.1.0"}`+"\n")
+	writeMainTestFile(t, root, "corpus/lobsters.tar.gz", "public corpus bytes\n")
+	out := filepath.Join(root, "provenance.json")
+	if err := run([]string{
+		"supply-chain", "provenance",
+		"--subject", "patchline-test",
+		"--source", "repo=lobsters/lobsters@3b80b47aa5aaba37ec44413e7d1dc96fcf1585b6",
+		"--command", "go build -o bin/patchline ./cmd/patchline",
+		"--artifact", "binary=" + binary,
+		"--artifact", "release_archive=" + release,
+		"--artifact", "generated_experiment_artifact=" + experimentDir,
+		"--artifact", "public_corpus_download=" + corpus,
+		"--out", out,
+		"--json",
+	}); err != nil {
+		t.Fatalf("supply-chain provenance failed: %v", err)
+	}
+	var report supplyChainProvenanceReport
+	readMainTestJSON(t, out, &report)
+	if report.Version != "patchline.supply-chain-provenance/v1" || report.Subject != "patchline-test" || !report.Verification.Complete {
+		t.Fatalf("unexpected provenance report: %#v", report)
+	}
+	if report.Summary.Binaries != 1 || report.Summary.ReleaseArchives != 1 || report.Summary.ExperimentArtifacts != 1 || report.Summary.PublicCorpusDownloads != 1 || report.Summary.Directories != 1 {
+		t.Fatalf("unexpected provenance summary: %#v", report.Summary)
+	}
+	if len(report.Artifacts) != 4 || report.ReportHash == "" {
+		t.Fatalf("expected four hashed artifacts and report hash: %#v", report)
+	}
+	for _, artifact := range report.Artifacts {
+		if !strings.HasPrefix(artifact.SHA256, "sha256:") || artifact.Bytes <= 0 || artifact.Files <= 0 {
+			t.Fatalf("artifact missing digest metadata: %#v", artifact)
+		}
+	}
+}
+
 func TestContributorCheckPlanWritesExpectedSteps(t *testing.T) {
 	out := filepath.Join(t.TempDir(), "contributor")
 	if err := run([]string{"contributor", "check", "--root", ".", "--out", out, "--packages", "./cmd/patchline", "--gates", "gate,impact-gate", "--plan-only", "--json"}); err != nil {

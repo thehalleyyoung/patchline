@@ -1,0 +1,15 @@
+{
+  "version": "patchline.supply-chain-provenance-gate/v1",
+  "claim": "Patchline emits supply-chain provenance for binaries, release archives, generated experiment artifacts, and public corpus downloads with deterministic hashes and source refs.",
+  "real_code": {
+    "repo": "lobsters/lobsters",
+    "ref": "3b80b47aa5aaba37ec44413e7d1dc96fcf1585b6",
+    "subpath": "db/migrate"
+  },
+  "required_kinds": [
+    "binary",
+    "release_archive",
+    "generated_experiment_artifact",
+    "public_corpus_download"
+  ]
+}
