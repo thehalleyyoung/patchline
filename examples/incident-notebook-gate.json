@@ -1,0 +1,13 @@
+{
+  "version": "patchline.incident-notebook-gate/v1",
+  "claim": "Replayable incident notebooks reconstruct a data-change failure hypothesis from public artifacts: a real Patchline baseline plus deterministic runtime evidence. The notebook is a sequence of cells (load, select incident, gather evidence, temporal check, hypothesis, conclusion) each carrying its expected output, and re-running the reconstruction is byte-for-byte identical so reviewers can replay the reasoning without external services.",
+  "real_repo": {
+    "repo": "lobsters/lobsters",
+    "ref": "3b80b47aa5aaba37ec44413e7d1dc96fcf1585b6",
+    "subpath": "db/migrate"
+  },
+  "deploy_ts": 1700000000,
+  "error_offset_seconds": 42,
+  "required_cells": ["load-baseline", "select-incident", "gather-evidence", "temporal-check", "hypothesis", "conclusion"],
+  "minimum_findings": 50
+}

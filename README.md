@@ -237,6 +237,8 @@ Run `make prom-grafana-gate` to generate and re-ingest a Prometheus range export
 
 Run `make runtime-confidence-gate` to score every real finding on independent static-risk and observed-runtime axes, separating confirmed incidents from unconfirmed static risk via confidence quadrants and a divergence metric; see [docs/runtime-confidence.md](docs/runtime-confidence.md).
 
+Run `make incident-notebook-gate` to reconstruct a data-change failure hypothesis as a replayable, byte-identical notebook (load, select incident, gather evidence, temporal check, hypothesis, conclusion) from a real baseline; see [docs/incident-notebook.md](docs/incident-notebook.md).
+
 Add `--redact` to write `analysis-bundle/` copies with stable redaction tokens for identifiers, literals, customer-like strings, and secret-like values while preserving joins and existing artifact hashes.
 
 Add `--ci` to write `ci/summary.md` plus upload snippets and code-quality artifacts for GitHub Actions, GitLab CI, and Bitbucket Pipelines: SARIF under `analysis-bundle/summary.sarif`, GitLab `ci/gl-code-quality-report.json`, and Bitbucket `ci/bitbucket-code-insights.json`.
