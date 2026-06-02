@@ -371,6 +371,8 @@ Run `make burndown-gate` to compute a **roadmap burndown** where every deliverab
 
 Run `make counterfactual-gate` to run a **counterfactual** repair eval — the safety verdict flips only when a **causally** relevant factor changes (removing a backfill) and stays put under an irrelevant edit (a comment change); see [docs/counterfactual.md](docs/counterfactual.md).
 
+Run `make invariant-extract-gate` to perform formal **invariant extraction** from a schema — NOT NULL, unique, and foreign-key invariants are extracted and a migration that drops a `NOT NULL` guarantee is flagged as a violation; see [docs/invariant-extract.md](docs/invariant-extract.md).
+
 Add `--redact` to write `analysis-bundle/` copies with stable redaction tokens for identifiers, literals, customer-like strings, and secret-like values while preserving joins and existing artifact hashes.
 
 Add `--ci` to write `ci/summary.md` plus upload snippets and code-quality artifacts for GitHub Actions, GitLab CI, and Bitbucket Pipelines: SARIF under `analysis-bundle/summary.sarif`, GitLab `ci/gl-code-quality-report.json`, and Bitbucket `ci/bitbucket-code-insights.json`.

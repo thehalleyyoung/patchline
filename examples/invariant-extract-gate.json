@@ -1,0 +1,13 @@
+{
+  "version": "patchline.invariant-extract-gate/v1",
+  "claim": "Patchline extracts formal schema invariants — NOT NULL columns, unique keys, and foreign-key references — directly from a schema description and then checks a proposed migration against each extracted invariant, so that a change which would violate an invariant is caught structurally rather than relying on a reviewer to remember every constraint. The worker derives the invariant set, evaluates the proposed migration against it, and reports per-invariant preserved/violated status with the offending operation, while a control migration that drops a NOT-NULL guarantee is flagged as a violation. The gate proves the safe migration preserves all extracted invariants and the unsafe control violates exactly the NOT-NULL invariant.",
+  "real_repo": "patchline (self): formal invariant extraction and checking",
+  "schema": {
+    "table": "users",
+    "not_null": ["id", "email"],
+    "unique": ["email"],
+    "foreign_keys": [{"column": "org_id", "references": "orgs.id"}]
+  },
+  "safe_migration": {"ops": [{"op": "add_column", "column": "nickname", "nullable": true}]},
+  "unsafe_migration": {"ops": [{"op": "drop_not_null", "column": "email"}]}
+}
