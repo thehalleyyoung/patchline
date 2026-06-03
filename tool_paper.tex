@@ -55,8 +55,10 @@ snapshots and emits only hash-based counterexamples, and a repair-risk escrow ho
 until distinct manual-review and certificate thresholds clear, while an incident-postmortem importer
 turns public remediation lessons into detector regression tests with positive and negative controls, and
 a verified multi-service rollback planner reverses migration dependency DAGs while enforcing explicit
-dependency-depth, fanout, wave, and data-loss bounds, and a remediation-cost optimizer chooses guard,
-backfill, expand/contract, or manual review using uncertainty-adjusted expected loss.
+dependency-depth, fanout, wave, and data-loss bounds, a remediation-cost optimizer chooses guard,
+backfill, expand/contract, or manual review using uncertainty-adjusted expected loss, and a
+patch-series verifier proves every modeled SQL statement boundary in a migration-PR sequence preserves
+declared schema invariants.
 Critically,
 every capability in \tool{} is backed by a reproducible \emph{gate}: a script that proves the
 capability against real, pinned public code and fails loudly on drift. \tool{} currently ships more
@@ -217,6 +219,8 @@ check cross-service handoff metadata and prove dependency-depth, fanout, wave, a
 \code{remediation-cost} & Rank guard, backfill, expand/contract, and manual-review options by
 uncertainty-adjusted expected loss; escalate high-uncertainty cases before automated ranking. &
 \code{remediation-cost.json}, \code{.md} \\
+\code{patch-series-verify} & Apply migration PRs statement-by-statement and prove declared schema
+invariants at the initial state and every intermediate state. & \code{patch-series.json}, \code{.md} \\
 \code{propose} & Generate bounded interventions (guards, tests) within an explicit budget; quarantine
 them as untrusted artifacts. & \code{proposal.patch}, \code{patchline-proposals/} \\
 \code{compare} & Deterministically re-analyze proposed changes; accept or reject by evidence delta. &
@@ -518,6 +522,16 @@ chooses the viable option with the smallest total expected loss subject to a res
 guard, staged backfill, expand/contract, and manual review---then runs an unsafe control whose selected
 manual review leaves residual loss above policy and must emit an \code{ok=false} counterexample.
 
+\paragraph{Patch-series invariant preservation.} The \code{patch-series-verify} command treats a
+sequence of migration pull requests as a release object rather than isolated files. A versioned spec
+declares the initial schema, the PR order and \code{depends\_on} edges, inline migration SQL, and schema
+invariants such as required tables, required columns, and forbidden compatibility columns. \tool{}
+splits each migration file at the same statement boundaries used by the migration analyzer, applies the
+modeled DDL fragment statement-by-statement, and checks the invariant set after the initial state and
+after every intermediate statement state. The \gate{patch-series-verifier-gate} proves a three-PR
+invoice rollout preserves four invariants across five states, then runs an unsafe control whose modeled
+\code{DROP COLUMN total\_cents} is schema-changing and refuted at the exact intermediate statement.
+
 \paragraph{The accept/reject decision.} Table~\ref{tab:compare} makes the compare contract precise.
 Each proposed artifact is scored on the same fact-derived axes as the baseline, and the decision is a
 pure function of the evidence delta---never of a model's self-reported confidence. An artifact that
@@ -762,6 +776,7 @@ Pre/post canary invariant validation & no & no & yes \\
 Manual-review/certificate escrow & no & no & yes \\
 Multi-service rollback bounds & no & no & yes \\
 Expected-loss remediation choice & no & no & yes \\
+Patch-series intermediate invariant proof & no & no & yes \\
 Deterministic, byte-stable artifacts & no & partial & yes \\
 Real-repo proof gates & no & no & yes \\
 \bottomrule
@@ -787,6 +802,7 @@ owner-routed rollback playbooks for broad writes & \gate{remediation-playbook-ga
 27 detector regressions imported from public postmortems & \gate{incident-postmortem-importer-gate} \\
 4 rollback waves with 0 data-loss rows; unsafe 125-row rollback refuted & \gate{verified-rollback-planner-gate} \\
 4 expected-loss remediation choices; unsafe residual-loss bound refuted & \gate{remediation-cost-optimizer-gate} \\
+5 migration-PR states preserve invariants; unsafe drop refuted & \gate{patch-series-verifier-gate} \\
 9 Cassandra changes incl.\ destructive drops & \code{laaksomavrick/twitter-go} \\
 17 $\rightarrow$ 1 line, 1-minimal reproduction & delta-debugging oracle \\
 3 pipeline frameworks in one repo & \code{harrydevforlife/building-lakehouse} \\

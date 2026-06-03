@@ -47,6 +47,7 @@ import (
 	"github.com/thehalleyyoung/patchline/internal/invariant"
 	"github.com/thehalleyyoung/patchline/internal/ledger"
 	"github.com/thehalleyyoung/patchline/internal/migration"
+	"github.com/thehalleyyoung/patchline/internal/patchseries"
 	"github.com/thehalleyyoung/patchline/internal/plugins"
 	"github.com/thehalleyyoung/patchline/internal/policy"
 	"github.com/thehalleyyoung/patchline/internal/project"
@@ -429,6 +430,8 @@ func run(args []string) error {
 		return multiServiceRollbackPlanCommand(args[1:], hasFlag(args[1:], "--json"))
 	case "remediation-cost":
 		return remediationCostCommand(args[1:], hasFlag(args[1:], "--json"))
+	case "patch-series-verify":
+		return patchSeriesVerifyCommand(args[1:], hasFlag(args[1:], "--json"))
 	case "feedback":
 		return feedbackCommand(args[1:])
 	case "security":
@@ -571,6 +574,7 @@ Usage:
   patchline incident-postmortem-import --spec incident-postmortem-import.json --out dir [--json]
   patchline multi-service-rollback-plan --spec multi-service-rollback-plan.json --out dir [--json]
   patchline remediation-cost --spec remediation-cost-optimizer.json --out dir [--json]
+  patchline patch-series-verify --spec patch-series.json --out dir [--json]
   patchline feedback counterfactual-log --feedback live-feedback.json --history policy-history.json --out dir [--json]
   patchline feedback online-eval --feedback live-feedback.json --spec online-evaluation.json --out dir [--json]
   patchline feedback active-learning-queue --spec active-learning.json --out dir [--json]
@@ -14826,6 +14830,35 @@ func remediationCostCommand(args []string, jsonOut bool) error {
 		return writeJSON(os.Stdout, report)
 	}
 	fmt.Printf("wrote remediation-cost optimizer ok=%t guard=%d backfill=%d expand_contract=%d manual_review=%d counterexamples=%d to %s\n", report.OK, report.Summary.Guard, report.Summary.Backfill, report.Summary.ExpandContract, report.Summary.ManualReview, report.Summary.Counterexamples, outPath)
+	return nil
+}
+
+func patchSeriesVerifyCommand(args []string, jsonOut bool) error {
+	usage := "patchline patch-series-verify --spec patch-series.json --out <dir> [--json]"
+	specPath, outPath, err := feedbackSpecOut(args, usage)
+	if err != nil {
+		return err
+	}
+	file, err := os.Open(specPath)
+	if err != nil {
+		return err
+	}
+	defer file.Close()
+	spec, err := patchseries.ReadSpec(file)
+	if err != nil {
+		return err
+	}
+	report, err := patchseries.BuildReport(spec)
+	if err != nil {
+		return err
+	}
+	if err := patchseries.WriteArtifacts(outPath, report); err != nil {
+		return err
+	}
+	if jsonOut {
+		return writeJSON(os.Stdout, report)
+	}
+	fmt.Printf("wrote patch-series verifier ok=%t prs=%d statements=%d counterexamples=%d to %s\n", report.OK, report.Summary.PullRequests, report.Summary.Statements, report.Summary.Counterexamples, outPath)
 	return nil
 }
 

@@ -1,0 +1,59 @@
+{
+  "version": "patchline.patch-series/v1",
+  "name": "invoice external-id expand/read-shift patch series",
+  "dialect": "postgres",
+  "initial_schema": {
+    "version": "patchline.schema/v1",
+    "tables": [
+      {
+        "name": "invoices",
+        "columns": [
+          {"name": "id", "type": "uuid"},
+          {"name": "customer_id", "type": "uuid"},
+          {"name": "total_cents", "type": "integer"},
+          {"name": "legacy_external_id", "type": "text"}
+        ]
+      }
+    ]
+  },
+  "invariants": [
+    {"id": "invoices-table", "kind": "table_exists", "table": "invoices"},
+    {"id": "invoice-id-preserved", "kind": "column_exists", "table": "invoices", "column": "id"},
+    {"id": "invoice-total-preserved", "kind": "column_exists", "table": "invoices", "column": "total_cents"},
+    {"id": "legacy-shadow-not-precreated", "kind": "column_absent", "table": "invoices", "column": "external_id_shadow_old"}
+  ],
+  "pull_requests": [
+    {
+      "id": "billing-expand",
+      "title": "Add nullable external identifier",
+      "migrations": [
+        {
+          "path": "db/migrate/20260101010101_add_invoice_external_id.sql",
+          "sql": "ALTER TABLE invoices ADD COLUMN external_id text;"
+        }
+      ]
+    },
+    {
+      "id": "ledger-shadow",
+      "title": "Add shadow state for ledger read shift",
+      "depends_on": ["billing-expand"],
+      "migrations": [
+        {
+          "path": "db/migrate/20260102020202_add_invoice_external_id_shadow.sql",
+          "sql": "ALTER TABLE invoices ADD COLUMN external_id_shadow text; ALTER TABLE invoices ADD COLUMN external_id_verified_at timestamp;"
+        }
+      ]
+    },
+    {
+      "id": "api-read-shift",
+      "title": "Expose read-shift guard column",
+      "depends_on": ["ledger-shadow"],
+      "migrations": [
+        {
+          "path": "db/migrate/20260103030303_add_api_read_shift_guard.sql",
+          "sql": "ALTER TABLE invoices ADD COLUMN api_reads_external_id boolean;"
+        }
+      ]
+    }
+  ]
+}

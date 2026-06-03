@@ -133,6 +133,8 @@ Run `multi-service-rollback-plan --spec <spec>` to reverse a service-migration d
 
 Run `remediation-cost --spec <spec>` to choose guard, backfill, expand/contract, or manual review via uncertainty-adjusted expected loss; reproduce it with `make remediation-cost-optimizer-gate`.
 
+Run `patch-series-verify --spec <spec>` to prove every modeled migration-PR intermediate state preserves declared schema invariants; reproduce it with `make patch-series-verifier-gate`.
+
 Run `golden-fixture generate --github owner/repo --ref <sha> --subpath <path> --out <dir>` to turn a real-repo slice into a tiny deterministic Go test without vendoring the full repository; see [docs/golden-fixtures.md](docs/golden-fixtures.md).
 
 <details>

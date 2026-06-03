@@ -22,6 +22,7 @@ import (
 	"github.com/thehalleyyoung/patchline/internal/feedback"
 	"github.com/thehalleyyoung/patchline/internal/incidentpostmortem"
 	"github.com/thehalleyyoung/patchline/internal/intake"
+	"github.com/thehalleyyoung/patchline/internal/patchseries"
 	"github.com/thehalleyyoung/patchline/internal/project"
 	"github.com/thehalleyyoung/patchline/internal/remediationcost"
 	"github.com/thehalleyyoung/patchline/internal/repairescrow"
@@ -417,6 +418,57 @@ func TestRemediationCostCommandWritesReports(t *testing.T) {
 	}
 	if stat, err := os.Stat(filepath.Join(out, "remediation-cost.md")); err != nil || stat.Size() == 0 {
 		t.Fatalf("expected remediation-cost.md to be written, stat=%#v err=%v", stat, err)
+	}
+}
+
+func TestPatchSeriesVerifyCommandWritesReports(t *testing.T) {
+	root := t.TempDir()
+	specPath := filepath.Join(root, "patch-series.json")
+	writeMainTestFile(t, root, "patch-series.json", `{
+  "version": "patchline.patch-series/v1",
+  "name": "main test patch-series verifier",
+  "initial_schema": {
+    "version": "patchline.schema/v1",
+    "tables": [{
+      "name": "invoices",
+      "columns": [
+        {"name":"id","type":"uuid"},
+        {"name":"total_cents","type":"integer"},
+        {"name":"legacy_external_id","type":"text"}
+      ]
+    }]
+  },
+  "invariants": [
+    {"id":"invoices-table","kind":"table_exists","table":"invoices"},
+    {"id":"invoice-id-preserved","kind":"column_exists","table":"invoices","column":"id"},
+    {"id":"invoice-total-preserved","kind":"column_exists","table":"invoices","column":"total_cents"}
+  ],
+  "pull_requests": [
+    {
+      "id":"billing-expand",
+      "migrations":[{"path":"db/migrate/001.sql","sql":"ALTER TABLE invoices ADD COLUMN external_id text;"}]
+    },
+    {
+      "id":"ledger-shadow",
+      "depends_on":["billing-expand"],
+      "migrations":[{"path":"db/migrate/002.sql","sql":"ALTER TABLE invoices ADD COLUMN external_id_shadow text; ALTER TABLE invoices ADD COLUMN external_id_verified_at timestamp;"}]
+    }
+  ]
+}`)
+	out := filepath.Join(t.TempDir(), "patch-series")
+	if err := run([]string{"patch-series-verify", "--spec", specPath, "--out", out, "--json"}); err != nil {
+		t.Fatalf("patch-series-verify failed: %v", err)
+	}
+	var report patchseries.Report
+	readMainTestJSON(t, filepath.Join(out, "patch-series.json"), &report)
+	if !report.OK || report.Summary.PullRequests != 2 || report.Summary.Statements != 3 || report.Summary.Intermediate != 4 {
+		t.Fatalf("unexpected patch-series report: %#v", report)
+	}
+	if got, want := strings.Join(report.SequenceProof.Order, ","), "billing-expand,ledger-shadow"; got != want {
+		t.Fatalf("unexpected patch-series order: got %s want %s", got, want)
+	}
+	if stat, err := os.Stat(filepath.Join(out, "patch-series.md")); err != nil || stat.Size() == 0 {
+		t.Fatalf("expected patch-series.md to be written, stat=%#v err=%v", stat, err)
 	}
 }
 

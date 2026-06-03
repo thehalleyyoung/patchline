@@ -224,6 +224,11 @@ func NormalizeSQLWithDialect(sql string, dialect Dialect) string {
 	return strings.TrimSpace(normalizedWhitespace)
 }
 
+// SplitSQLStatements returns the same statement boundaries used by the migration analyzers.
+func SplitSQLStatements(sql string) []string {
+	return splitStatements(sql)
+}
+
 func splitStatements(sql string) []string {
 	var statements []string
 	var current strings.Builder

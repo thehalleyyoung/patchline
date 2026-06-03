@@ -1354,6 +1354,10 @@ verified-rollback-planner-gate:
 remediation-cost-optimizer-gate:
 	bash scripts/remediation-cost-optimizer-gate.sh
 
+.PHONY: patch-series-verifier-gate
+patch-series-verifier-gate:
+	bash scripts/patch-series-verifier-gate.sh
+
 
 
 acm-reproduced-badge-gate:

@@ -1,0 +1,47 @@
+{
+  "version": "patchline.patch-series/v1",
+  "name": "unsafe invoice external-id patch series",
+  "dialect": "postgres",
+  "initial_schema": {
+    "version": "patchline.schema/v1",
+    "tables": [
+      {
+        "name": "invoices",
+        "columns": [
+          {"name": "id", "type": "uuid"},
+          {"name": "customer_id", "type": "uuid"},
+          {"name": "total_cents", "type": "integer"},
+          {"name": "legacy_external_id", "type": "text"}
+        ]
+      }
+    ]
+  },
+  "invariants": [
+    {"id": "invoices-table", "kind": "table_exists", "table": "invoices"},
+    {"id": "invoice-id-preserved", "kind": "column_exists", "table": "invoices", "column": "id"},
+    {"id": "invoice-total-preserved", "kind": "column_exists", "table": "invoices", "column": "total_cents"}
+  ],
+  "pull_requests": [
+    {
+      "id": "billing-expand",
+      "title": "Add nullable external identifier",
+      "migrations": [
+        {
+          "path": "db/migrate/20260101010101_add_invoice_external_id.sql",
+          "sql": "ALTER TABLE invoices ADD COLUMN external_id text;"
+        }
+      ]
+    },
+    {
+      "id": "ledger-shadow",
+      "title": "Accidentally drops an invariant column mid-series",
+      "depends_on": ["billing-expand"],
+      "migrations": [
+        {
+          "path": "db/migrate/20260102020202_unsafe_contract.sql",
+          "sql": "ALTER TABLE invoices ADD COLUMN external_id_shadow text; ALTER TABLE invoices DROP COLUMN total_cents;"
+        }
+      ]
+    }
+  ]
+}
