@@ -31,6 +31,7 @@ import (
 	"github.com/thehalleyyoung/patchline/internal/intake"
 	"github.com/thehalleyyoung/patchline/internal/misuseresistance"
 	"github.com/thehalleyyoung/patchline/internal/patchseries"
+	"github.com/thehalleyyoung/patchline/internal/practitionercertification"
 	"github.com/thehalleyyoung/patchline/internal/project"
 	"github.com/thehalleyyoung/patchline/internal/remediationcost"
 	"github.com/thehalleyyoung/patchline/internal/repairescrow"
@@ -900,6 +901,83 @@ func TestMaintainerAcceptanceStudyCommandWritesReports(t *testing.T) {
 	}
 	if stat, err := os.Stat(filepath.Join(out, "maintainer-acceptance-study.md")); err != nil || stat.Size() == 0 {
 		t.Fatalf("expected maintainer-acceptance-study.md to be written, stat=%#v err=%v", stat, err)
+	}
+}
+
+func TestPractitionerCertificationCommandWritesReports(t *testing.T) {
+	root := t.TempDir()
+	writeMainTestFile(t, root, "Makefile", "staged-backfill-planner-gate:\n\tbash scripts/staged-backfill-planner-gate.sh\n\ncanary-validation-gate:\n\tbash scripts/canary-validation-gate.sh\n")
+	writeMainTestFile(t, root, "scripts/staged-backfill-planner-gate.sh", "#!/usr/bin/env bash\nset -euo pipefail\n")
+	writeMainTestFile(t, root, "scripts/canary-validation-gate.sh", "#!/usr/bin/env bash\nset -euo pipefail\n")
+	writeMainTestFile(t, root, "docs/staged-backfill-planner.md", "Backfill plan gates NOT NULL on complete replay-store validation.\n")
+	writeMainTestFile(t, root, "examples/staged-backfill-plan.json", `{"version":"patchline.backfill-plan/v1","table":"invoices"}`)
+	writeMainTestFile(t, root, "docs/canary-validation.md", "Canary validation reports hash-only counterexamples over redacted production-like snapshots.\n")
+	writeMainTestFile(t, root, "examples/canary-validation-gate.json", `{"version":"patchline.canary-validation/v1","name":"fixture"}`)
+	specPath := filepath.Join(root, "practitioner-certification.json")
+	writeMainTestFile(t, root, "practitioner-certification.json", `{
+  "version": "patchline.practitioner-certification/v1",
+  "name": "main test practitioner certification",
+  "claim": "Patchline grades practitioner certification attempts against hands-on gate-backed migration safety scenarios, evidence hashes, expected safety decisions, and reproducible commands instead of a prose-only badge.",
+  "criteria": {
+    "min_scenarios": 2,
+    "min_total_points": 20,
+    "passing_score_pct": 85,
+    "min_gate_backed_scenarios": 2,
+    "require_reproducible_commands": true
+  },
+  "scenarios": [
+    {
+      "id": "backfill-contract",
+      "title": "Review a staged backfill before NOT NULL",
+      "role": "database reviewer",
+      "repo": "example/billing",
+      "hazard_class": "partial-backfill",
+      "prompt": "Decide whether contract can proceed.",
+      "evidence_paths": ["docs/staged-backfill-planner.md", "examples/staged-backfill-plan.json"],
+      "gate": "staged-backfill-planner-gate",
+      "reproduce_commands": ["make staged-backfill-planner-gate"],
+      "expected_decision": "request_changes_until_validation_proof",
+      "rubric": [
+        {"id":"proof","description":"Requires backfill proof before NOT NULL","points":5,"required_concepts":["backfill-completeness","not-null-contract"]},
+        {"id":"compat","description":"Keeps compatibility code until validation","points":5,"required_concepts":["validate-before-contract","compatibility-code"]}
+      ]
+    },
+    {
+      "id": "canary-review",
+      "title": "Review canary validation",
+      "role": "SRE reviewer",
+      "repo": "example/billing",
+      "hazard_class": "canary-regression",
+      "prompt": "Decide whether canary evidence is acceptable.",
+      "evidence_paths": ["docs/canary-validation.md", "examples/canary-validation-gate.json"],
+      "gate": "canary-validation-gate",
+      "reproduce_commands": ["make canary-validation-gate"],
+      "expected_decision": "approve_with_hash_only_counterexample_review",
+      "rubric": [
+        {"id":"sample","description":"Requires redacted production-like sample","points":5,"required_concepts":["redacted-production-like-sample"]},
+        {"id":"hashes","description":"Keeps failures hash only","points":5,"required_concepts":["hash-only-counterexamples"]}
+      ]
+    }
+  ],
+  "attempts": [
+    {"candidate_id":"candidate-a","scenario_id":"backfill-contract","decision":"request_changes_until_validation_proof","concepts":["backfill-completeness","not-null-contract","validate-before-contract","compatibility-code"],"commands":["make staged-backfill-planner-gate"]},
+    {"candidate_id":"candidate-a","scenario_id":"canary-review","decision":"approve_with_hash_only_counterexample_review","concepts":["redacted-production-like-sample","hash-only-counterexamples"],"commands":["make canary-validation-gate"]}
+  ]
+}`)
+	out := filepath.Join(t.TempDir(), "practitioner-certification")
+	if err := run([]string{"practitioner-certification", "--spec", specPath, "--root", root, "--out", out, "--json"}); err != nil {
+		t.Fatalf("practitioner-certification failed: %v", err)
+	}
+	var report practitionercertification.Report
+	readMainTestJSON(t, filepath.Join(out, "practitioner-certification.json"), &report)
+	if !report.OK || report.Summary.Scenarios != 2 || report.Summary.GateBackedScenarios != 2 || report.Summary.PassedCandidates != 1 {
+		t.Fatalf("unexpected practitioner certification report: %#v", report)
+	}
+	if len(report.Scenarios[0].Evidence) == 0 || report.Scenarios[0].Evidence[0].SHA256 == "" {
+		t.Fatalf("expected evidence hashes, got %#v", report.Scenarios)
+	}
+	if stat, err := os.Stat(filepath.Join(out, "practitioner-certification.md")); err != nil || stat.Size() == 0 {
+		t.Fatalf("expected practitioner-certification.md to be written, stat=%#v err=%v", stat, err)
 	}
 }
 

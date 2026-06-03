@@ -1,0 +1,169 @@
+{
+  "version": "patchline.practitioner-certification/v1",
+  "name": "Patchline migration-safety practitioner certification",
+  "claim": "Patchline ships a practitioner certification exam with hands-on, gate-backed migration-safety scenarios and reproducible grading. The exam is not a prose badge: every scenario cites real Patchline evidence files, names a concrete make gate, requires the candidate to include the reproducing command, scores an explicit rubric, hashes the evidence, emits candidate score reports, and fails negative controls that omit evidence, miss rubric obligations, choose the wrong safety decision, or skip the gate command.",
+  "criteria": {
+    "min_scenarios": 3,
+    "min_total_points": 30,
+    "passing_score_pct": 85,
+    "min_gate_backed_scenarios": 3,
+    "require_reproducible_commands": true
+  },
+  "scenarios": [
+    {
+      "id": "staged-backfill-contract",
+      "title": "Review a NOT NULL contract after a staged invoice backfill",
+      "role": "database reviewer",
+      "repo": "thehalleyyoung/patchline",
+      "hazard_class": "partial-backfill",
+      "prompt": "Decide whether a NOT NULL contract and compatibility-code deletion can proceed from the staged backfill evidence.",
+      "evidence_paths": [
+        "examples/staged-backfill-plan.json",
+        "docs/staged-backfill-planner.md"
+      ],
+      "gate": "staged-backfill-planner-gate",
+      "reproduce_commands": [
+        "make staged-backfill-planner-gate",
+        "go run ./cmd/patchline backfill-plan --spec examples/staged-backfill-plan.json --store examples/staged-backfill-store-complete.json --out results/generated/staged-backfill-planner --json"
+      ],
+      "expected_decision": "request_changes_until_validation_proof",
+      "rubric": [
+        {
+          "id": "complete-backfill",
+          "description": "Identifies that NOT NULL tightening requires an exhaustive replay-store proof covering every pre-existing row.",
+          "points": 4,
+          "required_concepts": ["backfill-completeness", "not-null-contract"]
+        },
+        {
+          "id": "validate-before-delete",
+          "description": "Requires validate to run after backfill and before compatibility-code deletion.",
+          "points": 3,
+          "required_concepts": ["validate-before-contract", "compatibility-code"]
+        },
+        {
+          "id": "hash-counterexamples",
+          "description": "Explains that row-level failures must be reported as hash-bound evidence, not raw production values.",
+          "points": 3,
+          "required_concepts": ["hash-bound-evidence"]
+        }
+      ]
+    },
+    {
+      "id": "patch-series-intermediate-state",
+      "title": "Review a multi-PR migration series for unsafe intermediate schema states",
+      "role": "application maintainer",
+      "repo": "thehalleyyoung/patchline",
+      "hazard_class": "migration-pr-intermediate-state",
+      "prompt": "Determine whether the migration PR sequence can be accepted before every modeled intermediate state is checked.",
+      "evidence_paths": [
+        "examples/patch-series-verifier.json",
+        "docs/patch-series-verifier.md"
+      ],
+      "gate": "patch-series-verifier-gate",
+      "reproduce_commands": [
+        "make patch-series-verifier-gate",
+        "go run ./cmd/patchline patch-series-verify --spec examples/patch-series-verifier.json --out results/generated/patch-series-verifier --json"
+      ],
+      "expected_decision": "escalate_until_intermediate_invariants_pass",
+      "rubric": [
+        {
+          "id": "statement-boundaries",
+          "description": "Checks schema invariants at the initial state and after every SQL statement boundary.",
+          "points": 4,
+          "required_concepts": ["statement-boundary-invariants"]
+        },
+        {
+          "id": "dependency-order",
+          "description": "Uses declared PR dependencies and before/after schema hashes to explain ordering risk.",
+          "points": 3,
+          "required_concepts": ["dependency-order", "schema-hash-evidence"]
+        },
+        {
+          "id": "counterexample-action",
+          "description": "Routes any invariant refutation to escalation rather than approval-by-documentation.",
+          "points": 3,
+          "required_concepts": ["invariant-counterexample", "escalation"]
+        }
+      ]
+    },
+    {
+      "id": "canary-validation-review",
+      "title": "Review redacted canary snapshots before accepting a migration",
+      "role": "SRE reviewer",
+      "repo": "thehalleyyoung/patchline",
+      "hazard_class": "production-like-canary-regression",
+      "prompt": "Evaluate whether the redacted canary snapshots support accepting the migration and how failures should be disclosed.",
+      "evidence_paths": [
+        "examples/canary-validation-gate.json",
+        "docs/canary-validation.md"
+      ],
+      "gate": "canary-validation-gate",
+      "reproduce_commands": [
+        "make canary-validation-gate",
+        "go run ./cmd/patchline canary-validate --spec examples/canary-validation-gate.json --before examples/canary-before-snapshot.json --after examples/canary-after-snapshot-good.json --out results/generated/canary-validation --json"
+      ],
+      "expected_decision": "approve_with_hash_only_counterexample_review",
+      "rubric": [
+        {
+          "id": "sample-policy",
+          "description": "Recognizes redacted, production-like, matched-row sampling as required context for the verdict.",
+          "points": 3,
+          "required_concepts": ["redacted-production-like-sample"]
+        },
+        {
+          "id": "invariant-coverage",
+          "description": "Checks row count, not-null, uniqueness, derived-value, and stable-field invariants.",
+          "points": 4,
+          "required_concepts": ["row-count-preservation", "stable-business-fields", "derived-value-invariant"]
+        },
+        {
+          "id": "hash-only-failures",
+          "description": "Requires counterexamples to stay hash-only so reviewers can act without leaking sampled values.",
+          "points": 3,
+          "required_concepts": ["hash-only-counterexamples"]
+        }
+      ]
+    }
+  ],
+  "attempts": [
+    {
+      "candidate_id": "certified-practitioner-demo",
+      "scenario_id": "staged-backfill-contract",
+      "decision": "request_changes_until_validation_proof",
+      "concepts": [
+        "backfill-completeness",
+        "not-null-contract",
+        "validate-before-contract",
+        "compatibility-code",
+        "hash-bound-evidence"
+      ],
+      "commands": ["make staged-backfill-planner-gate"]
+    },
+    {
+      "candidate_id": "certified-practitioner-demo",
+      "scenario_id": "patch-series-intermediate-state",
+      "decision": "escalate_until_intermediate_invariants_pass",
+      "concepts": [
+        "statement-boundary-invariants",
+        "dependency-order",
+        "schema-hash-evidence",
+        "invariant-counterexample",
+        "escalation"
+      ],
+      "commands": ["make patch-series-verifier-gate"]
+    },
+    {
+      "candidate_id": "certified-practitioner-demo",
+      "scenario_id": "canary-validation-review",
+      "decision": "approve_with_hash_only_counterexample_review",
+      "concepts": [
+        "redacted-production-like-sample",
+        "row-count-preservation",
+        "stable-business-fields",
+        "derived-value-invariant",
+        "hash-only-counterexamples"
+      ],
+      "commands": ["make canary-validation-gate"]
+    }
+  ]
+}

@@ -57,6 +57,7 @@ import (
 	"github.com/thehalleyyoung/patchline/internal/patchseries"
 	"github.com/thehalleyyoung/patchline/internal/plugins"
 	"github.com/thehalleyyoung/patchline/internal/policy"
+	"github.com/thehalleyyoung/patchline/internal/practitionercertification"
 	"github.com/thehalleyyoung/patchline/internal/project"
 	"github.com/thehalleyyoung/patchline/internal/proof"
 	"github.com/thehalleyyoung/patchline/internal/provenance"
@@ -450,6 +451,8 @@ func run(args []string) error {
 		return patchSeriesVerifyCommand(args[1:], hasFlag(args[1:], "--json"))
 	case "maintainer-acceptance-study":
 		return maintainerAcceptanceStudyCommand(args[1:], hasFlag(args[1:], "--json"))
+	case "practitioner-certification":
+		return practitionerCertificationCommand(args[1:], hasFlag(args[1:], "--json"))
 	case "reviewer-fairness-audit":
 		return reviewerFairnessAuditCommand(args[1:], hasFlag(args[1:], "--json"))
 	case "change-management-verify":
@@ -615,6 +618,7 @@ Usage:
   patchline remediation-cost --spec remediation-cost-optimizer.json --out dir [--json]
   patchline patch-series-verify --spec patch-series.json --out dir [--json]
   patchline maintainer-acceptance-study --spec maintainer-acceptance-study.json --root repo-root --out dir [--json]
+  patchline practitioner-certification --spec practitioner-certification.json --root repo-root --out dir [--json]
   patchline reviewer-fairness-audit --spec reviewer-fairness-audit.json --root repo-root --out dir [--json]
   patchline change-management-verify --spec change-management.json --root repo-root --out dir [--json]
   patchline governance-risk-register --spec governance-risk-register.json --root repo-root --out dir [--json]
@@ -15100,6 +15104,39 @@ func maintainerAcceptanceStudyCommand(args []string, jsonOut bool) error {
 		return writeJSON(os.Stdout, report)
 	}
 	fmt.Printf("wrote maintainer acceptance study ok=%t pairs=%d time_reduction=%.2f%% generated_uncertainty_recall=%.2f counterexamples=%d to %s\n", report.OK, report.Summary.Pairs, report.Summary.ReviewTimeReductionPercent, report.Summary.GeneratedUncertaintyRecall, report.Summary.Counterexamples, outPath)
+	return nil
+}
+
+func practitionerCertificationCommand(args []string, jsonOut bool) error {
+	usage := "patchline practitioner-certification --spec practitioner-certification.json --root repo-root --out <dir> [--json]"
+	specPath, outPath, err := feedbackSpecOut(args, usage)
+	if err != nil {
+		return err
+	}
+	rootPath := "."
+	if value, ok := flagValue(args, "--root"); ok && value != "" {
+		rootPath = value
+	}
+	file, err := os.Open(specPath)
+	if err != nil {
+		return err
+	}
+	defer file.Close()
+	spec, err := practitionercertification.ReadSpec(file)
+	if err != nil {
+		return err
+	}
+	report, err := practitionercertification.BuildReport(spec, rootPath)
+	if err != nil {
+		return err
+	}
+	if err := practitionercertification.WriteArtifacts(outPath, report); err != nil {
+		return err
+	}
+	if jsonOut {
+		return writeJSON(os.Stdout, report)
+	}
+	fmt.Printf("wrote practitioner certification exam ok=%t scenarios=%d gate_backed=%d candidates=%d passed=%d counterexamples=%d to %s\n", report.OK, report.Summary.Scenarios, report.Summary.GateBackedScenarios, report.Summary.Candidates, report.Summary.PassedCandidates, report.Summary.Counterexamples, outPath)
 	return nil
 }
 

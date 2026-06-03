@@ -139,6 +139,8 @@ Run `maintainer-acceptance-study --spec <spec>` to measure paired maintainer rev
 
 Run `reviewer-fairness-audit --spec <spec>` to gate reviewer burden, false positives, and escalation parity across teams and ecosystems with real evidence hashes; reproduce it with `make reviewer-fairness-audit-gate`.
 
+Run `practitioner-certification --spec examples/practitioner-certification-exam.json` to grade hands-on, gate-backed migration-safety scenarios with reproducible evidence hashes; reproduce it with `make practitioner-certification-exam-gate`.
+
 Run `explainability-audit --spec examples/explainability-audit.json` to verify independent reviewers agree evidence trails support stated verdicts, with hash-mismatch and disagreement negative controls; reproduce it with `make explainability-audit-gate`.
 
 Run `change-management-verify --spec <spec>` to prove organizational approvals are bound to passed Patchline gates, hash-pinned reports, rollback evidence, and emergency expiry; reproduce it with `make change-management-integration-gate`.
