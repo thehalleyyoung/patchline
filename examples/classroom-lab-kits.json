@@ -1,0 +1,210 @@
+{
+  "version": "patchline.classroom-lab-kit/v1",
+  "name": "Patchline classroom lab kits",
+  "claim": "Patchline ships classroom lab kits for database, software engineering, programming languages, and DevOps courses. The kits are not slideware: every lab names a real Patchline evidence artifact, an instructor solution gate, the exact reproducing make command, expected generated artifacts, and a negative control that students and instructors can mutate to see the gate fail.",
+  "criteria": {
+    "required_audiences": [
+      "database",
+      "software-engineering",
+      "programming-languages",
+      "devops"
+    ],
+    "min_courses": 4,
+    "min_labs_per_course": 1,
+    "min_objectives_per_lab": 2,
+    "min_evidence_artifacts_per_lab": 2,
+    "require_instructor_solution_gate": true,
+    "require_reproducible_command": true,
+    "require_negative_control": true
+  },
+  "courses": [
+    {
+      "id": "database-systems",
+      "audience": "database",
+      "title": "Database systems: staged migration safety",
+      "repo": "thehalleyyoung/patchline",
+      "labs": [
+        {
+          "id": "backfill-contract-review",
+          "title": "Prove a backfill before tightening a NOT NULL contract",
+          "hazard_class": "partial-backfill",
+          "student_prompt": "Inspect the staged backfill plan, run the instructor gate, and decide whether the contract and compatibility-code deletion can proceed.",
+          "timebox_minutes": 45,
+          "objectives": [
+            "Explain why every pre-existing row needs replay-store evidence before NOT NULL tightening",
+            "Distinguish a passing backfill proof from an incomplete-row counterexample"
+          ],
+          "evidence_paths": [
+            "docs/staged-backfill-planner.md"
+          ],
+          "instructor_solution": {
+            "gate": "staged-backfill-planner-gate",
+            "commands": [
+              "make staged-backfill-planner-gate"
+            ],
+            "solution_outline": [
+              "Run the staged backfill planner gate",
+              "Inspect the generated JSON for blocked contract stages",
+              "Discuss why the incomplete replay store is the negative control"
+            ],
+            "evidence_paths": [
+              "examples/staged-backfill-plan.json"
+            ],
+            "expected_artifacts": [
+              "results/generated/staged-backfill-planner-gate/gate-summary.json",
+              "results/generated/staged-backfill-planner/staged-backfill-plan.md"
+            ]
+          },
+          "negative_controls": [
+            {
+              "id": "missing-row-proof",
+              "mutation": "Use the incomplete replay store so one legacy invoice has no target value.",
+              "expected_counterexample": "contract and compatibility deletion remain blocked with the missing row witness"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "software-engineering",
+      "audience": "software-engineering",
+      "title": "Software engineering: migration PR review",
+      "repo": "thehalleyyoung/patchline",
+      "labs": [
+        {
+          "id": "patch-series-intermediate-state",
+          "title": "Review every intermediate state in a migration PR sequence",
+          "hazard_class": "migration-pr-intermediate-state",
+          "student_prompt": "Review the patch-series spec and explain why a multi-PR migration can fail even when the final schema looks valid.",
+          "timebox_minutes": 50,
+          "objectives": [
+            "Map SQL statement boundaries to invariant checks",
+            "Use dependency order and schema hashes to justify escalation"
+          ],
+          "evidence_paths": [
+            "docs/patch-series-verifier.md"
+          ],
+          "instructor_solution": {
+            "gate": "patch-series-verifier-gate",
+            "commands": [
+              "make patch-series-verifier-gate"
+            ],
+            "solution_outline": [
+              "Run the verifier gate",
+              "Compare safe and unsafe patch-series fixtures",
+              "Explain why documentation alone cannot substitute for intermediate invariant checks"
+            ],
+            "evidence_paths": [
+              "examples/patch-series-verifier.json"
+            ],
+            "expected_artifacts": [
+              "results/generated/patch-series-verifier-gate/gate-summary.json",
+              "results/generated/patch-series-verifier/patch-series.md"
+            ]
+          },
+          "negative_controls": [
+            {
+              "id": "unsafe-intermediate-state",
+              "mutation": "Swap in the unsafe patch-series fixture that violates an invariant before the final PR.",
+              "expected_counterexample": "the verifier emits an invariant counterexample before approval"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "programming-languages",
+      "audience": "programming-languages",
+      "title": "Programming languages: symbolic guard analysis",
+      "repo": "thehalleyyoung/patchline",
+      "labs": [
+        {
+          "id": "symbolic-guard-witness",
+          "title": "Find the path witness that reaches an unsafe repair guard",
+          "hazard_class": "symbolic-guard-safety",
+          "student_prompt": "Run the symbolic execution gate and explain why the vulnerable guard reaches an unsafe leaf while the hardened guard does not.",
+          "timebox_minutes": 55,
+          "objectives": [
+            "Interpret path constraints as a bounded program-analysis proof",
+            "Explain why the unsafe witness is a counterexample rather than a test assertion"
+          ],
+          "evidence_paths": [
+            "docs/symexec.md"
+          ],
+          "instructor_solution": {
+            "gate": "symexec-gate",
+            "commands": [
+              "make symexec-gate"
+            ],
+            "solution_outline": [
+              "Run the symbolic execution gate",
+              "Read the vulnerable unsafe witness",
+              "Contrast the hardened guard's unreachable unsafe leaf"
+            ],
+            "evidence_paths": [
+              "examples/symexec-gate.json"
+            ],
+            "expected_artifacts": [
+              "results/generated/symexec-gate/symexec.json",
+              "results/generated/symexec-gate/symexec.md"
+            ]
+          },
+          "negative_controls": [
+            {
+              "id": "drop-lock-precondition",
+              "mutation": "Remove the lock precondition from the hardened guard.",
+              "expected_counterexample": "unsafe_reachable becomes true with a witness"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "devops",
+      "audience": "devops",
+      "title": "DevOps: deployment ordering for data changes",
+      "repo": "thehalleyyoung/patchline",
+      "labs": [
+        {
+          "id": "infra-ordering-migration-job",
+          "title": "Prove migration jobs are ordered before dependent deploys",
+          "hazard_class": "migration-job-ordering",
+          "student_prompt": "Inspect the infra-ordering evidence and decide whether a migration job can race the application rollout.",
+          "timebox_minutes": 45,
+          "objectives": [
+            "Recognize Helm hook and sync-wave evidence for ordered migrations",
+            "Explain why an unordered database job must fail the deployment-ordering gate"
+          ],
+          "evidence_paths": [
+            "docs/infra-ordering.md"
+          ],
+          "instructor_solution": {
+            "gate": "infra-ordering-gate",
+            "commands": [
+              "make infra-ordering-gate"
+            ],
+            "solution_outline": [
+              "Run the infrastructure ordering gate",
+              "Inspect sequenced and unordered job classifications",
+              "Connect deploy ordering facts to migration safety"
+            ],
+            "evidence_paths": [
+              "examples/infra-ordering-gate.json"
+            ],
+            "expected_artifacts": [
+              "results/generated/infra-ordering-gate/gate-summary.json",
+              "results/generated/infra-ordering/infra-ordering.md"
+            ]
+          },
+          "negative_controls": [
+            {
+              "id": "remove-hook",
+              "mutation": "Remove the Helm hook or sync-wave marker from the migration job.",
+              "expected_counterexample": "the job is classified as unordered and must not be accepted"
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

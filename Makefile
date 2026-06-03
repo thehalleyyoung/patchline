@@ -5,6 +5,7 @@
 .PHONY: expand-contract-templates-gate staged-backfill-planner-gate remediation-playbook-gate canary-validation-gate repair-risk-escrow-gate incident-postmortem-importer-gate verified-rollback-planner-gate remediation-cost-optimizer-gate maintainer-acceptance-study-gate evidence-marketplace-gate federated-benchmark-split-gate
 .PHONY: adversarial-challenge-gate evidence-governance-board-gate evidence-appeal-workflow-gate partition-sharding-semantics-gate
 .PHONY: practitioner-certification-exam-gate
+.PHONY: classroom-lab-kits-gate
 
 build:
 	go build -o bin/patchline ./cmd/patchline
@@ -1194,6 +1195,9 @@ external-curriculum-module-gate:
 
 practitioner-certification-exam-gate:
 	bash scripts/practitioner-certification-exam-gate.sh
+
+classroom-lab-kits-gate:
+	bash scripts/classroom-lab-kits-gate.sh
 
 industry-working-group-gate:
 	bash scripts/industry-working-group-gate.sh

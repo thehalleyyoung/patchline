@@ -19,6 +19,7 @@ import (
 	"github.com/thehalleyyoung/patchline/internal/backfillplanner"
 	"github.com/thehalleyyoung/patchline/internal/canaryvalidate"
 	"github.com/thehalleyyoung/patchline/internal/changemanagement"
+	"github.com/thehalleyyoung/patchline/internal/education"
 	"github.com/thehalleyyoung/patchline/internal/ethicsreview"
 	"github.com/thehalleyyoung/patchline/internal/evidence"
 	"github.com/thehalleyyoung/patchline/internal/evidencemarketplace"
@@ -978,6 +979,59 @@ func TestPractitionerCertificationCommandWritesReports(t *testing.T) {
 	}
 	if stat, err := os.Stat(filepath.Join(out, "practitioner-certification.md")); err != nil || stat.Size() == 0 {
 		t.Fatalf("expected practitioner-certification.md to be written, stat=%#v err=%v", stat, err)
+	}
+}
+
+func TestClassroomLabKitsCommandWritesReports(t *testing.T) {
+	root := t.TempDir()
+	writeMainTestFile(t, root, "Makefile", "staged-backfill-planner-gate:\n\tbash scripts/staged-backfill-planner-gate.sh\n\npatch-series-verifier-gate:\n\tbash scripts/patch-series-verifier-gate.sh\n\nsymexec-gate:\n\tbash scripts/symexec-gate.sh\n\ninfra-ordering-gate:\n\tbash scripts/infra-ordering-gate.sh\n")
+	for _, gate := range []string{"staged-backfill-planner-gate", "patch-series-verifier-gate", "symexec-gate", "infra-ordering-gate"} {
+		writeMainTestFile(t, root, "scripts/"+gate+".sh", "#!/usr/bin/env bash\nset -euo pipefail\n")
+	}
+	writeMainTestFile(t, root, "docs/staged-backfill-planner.md", "Backfill planner proof.\n")
+	writeMainTestFile(t, root, "examples/staged-backfill-plan.json", `{"version":"patchline.backfill-plan/v1"}`)
+	writeMainTestFile(t, root, "docs/patch-series-verifier.md", "Patch-series verifier proof.\n")
+	writeMainTestFile(t, root, "examples/patch-series-verifier.json", `{"version":"patchline.patch-series/v1"}`)
+	writeMainTestFile(t, root, "docs/symexec.md", "Symbolic execution proof.\n")
+	writeMainTestFile(t, root, "examples/symexec-gate.json", `{"version":"patchline.symexec-gate/v1"}`)
+	writeMainTestFile(t, root, "docs/infra-ordering.md", "Infrastructure ordering proof.\n")
+	writeMainTestFile(t, root, "examples/infra-ordering-gate.json", `{"version":"patchline.infra-ordering-gate/v1"}`)
+	specPath := filepath.Join(root, "classroom-lab-kits.json")
+	writeMainTestFile(t, root, "classroom-lab-kits.json", `{
+  "version": "patchline.classroom-lab-kit/v1",
+  "name": "main test classroom lab kits",
+  "claim": "Patchline validates classroom lab kits with instructor solution gates, evidence hashes, reproducible commands, expected outputs, and negative controls across database, software engineering, programming languages, and DevOps courses.",
+  "criteria": {
+    "required_audiences": ["database","software-engineering","programming-languages","devops"],
+    "min_courses": 4,
+    "min_labs_per_course": 1,
+    "min_objectives_per_lab": 2,
+    "min_evidence_artifacts_per_lab": 2,
+    "require_instructor_solution_gate": true,
+    "require_reproducible_command": true,
+    "require_negative_control": true
+  },
+  "courses": [
+    {"id":"database","audience":"database","title":"Database systems","repo":"example/repo","labs":[{"id":"backfill","title":"Backfill proof","hazard_class":"partial-backfill","student_prompt":"Run the gate and explain the proof.","timebox_minutes":45,"objectives":["trace evidence","explain failure"],"evidence_paths":["docs/staged-backfill-planner.md"],"instructor_solution":{"gate":"staged-backfill-planner-gate","commands":["make staged-backfill-planner-gate"],"solution_outline":["run gate"],"evidence_paths":["examples/staged-backfill-plan.json"],"expected_artifacts":["gate-summary.json"]},"negative_controls":[{"id":"missing-row","mutation":"remove row","expected_counterexample":"missing row is rejected"}]}]},
+    {"id":"se","audience":"software-engineering","title":"Software engineering","repo":"example/repo","labs":[{"id":"series","title":"Patch series","hazard_class":"intermediate-state","student_prompt":"Run the gate and explain the proof.","timebox_minutes":45,"objectives":["trace invariant","explain failure"],"evidence_paths":["docs/patch-series-verifier.md"],"instructor_solution":{"gate":"patch-series-verifier-gate","commands":["make patch-series-verifier-gate"],"solution_outline":["run gate"],"evidence_paths":["examples/patch-series-verifier.json"],"expected_artifacts":["gate-summary.json"]},"negative_controls":[{"id":"unsafe-state","mutation":"unsafe state","expected_counterexample":"invariant is rejected"}]}]},
+    {"id":"pl","audience":"programming-languages","title":"Programming languages","repo":"example/repo","labs":[{"id":"symexec","title":"Symbolic guard","hazard_class":"symbolic-guard","student_prompt":"Run the gate and explain the proof.","timebox_minutes":45,"objectives":["trace path","explain witness"],"evidence_paths":["docs/symexec.md"],"instructor_solution":{"gate":"symexec-gate","commands":["make symexec-gate"],"solution_outline":["run gate"],"evidence_paths":["examples/symexec-gate.json"],"expected_artifacts":["symexec.json"]},"negative_controls":[{"id":"bad-guard","mutation":"remove guard","expected_counterexample":"unsafe path is reachable"}]}]},
+    {"id":"devops","audience":"devops","title":"DevOps","repo":"example/repo","labs":[{"id":"ordering","title":"Infra ordering","hazard_class":"migration-job-ordering","student_prompt":"Run the gate and explain the proof.","timebox_minutes":45,"objectives":["trace hook","explain race"],"evidence_paths":["docs/infra-ordering.md"],"instructor_solution":{"gate":"infra-ordering-gate","commands":["make infra-ordering-gate"],"solution_outline":["run gate"],"evidence_paths":["examples/infra-ordering-gate.json"],"expected_artifacts":["gate-summary.json"]},"negative_controls":[{"id":"remove-hook","mutation":"remove hook","expected_counterexample":"unordered job is rejected"}]}]}
+  ]
+}`)
+	out := filepath.Join(t.TempDir(), "classroom-lab-kits")
+	if err := run([]string{"classroom-lab-kits", "--spec", specPath, "--root", root, "--out", out, "--json"}); err != nil {
+		t.Fatalf("classroom-lab-kits failed: %v", err)
+	}
+	var report education.LabKitReport
+	readMainTestJSON(t, filepath.Join(out, "classroom-lab-kits.json"), &report)
+	if !report.OK || report.Summary.Courses != 4 || report.Summary.Labs != 4 || report.Summary.GateBackedLabs != 4 || report.Summary.AudiencesCovered != 4 {
+		t.Fatalf("unexpected classroom lab kit report: %#v", report)
+	}
+	if report.Summary.EvidenceArtifacts != 8 || len(report.Courses[0].LabReports[0].Evidence[0].SHA256) != 64 {
+		t.Fatalf("expected evidence hashes, got %#v", report.Summary)
+	}
+	if stat, err := os.Stat(filepath.Join(out, "classroom-lab-kits.md")); err != nil || stat.Size() == 0 {
+		t.Fatalf("expected classroom-lab-kits.md to be written, stat=%#v err=%v", stat, err)
 	}
 }
 

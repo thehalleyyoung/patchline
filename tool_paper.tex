@@ -3,7 +3,7 @@
 \usepackage[utf8]{inputenc}
 \usepackage[T1]{fontenc}
 \usepackage{lmodern}
-\usepackage[margin=0.95in]{geometry}
+\usepackage[margin=0.9in]{geometry}
 \usepackage{booktabs}
 \usepackage{longtable}
 \usepackage{array}
@@ -72,7 +72,10 @@ disputed findings with preserved evidence, independent reviewer rationales, and 
 and a reviewer-fairness audit gates reviewer burden, false positives, and escalation rates across teams
 and ecosystems using hashed review evidence, while a practitioner certification exam grades
 hands-on migration-safety scenarios only when each answer cites the reproducing gate and passes an
-explicit rubric over real evidence hashes, while a change-management verifier proves organizational
+explicit rubric over real evidence hashes, and classroom lab kits package database, software
+engineering, programming-languages, and DevOps exercises only when each lab has real evidence hashes,
+an instructor solution gate, a reproducing command, expected artifacts, and a failing negative control,
+while a change-management verifier proves organizational
 approvals cite passed blocking Patchline gates, hash-pinned reports, rollback plans, and bounded
 emergency expiry rather than bypassing the safety layer, a governance-risk register quantifies
 maintainership, funding, infrastructure, and benchmark-control concentration with hash-backed evidence,
@@ -91,7 +94,7 @@ k-thresholded aggregate metrics.
 Critically,
 every capability in \tool{} is backed by a reproducible \emph{gate}: a script that proves the
 capability against real, pinned public code and fails loudly on drift. \tool{} currently ships more
-than 615 such gates over 560 documented capabilities, spanning relational migrations across nine
+than 616 such gates over 561 documented capabilities, spanning relational migrations across nine
 ecosystems, versioned database semantics with pinned reproducibility reports, computed unsafe counter-profile controls, lock-mode simulations, online-schema-change adapters,
 conditional replication-lag analysis, query-plan regression preflight, data-volume-aware runtime estimates, partition/shard routing semantics, and rollback-feasibility verdicts
 across eight production engines, five NoSQL engines,
@@ -160,7 +163,7 @@ ranks the risks, and prints the next commands that can run immediately.
   \item A \textbf{runtime and observability evidence} layer that scores findings on independent
   static-risk and observed-runtime axes using OpenTelemetry, Datadog-style, and Prometheus/Grafana
   exports (Section~\ref{sec:runtime}).
-  \item A \textbf{gate-backed reproducibility and evaluation methodology}---over 615 gates, blinded
+  \item A \textbf{gate-backed reproducibility and evaluation methodology}---over 616 gates, blinded
   false-positive adjudication, seeded false-negative recall, ablations, standardized effect sizes,
   severity calibration, a duplicate-safe certificate-backed public evidence marketplace, deterministic
   governance-board lifecycle decisions, hash-bound appeal resolution, reviewer-fairness burden/false-positive/escalation audits, change-management approval binding, governance-risk concentration audits, ethics-review controls for data sources, live learning, and outcome studies, independent explainability audits for stated verdicts, misuse-resistance checks for certificates/scoreboards/adoption metrics, transparent detector deprecation, adversarial-challenge scoring, signed federated benchmark
@@ -266,6 +269,9 @@ against generated plans while hashing the real artifacts reviewed and failing hi
 real evidence files, explicit rubrics, expected safety decisions, and required \code{make} gates; fail
 wrong decisions, missing rubric concepts, absent evidence, and non-reproducible answers. &
 \code{practitioner-certification.json}, \code{.md} \\
+\code{classroom-lab-kits} & Validate database, software-engineering, programming-languages, and
+DevOps lab kits against real evidence hashes, instructor solution gates, reproducing commands,
+expected artifacts, and negative controls. & \code{classroom-lab-kits.json}, \code{.md} \\
 \code{reviewer-fairness-audit} & Audit review-minute burden, false-positive rate, and escalation-rate
 disparities across teams and ecosystems, hashing every reviewed evidence file and rejecting under-sampled
 or unequal outcomes. & \code{reviewer-fairness-audit.json}, \code{.md} \\
