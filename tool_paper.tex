@@ -3,7 +3,7 @@
 \usepackage[utf8]{inputenc}
 \usepackage[T1]{fontenc}
 \usepackage{lmodern}
-\usepackage[margin=0.9in]{geometry}
+\usepackage[margin=0.82in]{geometry}
 \usepackage{booktabs}
 \usepackage{longtable}
 \usepackage{array}
@@ -75,7 +75,10 @@ localized teaching examples, role-specific tutorials, a public skills taxonomy, 
 assessments: certification grades rubriced hands-on decisions, lab kits require instructor solution
 gates and failing controls, localized lessons preserve byte-identical commands and identifiers across translations while checking accessibility, the taxonomy maps hazard classes to reviewer concepts, prerequisites, prompts, gates, and controls, tutorials compile app-developer, DBA, SRE, security-reviewer, and manager
 playbooks from real evidence paths, and the longitudinal study counts only blinded six-month detections that
-cite evidence and reproducing gates before comparing trained reviewers with controls, while a
+cite evidence and reproducing gates before comparing trained reviewers with controls; a workforce-impact
+study then measures whether automation changes review ownership, escalation load, and learning outcomes
+with treated/control difference-in-differences, gate-backed evidence, privacy-preserving reviewer IDs,
+held-out detection corroboration, and suppressed-escalation controls, while a
 change-management verifier proves organizational
 approvals cite passed blocking Patchline gates, hash-pinned reports, rollback plans, and bounded
 emergency expiry rather than bypassing the safety layer, a governance-risk register quantifies
@@ -95,7 +98,7 @@ k-thresholded aggregate metrics.
 Critically,
 every capability in \tool{} is backed by a reproducible \emph{gate}: a script that proves the
 capability against real, pinned public code and fails loudly on drift. \tool{} currently ships more
-than 619 such gates over 564 documented capabilities, spanning relational migrations across nine
+than 620 such gates over 565 documented capabilities, spanning relational migrations across nine
 ecosystems, versioned database semantics with pinned reproducibility reports, computed unsafe counter-profile controls, lock-mode simulations, online-schema-change adapters,
 conditional replication-lag analysis, query-plan regression preflight, data-volume-aware runtime estimates, partition/shard routing semantics, and rollback-feasibility verdicts
 across eight production engines, five NoSQL engines,
@@ -164,10 +167,10 @@ ranks the risks, and prints the next commands that can run immediately.
   \item A \textbf{runtime and observability evidence} layer that scores findings on independent
   static-risk and observed-runtime axes using OpenTelemetry, Datadog-style, and Prometheus/Grafana
   exports (Section~\ref{sec:runtime}).
-  \item A \textbf{gate-backed reproducibility and evaluation methodology}---over 617 gates, blinded
+  \item A \textbf{gate-backed reproducibility and evaluation methodology}---over 618 gates, blinded
   false-positive adjudication, seeded false-negative recall, ablations, standardized effect sizes,
   severity calibration, a duplicate-safe certificate-backed public evidence marketplace, deterministic
-  governance-board lifecycle decisions, hash-bound appeal resolution, reviewer-fairness burden/false-positive/escalation audits, change-management approval binding, governance-risk concentration audits, ethics-review controls for data sources, live learning, and outcome studies, independent explainability audits for stated verdicts, misuse-resistance checks for certificates/scoreboards/adoption metrics, transparent detector deprecation, adversarial-challenge scoring, signed federated benchmark
+  governance-board lifecycle decisions, hash-bound appeal resolution, reviewer-fairness burden/false-positive/escalation audits, workforce-impact difference-in-differences with suppressed-escalation and teaching-to-test controls, change-management approval binding, governance-risk concentration audits, ethics-review controls for data sources, live learning, and outcome studies, independent explainability audits for stated verdicts, misuse-resistance checks for certificates/scoreboards/adoption metrics, transparent detector deprecation, adversarial-challenge scoring, signed federated benchmark
   aggregates for private adopters, and accountable-use mappings from autonomous or blocking capabilities
   to required human oversight---designed for artifact
   evaluation and best-paper-grade rigor
@@ -276,6 +279,10 @@ expected artifacts, and negative controls. & \code{classroom-lab-kits.json}, \co
 \code{longitudinal-education-study} & Compare Patchline-trained reviewers with a control cohort at
 delayed follow-up; count only detections that match the expected safety decision, cite evidence, and
 include the reproducing \code{make} gate. & \code{longitudinal-education-study.json}, \code{.md} \\
+\code{workforce-impact-study} & Measure whether automation shifts review ownership, escalation load,
+and learning outcomes using treated/control difference-in-differences, gate-backed evidence, privacy-safe
+reviewer IDs, held-out detection corroboration, and suppressed-escalation controls. &
+\code{workforce-impact-study.json}, \code{.md} \\
 \code{contributor-apprenticeship} & Graduate contributors only when detector code, a Make-backed
 gate, documentation, minimized positive and negative fixtures, mentor signoff, and reviewer evidence
 all validate against the checkout. & \code{contributor-apprenticeship.json}, \code{.md} \\
@@ -1061,6 +1068,13 @@ migration age and change type (recent vs.\ old, schema-only vs.\ backfill-heavy)
 real download proven from each stratum. Longitudinal reruns over multiple historical commits per
 repository summarize risk/evidence deltas over time.
 
+\paragraph{Workforce impact without vanity metrics.} The \code{workforce-impact-study} command measures
+review ownership, escalation load, and learning outcomes with a treated/control before/after design
+rather than raw before/after deltas. Its gate rejects fictional automation references, evidence-free
+observations, personally identifying reviewer IDs, control-cohort secular shifts, lower escalation paired
+with higher downstream misses, and assessment-score gains that are not corroborated by held-out hazard
+detections.
+
 \paragraph{Baselines.} \tool's value over weaker baselines is made concrete through side-by-side
 examples in which \tool{} links cross-file repair clues that grep-only and SQL-only baselines miss.
 Table~\ref{tab:baselines} contrasts the three approaches on the capabilities that matter for safe
@@ -1114,6 +1128,7 @@ owner-routed rollback playbooks for broad writes & \gate{remediation-playbook-ga
 4 expected-loss remediation choices; unsafe residual-loss bound refuted & \gate{remediation-cost-optimizer-gate} \\
 5 migration-PR states preserve invariants; unsafe drop refuted & \gate{patch-series-verifier-gate} \\
 9 paired maintainer reviews; 38.55\% faster with full uncertainty recall; hidden-control refuted & \gate{maintainer-acceptance-study-gate} \\
+2 workforce cohorts / 8 observations with 100-point ownership and escalation diff-in-diff, 23-point learning diff-in-diff, 66.67-point held-out detection diff-in-diff, and confounding/suppressed-escalation/teaching-to-test controls refuted & \gate{workforce-impact-study-gate} \\
 2 public-release-eligible examples with reviewable gate reputation, duplicate-collapsed prevalence, and 4 mirrored artifacts imported into runnable benchmarks; corrupted certificate rejected & \gate{evidence-marketplace-gate} \\
 1 accepted, 1 deprecated, and 1 quarantined shared-evidence record; 4 archive artifacts preserved with tombstones; weak quorum/conflict/missing-tombstone controls rejected & \gate{evidence-governance-board-gate} \\
 3 disputed findings resolved with 6 preserved artifacts, 9 reviewer rationales, and controls for missing preservation, original approver reuse, and private markers & \gate{evidence-appeal-workflow-gate} \\
@@ -1617,8 +1632,8 @@ production-grade remediation loops for rollback, repair escrow, and patch-series
 federated, checksum-mirrored, withdrawal-aware, challenge-ready public evidence marketplace with
 externally adopted governance and appeal audit trails; deeper rollback, query-plan, data-volume, and engine-negative-control semantics
 on top of the new versioned production-database profiles;
-socio-technical accountability beyond accountable-use, reviewer-fairness, change-management binding,
-governance-risk registration, ethics review, explainability audit, misuse resistance, and detector
+socio-technical accountability beyond accountable-use, reviewer-fairness, workforce-impact measurement,
+change-management binding, governance-risk registration, ethics review, explainability audit, misuse resistance, and detector
 deprecation; certification-renewal and textbook extensions for the education and
 certification materials that make migration safety teachable; resilient offline, edge, confidential,
 and disaster-recovery deployments; and an award-to-standard transition that externalizes benchmarks,

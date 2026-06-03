@@ -145,6 +145,8 @@ Run `classroom-lab-kits --spec examples/classroom-lab-kits.json` to verify datab
 
 Run `longitudinal-education-study --spec examples/longitudinal-education-study.json` to measure whether Patchline-trained reviewers still catch real, gate-backed hazards months later versus a control cohort; reproduce it with `make longitudinal-education-study-gate`.
 
+Run `workforce-impact-study --spec examples/workforce-impact-study.json` to measure whether automation changes review ownership, escalation load, and learning outcomes with difference-in-differences, gate-backed evidence, and suppressed-escalation controls; reproduce it with `make workforce-impact-study-gate`.
+
 Run `contributor-apprenticeship --spec examples/contributor-apprenticeship.json` to graduate contributors only after detector code, a Make-backed gate, docs, minimized positive/negative fixtures, mentor signoff, and reviewer evidence all verify; reproduce it with `make contributor-apprenticeship-gate`.
 
 Reviewer skills taxonomy (`make skills-taxonomy-gate`) maps each hazard class to concepts, prerequisites, assessment prompts, evidence, gates, negative controls, and tutorial/certification crosswalks.

@@ -1,0 +1,212 @@
+{
+  "version": "patchline.workforce-impact-study/v1",
+  "name": "Patchline workforce-impact study over review ownership, escalation load, and learning outcomes",
+  "claim": "Patchline measures whether migration-safety automation changes workforce outcomes without trusting vanity before/after deltas. The study compares treated and control reviewer cohorts before and after gate-backed automation; fails when the control moves with treatment; fails when escalation drops while downstream misses rise; and counts learning gains only when assessment-score lift is corroborated by held-out hazard detections, evidence citations, and reproducing gate commands.",
+  "criteria": {
+    "min_cohorts": 2,
+    "min_automation_references": 2,
+    "min_observations_per_cohort_period": 2,
+    "min_ownership_diff_in_diff_points": 25,
+    "min_escalation_diff_in_diff_points": 20,
+    "min_learning_diff_in_diff_points": 15,
+    "min_held_out_detection_diff_in_diff_points": 15,
+    "max_control_ownership_shift_points": 10,
+    "max_control_escalation_reduction_points": 10,
+    "max_control_learning_lift_points": 10,
+    "max_defect_rate_increase_points": 0,
+    "max_attrition_rate": 0,
+    "require_control_cohort": true,
+    "require_treated_cohort": true,
+    "require_before_after_periods": true,
+    "require_evidence_citations": true,
+    "require_gate_command_use": true,
+    "require_privacy_preserving_ids": true,
+    "require_automation_gate_backed": true,
+    "require_held_out_detection_lift": true,
+    "require_quality_guard": true
+  },
+  "protocol": {
+    "intervention_name": "Patchline migration-review automation",
+    "before_period": "pre-automation",
+    "after_period": "post-automation",
+    "assignment_unit": "reviewer",
+    "ownership_outcome": "share of migration reviews led by the primary owning team rather than a centralized specialist",
+    "escalation_outcome": "share of migration reviews requiring DBA/SRE escalation",
+    "learning_outcome": "assessment score corroborated by held-out gate-backed hazard detection",
+    "quality_outcome": "downstream misses after review"
+  },
+  "automations": [
+    {
+      "id": "fairness-audit",
+      "gate": "reviewer-fairness-audit-gate",
+      "description": "Reviewer fairness audit that monitors burden, false positives, and escalation parity.",
+      "commands": ["make reviewer-fairness-audit-gate"],
+      "evidence_paths": [
+        "docs/reviewer-fairness-audit.md",
+        "scripts/reviewer-fairness-audit-gate.sh"
+      ]
+    },
+    {
+      "id": "longitudinal-education",
+      "gate": "longitudinal-education-study-gate",
+      "description": "Longitudinal education study that verifies held-out reviewer learning retention.",
+      "commands": ["make longitudinal-education-study-gate"],
+      "evidence_paths": [
+        "docs/longitudinal-education-study.md",
+        "scripts/longitudinal-education-study-gate.sh"
+      ]
+    }
+  ],
+  "cohorts": [
+    {
+      "id": "patchline-treated",
+      "kind": "treated",
+      "description": "Reviewers using Patchline gate-backed automation during migration review.",
+      "participants": ["wf-treated-01", "wf-treated-02"]
+    },
+    {
+      "id": "ordinary-control",
+      "kind": "control",
+      "description": "Reviewers continuing ordinary migration-review workflow during the same interval.",
+      "participants": ["wf-control-01", "wf-control-02"]
+    }
+  ],
+  "observations": [
+    {
+      "review_id": "treated-before-01",
+      "cohort_id": "patchline-treated",
+      "participant_id": "wf-treated-01",
+      "period": "pre-automation",
+      "team": "payments",
+      "ecosystem": "rails",
+      "owned_by_primary_team": false,
+      "escalations": 1,
+      "downstream_misses": 0,
+      "learning_assessment_score": 60,
+      "held_out_detections": 1,
+      "held_out_opportunities": 3,
+      "automation_refs": [],
+      "commands": [],
+      "evidence_paths": ["docs/reviewer-fairness-audit.md", "docs/longitudinal-education-study.md"]
+    },
+    {
+      "review_id": "treated-before-02",
+      "cohort_id": "patchline-treated",
+      "participant_id": "wf-treated-02",
+      "period": "pre-automation",
+      "team": "payments",
+      "ecosystem": "django",
+      "owned_by_primary_team": false,
+      "escalations": 1,
+      "downstream_misses": 0,
+      "learning_assessment_score": 62,
+      "held_out_detections": 1,
+      "held_out_opportunities": 3,
+      "automation_refs": [],
+      "commands": [],
+      "evidence_paths": ["docs/reviewer-fairness-audit.md", "docs/longitudinal-education-study.md"]
+    },
+    {
+      "review_id": "treated-after-01",
+      "cohort_id": "patchline-treated",
+      "participant_id": "wf-treated-01",
+      "period": "post-automation",
+      "team": "payments",
+      "ecosystem": "rails",
+      "owned_by_primary_team": true,
+      "escalations": 0,
+      "downstream_misses": 0,
+      "learning_assessment_score": 86,
+      "held_out_detections": 3,
+      "held_out_opportunities": 3,
+      "automation_refs": ["fairness-audit", "longitudinal-education"],
+      "commands": ["make reviewer-fairness-audit-gate", "make longitudinal-education-study-gate"],
+      "evidence_paths": ["docs/reviewer-fairness-audit.md", "docs/longitudinal-education-study.md"]
+    },
+    {
+      "review_id": "treated-after-02",
+      "cohort_id": "patchline-treated",
+      "participant_id": "wf-treated-02",
+      "period": "post-automation",
+      "team": "payments",
+      "ecosystem": "django",
+      "owned_by_primary_team": true,
+      "escalations": 0,
+      "downstream_misses": 0,
+      "learning_assessment_score": 88,
+      "held_out_detections": 3,
+      "held_out_opportunities": 3,
+      "automation_refs": ["fairness-audit", "longitudinal-education"],
+      "commands": ["make reviewer-fairness-audit-gate", "make longitudinal-education-study-gate"],
+      "evidence_paths": ["docs/reviewer-fairness-audit.md", "docs/longitudinal-education-study.md"]
+    },
+    {
+      "review_id": "control-before-01",
+      "cohort_id": "ordinary-control",
+      "participant_id": "wf-control-01",
+      "period": "pre-automation",
+      "team": "platform",
+      "ecosystem": "rails",
+      "owned_by_primary_team": true,
+      "escalations": 1,
+      "downstream_misses": 0,
+      "learning_assessment_score": 61,
+      "held_out_detections": 1,
+      "held_out_opportunities": 3,
+      "automation_refs": [],
+      "commands": [],
+      "evidence_paths": ["docs/reviewer-fairness-audit.md", "docs/longitudinal-education-study.md"]
+    },
+    {
+      "review_id": "control-before-02",
+      "cohort_id": "ordinary-control",
+      "participant_id": "wf-control-02",
+      "period": "pre-automation",
+      "team": "platform",
+      "ecosystem": "django",
+      "owned_by_primary_team": false,
+      "escalations": 0,
+      "downstream_misses": 0,
+      "learning_assessment_score": 63,
+      "held_out_detections": 1,
+      "held_out_opportunities": 3,
+      "automation_refs": [],
+      "commands": [],
+      "evidence_paths": ["docs/reviewer-fairness-audit.md", "docs/longitudinal-education-study.md"]
+    },
+    {
+      "review_id": "control-after-01",
+      "cohort_id": "ordinary-control",
+      "participant_id": "wf-control-01",
+      "period": "post-automation",
+      "team": "platform",
+      "ecosystem": "rails",
+      "owned_by_primary_team": true,
+      "escalations": 1,
+      "downstream_misses": 0,
+      "learning_assessment_score": 66,
+      "held_out_detections": 1,
+      "held_out_opportunities": 3,
+      "automation_refs": ["fairness-audit"],
+      "commands": ["make reviewer-fairness-audit-gate"],
+      "evidence_paths": ["docs/reviewer-fairness-audit.md", "docs/longitudinal-education-study.md"]
+    },
+    {
+      "review_id": "control-after-02",
+      "cohort_id": "ordinary-control",
+      "participant_id": "wf-control-02",
+      "period": "post-automation",
+      "team": "platform",
+      "ecosystem": "django",
+      "owned_by_primary_team": false,
+      "escalations": 0,
+      "downstream_misses": 0,
+      "learning_assessment_score": 64,
+      "held_out_detections": 1,
+      "held_out_opportunities": 3,
+      "automation_refs": ["fairness-audit"],
+      "commands": ["make reviewer-fairness-audit-gate"],
+      "evidence_paths": ["docs/reviewer-fairness-audit.md", "docs/longitudinal-education-study.md"]
+    }
+  ]
+}

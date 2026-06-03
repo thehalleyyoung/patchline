@@ -1108,6 +1108,117 @@ func mainLongitudinalObservation(cohort, reviewer string, month int, hazard educ
 	return obs
 }
 
+func TestWorkforceImpactStudyCommandWritesReports(t *testing.T) {
+	root := t.TempDir()
+	writeMainTestFile(t, root, "Makefile", "reviewer-fairness-audit-gate:\n\tbash scripts/reviewer-fairness-audit-gate.sh\n\nlongitudinal-education-study-gate:\n\tbash scripts/longitudinal-education-study-gate.sh\n")
+	writeMainTestFile(t, root, "scripts/reviewer-fairness-audit-gate.sh", "#!/usr/bin/env bash\nset -euo pipefail\n")
+	writeMainTestFile(t, root, "scripts/longitudinal-education-study-gate.sh", "#!/usr/bin/env bash\nset -euo pipefail\n")
+	writeMainTestFile(t, root, "docs/reviewer-fairness-audit.md", "Reviewer fairness audit checks burden, false positives, and escalation parity.\n")
+	writeMainTestFile(t, root, "docs/longitudinal-education-study.md", "Longitudinal education study checks held-out reviewer learning.\n")
+	specPath := filepath.Join(root, "workforce-impact-study.json")
+	writeMainTestJSONFile(t, specPath, education.WorkforceImpactSpec{
+		Version: education.WorkforceImpactSpecVersion,
+		Name:    "main test workforce impact study",
+		Claim:   "Patchline compares treated and control reviewer cohorts before and after gate-backed automation to measure ownership, escalation load, and learning outcomes without trusting raw before-after deltas.",
+		Criteria: education.WorkforceImpactCriteria{
+			MinCohorts:                          2,
+			MinAutomationReferences:             2,
+			MinObservationsPerCohortPeriod:      2,
+			MinOwnershipDiffInDiffPoints:        25,
+			MinEscalationDiffInDiffPoints:       20,
+			MinLearningDiffInDiffPoints:         15,
+			MinHeldOutDetectionDiffInDiffPoints: 15,
+			MaxControlOwnershipShiftPoints:      10,
+			MaxControlEscalationReductionPoints: 10,
+			MaxControlLearningLiftPoints:        10,
+			MaxDefectRateIncreasePoints:         0,
+			MaxAttritionRate:                    0,
+			RequireControlCohort:                true,
+			RequireTreatedCohort:                true,
+			RequireBeforeAfterPeriods:           true,
+			RequireEvidenceCitations:            true,
+			RequireGateCommandUse:               true,
+			RequirePrivacyPreservingIDs:         true,
+			RequireAutomationGateBacked:         true,
+			RequireHeldOutDetectionLift:         true,
+			RequireQualityGuard:                 true,
+		},
+		Protocol: education.WorkforceImpactProtocol{
+			InterventionName:  "Patchline review automation",
+			BeforePeriod:      "pre-automation",
+			AfterPeriod:       "post-automation",
+			AssignmentUnit:    "reviewer",
+			OwnershipOutcome:  "primary owning team leads migration review",
+			EscalationOutcome: "review requires DBA or SRE escalation",
+			LearningOutcome:   "assessment score corroborated by held-out detection",
+			QualityOutcome:    "downstream misses after review",
+		},
+		Automations: []education.WorkforceAutomation{{
+			ID: "fairness-audit", Gate: "reviewer-fairness-audit-gate", Description: "fairness audit automation", Commands: []string{"make reviewer-fairness-audit-gate"}, EvidencePaths: []string{"docs/reviewer-fairness-audit.md", "scripts/reviewer-fairness-audit-gate.sh"},
+		}, {
+			ID: "longitudinal-education", Gate: "longitudinal-education-study-gate", Description: "education retention automation", Commands: []string{"make longitudinal-education-study-gate"}, EvidencePaths: []string{"docs/longitudinal-education-study.md", "scripts/longitudinal-education-study-gate.sh"},
+		}},
+		Cohorts: []education.WorkforceCohort{{
+			ID: "treated", Kind: "treated", Description: "Patchline automation users", Participants: []string{"wf-treated-01", "wf-treated-02"},
+		}, {
+			ID: "control", Kind: "control", Description: "ordinary review workflow", Participants: []string{"wf-control-01", "wf-control-02"},
+		}},
+		Observations: []education.WorkforceObservation{
+			mainWorkforceObservation("treated-before-01", "treated", "wf-treated-01", "pre-automation", false, 1, 0, 60, 1, 3, nil),
+			mainWorkforceObservation("treated-before-02", "treated", "wf-treated-02", "pre-automation", false, 1, 0, 62, 1, 3, nil),
+			mainWorkforceObservation("treated-after-01", "treated", "wf-treated-01", "post-automation", true, 0, 0, 86, 3, 3, []string{"fairness-audit", "longitudinal-education"}),
+			mainWorkforceObservation("treated-after-02", "treated", "wf-treated-02", "post-automation", true, 0, 0, 88, 3, 3, []string{"fairness-audit", "longitudinal-education"}),
+			mainWorkforceObservation("control-before-01", "control", "wf-control-01", "pre-automation", true, 1, 0, 61, 1, 3, nil),
+			mainWorkforceObservation("control-before-02", "control", "wf-control-02", "pre-automation", false, 0, 0, 63, 1, 3, nil),
+			mainWorkforceObservation("control-after-01", "control", "wf-control-01", "post-automation", true, 1, 0, 66, 1, 3, []string{"fairness-audit"}),
+			mainWorkforceObservation("control-after-02", "control", "wf-control-02", "post-automation", false, 0, 0, 64, 1, 3, []string{"fairness-audit"}),
+		},
+	})
+	out := filepath.Join(t.TempDir(), "workforce-impact-study")
+	if err := run([]string{"workforce-impact-study", "--spec", specPath, "--root", root, "--out", out, "--json"}); err != nil {
+		t.Fatalf("workforce-impact-study failed: %v", err)
+	}
+	var report education.WorkforceImpactReport
+	readMainTestJSON(t, filepath.Join(out, "workforce-impact-study.json"), &report)
+	if !report.OK || report.Summary.OwnershipDiffInDiffPoints != 100 || report.Summary.EscalationDiffInDiffPoints != 100 || report.Summary.LearningDiffInDiffPoints != 23 {
+		t.Fatalf("unexpected workforce impact report: %#v", report)
+	}
+	if report.Summary.GateBackedAutomations != 2 || len(report.Observations[0].Evidence[0].SHA256) != 64 {
+		t.Fatalf("expected gate-backed evidence hashes, got %#v", report.Summary)
+	}
+	if stat, err := os.Stat(filepath.Join(out, "workforce-impact-study.md")); err != nil || stat.Size() == 0 {
+		t.Fatalf("expected workforce-impact-study.md to be written, stat=%#v err=%v", stat, err)
+	}
+}
+
+func mainWorkforceObservation(reviewID, cohortID, participantID, period string, owned bool, escalations int, misses int, score float64, detections int, opportunities int, automations []string) education.WorkforceObservation {
+	observation := education.WorkforceObservation{
+		ReviewID:                reviewID,
+		CohortID:                cohortID,
+		ParticipantID:           participantID,
+		Period:                  period,
+		Team:                    "payments",
+		Ecosystem:               "rails",
+		OwnedByPrimaryTeam:      owned,
+		Escalations:             escalations,
+		DownstreamMisses:        misses,
+		LearningAssessmentScore: score,
+		HeldOutDetections:       detections,
+		HeldOutOpportunities:    opportunities,
+		AutomationRefs:          automations,
+		EvidencePaths:           []string{"docs/reviewer-fairness-audit.md", "docs/longitudinal-education-study.md"},
+	}
+	for _, automation := range automations {
+		switch automation {
+		case "fairness-audit":
+			observation.Commands = append(observation.Commands, "make reviewer-fairness-audit-gate")
+		case "longitudinal-education":
+			observation.Commands = append(observation.Commands, "make longitudinal-education-study-gate")
+		}
+	}
+	return observation
+}
+
 func TestContributorApprenticeshipCommandWritesReports(t *testing.T) {
 	root := t.TempDir()
 	gates := []string{"query-plan-regression-gate", "online-schema-change-adapters-gate", "staged-backfill-planner-gate"}

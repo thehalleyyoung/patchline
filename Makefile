@@ -10,6 +10,7 @@
 .PHONY: contributor-apprenticeship-gate
 .PHONY: skills-taxonomy-gate
 .PHONY: localized-teaching-examples-gate
+.PHONY: workforce-impact-study-gate
 
 build:
 	go build -o bin/patchline ./cmd/patchline
@@ -1401,6 +1402,9 @@ maintainer-acceptance-study-gate:
 
 longitudinal-education-study-gate:
 	bash scripts/longitudinal-education-study-gate.sh
+
+workforce-impact-study-gate:
+	bash scripts/workforce-impact-study-gate.sh
 
 contributor-apprenticeship-gate:
 	bash scripts/contributor-apprenticeship-gate.sh

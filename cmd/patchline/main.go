@@ -458,6 +458,8 @@ func run(args []string) error {
 		return classroomLabKitsCommand(args[1:], hasFlag(args[1:], "--json"))
 	case "longitudinal-education-study":
 		return longitudinalEducationStudyCommand(args[1:], hasFlag(args[1:], "--json"))
+	case "workforce-impact-study":
+		return workforceImpactStudyCommand(args[1:], hasFlag(args[1:], "--json"))
 	case "contributor-apprenticeship":
 		return contributorApprenticeshipCommand(args[1:], hasFlag(args[1:], "--json"))
 	case "skills-taxonomy":
@@ -632,6 +634,7 @@ Usage:
   patchline practitioner-certification --spec practitioner-certification.json --root repo-root --out dir [--json]
   patchline classroom-lab-kits --spec classroom-lab-kits.json --root repo-root --out dir [--json]
   patchline longitudinal-education-study --spec longitudinal-education-study.json --root repo-root --out dir [--json]
+  patchline workforce-impact-study --spec workforce-impact-study.json --root repo-root --out dir [--json]
   patchline contributor-apprenticeship --spec contributor-apprenticeship.json --root repo-root --out dir [--json]
   patchline skills-taxonomy --spec skills-taxonomy.json --root repo-root --out dir [--json]
   patchline localized-teaching-examples --spec localized-teaching-examples.json --root repo-root --out dir [--json]
@@ -15219,6 +15222,39 @@ func longitudinalEducationStudyCommand(args []string, jsonOut bool) error {
 		return writeJSON(os.Stdout, report)
 	}
 	fmt.Printf("wrote longitudinal education study ok=%t cohorts=%d real_hazards=%d followup_month=%d lift=%.2f counterexamples=%d to %s\n", report.OK, report.Summary.Cohorts, report.Summary.RealHazards, report.Summary.DelayedFollowupMonth, report.Summary.RetentionLiftPoints, report.Summary.Counterexamples, outPath)
+	return nil
+}
+
+func workforceImpactStudyCommand(args []string, jsonOut bool) error {
+	usage := "patchline workforce-impact-study --spec workforce-impact-study.json --root repo-root --out <dir> [--json]"
+	specPath, outPath, err := feedbackSpecOut(args, usage)
+	if err != nil {
+		return err
+	}
+	rootPath := "."
+	if value, ok := flagValue(args, "--root"); ok && value != "" {
+		rootPath = value
+	}
+	file, err := os.Open(specPath)
+	if err != nil {
+		return err
+	}
+	defer file.Close()
+	spec, err := education.ReadWorkforceImpactSpec(file)
+	if err != nil {
+		return err
+	}
+	report, err := education.BuildWorkforceImpactReport(spec, rootPath)
+	if err != nil {
+		return err
+	}
+	if err := education.WriteWorkforceImpactArtifacts(outPath, report); err != nil {
+		return err
+	}
+	if jsonOut {
+		return writeJSON(os.Stdout, report)
+	}
+	fmt.Printf("wrote workforce impact study ok=%t cohorts=%d observations=%d ownership_did=%.2f escalation_did=%.2f learning_did=%.2f counterexamples=%d to %s\n", report.OK, report.Summary.Cohorts, report.Summary.Observations, report.Summary.OwnershipDiffInDiffPoints, report.Summary.EscalationDiffInDiffPoints, report.Summary.LearningDiffInDiffPoints, report.Summary.Counterexamples, outPath)
 	return nil
 }
 
