@@ -20,6 +20,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/thehalleyyoung/patchline/internal/acceleratorfallback"
 	"github.com/thehalleyyoung/patchline/internal/acceptancestudy"
 	"github.com/thehalleyyoung/patchline/internal/archive"
 	"github.com/thehalleyyoung/patchline/internal/artifact"
@@ -491,6 +492,8 @@ func run(args []string) error {
 		return hardwareSigningCommand(args[1:], hasFlag(args[1:], "--json"))
 	case "confidential-computing":
 		return confidentialComputingCommand(args[1:], hasFlag(args[1:], "--json"))
+	case "accelerator-fallbacks":
+		return acceleratorFallbacksCommand(args[1:], hasFlag(args[1:], "--json"))
 	case "reviewer-fairness-audit":
 		return reviewerFairnessAuditCommand(args[1:], hasFlag(args[1:], "--json"))
 	case "change-management-verify":
@@ -670,6 +673,7 @@ Usage:
   patchline resilient-analysis --spec resilient-analysis.json --root repo-root --out dir [--json]
   patchline hardware-signing --spec hardware-signing.json --root repo-root --out dir [--json]
   patchline confidential-computing --spec confidential-computing.json --root repo-root --out dir [--json]
+  patchline accelerator-fallbacks --spec accelerator-fallbacks.json --root repo-root --out dir [--json]
   patchline reviewer-fairness-audit --spec reviewer-fairness-audit.json --root repo-root --out dir [--json]
   patchline change-management-verify --spec change-management.json --root repo-root --out dir [--json]
   patchline governance-risk-register --spec governance-risk-register.json --root repo-root --out dir [--json]
@@ -15646,6 +15650,45 @@ func confidentialComputingCommand(args []string, jsonOut bool) error {
 	}
 	if !report.OK {
 		return codedError{code: 2, err: errors.New("confidential computing validation failed")}
+	}
+	return nil
+}
+
+func acceleratorFallbacksCommand(args []string, jsonOut bool) error {
+	usage := "patchline accelerator-fallbacks --spec accelerator-fallbacks.json --root repo-root --out <dir> [--json]"
+	specPath, outPath, err := feedbackSpecOut(args, usage)
+	if err != nil {
+		return err
+	}
+	rootPath := "."
+	if value, ok := flagValue(args, "--root"); ok && value != "" {
+		rootPath = value
+	}
+	file, err := os.Open(specPath)
+	if err != nil {
+		return err
+	}
+	defer file.Close()
+	spec, err := acceleratorfallback.ReadSpec(file)
+	if err != nil {
+		return err
+	}
+	report, err := acceleratorfallback.BuildReport(spec, rootPath)
+	if err != nil {
+		return err
+	}
+	if err := acceleratorfallback.WriteArtifacts(outPath, report); err != nil {
+		return err
+	}
+	if jsonOut {
+		if err := writeJSON(os.Stdout, report); err != nil {
+			return err
+		}
+	} else {
+		fmt.Printf("wrote accelerator fallbacks ok=%t discovered=%d components=%d cpu=%d accelerator_free=%d deterministic=%d parity=%d counterexamples=%d to %s\n", report.OK, report.Summary.DiscoveredComponents, report.Summary.Components, report.Summary.CPUFallbacks, report.Summary.AcceleratorFreeFallbacks, report.Summary.DeterministicFallbacks, report.Summary.ParityChecks, report.Summary.Counterexamples, outPath)
+	}
+	if !report.OK {
+		return codedError{code: 2, err: errors.New("accelerator fallback validation failed")}
 	}
 	return nil
 }

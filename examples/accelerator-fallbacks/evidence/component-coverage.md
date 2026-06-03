@@ -1,0 +1,1 @@
+Each discovered learned component maps to a source gate, a frozen learned-artifact catalog, the same reviewable CPU fallback implementation, shared pinned public fixture inputs, shared pinned fallback outputs, and repeated replay evidence.

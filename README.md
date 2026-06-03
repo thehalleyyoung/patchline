@@ -163,6 +163,7 @@ Run `resilient-analysis --spec examples/resilient-analysis.json` to replay distr
 
 Run `hardware-signing --spec examples/hardware-signing.json` to verify release, gate, and certificate artifacts with hardware-backed signing, threshold approval, recovery shares, and key-rotation drills; reproduce it with `make hardware-signing-gate`.
 Confidential-computing evaluation (`make confidential-computing-gate`) verifies private corpus analysis with verifiable enclave attestation, encrypted inputs, key-release policy, redacted aggregate outputs, and replay evidence.
+Deterministic accelerator-free fallbacks (`make accelerator-fallbacks-gate`) prove every repository-discovered learned component has a pinned CPU-only replay with parity evidence.
 Run `make disaster-recovery-exercise-gate` to rebuild the public corpus, docs, release manifest, and certificate logs, restore them from checksum-verified mirrors, and reject unrecoverable mirror loss; see [docs/disaster-recovery-exercise.md](docs/disaster-recovery-exercise.md).
 Run `supply-chain simulate --spec examples/supply-chain-compromise-sim.json` for supply-chain compromise simulations covering dependency poisoning, malicious archives, and forged release metadata; reproduce it with `make supply-chain-compromise-sim-gate`.
 

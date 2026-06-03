@@ -99,9 +99,9 @@ k-thresholded aggregate metrics.
 Critically,
 every capability in \tool{} is backed by a reproducible \emph{gate}: a script that proves the
 capability against real, pinned public code and fails loudly on drift. \tool{} currently ships more
-than 622 such gates over 567 documented capabilities, now including supply-chain compromise simulations
+than 623 such gates over 568 documented capabilities, now including supply-chain compromise simulations
 for dependency poisoning, malicious archives, and forged release metadata, plus resilient distributed-analysis,
-hardware-signing, and confidential-computing verifiers for worker loss, cache corruption, partitions, threshold signatures,
+hardware-signing, confidential-computing, and accelerator-free learned-component verifiers for worker loss, cache corruption, partitions, threshold signatures,
 recovery, rotation, revocation, and verifiable enclave attestation before accepting a corpus run or trusted artifact; the broader gate catalog spans relational migrations across nine
 ecosystems, versioned database semantics with pinned reproducibility reports, computed unsafe counter-profile controls, lock-mode simulations, online-schema-change adapters,
 conditional replication-lag analysis, query-plan regression preflight, data-volume-aware runtime estimates, partition/shard routing semantics, and rollback-feasibility verdicts
@@ -171,7 +171,7 @@ ranks the risks, and prints the next commands that can run immediately.
   \item A \textbf{runtime and observability evidence} layer that scores findings on independent
   static-risk and observed-runtime axes using OpenTelemetry, Datadog-style, and Prometheus/Grafana
   exports (Section~\ref{sec:runtime}).
-  \item A \textbf{gate-backed reproducibility and evaluation methodology}---over 622 gates, blinded
+  \item A \textbf{gate-backed reproducibility and evaluation methodology}---over 623 gates, blinded
   false-positive adjudication, seeded false-negative recall, ablations, standardized effect sizes,
   severity calibration, a duplicate-safe certificate-backed public evidence marketplace, deterministic
   governance-board lifecycle decisions, hash-bound appeal resolution, reviewer-fairness burden/false-positive/escalation audits, workforce-impact difference-in-differences with suppressed-escalation and teaching-to-test controls, change-management approval binding, governance-risk concentration audits, ethics-review controls for data sources, live learning, and outcome studies, independent explainability audits for stated verdicts, misuse-resistance checks for certificates/scoreboards/adoption metrics, transparent detector deprecation, adversarial-challenge scoring, signed federated benchmark
@@ -357,12 +357,12 @@ deterministic reviewer artifact that pins engine versions, local runtime or emul
 where available, embedded/managed-service profiles where not, and observed profile, rule, lock,
 rollback, query-plan, runtime, replication, and partition evidence rows. &
 \code{reproducibility-report.json}, \code{.md} \\
-\code{resilient-analysis}, \code{hardware-signing}, \code{confidential-computing}, \code{supply-chain simulate} & Replay distributed analysis evidence under worker
+\code{resilient-analysis}, \code{hardware-signing}, \code{confidential-computing}, \code{accelerator-fallbacks}, \code{supply-chain simulate} & Replay distributed analysis evidence under worker
 loss, cache corruption, deterministic leases, and recovered partitions; verify release, gate, and
 certificate artifacts against hardware attestations, thresholds, recovery shares, logs, reports, and
 key-rotation/revocation drills; bind private corpus workloads to enclave quotes, verifier reports,
 key-release policy, encrypted inputs, redacted aggregates, private retained outputs, and replay proofs;
-reject dependency poisoning, malicious archive, and forged metadata simulations. & \code{resilient-analysis.json}, \code{hardware-signing.json}, \code{confidential-computing.json}, \code{supply-chain-sim.json}, \code{.md} \\
+prove every learned fixture has CPU-only pinned replay and parity; reject dependency poisoning, malicious archive, and forged metadata simulations. & \code{resilient-analysis.json}, \code{hardware-signing.json}, \code{confidential-computing.json}, \code{accelerator-fallbacks.json}, \code{supply-chain-sim.json}, \code{.md} \\
 \code{propose} & Generate bounded interventions (guards, tests) within an explicit budget; quarantine
 them as untrusted artifacts. & \code{proposal.patch}, \code{patchline-proposals/} \\
 \code{compare} & Deterministically re-analyze proposed changes; accept or reject by evidence delta. &
@@ -377,7 +377,7 @@ A cross-cutting \emph{gate layer} sits beside the pipeline. Each gate is a self-
 (a) validates a versioned example specification, (b) checks that the relevant documentation and the
 README still describe the capability, (c) runs the capability against real pinned code, (d) asserts
 machine-checkable invariants on the output, and (e) writes a \code{gate-summary.json}. The repository
-currently ships \textbf{more than 622 gates}, \textbf{more than 567 capability documents}, and \textbf{more than 600 example
+currently ships \textbf{more than 623 gates}, \textbf{more than 568 capability documents}, and \textbf{more than 600 example
 specifications}, with a single analyzer core of roughly 2{,}900 lines of Go.
 
 \paragraph{Resumability, offline operation, resilience, and release trust.} \code{repo analyze --resume} reuses existing fetch,
@@ -395,7 +395,10 @@ outputs, and certificate ledgers must be threshold-signed by attested hardware i
 offline-root recovery shares plus key-rotation, recovery, and revocation drills. The
 \code{confidential-computing} gate applies the same discipline to private corpus analysis: encrypted
 inputs, enclave quotes, verifier reports, key-release policies, redacted aggregate public outputs,
-private retained outputs, and replay proofs must agree before a confidential run is accepted. The
+private retained outputs, and replay proofs must agree before a confidential run is accepted.
+\code{accelerator-fallbacks} discovers every learned fixture and requires CPU-only implementation bytes,
+pinned inputs/outputs, a stable seed, two matching replays, and parity bounds before learned results
+count as broadly reproducible. The
 \code{disaster-recovery-exercise} gate closes the loop by rebuilding the public corpus, hosted docs,
 release manifest, and certificate logs, publishing each to checksum-covered mirrors, corrupting three
 primary mirrors, restoring from the first valid mirror, replaying the restored certificate log, and
@@ -1247,13 +1250,13 @@ DOI, and a sustainability plan---the connective tissue that turns a paper artifa
 project.
 
 \subsection{Research-frontier evidence}
-Finally, \tool{} stakes out forward-looking directions while keeping every one falsifiable: a
-learned risk model and a neuro-symbolic verdict that must never override a deterministic rejection;
-invariant inference and differential-semantics checks; an LLM-judge harness and an abstention policy
-that quantify and bound model uncertainty; a theorem-prover backend and counterfactual explanations;
-and transfer-learning and causal-effect studies. Each ships with a negative control proving the
-learned component cannot manufacture a passing verdict that the deterministic core would reject---
-the central safety invariant of the whole system.
+Finally, \tool{} stakes out forward-looking directions while keeping every one falsifiable: learned
+risk, active-learning, RL, foundation-model, and neuro-symbolic components that must never override a
+deterministic rejection and must now replay through CPU-only fallbacks; invariant inference and
+differential-semantics checks; an LLM-judge harness and an abstention policy that quantify and bound
+model uncertainty; a theorem-prover backend and counterfactual explanations; and transfer-learning and
+causal-effect studies. Each ships with a negative control proving the learned component cannot
+manufacture a passing verdict that the deterministic core would reject---the central safety invariant.
 
 %======================================================================
 \section{Field-Defining Extensions: Foundations, Scale, and Lasting Impact}
@@ -1292,8 +1295,9 @@ proven on a real slice so the ``product'' claims are testable, not aspirational.
 
 \paragraph{A learned-but-verified frontier.}
 Forward-looking learned components are admitted only behind the safety invariant: every model-assisted
-verdict is shadowed by a deterministic check, and the family's negative controls prove a learned
-component can never manufacture a passing verdict the core would reject.
+verdict is shadowed by a deterministic check, every repository-discovered learned fixture has a
+CPU-only replay fallback, and the family's negative controls prove a learned component can never
+manufacture a passing verdict the core would reject.
 
 \paragraph{A lasting-impact dossier.}
 Finally, longevity artifacts---a reproducibility appendix, a citation/DOI record, a governance and
@@ -1696,7 +1700,7 @@ documentation that fails if it overstates the evidence.
 data changes---can be analyzed \emph{deterministically}, with full provenance, across relational,
 NoSQL, pipeline, schema, and infrastructure surfaces, and that generation can be made safe by bounding
 it, quarantining it, and deterministically rejecting it. Just as important, \tool{} shows that
-\emph{every} such claim can be made reproducible: over 616 gates prove the system against real, pinned
+\emph{every} such claim can be made reproducible: over 617 gates prove the system against real, pinned
 public code and fail loudly on drift, and a research-grade evaluation methodology---blinded
 adjudication, seeded recall, ablations, effect sizes, and severity calibration---turns the artifact
 into evidence. We believe this combination of breadth, safety, and gate-backed reproducibility is a
@@ -1902,7 +1906,7 @@ Trust stack & \code{signed-provenance-chain-gate}, \code{reproducible-build-atte
 \code{disaster-recovery-exercise-gate} \\
 Reviewer \& community & \code{quickstart-sixty-seconds-gate}, \code{inline-review-surface-gate},
 \code{ci-pr-bot-gate}, \code{governance-policy-gate}, \code{citation-doi-gate} \\
-Research frontier & \code{learned-risk-model-gate}, \code{neuro-symbolic-verdict-gate},
+Research frontier & \code{learned-risk-model-gate}, \code{neuro-symbolic-verdict-gate}, \code{accelerator-fallbacks-gate},
 \code{theorem-prover-backend-gate}, \code{abstention-policy-gate}, \code{causal-effect-estimate-gate} \\
 Camera-ready & \code{repro-appendix-gate}, \code{dataset-datasheet-gate}, \code{model-card-gate},
 \code{evaluation-preregistration-gate}, \code{camera-ready-build-gate} \\
@@ -1971,7 +1975,8 @@ make live-calibration-monitor-gate \quad\# decile drift alerts\\
 make feedback-retention-lifecycle-gate \quad\# expiry/anonymization proof\\
 make detector-deprecation-gate \quad\# public lifecycle for weak detectors\\
 make human-trust-regression-gate \quad\# explanation faithfulness checks\\
-make live-learning-methodology-gate \quad\# recall gain without over-reliance
+make live-learning-methodology-gate \quad\# recall gain without over-reliance\\
+make accelerator-fallbacks-gate \quad\# CPU-only learned-component replay
 \end{quote}
 
 \noindent

@@ -1,0 +1,1 @@
+Patchline discovered every learned gate fixture in `examples/*-gate.json` and bound each one to a deterministic CPU fallback with no network access, pinned bytes, replay evidence, and bounded parity drift.

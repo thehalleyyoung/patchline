@@ -1,0 +1,33 @@
+{
+  "artifact": "patchline learned component catalog",
+  "version": "2026.06",
+  "components": [
+    "abstraction-selection-policy",
+    "active-learning",
+    "active-learning-loop",
+    "adopter-active-learning",
+    "adversarial-training-loop",
+    "continual-learning-eval",
+    "extractable-neuro-symbolic",
+    "foundation-model-finetune",
+    "human-trust-regression",
+    "interpretability-probe",
+    "learned-policy-safety-case",
+    "learned-program-repair",
+    "learned-risk-model",
+    "live-learning-methodology",
+    "mechanistic-decision-circuits",
+    "neuro-symbolic-proof-search",
+    "neuro-symbolic-verdict",
+    "neurosymbolic-explanations",
+    "online-learning-guard",
+    "reproducible-rl-repair-policy",
+    "reviewer-action-model",
+    "rl-reviewer",
+    "rl-rollout-sequencing",
+    "schema-foundation-model",
+    "schema-self-supervised-pretrain",
+    "transfer-learning-study",
+    "verified-learned-heuristics"
+  ]
+}

@@ -1,0 +1,1 @@
+The CPU fallback keeps each learned component within a maximum absolute accuracy drift of 0.01 from the learned artifact's recorded score, so accelerator-free reproduction preserves the artifact-level verdicts used by Patchline gates.

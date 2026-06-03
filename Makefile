@@ -17,6 +17,7 @@
 .PHONY: resilient-analysis-gate
 .PHONY: hardware-signing-gate
 .PHONY: confidential-computing-gate
+.PHONY: accelerator-fallbacks-gate
 .PHONY: disaster-recovery-exercise-gate
 .PHONY: supply-chain-compromise-sim-gate
 
@@ -1229,6 +1230,9 @@ hardware-signing-gate:
 
 confidential-computing-gate:
 	bash scripts/confidential-computing-gate.sh
+
+accelerator-fallbacks-gate:
+	bash scripts/accelerator-fallbacks-gate.sh
 
 disaster-recovery-exercise-gate:
 	bash scripts/disaster-recovery-exercise-gate.sh

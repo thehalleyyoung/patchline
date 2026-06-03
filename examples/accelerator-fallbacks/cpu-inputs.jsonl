@@ -1,0 +1,5 @@
+{"case":"rails-add-index-concurrently","features":{"schema_change":1,"runtime_evidence":1,"reviewer_uncertainty":0.14}}
+{"case":"django-nullable-contract","features":{"schema_change":1,"runtime_evidence":0,"reviewer_uncertainty":0.31}}
+{"case":"prisma-enum-expansion","features":{"schema_change":1,"runtime_evidence":1,"reviewer_uncertainty":0.22}}
+{"case":"mongo-shard-key-backfill","features":{"schema_change":0,"runtime_evidence":1,"reviewer_uncertainty":0.38}}
+{"case":"kafka-event-rename","features":{"schema_change":0,"runtime_evidence":1,"reviewer_uncertainty":0.27}}

@@ -13,6 +13,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/thehalleyyoung/patchline/internal/acceleratorfallback"
 	"github.com/thehalleyyoung/patchline/internal/acceptancestudy"
 	"github.com/thehalleyyoung/patchline/internal/artifact"
 	"github.com/thehalleyyoung/patchline/internal/attest"
@@ -2068,6 +2069,118 @@ func TestConfidentialComputingCommandWritesReports(t *testing.T) {
 	}
 	if stat, err := os.Stat(filepath.Join(out, "confidential-computing.md")); err != nil || stat.Size() == 0 {
 		t.Fatalf("expected confidential-computing.md to be written, stat=%#v err=%v", stat, err)
+	}
+}
+
+func TestAcceleratorFallbacksCommandWritesReports(t *testing.T) {
+	root := t.TempDir()
+	ids := []struct {
+		id   string
+		kind string
+	}{
+		{id: "active-learning", kind: "active_learning"},
+		{id: "learned-risk-model", kind: "risk_model"},
+		{id: "rl-reviewer", kind: "review_policy"},
+	}
+	files := map[string]string{
+		"evidence/overview.md":    "accelerator-free fallback run evidence\n",
+		"evidence/component.md":   "component fallback evidence\n",
+		"evidence/parity.md":      "parity evidence within drift budget\n",
+		"fallback/cpu.go":         "package fallbackfixture\n\nfunc Score(seed uint64, feature uint64) uint64 { return (seed ^ feature) % 997 }\n",
+		"artifacts/learned.json":  `{"artifact":"learned-component-catalog","components":3}` + "\n",
+		"artifacts/inputs.jsonl":  "{\"case\":\"migration-a\",\"feature\":7}\n{\"case\":\"migration-b\",\"feature\":11}\n",
+		"artifacts/outputs.jsonl": "{\"component\":\"active-learning\",\"score\":0.910}\n{\"component\":\"learned-risk-model\",\"score\":0.909}\n{\"component\":\"rl-reviewer\",\"score\":0.911}\n",
+	}
+	for _, id := range ids {
+		files["examples/"+id.id+"-gate.json"] = `{"version":"patchline.` + id.id + `-gate/v1","claim":"` + id.id + ` learned fixture"}` + "\n"
+	}
+	for path, contents := range files {
+		writeMainTestFile(t, root, path, contents)
+	}
+	outputHash := mainTestFileHash(t, filepath.Join(root, "artifacts/outputs.jsonl"))
+	replay := ""
+	for _, id := range ids {
+		replay += `{"component":"` + id.id + `","output_sha256":"` + outputHash + `","seed":"patchline-cpu-fallback-v1"}` + "\n"
+	}
+	writeMainTestFile(t, root, "replay/pass-1.jsonl", replay)
+	writeMainTestFile(t, root, "replay/pass-2.jsonl", replay)
+
+	learnedHash := mainTestFileHash(t, filepath.Join(root, "artifacts/learned.json"))
+	implementationHash := mainTestFileHash(t, filepath.Join(root, "fallback/cpu.go"))
+	inputHash := mainTestFileHash(t, filepath.Join(root, "artifacts/inputs.jsonl"))
+	learnedValue := 0.91
+	fallbackValue := 0.908
+	maxDrift := 0.01
+	var components []acceleratorfallback.Component
+	var required []string
+	for _, id := range ids {
+		required = append(required, id.id)
+		components = append(components, acceleratorfallback.Component{
+			ID:                    id.id,
+			Kind:                  id.kind,
+			SourcePaths:           []string{"examples/" + id.id + "-gate.json"},
+			LearnedArtifactPath:   "artifacts/learned.json",
+			LearnedArtifactSHA256: learnedHash,
+			Fallback: acceleratorfallback.Fallback{
+				Runtime:              "go-cpu",
+				ImplementationPath:   "fallback/cpu.go",
+				ImplementationSHA256: implementationHash,
+				InputArtifacts:       []acceleratorfallback.ArtifactRef{{Path: "artifacts/inputs.jsonl", SHA256: inputHash}},
+				OutputArtifact:       acceleratorfallback.ArtifactRef{Path: "artifacts/outputs.jsonl", SHA256: outputHash},
+				ReplayEvidencePaths:  []string{"replay/pass-1.jsonl", "replay/pass-2.jsonl"},
+				Deterministic:        true,
+				Seed:                 "patchline-cpu-fallback-v1",
+				Threads:              1,
+			},
+			Parity: acceleratorfallback.Parity{
+				Metric:          "accuracy",
+				LearnedValue:    &learnedValue,
+				FallbackValue:   &fallbackValue,
+				MaxAllowedDrift: &maxDrift,
+				HigherIsBetter:  true,
+				EvidencePaths:   []string{"evidence/parity.md"},
+			},
+			EvidencePaths: []string{"evidence/component.md"},
+		})
+	}
+	spec := acceleratorfallback.Spec{
+		Version: acceleratorfallback.SpecVersion,
+		Name:    "main test accelerator fallbacks",
+		Claim:   "Patchline verifies every repository-discovered learned component has a deterministic CPU fallback with pinned inputs, outputs, implementation bytes, no accelerator dependency, no network access, replay evidence, and bounded parity drift.",
+		Criteria: acceleratorfallback.Criteria{
+			RequiredComponentIDs:        required,
+			MinComponents:               len(required),
+			MinReplayArtifacts:          2,
+			RequireRepositoryDiscovery:  true,
+			RequireCPUFallback:          true,
+			RequireAcceleratorFree:      true,
+			RequireNoNetwork:            true,
+			RequireDeterministicReplay:  true,
+			RequireStableSeed:           true,
+			RequirePinnedLearned:        true,
+			RequirePinnedImplementation: true,
+			RequirePinnedInputs:         true,
+			RequirePinnedOutputs:        true,
+			RequireParityEvidence:       true,
+			RequireEvidenceHashes:       true,
+			MaxAllowedDrift:             0.01,
+		},
+		Components:    components,
+		EvidencePaths: []string{"evidence/overview.md"},
+	}
+	specPath := filepath.Join(root, "accelerator-fallbacks.json")
+	writeMainTestJSONFile(t, specPath, spec)
+	out := filepath.Join(t.TempDir(), "accelerator-fallbacks")
+	if err := run([]string{"accelerator-fallbacks", "--spec", specPath, "--root", root, "--out", out, "--json"}); err != nil {
+		t.Fatalf("accelerator-fallbacks failed: %v", err)
+	}
+	var report acceleratorfallback.Report
+	readMainTestJSON(t, filepath.Join(out, "accelerator-fallbacks.json"), &report)
+	if !report.OK || report.Summary.DiscoveredComponents != 3 || report.Summary.CPUFallbacks != 3 || report.Summary.AcceleratorFreeFallbacks != 3 || report.Summary.DeterministicFallbacks != 3 || report.Summary.ParityChecks != 3 {
+		t.Fatalf("unexpected accelerator fallback report: %#v", report)
+	}
+	if stat, err := os.Stat(filepath.Join(out, "accelerator-fallbacks.md")); err != nil || stat.Size() == 0 {
+		t.Fatalf("expected accelerator-fallbacks.md to be written, stat=%#v err=%v", stat, err)
 	}
 }
 

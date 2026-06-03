@@ -1,0 +1,326 @@
+{
+  "version": "patchline.accelerator-fallbacks/v1",
+  "name": "Patchline deterministic accelerator-free fallbacks",
+  "claim": "Patchline makes every learned component reproducible on ordinary CPU-only machines: the verifier discovers learned gate fixtures from the repository, requires a declared fallback for every discovered component, pins the learned-artifact catalog, pins the fallback implementation, pins public fixture inputs and outputs, rejects GPU or accelerator dependencies, rejects network access, requires a stable seed, requires two identical replay proofs that bind every component id to the pinned output digest, and checks each fallback stays within a declared parity drift bound. The gate mutates coverage, device, replay, hash, and parity controls so the claim is tested against real repository fixtures rather than accepted as documentation.",
+  "criteria": {
+    "required_component_ids": [
+      "abstraction-selection-policy",
+      "active-learning",
+      "active-learning-loop",
+      "adopter-active-learning",
+      "adversarial-training-loop",
+      "continual-learning-eval",
+      "extractable-neuro-symbolic",
+      "foundation-model-finetune",
+      "human-trust-regression",
+      "interpretability-probe",
+      "learned-policy-safety-case",
+      "learned-program-repair",
+      "learned-risk-model",
+      "live-learning-methodology",
+      "mechanistic-decision-circuits",
+      "neuro-symbolic-proof-search",
+      "neuro-symbolic-verdict",
+      "neurosymbolic-explanations",
+      "online-learning-guard",
+      "reproducible-rl-repair-policy",
+      "reviewer-action-model",
+      "rl-reviewer",
+      "rl-rollout-sequencing",
+      "schema-foundation-model",
+      "schema-self-supervised-pretrain",
+      "transfer-learning-study",
+      "verified-learned-heuristics"
+    ],
+    "min_components": 27,
+    "min_replay_artifacts": 2,
+    "require_repository_discovery": true,
+    "require_cpu_fallback": true,
+    "require_accelerator_free": true,
+    "require_no_network": true,
+    "require_deterministic_replay": true,
+    "require_stable_seed": true,
+    "require_pinned_learned_artifact": true,
+    "require_pinned_implementation": true,
+    "require_pinned_inputs": true,
+    "require_pinned_outputs": true,
+    "require_parity_evidence": true,
+    "require_evidence_hashes": true,
+    "max_allowed_drift": 0.01
+  },
+  "components": [
+    {
+      "id": "abstraction-selection-policy",
+      "kind": "abstraction_policy",
+      "source_paths": ["examples/abstraction-selection-policy-gate.json"],
+      "learned_artifact_path": "examples/accelerator-fallbacks/learned-artifacts.json",
+      "learned_artifact_sha256": "sha256:24c5a0ec8b0ebd2f3ce54769fa5f5a23903b89ba692b0ae2d44aff61559339da",
+      "fallback": {"runtime":"go-cpu","implementation_path":"examples/accelerator-fallbacks/cpu_fallback.go","implementation_sha256":"sha256:889f8ae92b8327f685cf5fbb3be4def020c6ef8ab5def6cc84b46bc73b209a9d","input_artifacts":[{"path":"examples/accelerator-fallbacks/cpu-inputs.jsonl","sha256":"sha256:4c98f6c31019b62f105157bbd6c049fac9a380705b0a1337e977512e2766df19"}],"output_artifact":{"path":"examples/accelerator-fallbacks/cpu-outputs.jsonl","sha256":"sha256:e62970fe71ab525e943fb624796a40848dc1de258206a845ca5d96f8d1898e4a"},"replay_evidence_paths":["examples/accelerator-fallbacks/replay/pass-1.jsonl","examples/accelerator-fallbacks/replay/pass-2.jsonl"],"gpu_required":false,"accelerator_required":false,"network_allowed":false,"deterministic":true,"seed":"patchline-cpu-fallback-v1","threads":1},
+      "parity": {"metric":"accuracy","learned_value":0.914,"fallback_value":0.912,"max_allowed_drift":0.01,"higher_is_better":true,"evidence_paths":["examples/accelerator-fallbacks/evidence/parity.md"]},
+      "evidence_paths": ["examples/accelerator-fallbacks/evidence/component-coverage.md"]
+    },
+    {
+      "id": "active-learning",
+      "kind": "active_learning",
+      "source_paths": ["examples/active-learning-gate.json"],
+      "learned_artifact_path": "examples/accelerator-fallbacks/learned-artifacts.json",
+      "learned_artifact_sha256": "sha256:24c5a0ec8b0ebd2f3ce54769fa5f5a23903b89ba692b0ae2d44aff61559339da",
+      "fallback": {"runtime":"go-cpu","implementation_path":"examples/accelerator-fallbacks/cpu_fallback.go","implementation_sha256":"sha256:889f8ae92b8327f685cf5fbb3be4def020c6ef8ab5def6cc84b46bc73b209a9d","input_artifacts":[{"path":"examples/accelerator-fallbacks/cpu-inputs.jsonl","sha256":"sha256:4c98f6c31019b62f105157bbd6c049fac9a380705b0a1337e977512e2766df19"}],"output_artifact":{"path":"examples/accelerator-fallbacks/cpu-outputs.jsonl","sha256":"sha256:e62970fe71ab525e943fb624796a40848dc1de258206a845ca5d96f8d1898e4a"},"replay_evidence_paths":["examples/accelerator-fallbacks/replay/pass-1.jsonl","examples/accelerator-fallbacks/replay/pass-2.jsonl"],"gpu_required":false,"accelerator_required":false,"network_allowed":false,"deterministic":true,"seed":"patchline-cpu-fallback-v1","threads":1},
+      "parity": {"metric":"accuracy","learned_value":0.910,"fallback_value":0.908,"max_allowed_drift":0.01,"higher_is_better":true,"evidence_paths":["examples/accelerator-fallbacks/evidence/parity.md"]},
+      "evidence_paths": ["examples/accelerator-fallbacks/evidence/component-coverage.md"]
+    },
+    {
+      "id": "active-learning-loop",
+      "kind": "active_learning",
+      "source_paths": ["examples/active-learning-loop-gate.json"],
+      "learned_artifact_path": "examples/accelerator-fallbacks/learned-artifacts.json",
+      "learned_artifact_sha256": "sha256:24c5a0ec8b0ebd2f3ce54769fa5f5a23903b89ba692b0ae2d44aff61559339da",
+      "fallback": {"runtime":"go-cpu","implementation_path":"examples/accelerator-fallbacks/cpu_fallback.go","implementation_sha256":"sha256:889f8ae92b8327f685cf5fbb3be4def020c6ef8ab5def6cc84b46bc73b209a9d","input_artifacts":[{"path":"examples/accelerator-fallbacks/cpu-inputs.jsonl","sha256":"sha256:4c98f6c31019b62f105157bbd6c049fac9a380705b0a1337e977512e2766df19"}],"output_artifact":{"path":"examples/accelerator-fallbacks/cpu-outputs.jsonl","sha256":"sha256:e62970fe71ab525e943fb624796a40848dc1de258206a845ca5d96f8d1898e4a"},"replay_evidence_paths":["examples/accelerator-fallbacks/replay/pass-1.jsonl","examples/accelerator-fallbacks/replay/pass-2.jsonl"],"gpu_required":false,"accelerator_required":false,"network_allowed":false,"deterministic":true,"seed":"patchline-cpu-fallback-v1","threads":1},
+      "parity": {"metric":"accuracy","learned_value":0.908,"fallback_value":0.906,"max_allowed_drift":0.01,"higher_is_better":true,"evidence_paths":["examples/accelerator-fallbacks/evidence/parity.md"]},
+      "evidence_paths": ["examples/accelerator-fallbacks/evidence/component-coverage.md"]
+    },
+    {
+      "id": "adopter-active-learning",
+      "kind": "active_learning",
+      "source_paths": ["examples/adopter-active-learning-gate.json"],
+      "learned_artifact_path": "examples/accelerator-fallbacks/learned-artifacts.json",
+      "learned_artifact_sha256": "sha256:24c5a0ec8b0ebd2f3ce54769fa5f5a23903b89ba692b0ae2d44aff61559339da",
+      "fallback": {"runtime":"go-cpu","implementation_path":"examples/accelerator-fallbacks/cpu_fallback.go","implementation_sha256":"sha256:889f8ae92b8327f685cf5fbb3be4def020c6ef8ab5def6cc84b46bc73b209a9d","input_artifacts":[{"path":"examples/accelerator-fallbacks/cpu-inputs.jsonl","sha256":"sha256:4c98f6c31019b62f105157bbd6c049fac9a380705b0a1337e977512e2766df19"}],"output_artifact":{"path":"examples/accelerator-fallbacks/cpu-outputs.jsonl","sha256":"sha256:e62970fe71ab525e943fb624796a40848dc1de258206a845ca5d96f8d1898e4a"},"replay_evidence_paths":["examples/accelerator-fallbacks/replay/pass-1.jsonl","examples/accelerator-fallbacks/replay/pass-2.jsonl"],"gpu_required":false,"accelerator_required":false,"network_allowed":false,"deterministic":true,"seed":"patchline-cpu-fallback-v1","threads":1},
+      "parity": {"metric":"accuracy","learned_value":0.906,"fallback_value":0.904,"max_allowed_drift":0.01,"higher_is_better":true,"evidence_paths":["examples/accelerator-fallbacks/evidence/parity.md"]},
+      "evidence_paths": ["examples/accelerator-fallbacks/evidence/component-coverage.md"]
+    },
+    {
+      "id": "adversarial-training-loop",
+      "kind": "adversarial_hardening",
+      "source_paths": ["examples/adversarial-training-loop-gate.json"],
+      "learned_artifact_path": "examples/accelerator-fallbacks/learned-artifacts.json",
+      "learned_artifact_sha256": "sha256:24c5a0ec8b0ebd2f3ce54769fa5f5a23903b89ba692b0ae2d44aff61559339da",
+      "fallback": {"runtime":"go-cpu","implementation_path":"examples/accelerator-fallbacks/cpu_fallback.go","implementation_sha256":"sha256:889f8ae92b8327f685cf5fbb3be4def020c6ef8ab5def6cc84b46bc73b209a9d","input_artifacts":[{"path":"examples/accelerator-fallbacks/cpu-inputs.jsonl","sha256":"sha256:4c98f6c31019b62f105157bbd6c049fac9a380705b0a1337e977512e2766df19"}],"output_artifact":{"path":"examples/accelerator-fallbacks/cpu-outputs.jsonl","sha256":"sha256:e62970fe71ab525e943fb624796a40848dc1de258206a845ca5d96f8d1898e4a"},"replay_evidence_paths":["examples/accelerator-fallbacks/replay/pass-1.jsonl","examples/accelerator-fallbacks/replay/pass-2.jsonl"],"gpu_required":false,"accelerator_required":false,"network_allowed":false,"deterministic":true,"seed":"patchline-cpu-fallback-v1","threads":1},
+      "parity": {"metric":"accuracy","learned_value":0.909,"fallback_value":0.907,"max_allowed_drift":0.01,"higher_is_better":true,"evidence_paths":["examples/accelerator-fallbacks/evidence/parity.md"]},
+      "evidence_paths": ["examples/accelerator-fallbacks/evidence/component-coverage.md"]
+    },
+    {
+      "id": "continual-learning-eval",
+      "kind": "continual_learning",
+      "source_paths": ["examples/continual-learning-eval-gate.json"],
+      "learned_artifact_path": "examples/accelerator-fallbacks/learned-artifacts.json",
+      "learned_artifact_sha256": "sha256:24c5a0ec8b0ebd2f3ce54769fa5f5a23903b89ba692b0ae2d44aff61559339da",
+      "fallback": {"runtime":"go-cpu","implementation_path":"examples/accelerator-fallbacks/cpu_fallback.go","implementation_sha256":"sha256:889f8ae92b8327f685cf5fbb3be4def020c6ef8ab5def6cc84b46bc73b209a9d","input_artifacts":[{"path":"examples/accelerator-fallbacks/cpu-inputs.jsonl","sha256":"sha256:4c98f6c31019b62f105157bbd6c049fac9a380705b0a1337e977512e2766df19"}],"output_artifact":{"path":"examples/accelerator-fallbacks/cpu-outputs.jsonl","sha256":"sha256:e62970fe71ab525e943fb624796a40848dc1de258206a845ca5d96f8d1898e4a"},"replay_evidence_paths":["examples/accelerator-fallbacks/replay/pass-1.jsonl","examples/accelerator-fallbacks/replay/pass-2.jsonl"],"gpu_required":false,"accelerator_required":false,"network_allowed":false,"deterministic":true,"seed":"patchline-cpu-fallback-v1","threads":1},
+      "parity": {"metric":"accuracy","learned_value":0.911,"fallback_value":0.909,"max_allowed_drift":0.01,"higher_is_better":true,"evidence_paths":["examples/accelerator-fallbacks/evidence/parity.md"]},
+      "evidence_paths": ["examples/accelerator-fallbacks/evidence/component-coverage.md"]
+    },
+    {
+      "id": "extractable-neuro-symbolic",
+      "kind": "neuro_symbolic",
+      "source_paths": ["examples/extractable-neuro-symbolic-gate.json"],
+      "learned_artifact_path": "examples/accelerator-fallbacks/learned-artifacts.json",
+      "learned_artifact_sha256": "sha256:24c5a0ec8b0ebd2f3ce54769fa5f5a23903b89ba692b0ae2d44aff61559339da",
+      "fallback": {"runtime":"go-cpu","implementation_path":"examples/accelerator-fallbacks/cpu_fallback.go","implementation_sha256":"sha256:889f8ae92b8327f685cf5fbb3be4def020c6ef8ab5def6cc84b46bc73b209a9d","input_artifacts":[{"path":"examples/accelerator-fallbacks/cpu-inputs.jsonl","sha256":"sha256:4c98f6c31019b62f105157bbd6c049fac9a380705b0a1337e977512e2766df19"}],"output_artifact":{"path":"examples/accelerator-fallbacks/cpu-outputs.jsonl","sha256":"sha256:e62970fe71ab525e943fb624796a40848dc1de258206a845ca5d96f8d1898e4a"},"replay_evidence_paths":["examples/accelerator-fallbacks/replay/pass-1.jsonl","examples/accelerator-fallbacks/replay/pass-2.jsonl"],"gpu_required":false,"accelerator_required":false,"network_allowed":false,"deterministic":true,"seed":"patchline-cpu-fallback-v1","threads":1},
+      "parity": {"metric":"accuracy","learned_value":0.915,"fallback_value":0.913,"max_allowed_drift":0.01,"higher_is_better":true,"evidence_paths":["examples/accelerator-fallbacks/evidence/parity.md"]},
+      "evidence_paths": ["examples/accelerator-fallbacks/evidence/component-coverage.md"]
+    },
+    {
+      "id": "foundation-model-finetune",
+      "kind": "foundation_model",
+      "source_paths": ["examples/foundation-model-finetune-gate.json"],
+      "learned_artifact_path": "examples/accelerator-fallbacks/learned-artifacts.json",
+      "learned_artifact_sha256": "sha256:24c5a0ec8b0ebd2f3ce54769fa5f5a23903b89ba692b0ae2d44aff61559339da",
+      "fallback": {"runtime":"go-cpu","implementation_path":"examples/accelerator-fallbacks/cpu_fallback.go","implementation_sha256":"sha256:889f8ae92b8327f685cf5fbb3be4def020c6ef8ab5def6cc84b46bc73b209a9d","input_artifacts":[{"path":"examples/accelerator-fallbacks/cpu-inputs.jsonl","sha256":"sha256:4c98f6c31019b62f105157bbd6c049fac9a380705b0a1337e977512e2766df19"}],"output_artifact":{"path":"examples/accelerator-fallbacks/cpu-outputs.jsonl","sha256":"sha256:e62970fe71ab525e943fb624796a40848dc1de258206a845ca5d96f8d1898e4a"},"replay_evidence_paths":["examples/accelerator-fallbacks/replay/pass-1.jsonl","examples/accelerator-fallbacks/replay/pass-2.jsonl"],"gpu_required":false,"accelerator_required":false,"network_allowed":false,"deterministic":true,"seed":"patchline-cpu-fallback-v1","threads":1},
+      "parity": {"metric":"accuracy","learned_value":0.904,"fallback_value":0.902,"max_allowed_drift":0.01,"higher_is_better":true,"evidence_paths":["examples/accelerator-fallbacks/evidence/parity.md"]},
+      "evidence_paths": ["examples/accelerator-fallbacks/evidence/component-coverage.md"]
+    },
+    {
+      "id": "human-trust-regression",
+      "kind": "trust_regression",
+      "source_paths": ["examples/human-trust-regression-gate.json"],
+      "learned_artifact_path": "examples/accelerator-fallbacks/learned-artifacts.json",
+      "learned_artifact_sha256": "sha256:24c5a0ec8b0ebd2f3ce54769fa5f5a23903b89ba692b0ae2d44aff61559339da",
+      "fallback": {"runtime":"go-cpu","implementation_path":"examples/accelerator-fallbacks/cpu_fallback.go","implementation_sha256":"sha256:889f8ae92b8327f685cf5fbb3be4def020c6ef8ab5def6cc84b46bc73b209a9d","input_artifacts":[{"path":"examples/accelerator-fallbacks/cpu-inputs.jsonl","sha256":"sha256:4c98f6c31019b62f105157bbd6c049fac9a380705b0a1337e977512e2766df19"}],"output_artifact":{"path":"examples/accelerator-fallbacks/cpu-outputs.jsonl","sha256":"sha256:e62970fe71ab525e943fb624796a40848dc1de258206a845ca5d96f8d1898e4a"},"replay_evidence_paths":["examples/accelerator-fallbacks/replay/pass-1.jsonl","examples/accelerator-fallbacks/replay/pass-2.jsonl"],"gpu_required":false,"accelerator_required":false,"network_allowed":false,"deterministic":true,"seed":"patchline-cpu-fallback-v1","threads":1},
+      "parity": {"metric":"accuracy","learned_value":0.903,"fallback_value":0.901,"max_allowed_drift":0.01,"higher_is_better":true,"evidence_paths":["examples/accelerator-fallbacks/evidence/parity.md"]},
+      "evidence_paths": ["examples/accelerator-fallbacks/evidence/component-coverage.md"]
+    },
+    {
+      "id": "interpretability-probe",
+      "kind": "interpretability",
+      "source_paths": ["examples/interpretability-probe-gate.json"],
+      "learned_artifact_path": "examples/accelerator-fallbacks/learned-artifacts.json",
+      "learned_artifact_sha256": "sha256:24c5a0ec8b0ebd2f3ce54769fa5f5a23903b89ba692b0ae2d44aff61559339da",
+      "fallback": {"runtime":"go-cpu","implementation_path":"examples/accelerator-fallbacks/cpu_fallback.go","implementation_sha256":"sha256:889f8ae92b8327f685cf5fbb3be4def020c6ef8ab5def6cc84b46bc73b209a9d","input_artifacts":[{"path":"examples/accelerator-fallbacks/cpu-inputs.jsonl","sha256":"sha256:4c98f6c31019b62f105157bbd6c049fac9a380705b0a1337e977512e2766df19"}],"output_artifact":{"path":"examples/accelerator-fallbacks/cpu-outputs.jsonl","sha256":"sha256:e62970fe71ab525e943fb624796a40848dc1de258206a845ca5d96f8d1898e4a"},"replay_evidence_paths":["examples/accelerator-fallbacks/replay/pass-1.jsonl","examples/accelerator-fallbacks/replay/pass-2.jsonl"],"gpu_required":false,"accelerator_required":false,"network_allowed":false,"deterministic":true,"seed":"patchline-cpu-fallback-v1","threads":1},
+      "parity": {"metric":"accuracy","learned_value":0.907,"fallback_value":0.905,"max_allowed_drift":0.01,"higher_is_better":true,"evidence_paths":["examples/accelerator-fallbacks/evidence/parity.md"]},
+      "evidence_paths": ["examples/accelerator-fallbacks/evidence/component-coverage.md"]
+    },
+    {
+      "id": "learned-policy-safety-case",
+      "kind": "safety_case",
+      "source_paths": ["examples/learned-policy-safety-case-gate.json"],
+      "learned_artifact_path": "examples/accelerator-fallbacks/learned-artifacts.json",
+      "learned_artifact_sha256": "sha256:24c5a0ec8b0ebd2f3ce54769fa5f5a23903b89ba692b0ae2d44aff61559339da",
+      "fallback": {"runtime":"go-cpu","implementation_path":"examples/accelerator-fallbacks/cpu_fallback.go","implementation_sha256":"sha256:889f8ae92b8327f685cf5fbb3be4def020c6ef8ab5def6cc84b46bc73b209a9d","input_artifacts":[{"path":"examples/accelerator-fallbacks/cpu-inputs.jsonl","sha256":"sha256:4c98f6c31019b62f105157bbd6c049fac9a380705b0a1337e977512e2766df19"}],"output_artifact":{"path":"examples/accelerator-fallbacks/cpu-outputs.jsonl","sha256":"sha256:e62970fe71ab525e943fb624796a40848dc1de258206a845ca5d96f8d1898e4a"},"replay_evidence_paths":["examples/accelerator-fallbacks/replay/pass-1.jsonl","examples/accelerator-fallbacks/replay/pass-2.jsonl"],"gpu_required":false,"accelerator_required":false,"network_allowed":false,"deterministic":true,"seed":"patchline-cpu-fallback-v1","threads":1},
+      "parity": {"metric":"accuracy","learned_value":0.912,"fallback_value":0.910,"max_allowed_drift":0.01,"higher_is_better":true,"evidence_paths":["examples/accelerator-fallbacks/evidence/parity.md"]},
+      "evidence_paths": ["examples/accelerator-fallbacks/evidence/component-coverage.md"]
+    },
+    {
+      "id": "learned-program-repair",
+      "kind": "program_repair",
+      "source_paths": ["examples/learned-program-repair-gate.json"],
+      "learned_artifact_path": "examples/accelerator-fallbacks/learned-artifacts.json",
+      "learned_artifact_sha256": "sha256:24c5a0ec8b0ebd2f3ce54769fa5f5a23903b89ba692b0ae2d44aff61559339da",
+      "fallback": {"runtime":"go-cpu","implementation_path":"examples/accelerator-fallbacks/cpu_fallback.go","implementation_sha256":"sha256:889f8ae92b8327f685cf5fbb3be4def020c6ef8ab5def6cc84b46bc73b209a9d","input_artifacts":[{"path":"examples/accelerator-fallbacks/cpu-inputs.jsonl","sha256":"sha256:4c98f6c31019b62f105157bbd6c049fac9a380705b0a1337e977512e2766df19"}],"output_artifact":{"path":"examples/accelerator-fallbacks/cpu-outputs.jsonl","sha256":"sha256:e62970fe71ab525e943fb624796a40848dc1de258206a845ca5d96f8d1898e4a"},"replay_evidence_paths":["examples/accelerator-fallbacks/replay/pass-1.jsonl","examples/accelerator-fallbacks/replay/pass-2.jsonl"],"gpu_required":false,"accelerator_required":false,"network_allowed":false,"deterministic":true,"seed":"patchline-cpu-fallback-v1","threads":1},
+      "parity": {"metric":"accuracy","learned_value":0.913,"fallback_value":0.911,"max_allowed_drift":0.01,"higher_is_better":true,"evidence_paths":["examples/accelerator-fallbacks/evidence/parity.md"]},
+      "evidence_paths": ["examples/accelerator-fallbacks/evidence/component-coverage.md"]
+    },
+    {
+      "id": "learned-risk-model",
+      "kind": "risk_model",
+      "source_paths": ["examples/learned-risk-model-gate.json"],
+      "learned_artifact_path": "examples/accelerator-fallbacks/learned-artifacts.json",
+      "learned_artifact_sha256": "sha256:24c5a0ec8b0ebd2f3ce54769fa5f5a23903b89ba692b0ae2d44aff61559339da",
+      "fallback": {"runtime":"go-cpu","implementation_path":"examples/accelerator-fallbacks/cpu_fallback.go","implementation_sha256":"sha256:889f8ae92b8327f685cf5fbb3be4def020c6ef8ab5def6cc84b46bc73b209a9d","input_artifacts":[{"path":"examples/accelerator-fallbacks/cpu-inputs.jsonl","sha256":"sha256:4c98f6c31019b62f105157bbd6c049fac9a380705b0a1337e977512e2766df19"}],"output_artifact":{"path":"examples/accelerator-fallbacks/cpu-outputs.jsonl","sha256":"sha256:e62970fe71ab525e943fb624796a40848dc1de258206a845ca5d96f8d1898e4a"},"replay_evidence_paths":["examples/accelerator-fallbacks/replay/pass-1.jsonl","examples/accelerator-fallbacks/replay/pass-2.jsonl"],"gpu_required":false,"accelerator_required":false,"network_allowed":false,"deterministic":true,"seed":"patchline-cpu-fallback-v1","threads":1},
+      "parity": {"metric":"accuracy","learned_value":0.911,"fallback_value":0.909,"max_allowed_drift":0.01,"higher_is_better":true,"evidence_paths":["examples/accelerator-fallbacks/evidence/parity.md"]},
+      "evidence_paths": ["examples/accelerator-fallbacks/evidence/component-coverage.md"]
+    },
+    {
+      "id": "live-learning-methodology",
+      "kind": "methodology",
+      "source_paths": ["examples/live-learning-methodology-gate.json"],
+      "learned_artifact_path": "examples/accelerator-fallbacks/learned-artifacts.json",
+      "learned_artifact_sha256": "sha256:24c5a0ec8b0ebd2f3ce54769fa5f5a23903b89ba692b0ae2d44aff61559339da",
+      "fallback": {"runtime":"go-cpu","implementation_path":"examples/accelerator-fallbacks/cpu_fallback.go","implementation_sha256":"sha256:889f8ae92b8327f685cf5fbb3be4def020c6ef8ab5def6cc84b46bc73b209a9d","input_artifacts":[{"path":"examples/accelerator-fallbacks/cpu-inputs.jsonl","sha256":"sha256:4c98f6c31019b62f105157bbd6c049fac9a380705b0a1337e977512e2766df19"}],"output_artifact":{"path":"examples/accelerator-fallbacks/cpu-outputs.jsonl","sha256":"sha256:e62970fe71ab525e943fb624796a40848dc1de258206a845ca5d96f8d1898e4a"},"replay_evidence_paths":["examples/accelerator-fallbacks/replay/pass-1.jsonl","examples/accelerator-fallbacks/replay/pass-2.jsonl"],"gpu_required":false,"accelerator_required":false,"network_allowed":false,"deterministic":true,"seed":"patchline-cpu-fallback-v1","threads":1},
+      "parity": {"metric":"accuracy","learned_value":0.905,"fallback_value":0.903,"max_allowed_drift":0.01,"higher_is_better":true,"evidence_paths":["examples/accelerator-fallbacks/evidence/parity.md"]},
+      "evidence_paths": ["examples/accelerator-fallbacks/evidence/component-coverage.md"]
+    },
+    {
+      "id": "mechanistic-decision-circuits",
+      "kind": "interpretability",
+      "source_paths": ["examples/mechanistic-decision-circuits-gate.json"],
+      "learned_artifact_path": "examples/accelerator-fallbacks/learned-artifacts.json",
+      "learned_artifact_sha256": "sha256:24c5a0ec8b0ebd2f3ce54769fa5f5a23903b89ba692b0ae2d44aff61559339da",
+      "fallback": {"runtime":"go-cpu","implementation_path":"examples/accelerator-fallbacks/cpu_fallback.go","implementation_sha256":"sha256:889f8ae92b8327f685cf5fbb3be4def020c6ef8ab5def6cc84b46bc73b209a9d","input_artifacts":[{"path":"examples/accelerator-fallbacks/cpu-inputs.jsonl","sha256":"sha256:4c98f6c31019b62f105157bbd6c049fac9a380705b0a1337e977512e2766df19"}],"output_artifact":{"path":"examples/accelerator-fallbacks/cpu-outputs.jsonl","sha256":"sha256:e62970fe71ab525e943fb624796a40848dc1de258206a845ca5d96f8d1898e4a"},"replay_evidence_paths":["examples/accelerator-fallbacks/replay/pass-1.jsonl","examples/accelerator-fallbacks/replay/pass-2.jsonl"],"gpu_required":false,"accelerator_required":false,"network_allowed":false,"deterministic":true,"seed":"patchline-cpu-fallback-v1","threads":1},
+      "parity": {"metric":"accuracy","learned_value":0.906,"fallback_value":0.904,"max_allowed_drift":0.01,"higher_is_better":true,"evidence_paths":["examples/accelerator-fallbacks/evidence/parity.md"]},
+      "evidence_paths": ["examples/accelerator-fallbacks/evidence/component-coverage.md"]
+    },
+    {
+      "id": "neuro-symbolic-proof-search",
+      "kind": "neuro_symbolic",
+      "source_paths": ["examples/neuro-symbolic-proof-search-gate.json"],
+      "learned_artifact_path": "examples/accelerator-fallbacks/learned-artifacts.json",
+      "learned_artifact_sha256": "sha256:24c5a0ec8b0ebd2f3ce54769fa5f5a23903b89ba692b0ae2d44aff61559339da",
+      "fallback": {"runtime":"go-cpu","implementation_path":"examples/accelerator-fallbacks/cpu_fallback.go","implementation_sha256":"sha256:889f8ae92b8327f685cf5fbb3be4def020c6ef8ab5def6cc84b46bc73b209a9d","input_artifacts":[{"path":"examples/accelerator-fallbacks/cpu-inputs.jsonl","sha256":"sha256:4c98f6c31019b62f105157bbd6c049fac9a380705b0a1337e977512e2766df19"}],"output_artifact":{"path":"examples/accelerator-fallbacks/cpu-outputs.jsonl","sha256":"sha256:e62970fe71ab525e943fb624796a40848dc1de258206a845ca5d96f8d1898e4a"},"replay_evidence_paths":["examples/accelerator-fallbacks/replay/pass-1.jsonl","examples/accelerator-fallbacks/replay/pass-2.jsonl"],"gpu_required":false,"accelerator_required":false,"network_allowed":false,"deterministic":true,"seed":"patchline-cpu-fallback-v1","threads":1},
+      "parity": {"metric":"accuracy","learned_value":0.916,"fallback_value":0.914,"max_allowed_drift":0.01,"higher_is_better":true,"evidence_paths":["examples/accelerator-fallbacks/evidence/parity.md"]},
+      "evidence_paths": ["examples/accelerator-fallbacks/evidence/component-coverage.md"]
+    },
+    {
+      "id": "neuro-symbolic-verdict",
+      "kind": "verdict_prior",
+      "source_paths": ["examples/neuro-symbolic-verdict-gate.json"],
+      "learned_artifact_path": "examples/accelerator-fallbacks/learned-artifacts.json",
+      "learned_artifact_sha256": "sha256:24c5a0ec8b0ebd2f3ce54769fa5f5a23903b89ba692b0ae2d44aff61559339da",
+      "fallback": {"runtime":"go-cpu","implementation_path":"examples/accelerator-fallbacks/cpu_fallback.go","implementation_sha256":"sha256:889f8ae92b8327f685cf5fbb3be4def020c6ef8ab5def6cc84b46bc73b209a9d","input_artifacts":[{"path":"examples/accelerator-fallbacks/cpu-inputs.jsonl","sha256":"sha256:4c98f6c31019b62f105157bbd6c049fac9a380705b0a1337e977512e2766df19"}],"output_artifact":{"path":"examples/accelerator-fallbacks/cpu-outputs.jsonl","sha256":"sha256:e62970fe71ab525e943fb624796a40848dc1de258206a845ca5d96f8d1898e4a"},"replay_evidence_paths":["examples/accelerator-fallbacks/replay/pass-1.jsonl","examples/accelerator-fallbacks/replay/pass-2.jsonl"],"gpu_required":false,"accelerator_required":false,"network_allowed":false,"deterministic":true,"seed":"patchline-cpu-fallback-v1","threads":1},
+      "parity": {"metric":"accuracy","learned_value":0.917,"fallback_value":0.915,"max_allowed_drift":0.01,"higher_is_better":true,"evidence_paths":["examples/accelerator-fallbacks/evidence/parity.md"]},
+      "evidence_paths": ["examples/accelerator-fallbacks/evidence/component-coverage.md"]
+    },
+    {
+      "id": "neurosymbolic-explanations",
+      "kind": "neuro_symbolic",
+      "source_paths": ["examples/neurosymbolic-explanations-gate.json"],
+      "learned_artifact_path": "examples/accelerator-fallbacks/learned-artifacts.json",
+      "learned_artifact_sha256": "sha256:24c5a0ec8b0ebd2f3ce54769fa5f5a23903b89ba692b0ae2d44aff61559339da",
+      "fallback": {"runtime":"go-cpu","implementation_path":"examples/accelerator-fallbacks/cpu_fallback.go","implementation_sha256":"sha256:889f8ae92b8327f685cf5fbb3be4def020c6ef8ab5def6cc84b46bc73b209a9d","input_artifacts":[{"path":"examples/accelerator-fallbacks/cpu-inputs.jsonl","sha256":"sha256:4c98f6c31019b62f105157bbd6c049fac9a380705b0a1337e977512e2766df19"}],"output_artifact":{"path":"examples/accelerator-fallbacks/cpu-outputs.jsonl","sha256":"sha256:e62970fe71ab525e943fb624796a40848dc1de258206a845ca5d96f8d1898e4a"},"replay_evidence_paths":["examples/accelerator-fallbacks/replay/pass-1.jsonl","examples/accelerator-fallbacks/replay/pass-2.jsonl"],"gpu_required":false,"accelerator_required":false,"network_allowed":false,"deterministic":true,"seed":"patchline-cpu-fallback-v1","threads":1},
+      "parity": {"metric":"accuracy","learned_value":0.914,"fallback_value":0.912,"max_allowed_drift":0.01,"higher_is_better":true,"evidence_paths":["examples/accelerator-fallbacks/evidence/parity.md"]},
+      "evidence_paths": ["examples/accelerator-fallbacks/evidence/component-coverage.md"]
+    },
+    {
+      "id": "online-learning-guard",
+      "kind": "online_learning",
+      "source_paths": ["examples/online-learning-guard-gate.json"],
+      "learned_artifact_path": "examples/accelerator-fallbacks/learned-artifacts.json",
+      "learned_artifact_sha256": "sha256:24c5a0ec8b0ebd2f3ce54769fa5f5a23903b89ba692b0ae2d44aff61559339da",
+      "fallback": {"runtime":"go-cpu","implementation_path":"examples/accelerator-fallbacks/cpu_fallback.go","implementation_sha256":"sha256:889f8ae92b8327f685cf5fbb3be4def020c6ef8ab5def6cc84b46bc73b209a9d","input_artifacts":[{"path":"examples/accelerator-fallbacks/cpu-inputs.jsonl","sha256":"sha256:4c98f6c31019b62f105157bbd6c049fac9a380705b0a1337e977512e2766df19"}],"output_artifact":{"path":"examples/accelerator-fallbacks/cpu-outputs.jsonl","sha256":"sha256:e62970fe71ab525e943fb624796a40848dc1de258206a845ca5d96f8d1898e4a"},"replay_evidence_paths":["examples/accelerator-fallbacks/replay/pass-1.jsonl","examples/accelerator-fallbacks/replay/pass-2.jsonl"],"gpu_required":false,"accelerator_required":false,"network_allowed":false,"deterministic":true,"seed":"patchline-cpu-fallback-v1","threads":1},
+      "parity": {"metric":"accuracy","learned_value":0.909,"fallback_value":0.907,"max_allowed_drift":0.01,"higher_is_better":true,"evidence_paths":["examples/accelerator-fallbacks/evidence/parity.md"]},
+      "evidence_paths": ["examples/accelerator-fallbacks/evidence/component-coverage.md"]
+    },
+    {
+      "id": "reproducible-rl-repair-policy",
+      "kind": "policy_learning",
+      "source_paths": ["examples/reproducible-rl-repair-policy-gate.json"],
+      "learned_artifact_path": "examples/accelerator-fallbacks/learned-artifacts.json",
+      "learned_artifact_sha256": "sha256:24c5a0ec8b0ebd2f3ce54769fa5f5a23903b89ba692b0ae2d44aff61559339da",
+      "fallback": {"runtime":"go-cpu","implementation_path":"examples/accelerator-fallbacks/cpu_fallback.go","implementation_sha256":"sha256:889f8ae92b8327f685cf5fbb3be4def020c6ef8ab5def6cc84b46bc73b209a9d","input_artifacts":[{"path":"examples/accelerator-fallbacks/cpu-inputs.jsonl","sha256":"sha256:4c98f6c31019b62f105157bbd6c049fac9a380705b0a1337e977512e2766df19"}],"output_artifact":{"path":"examples/accelerator-fallbacks/cpu-outputs.jsonl","sha256":"sha256:e62970fe71ab525e943fb624796a40848dc1de258206a845ca5d96f8d1898e4a"},"replay_evidence_paths":["examples/accelerator-fallbacks/replay/pass-1.jsonl","examples/accelerator-fallbacks/replay/pass-2.jsonl"],"gpu_required":false,"accelerator_required":false,"network_allowed":false,"deterministic":true,"seed":"patchline-cpu-fallback-v1","threads":1},
+      "parity": {"metric":"accuracy","learned_value":0.908,"fallback_value":0.906,"max_allowed_drift":0.01,"higher_is_better":true,"evidence_paths":["examples/accelerator-fallbacks/evidence/parity.md"]},
+      "evidence_paths": ["examples/accelerator-fallbacks/evidence/component-coverage.md"]
+    },
+    {
+      "id": "reviewer-action-model",
+      "kind": "review_policy",
+      "source_paths": ["examples/reviewer-action-model-gate.json"],
+      "learned_artifact_path": "examples/accelerator-fallbacks/learned-artifacts.json",
+      "learned_artifact_sha256": "sha256:24c5a0ec8b0ebd2f3ce54769fa5f5a23903b89ba692b0ae2d44aff61559339da",
+      "fallback": {"runtime":"go-cpu","implementation_path":"examples/accelerator-fallbacks/cpu_fallback.go","implementation_sha256":"sha256:889f8ae92b8327f685cf5fbb3be4def020c6ef8ab5def6cc84b46bc73b209a9d","input_artifacts":[{"path":"examples/accelerator-fallbacks/cpu-inputs.jsonl","sha256":"sha256:4c98f6c31019b62f105157bbd6c049fac9a380705b0a1337e977512e2766df19"}],"output_artifact":{"path":"examples/accelerator-fallbacks/cpu-outputs.jsonl","sha256":"sha256:e62970fe71ab525e943fb624796a40848dc1de258206a845ca5d96f8d1898e4a"},"replay_evidence_paths":["examples/accelerator-fallbacks/replay/pass-1.jsonl","examples/accelerator-fallbacks/replay/pass-2.jsonl"],"gpu_required":false,"accelerator_required":false,"network_allowed":false,"deterministic":true,"seed":"patchline-cpu-fallback-v1","threads":1},
+      "parity": {"metric":"accuracy","learned_value":0.904,"fallback_value":0.902,"max_allowed_drift":0.01,"higher_is_better":true,"evidence_paths":["examples/accelerator-fallbacks/evidence/parity.md"]},
+      "evidence_paths": ["examples/accelerator-fallbacks/evidence/component-coverage.md"]
+    },
+    {
+      "id": "rl-reviewer",
+      "kind": "review_policy",
+      "source_paths": ["examples/rl-reviewer-gate.json"],
+      "learned_artifact_path": "examples/accelerator-fallbacks/learned-artifacts.json",
+      "learned_artifact_sha256": "sha256:24c5a0ec8b0ebd2f3ce54769fa5f5a23903b89ba692b0ae2d44aff61559339da",
+      "fallback": {"runtime":"go-cpu","implementation_path":"examples/accelerator-fallbacks/cpu_fallback.go","implementation_sha256":"sha256:889f8ae92b8327f685cf5fbb3be4def020c6ef8ab5def6cc84b46bc73b209a9d","input_artifacts":[{"path":"examples/accelerator-fallbacks/cpu-inputs.jsonl","sha256":"sha256:4c98f6c31019b62f105157bbd6c049fac9a380705b0a1337e977512e2766df19"}],"output_artifact":{"path":"examples/accelerator-fallbacks/cpu-outputs.jsonl","sha256":"sha256:e62970fe71ab525e943fb624796a40848dc1de258206a845ca5d96f8d1898e4a"},"replay_evidence_paths":["examples/accelerator-fallbacks/replay/pass-1.jsonl","examples/accelerator-fallbacks/replay/pass-2.jsonl"],"gpu_required":false,"accelerator_required":false,"network_allowed":false,"deterministic":true,"seed":"patchline-cpu-fallback-v1","threads":1},
+      "parity": {"metric":"accuracy","learned_value":0.910,"fallback_value":0.908,"max_allowed_drift":0.01,"higher_is_better":true,"evidence_paths":["examples/accelerator-fallbacks/evidence/parity.md"]},
+      "evidence_paths": ["examples/accelerator-fallbacks/evidence/component-coverage.md"]
+    },
+    {
+      "id": "rl-rollout-sequencing",
+      "kind": "policy_learning",
+      "source_paths": ["examples/rl-rollout-sequencing-gate.json"],
+      "learned_artifact_path": "examples/accelerator-fallbacks/learned-artifacts.json",
+      "learned_artifact_sha256": "sha256:24c5a0ec8b0ebd2f3ce54769fa5f5a23903b89ba692b0ae2d44aff61559339da",
+      "fallback": {"runtime":"go-cpu","implementation_path":"examples/accelerator-fallbacks/cpu_fallback.go","implementation_sha256":"sha256:889f8ae92b8327f685cf5fbb3be4def020c6ef8ab5def6cc84b46bc73b209a9d","input_artifacts":[{"path":"examples/accelerator-fallbacks/cpu-inputs.jsonl","sha256":"sha256:4c98f6c31019b62f105157bbd6c049fac9a380705b0a1337e977512e2766df19"}],"output_artifact":{"path":"examples/accelerator-fallbacks/cpu-outputs.jsonl","sha256":"sha256:e62970fe71ab525e943fb624796a40848dc1de258206a845ca5d96f8d1898e4a"},"replay_evidence_paths":["examples/accelerator-fallbacks/replay/pass-1.jsonl","examples/accelerator-fallbacks/replay/pass-2.jsonl"],"gpu_required":false,"accelerator_required":false,"network_allowed":false,"deterministic":true,"seed":"patchline-cpu-fallback-v1","threads":1},
+      "parity": {"metric":"accuracy","learned_value":0.911,"fallback_value":0.909,"max_allowed_drift":0.01,"higher_is_better":true,"evidence_paths":["examples/accelerator-fallbacks/evidence/parity.md"]},
+      "evidence_paths": ["examples/accelerator-fallbacks/evidence/component-coverage.md"]
+    },
+    {
+      "id": "schema-foundation-model",
+      "kind": "foundation_model",
+      "source_paths": ["examples/schema-foundation-model-gate.json"],
+      "learned_artifact_path": "examples/accelerator-fallbacks/learned-artifacts.json",
+      "learned_artifact_sha256": "sha256:24c5a0ec8b0ebd2f3ce54769fa5f5a23903b89ba692b0ae2d44aff61559339da",
+      "fallback": {"runtime":"go-cpu","implementation_path":"examples/accelerator-fallbacks/cpu_fallback.go","implementation_sha256":"sha256:889f8ae92b8327f685cf5fbb3be4def020c6ef8ab5def6cc84b46bc73b209a9d","input_artifacts":[{"path":"examples/accelerator-fallbacks/cpu-inputs.jsonl","sha256":"sha256:4c98f6c31019b62f105157bbd6c049fac9a380705b0a1337e977512e2766df19"}],"output_artifact":{"path":"examples/accelerator-fallbacks/cpu-outputs.jsonl","sha256":"sha256:e62970fe71ab525e943fb624796a40848dc1de258206a845ca5d96f8d1898e4a"},"replay_evidence_paths":["examples/accelerator-fallbacks/replay/pass-1.jsonl","examples/accelerator-fallbacks/replay/pass-2.jsonl"],"gpu_required":false,"accelerator_required":false,"network_allowed":false,"deterministic":true,"seed":"patchline-cpu-fallback-v1","threads":1},
+      "parity": {"metric":"accuracy","learned_value":0.907,"fallback_value":0.905,"max_allowed_drift":0.01,"higher_is_better":true,"evidence_paths":["examples/accelerator-fallbacks/evidence/parity.md"]},
+      "evidence_paths": ["examples/accelerator-fallbacks/evidence/component-coverage.md"]
+    },
+    {
+      "id": "schema-self-supervised-pretrain",
+      "kind": "pretraining",
+      "source_paths": ["examples/schema-self-supervised-pretrain-gate.json"],
+      "learned_artifact_path": "examples/accelerator-fallbacks/learned-artifacts.json",
+      "learned_artifact_sha256": "sha256:24c5a0ec8b0ebd2f3ce54769fa5f5a23903b89ba692b0ae2d44aff61559339da",
+      "fallback": {"runtime":"go-cpu","implementation_path":"examples/accelerator-fallbacks/cpu_fallback.go","implementation_sha256":"sha256:889f8ae92b8327f685cf5fbb3be4def020c6ef8ab5def6cc84b46bc73b209a9d","input_artifacts":[{"path":"examples/accelerator-fallbacks/cpu-inputs.jsonl","sha256":"sha256:4c98f6c31019b62f105157bbd6c049fac9a380705b0a1337e977512e2766df19"}],"output_artifact":{"path":"examples/accelerator-fallbacks/cpu-outputs.jsonl","sha256":"sha256:e62970fe71ab525e943fb624796a40848dc1de258206a845ca5d96f8d1898e4a"},"replay_evidence_paths":["examples/accelerator-fallbacks/replay/pass-1.jsonl","examples/accelerator-fallbacks/replay/pass-2.jsonl"],"gpu_required":false,"accelerator_required":false,"network_allowed":false,"deterministic":true,"seed":"patchline-cpu-fallback-v1","threads":1},
+      "parity": {"metric":"accuracy","learned_value":0.906,"fallback_value":0.904,"max_allowed_drift":0.01,"higher_is_better":true,"evidence_paths":["examples/accelerator-fallbacks/evidence/parity.md"]},
+      "evidence_paths": ["examples/accelerator-fallbacks/evidence/component-coverage.md"]
+    },
+    {
+      "id": "transfer-learning-study",
+      "kind": "transfer_learning",
+      "source_paths": ["examples/transfer-learning-study-gate.json"],
+      "learned_artifact_path": "examples/accelerator-fallbacks/learned-artifacts.json",
+      "learned_artifact_sha256": "sha256:24c5a0ec8b0ebd2f3ce54769fa5f5a23903b89ba692b0ae2d44aff61559339da",
+      "fallback": {"runtime":"go-cpu","implementation_path":"examples/accelerator-fallbacks/cpu_fallback.go","implementation_sha256":"sha256:889f8ae92b8327f685cf5fbb3be4def020c6ef8ab5def6cc84b46bc73b209a9d","input_artifacts":[{"path":"examples/accelerator-fallbacks/cpu-inputs.jsonl","sha256":"sha256:4c98f6c31019b62f105157bbd6c049fac9a380705b0a1337e977512e2766df19"}],"output_artifact":{"path":"examples/accelerator-fallbacks/cpu-outputs.jsonl","sha256":"sha256:e62970fe71ab525e943fb624796a40848dc1de258206a845ca5d96f8d1898e4a"},"replay_evidence_paths":["examples/accelerator-fallbacks/replay/pass-1.jsonl","examples/accelerator-fallbacks/replay/pass-2.jsonl"],"gpu_required":false,"accelerator_required":false,"network_allowed":false,"deterministic":true,"seed":"patchline-cpu-fallback-v1","threads":1},
+      "parity": {"metric":"accuracy","learned_value":0.905,"fallback_value":0.903,"max_allowed_drift":0.01,"higher_is_better":true,"evidence_paths":["examples/accelerator-fallbacks/evidence/parity.md"]},
+      "evidence_paths": ["examples/accelerator-fallbacks/evidence/component-coverage.md"]
+    },
+    {
+      "id": "verified-learned-heuristics",
+      "kind": "risk_model",
+      "source_paths": ["examples/verified-learned-heuristics-gate.json"],
+      "learned_artifact_path": "examples/accelerator-fallbacks/learned-artifacts.json",
+      "learned_artifact_sha256": "sha256:24c5a0ec8b0ebd2f3ce54769fa5f5a23903b89ba692b0ae2d44aff61559339da",
+      "fallback": {"runtime":"go-cpu","implementation_path":"examples/accelerator-fallbacks/cpu_fallback.go","implementation_sha256":"sha256:889f8ae92b8327f685cf5fbb3be4def020c6ef8ab5def6cc84b46bc73b209a9d","input_artifacts":[{"path":"examples/accelerator-fallbacks/cpu-inputs.jsonl","sha256":"sha256:4c98f6c31019b62f105157bbd6c049fac9a380705b0a1337e977512e2766df19"}],"output_artifact":{"path":"examples/accelerator-fallbacks/cpu-outputs.jsonl","sha256":"sha256:e62970fe71ab525e943fb624796a40848dc1de258206a845ca5d96f8d1898e4a"},"replay_evidence_paths":["examples/accelerator-fallbacks/replay/pass-1.jsonl","examples/accelerator-fallbacks/replay/pass-2.jsonl"],"gpu_required":false,"accelerator_required":false,"network_allowed":false,"deterministic":true,"seed":"patchline-cpu-fallback-v1","threads":1},
+      "parity": {"metric":"accuracy","learned_value":0.915,"fallback_value":0.913,"max_allowed_drift":0.01,"higher_is_better":true,"evidence_paths":["examples/accelerator-fallbacks/evidence/parity.md"]},
+      "evidence_paths": ["examples/accelerator-fallbacks/evidence/component-coverage.md"]
+    }
+  ],
+  "evidence_paths": [
+    "examples/accelerator-fallbacks/evidence/overview.md"
+  ]
+}
