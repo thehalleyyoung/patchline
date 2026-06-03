@@ -1457,6 +1457,10 @@ acm-reproduced-badge-gate:
 tutorial-autograder-gate:
 	bash scripts/tutorial-autograder-gate.sh
 
+.PHONY: role-specific-tutorials-gate
+role-specific-tutorials-gate:
+	bash scripts/role-specific-tutorials-gate.sh
+
 textbook-chapter-gate:
 	bash scripts/textbook-chapter-gate.sh
 

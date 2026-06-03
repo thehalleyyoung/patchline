@@ -1,0 +1,191 @@
+{
+  "version": "patchline.role-specific-tutorials-gate/v1",
+  "claim": "Patchline ships role-specific tutorials for app developers, DBAs, SREs, security reviewers, and engineering managers, so each audience learns the same data-change repair loop through the evidence, commands, and handoffs it actually owns. The worker compiles structured tutorial cards from real repo fixtures and public-proof specs into one Markdown tutorial per role plus a JSON index. The gate proves all five mandated roles are present, each tutorial cites a real code or evidence path, each role has multiple concrete commands and at least three success checks, and a generic tutorial with no role or evidence is rejected.",
+  "required_roles": [
+    "app-developer",
+    "dba",
+    "sre",
+    "security-reviewer",
+    "engineering-manager"
+  ],
+  "roles": [
+    {
+      "id": "app-developer",
+      "title": "App developer",
+      "mission": "Connect application writes to migration-touched fields and decide whether generated guards or tests make the change safer to review.",
+      "real_code": {
+        "local_path": "examples/expand-contract/django-billing/billing/models.py",
+        "proof": "Django billing model with dual-write application code used by the expand/contract and staged-backfill gates."
+      },
+      "hazard_classes": [
+        "dual-write drift",
+        "constraint tightening",
+        "generated-test coverage"
+      ],
+      "commands": [
+        "make expand-contract-templates-gate",
+        "make staged-backfill-planner-gate",
+        "make generated-test-mutation-gate"
+      ],
+      "steps": [
+        "Read the application write path and identify which model field keeps legacy and new writers compatible.",
+        "Run the expand/contract template gate to see the expected invariant-backed migration sequence.",
+        "Run the staged-backfill planner gate and compare its completion proof with the generated test mutation check."
+      ],
+      "success_checks": [
+        "Every tutorial decision cites the model path and at least one generated invariant or backfill artifact.",
+        "The learner can explain why tests alone are insufficient before the backfill proof passes.",
+        "A weakened generated test is rejected by the mutation gate rather than accepted as review-ready."
+      ],
+      "review_decision": "Request changes until generated tests cite the exact risk IDs and the backfill proof covers all pre-existing rows.",
+      "handoff": "Hand the DBA the table/column obligations and hand the SRE the runtime counter that proves no stale writer remains."
+    },
+    {
+      "id": "dba",
+      "title": "DBA",
+      "mission": "Classify rollback feasibility, dry-run safety, and query-plan risk using engine semantics instead of SQL keyword matching.",
+      "real_code": {
+        "local_path": "examples/db-rollback-feasibility-gate.json",
+        "proof": "Engine-version rollback cases spanning PostgreSQL, MySQL, BigQuery, Snowflake, ClickHouse, point DML, bulk DML, and read-only controls."
+      },
+      "hazard_classes": [
+        "implicit commit",
+        "irreversible metadata",
+        "query-plan regression"
+      ],
+      "commands": [
+        "make db-rollback-feasibility-gate",
+        "make db-dry-run-gate",
+        "make query-plan-regression-gate"
+      ],
+      "steps": [
+        "Inspect the engine-specific rollback case that most closely matches the proposed migration.",
+        "Run the rollback-feasibility gate and confirm the verdict distinguishes transactional, compensating, and snapshot-required changes.",
+        "Run dry-run and query-plan gates before approving production execution."
+      ],
+      "success_checks": [
+        "The tutorial answer names the database engine and version that changes the verdict.",
+        "A read-only control remains unflagged while unsafe DDL or DML requires compensation evidence.",
+        "The approval notes include the required before-image, snapshot, or time-travel obligation."
+      ],
+      "review_decision": "Approve only after rollback feasibility, dry-run scope, and representative workload checks are all explicit.",
+      "handoff": "Hand app developers the required guard shape and hand SREs the lock, lag, and runtime signals to watch."
+    },
+    {
+      "id": "sre",
+      "title": "SRE",
+      "mission": "Tie deploy markers, traces, logs, and incident timelines to data-change findings without overclaiming causality.",
+      "real_code": {
+        "local_path": "examples/otel-collector-ingestion.json",
+        "proof": "OpenTelemetry collector ingestion spec with four public OTLP log fixtures from repositories not built for Patchline."
+      },
+      "hazard_classes": [
+        "runtime confidence",
+        "incident causality limit",
+        "rollback readiness"
+      ],
+      "commands": [
+        "make otel-collector-ingestion-gate",
+        "make runtime-confidence-gate",
+        "make incident-notebook-gate"
+      ],
+      "steps": [
+        "Open the OTLP fixture list and identify which signals are trace, log, and SQL mutation evidence.",
+        "Run the ingestion and runtime-confidence gates to see observed impact separated from static risk.",
+        "Use the incident notebook gate to reconstruct hypotheses while preserving causality limitations."
+      ],
+      "success_checks": [
+        "The tutorial output cites at least one public telemetry fixture and its pinned commit.",
+        "Runtime evidence raises or lowers confidence without deleting static proof holes.",
+        "The learner records an explicit rollback observation or missing-signal gap."
+      ],
+      "review_decision": "Escalate when runtime evidence supports impact or when a missing signal blocks safe rollout confidence.",
+      "handoff": "Hand DBAs observed lag/lock symptoms and hand engineering managers a source-free risk trend summary."
+    },
+    {
+      "id": "security-reviewer",
+      "title": "Security reviewer",
+      "mission": "Keep untrusted repositories, archives, generated code, native checks, and adapter inputs isolated and auditable.",
+      "real_code": {
+        "local_path": "examples/threat-model-gate.json",
+        "proof": "Threat-model spec tied to a pinned lobsters/lobsters migration slice and adapter fixture boundaries."
+      },
+      "hazard_classes": [
+        "archive traversal",
+        "secret leakage",
+        "generated-code quarantine"
+      ],
+      "commands": [
+        "make threat-model-gate",
+        "make archive-security-gate",
+        "make generated-code-quarantine-gate",
+        "make secret-scan-gate"
+      ],
+      "steps": [
+        "Read the threat-model boundaries and identify which inputs are untrusted.",
+        "Run archive, quarantine, and secret gates before allowing new fetchers, adapters, or native-check execution.",
+        "Confirm generated artifacts remain non-executable and redacted reports do not leak canary values."
+      ],
+      "success_checks": [
+        "Every boundary in the threat model maps to a concrete gate or generated report artifact.",
+        "The tutorial rejects any generated code path that becomes executable by default.",
+        "The learner can identify where archive, adapter, and native-test trust boundaries differ."
+      ],
+      "review_decision": "Block the change until the relevant isolation, redaction, and provenance gates pass with negative controls.",
+      "handoff": "Hand maintainers the smallest failing boundary and the exact reproducing gate command."
+    },
+    {
+      "id": "engineering-manager",
+      "title": "Engineering manager",
+      "mission": "Turn Patchline findings into staffing, review-time, fairness, and cost decisions without hiding uncertainty.",
+      "real_code": {
+        "local_path": "examples/maintainer-acceptance-study.json",
+        "proof": "Maintainer acceptance study with paired review-time observations and uncertainty-recall controls across DBA, SRE, and app-maintainer roles."
+      },
+      "hazard_classes": [
+        "review burden",
+        "uncertainty hiding",
+        "expected-loss tradeoff"
+      ],
+      "commands": [
+        "make maintainer-acceptance-study-gate",
+        "make remediation-cost-optimizer-gate",
+        "make reviewer-fairness-audit-gate",
+        "make governance-risk-register-gate"
+      ],
+      "steps": [
+        "Inspect paired observations and separate review-time reduction from uncertainty recall.",
+        "Run the acceptance, cost, fairness, and governance-risk gates before using Patchline output as a management metric.",
+        "Decide which role owns follow-up based on evidence, not on aggregate severity alone."
+      ],
+      "success_checks": [
+        "Reported time savings preserve or improve uncertainty recall.",
+        "Cost decisions cite residual loss, manual-review thresholds, and missing evidence.",
+        "Reviewer-burden or escalation disparities are surfaced before adoption claims are made."
+      ],
+      "review_decision": "Adopt the workflow only when it reduces review time without increasing overconfidence or unfair escalation load.",
+      "handoff": "Hand role owners their next command, expected artifact, and unresolved uncertainty rather than a generic dashboard score."
+    }
+  ],
+  "bad": {
+    "id": "generic-tutorial",
+    "title": "Generic tutorial",
+    "mission": "Give everyone the same overview.",
+    "real_code": {
+      "local_path": "",
+      "proof": ""
+    },
+    "hazard_classes": [],
+    "commands": [
+      "make gate"
+    ],
+    "steps": [
+      "Read the docs."
+    ],
+    "success_checks": [
+      "The learner says it makes sense."
+    ],
+    "review_decision": "",
+    "handoff": ""
+  }
+}
