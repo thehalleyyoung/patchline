@@ -58,7 +58,8 @@ a verified multi-service rollback planner reverses migration dependency DAGs whi
 dependency-depth, fanout, wave, and data-loss bounds, a remediation-cost optimizer chooses guard,
 backfill, expand/contract, or manual review using uncertainty-adjusted expected loss, and a
 patch-series verifier proves every modeled SQL statement boundary in a migration-PR sequence preserves
-declared schema invariants.
+declared schema invariants, while a maintainer acceptance study measures paired review-time savings and
+fails generated remediation plans that hide uncertainty or inflate confidence.
 Critically,
 every capability in \tool{} is backed by a reproducible \emph{gate}: a script that proves the
 capability against real, pinned public code and fails loudly on drift. \tool{} currently ships more
@@ -221,6 +222,9 @@ uncertainty-adjusted expected loss; escalate high-uncertainty cases before autom
 \code{remediation-cost.json}, \code{.md} \\
 \code{patch-series-verify} & Apply migration PRs statement-by-statement and prove declared schema
 invariants at the initial state and every intermediate state. & \code{patch-series.json}, \code{.md} \\
+\code{maintainer-acceptance-study} & Compare paired maintainer reviews of baseline remediation material
+against generated plans while hashing the real artifacts reviewed and failing hidden uncertainty. &
+\code{maintainer-acceptance-study.json}, \code{.md} \\
 \code{propose} & Generate bounded interventions (guards, tests) within an explicit budget; quarantine
 them as untrusted artifacts. & \code{proposal.patch}, \code{patchline-proposals/} \\
 \code{compare} & Deterministically re-analyze proposed changes; accept or reject by evidence delta. &
@@ -532,6 +536,17 @@ after every intermediate statement state. The \gate{patch-series-verifier-gate} 
 invoice rollout preserves four invariants across five states, then runs an unsafe control whose modeled
 \code{DROP COLUMN total\_cents} is schema-changing and refuted at the exact intermediate statement.
 
+\paragraph{Maintainer acceptance without uncertainty laundering.} The
+\code{maintainer-acceptance-study} command adds a human-facing evaluation surface to the remediation
+loop. A versioned study spec binds each review task to real artifacts that are hashed in the report,
+declares the ground-truth uncertainty items maintainers must still see, and records paired observations
+for the same participant and task under baseline and generated-plan conditions. \tool{} reports mean
+minutes saved, generated uncertainty recall, confidence deltas, and decision correctness; it fails if
+plans save time by omitting uncertainty, over-inflating confidence, or producing wrong accept/escalate
+decisions. The \gate{maintainer-acceptance-study-gate} proves a nine-pair fixture over remediation-cost,
+patch-series, and Rails backfill artifacts, then mutates the generated plans to hide a rollback gap and
+requires \code{hidden\_uncertainty} and \code{overconfidence} counterexamples.
+
 \paragraph{The accept/reject decision.} Table~\ref{tab:compare} makes the compare contract precise.
 Each proposed artifact is scored on the same fact-derived axes as the baseline, and the decision is a
 pure function of the evidence delta---never of a model's self-reported confidence. An artifact that
@@ -803,6 +818,7 @@ owner-routed rollback playbooks for broad writes & \gate{remediation-playbook-ga
 4 rollback waves with 0 data-loss rows; unsafe 125-row rollback refuted & \gate{verified-rollback-planner-gate} \\
 4 expected-loss remediation choices; unsafe residual-loss bound refuted & \gate{remediation-cost-optimizer-gate} \\
 5 migration-PR states preserve invariants; unsafe drop refuted & \gate{patch-series-verifier-gate} \\
+9 paired maintainer reviews; 38.55\% faster with full uncertainty recall; hidden-control refuted & \gate{maintainer-acceptance-study-gate} \\
 9 Cassandra changes incl.\ destructive drops & \code{laaksomavrick/twitter-go} \\
 17 $\rightarrow$ 1 line, 1-minimal reproduction & delta-debugging oracle \\
 3 pipeline frameworks in one repo & \code{harrydevforlife/building-lakehouse} \\
@@ -1462,7 +1478,7 @@ Intervention safety & \code{generated-code-quarantine-gate}, \code{rejected-gene
 \code{intervention-regression-archive-gate}, \code{expand-contract-templates-gate},
 \code{staged-backfill-planner-gate}, \code{canary-validation-gate}, \code{repair-risk-escrow-gate},
 \code{incident-postmortem-importer-gate}, \code{verified-rollback-planner-gate},
-\code{remediation-cost-optimizer-gate},
+\code{remediation-cost-optimizer-gate}, \code{maintainer-acceptance-study-gate},
 \code{reviewability-examples-gate} \\
 Runtime evidence & \code{otel-trace-gen-gate}, \code{datadog-timeline-gate}, \code{prom-grafana-gate},
 \code{runtime-confidence-gate} \\

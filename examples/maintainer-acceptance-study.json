@@ -1,0 +1,261 @@
+{
+  "version": "patchline.maintainer-acceptance-study/v1",
+  "name": "generated remediation plan maintainer acceptance study",
+  "criteria": {
+    "min_pairs": 9,
+    "min_review_time_reduction_pct": 25,
+    "min_generated_uncertainty_recall": 0.95,
+    "max_uncertainty_recall_drop": 0.05,
+    "max_confidence_increase": 0.12
+  },
+  "tasks": [
+    {
+      "id": "invoice-cost-choice",
+      "repo": "thehalleyyoung/patchline",
+      "hazard_class": "uncertainty-adjusted-remediation-choice",
+      "artifact_paths": [
+        "examples/remediation-cost-optimizer.json",
+        "docs/remediation-cost-optimizer.md"
+      ],
+      "ground_truth_uncertainties": [
+        "manual-review-threshold",
+        "residual-loss-bound"
+      ]
+    },
+    {
+      "id": "patch-series-review",
+      "repo": "thehalleyyoung/patchline",
+      "hazard_class": "migration-pr-intermediate-state",
+      "artifact_paths": [
+        "examples/patch-series-verifier.json",
+        "docs/patch-series-verifier.md"
+      ],
+      "ground_truth_uncertainties": [
+        "intermediate-state-invariants",
+        "rollback-gap"
+      ]
+    },
+    {
+      "id": "rails-backfill-plan",
+      "repo": "thehalleyyoung/patchline",
+      "hazard_class": "partial-backfill",
+      "artifact_paths": [
+        "examples/expand-contract/rails-billing/db/migrate/20260201010202_backfill_invoice_external_id.rb",
+        "examples/staged-backfill-plan.json"
+      ],
+      "ground_truth_uncertainties": [
+        "batch-size-bound",
+        "post-backfill-validation"
+      ]
+    }
+  ],
+  "observations": [
+    {
+      "participant_id": "maintainer-a",
+      "role": "dba",
+      "task_id": "invoice-cost-choice",
+      "condition": "baseline",
+      "review_minutes": 35,
+      "decision": "request_changes",
+      "correct_decision": true,
+      "confidence": 0.64,
+      "uncertainty_items_identified": ["manual-review-threshold"]
+    },
+    {
+      "participant_id": "maintainer-a",
+      "role": "dba",
+      "task_id": "invoice-cost-choice",
+      "condition": "generated_plan",
+      "review_minutes": 21,
+      "decision": "request_changes",
+      "correct_decision": true,
+      "confidence": 0.72,
+      "uncertainty_items_identified": ["manual-review-threshold", "residual-loss-bound"],
+      "generated_plan_uncertainties": ["manual-review-threshold", "residual-loss-bound"]
+    },
+    {
+      "participant_id": "maintainer-b",
+      "role": "sre",
+      "task_id": "invoice-cost-choice",
+      "condition": "baseline",
+      "review_minutes": 33,
+      "decision": "request_changes",
+      "correct_decision": true,
+      "confidence": 0.61,
+      "uncertainty_items_identified": ["residual-loss-bound"]
+    },
+    {
+      "participant_id": "maintainer-b",
+      "role": "sre",
+      "task_id": "invoice-cost-choice",
+      "condition": "generated_plan",
+      "review_minutes": 20,
+      "decision": "request_changes",
+      "correct_decision": true,
+      "confidence": 0.69,
+      "uncertainty_items_identified": ["manual-review-threshold", "residual-loss-bound"],
+      "generated_plan_uncertainties": ["manual-review-threshold", "residual-loss-bound"]
+    },
+    {
+      "participant_id": "maintainer-c",
+      "role": "app-maintainer",
+      "task_id": "invoice-cost-choice",
+      "condition": "baseline",
+      "review_minutes": 31,
+      "decision": "request_changes",
+      "correct_decision": true,
+      "confidence": 0.60,
+      "uncertainty_items_identified": ["manual-review-threshold"]
+    },
+    {
+      "participant_id": "maintainer-c",
+      "role": "app-maintainer",
+      "task_id": "invoice-cost-choice",
+      "condition": "generated_plan",
+      "review_minutes": 19,
+      "decision": "request_changes",
+      "correct_decision": true,
+      "confidence": 0.68,
+      "uncertainty_items_identified": ["manual-review-threshold", "residual-loss-bound"],
+      "generated_plan_uncertainties": ["manual-review-threshold", "residual-loss-bound"]
+    },
+    {
+      "participant_id": "maintainer-a",
+      "role": "dba",
+      "task_id": "patch-series-review",
+      "condition": "baseline",
+      "review_minutes": 42,
+      "decision": "escalate",
+      "correct_decision": true,
+      "confidence": 0.58,
+      "uncertainty_items_identified": ["intermediate-state-invariants"]
+    },
+    {
+      "participant_id": "maintainer-a",
+      "role": "dba",
+      "task_id": "patch-series-review",
+      "condition": "generated_plan",
+      "review_minutes": 26,
+      "decision": "escalate",
+      "correct_decision": true,
+      "confidence": 0.66,
+      "uncertainty_items_identified": ["intermediate-state-invariants", "rollback-gap"],
+      "generated_plan_uncertainties": ["intermediate-state-invariants", "rollback-gap"]
+    },
+    {
+      "participant_id": "maintainer-b",
+      "role": "sre",
+      "task_id": "patch-series-review",
+      "condition": "baseline",
+      "review_minutes": 39,
+      "decision": "escalate",
+      "correct_decision": true,
+      "confidence": 0.57,
+      "uncertainty_items_identified": ["rollback-gap"]
+    },
+    {
+      "participant_id": "maintainer-b",
+      "role": "sre",
+      "task_id": "patch-series-review",
+      "condition": "generated_plan",
+      "review_minutes": 24,
+      "decision": "escalate",
+      "correct_decision": true,
+      "confidence": 0.65,
+      "uncertainty_items_identified": ["intermediate-state-invariants", "rollback-gap"],
+      "generated_plan_uncertainties": ["intermediate-state-invariants", "rollback-gap"]
+    },
+    {
+      "participant_id": "maintainer-c",
+      "role": "app-maintainer",
+      "task_id": "patch-series-review",
+      "condition": "baseline",
+      "review_minutes": 37,
+      "decision": "escalate",
+      "correct_decision": true,
+      "confidence": 0.55,
+      "uncertainty_items_identified": ["intermediate-state-invariants"]
+    },
+    {
+      "participant_id": "maintainer-c",
+      "role": "app-maintainer",
+      "task_id": "patch-series-review",
+      "condition": "generated_plan",
+      "review_minutes": 23,
+      "decision": "escalate",
+      "correct_decision": true,
+      "confidence": 0.64,
+      "uncertainty_items_identified": ["intermediate-state-invariants", "rollback-gap"],
+      "generated_plan_uncertainties": ["intermediate-state-invariants", "rollback-gap"]
+    },
+    {
+      "participant_id": "maintainer-a",
+      "role": "dba",
+      "task_id": "rails-backfill-plan",
+      "condition": "baseline",
+      "review_minutes": 36,
+      "decision": "request_changes",
+      "correct_decision": true,
+      "confidence": 0.63,
+      "uncertainty_items_identified": ["batch-size-bound"]
+    },
+    {
+      "participant_id": "maintainer-a",
+      "role": "dba",
+      "task_id": "rails-backfill-plan",
+      "condition": "generated_plan",
+      "review_minutes": 22,
+      "decision": "request_changes",
+      "correct_decision": true,
+      "confidence": 0.70,
+      "uncertainty_items_identified": ["batch-size-bound", "post-backfill-validation"],
+      "generated_plan_uncertainties": ["batch-size-bound", "post-backfill-validation"]
+    },
+    {
+      "participant_id": "maintainer-b",
+      "role": "sre",
+      "task_id": "rails-backfill-plan",
+      "condition": "baseline",
+      "review_minutes": 34,
+      "decision": "request_changes",
+      "correct_decision": true,
+      "confidence": 0.60,
+      "uncertainty_items_identified": ["post-backfill-validation"]
+    },
+    {
+      "participant_id": "maintainer-b",
+      "role": "sre",
+      "task_id": "rails-backfill-plan",
+      "condition": "generated_plan",
+      "review_minutes": 21,
+      "decision": "request_changes",
+      "correct_decision": true,
+      "confidence": 0.67,
+      "uncertainty_items_identified": ["batch-size-bound", "post-backfill-validation"],
+      "generated_plan_uncertainties": ["batch-size-bound", "post-backfill-validation"]
+    },
+    {
+      "participant_id": "maintainer-c",
+      "role": "app-maintainer",
+      "task_id": "rails-backfill-plan",
+      "condition": "baseline",
+      "review_minutes": 32,
+      "decision": "request_changes",
+      "correct_decision": true,
+      "confidence": 0.59,
+      "uncertainty_items_identified": ["batch-size-bound"]
+    },
+    {
+      "participant_id": "maintainer-c",
+      "role": "app-maintainer",
+      "task_id": "rails-backfill-plan",
+      "condition": "generated_plan",
+      "review_minutes": 20,
+      "decision": "request_changes",
+      "correct_decision": true,
+      "confidence": 0.66,
+      "uncertainty_items_identified": ["batch-size-bound", "post-backfill-validation"],
+      "generated_plan_uncertainties": ["batch-size-bound", "post-backfill-validation"]
+    }
+  ]
+}

@@ -135,6 +135,8 @@ Run `remediation-cost --spec <spec>` to choose guard, backfill, expand/contract,
 
 Run `patch-series-verify --spec <spec>` to prove every modeled migration-PR intermediate state preserves declared schema invariants; reproduce it with `make patch-series-verifier-gate`.
 
+Run `maintainer-acceptance-study --spec <spec>` to measure paired maintainer review-time reduction for generated remediation plans while failing hidden uncertainty or overconfidence; reproduce it with `make maintainer-acceptance-study-gate`.
+
 Run `golden-fixture generate --github owner/repo --ref <sha> --subpath <path> --out <dir>` to turn a real-repo slice into a tiny deterministic Go test without vendoring the full repository; see [docs/golden-fixtures.md](docs/golden-fixtures.md).
 
 <details>

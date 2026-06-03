@@ -20,6 +20,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/thehalleyyoung/patchline/internal/acceptancestudy"
 	"github.com/thehalleyyoung/patchline/internal/archive"
 	"github.com/thehalleyyoung/patchline/internal/artifact"
 	"github.com/thehalleyyoung/patchline/internal/attest"
@@ -432,6 +433,8 @@ func run(args []string) error {
 		return remediationCostCommand(args[1:], hasFlag(args[1:], "--json"))
 	case "patch-series-verify":
 		return patchSeriesVerifyCommand(args[1:], hasFlag(args[1:], "--json"))
+	case "maintainer-acceptance-study":
+		return maintainerAcceptanceStudyCommand(args[1:], hasFlag(args[1:], "--json"))
 	case "feedback":
 		return feedbackCommand(args[1:])
 	case "security":
@@ -575,6 +578,7 @@ Usage:
   patchline multi-service-rollback-plan --spec multi-service-rollback-plan.json --out dir [--json]
   patchline remediation-cost --spec remediation-cost-optimizer.json --out dir [--json]
   patchline patch-series-verify --spec patch-series.json --out dir [--json]
+  patchline maintainer-acceptance-study --spec maintainer-acceptance-study.json --root repo-root --out dir [--json]
   patchline feedback counterfactual-log --feedback live-feedback.json --history policy-history.json --out dir [--json]
   patchline feedback online-eval --feedback live-feedback.json --spec online-evaluation.json --out dir [--json]
   patchline feedback active-learning-queue --spec active-learning.json --out dir [--json]
@@ -14859,6 +14863,39 @@ func patchSeriesVerifyCommand(args []string, jsonOut bool) error {
 		return writeJSON(os.Stdout, report)
 	}
 	fmt.Printf("wrote patch-series verifier ok=%t prs=%d statements=%d counterexamples=%d to %s\n", report.OK, report.Summary.PullRequests, report.Summary.Statements, report.Summary.Counterexamples, outPath)
+	return nil
+}
+
+func maintainerAcceptanceStudyCommand(args []string, jsonOut bool) error {
+	usage := "patchline maintainer-acceptance-study --spec maintainer-acceptance-study.json --root repo-root --out <dir> [--json]"
+	specPath, outPath, err := feedbackSpecOut(args, usage)
+	if err != nil {
+		return err
+	}
+	rootPath := "."
+	if value, ok := flagValue(args, "--root"); ok && value != "" {
+		rootPath = value
+	}
+	file, err := os.Open(specPath)
+	if err != nil {
+		return err
+	}
+	defer file.Close()
+	spec, err := acceptancestudy.ReadSpec(file)
+	if err != nil {
+		return err
+	}
+	report, err := acceptancestudy.BuildReport(spec, rootPath)
+	if err != nil {
+		return err
+	}
+	if err := acceptancestudy.WriteArtifacts(outPath, report); err != nil {
+		return err
+	}
+	if jsonOut {
+		return writeJSON(os.Stdout, report)
+	}
+	fmt.Printf("wrote maintainer acceptance study ok=%t pairs=%d time_reduction=%.2f%% generated_uncertainty_recall=%.2f counterexamples=%d to %s\n", report.OK, report.Summary.Pairs, report.Summary.ReviewTimeReductionPercent, report.Summary.GeneratedUncertaintyRecall, report.Summary.Counterexamples, outPath)
 	return nil
 }
 

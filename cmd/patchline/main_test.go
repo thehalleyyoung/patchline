@@ -13,6 +13,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/thehalleyyoung/patchline/internal/acceptancestudy"
 	"github.com/thehalleyyoung/patchline/internal/artifact"
 	"github.com/thehalleyyoung/patchline/internal/attest"
 	"github.com/thehalleyyoung/patchline/internal/backfillplanner"
@@ -469,6 +470,52 @@ func TestPatchSeriesVerifyCommandWritesReports(t *testing.T) {
 	}
 	if stat, err := os.Stat(filepath.Join(out, "patch-series.md")); err != nil || stat.Size() == 0 {
 		t.Fatalf("expected patch-series.md to be written, stat=%#v err=%v", stat, err)
+	}
+}
+
+func TestMaintainerAcceptanceStudyCommandWritesReports(t *testing.T) {
+	root := t.TempDir()
+	writeMainTestFile(t, root, "db/migrate/001_backfill.sql", "UPDATE invoices SET external_id = legacy_external_id WHERE external_id IS NULL;\n")
+	writeMainTestFile(t, root, "docs/remediation-plan.md", "Review bounded backfill, rollback window, and post-backfill validation.\n")
+	specPath := filepath.Join(root, "maintainer-acceptance-study.json")
+	writeMainTestFile(t, root, "maintainer-acceptance-study.json", `{
+  "version": "patchline.maintainer-acceptance-study/v1",
+  "name": "main test maintainer acceptance study",
+  "criteria": {
+    "min_pairs": 2,
+    "min_review_time_reduction_pct": 20,
+    "min_generated_uncertainty_recall": 0.95,
+    "max_uncertainty_recall_drop": 0.05,
+    "max_confidence_increase": 0.15
+  },
+  "tasks": [{
+    "id": "invoice-backfill",
+    "repo": "example/billing",
+    "hazard_class": "partial-backfill",
+    "artifact_paths": ["db/migrate/001_backfill.sql", "docs/remediation-plan.md"],
+    "ground_truth_uncertainties": ["batch-size-bound", "post-backfill-validation"]
+  }],
+  "observations": [
+    {"participant_id":"m-1","role":"dba","task_id":"invoice-backfill","condition":"baseline","review_minutes":34,"decision":"request_changes","correct_decision":true,"confidence":0.63,"uncertainty_items_identified":["batch-size-bound"]},
+    {"participant_id":"m-1","role":"dba","task_id":"invoice-backfill","condition":"generated_plan","review_minutes":20,"decision":"request_changes","correct_decision":true,"confidence":0.70,"uncertainty_items_identified":["batch-size-bound","post-backfill-validation"],"generated_plan_uncertainties":["batch-size-bound","post-backfill-validation"]},
+    {"participant_id":"m-2","role":"sre","task_id":"invoice-backfill","condition":"baseline","review_minutes":31,"decision":"request_changes","correct_decision":true,"confidence":0.60,"uncertainty_items_identified":["post-backfill-validation"]},
+    {"participant_id":"m-2","role":"sre","task_id":"invoice-backfill","condition":"generated_plan","review_minutes":19,"decision":"request_changes","correct_decision":true,"confidence":0.68,"uncertainty_items_identified":["batch-size-bound","post-backfill-validation"],"generated_plan_uncertainties":["batch-size-bound","post-backfill-validation"]}
+  ]
+}`)
+	out := filepath.Join(t.TempDir(), "maintainer-acceptance-study")
+	if err := run([]string{"maintainer-acceptance-study", "--spec", specPath, "--root", root, "--out", out, "--json"}); err != nil {
+		t.Fatalf("maintainer-acceptance-study failed: %v", err)
+	}
+	var report acceptancestudy.Report
+	readMainTestJSON(t, filepath.Join(out, "maintainer-acceptance-study.json"), &report)
+	if !report.OK || report.Summary.Pairs != 2 || report.Summary.GeneratedUncertaintyRecall != 1 {
+		t.Fatalf("unexpected maintainer acceptance report: %#v", report)
+	}
+	if report.Tasks[0].Artifacts[0].SHA256 == "" {
+		t.Fatalf("expected artifact hashes, got %#v", report.Tasks[0].Artifacts)
+	}
+	if stat, err := os.Stat(filepath.Join(out, "maintainer-acceptance-study.md")); err != nil || stat.Size() == 0 {
+		t.Fatalf("expected maintainer-acceptance-study.md to be written, stat=%#v err=%v", stat, err)
 	}
 }
 
