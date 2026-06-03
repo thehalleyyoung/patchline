@@ -1,0 +1,1 @@
+Mitigation runbook: guard invoice finalization reads, queue writes that depend on the new nullable column, verify canary rows before releasing queued work, and keep rollback available until the detector regression gate passes.

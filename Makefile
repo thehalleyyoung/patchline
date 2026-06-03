@@ -1151,6 +1151,10 @@ reviewer-fairness-audit-gate:
 change-management-integration-gate:
 	bash scripts/change-management-integration-gate.sh
 
+.PHONY: incident-response-drill-gate
+incident-response-drill-gate:
+	bash scripts/incident-response-drill-gate.sh
+
 provable-kill-switch-gate:
 	bash scripts/provable-kill-switch-gate.sh
 

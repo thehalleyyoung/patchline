@@ -1,0 +1,1 @@
+Status page update: Patchline is rehearsing a hypothetical false negative for a billing migration. The public impact is delayed invoice finalization until the guarded backfill completes. Mitigation is active, and the detector regression gate is due within 48 hours.

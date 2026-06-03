@@ -1,0 +1,1 @@
+Postmortem: the false-negative drill found that nullable-column backfill ordering needed a stronger detector regression. Public disclosure occurred two hours after discovery, mitigation completed four hours after discovery, and remediation completed twelve hours after discovery.

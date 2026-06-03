@@ -72,7 +72,9 @@ disputed findings with preserved evidence, independent reviewer rationales, and 
 and a reviewer-fairness audit gates reviewer burden, false positives, and escalation rates across teams
 and ecosystems using hashed review evidence, while a change-management verifier proves organizational
 approvals cite passed blocking Patchline gates, hash-pinned reports, rollback plans, and bounded
-emergency expiry rather than bypassing the safety layer;
+emergency expiry rather than bypassing the safety layer, and an incident-response drill rehearses
+hypothetical Patchline false negatives as public incidents with disclosure/remediation deadlines,
+evidence hashes, regression-gate closure, and leak-safe summaries;
 the same marketplace now hosts a public adversarial-migration challenge whose certificate-bound,
 public-safe submissions are scored from verified artifacts, analyzer behavior, minimization, novelty,
 and responsible disclosure; private adopters can then run federated benchmark splits locally and publish only signed,
@@ -257,6 +259,9 @@ or unequal outcomes. & \code{reviewer-fairness-audit.json}, \code{.md} \\
 \code{change-management-verify} & Verify that organizational approvals cite passed blocking Patchline
 gates, hash-pinned reports, rollback plans, distinct approvers, and deterministic emergency expiry rather
 than bypassing safety policy. & \code{change-management.json}, \code{.md} \\
+\code{incident-response-drill} & Rehearse a hypothetical Patchline false negative as a public incident;
+check disclosure/remediation timelines, role separation, evidence hashes, regression-gate closure, and
+leak-safe public summaries. & \code{incident-response-drill.json}, \code{.md} \\
 \code{evidence-marketplace} / \code{artifact-benchmark import-marketplace} & Publish redacted public
 hazard examples only after automated license/consent release admission, symlink-safe artifact-hash,
 certificate-obligation, public-data reproduction, deterministic reputation, and exact/near-duplicate
@@ -899,6 +904,11 @@ than open-ended waivers. The \gate{change-management-integration-gate} runs two 
 including one emergency path, then proves both a missing-gate approval bypass and a hash-mismatched gate
 report are rejected while the report hash remains stable across reruns.
 
+Finally, \code{incident-response-drill} treats Patchline's own false negatives as rehearsable public
+incidents. The \gate{incident-response-drill-gate} validates a seven-event disclosure/remediation
+timeline, four distinct response roles, ten-plus hashed evidence artifacts, and a regression-gate report,
+then rejects delayed disclosure, late remediation, gate-hash drift, and private markers in public text.
+
 The same machinery now publishes an adversarial challenge track without weakening the marketplace's
 privacy contract. A challenge entry must carry a conditional
 \code{responsible-disclosure-cleared} certificate obligation, reference only public-safe redacted proof
@@ -1024,6 +1034,7 @@ owner-routed rollback playbooks for broad writes & \gate{remediation-playbook-ga
 1 accepted, 1 deprecated, and 1 quarantined shared-evidence record; 4 archive artifacts preserved with tombstones; weak quorum/conflict/missing-tombstone controls rejected & \gate{evidence-governance-board-gate} \\
 3 disputed findings resolved with 6 preserved artifacts, 9 reviewer rationales, and controls for missing preservation, original approver reuse, and private markers & \gate{evidence-appeal-workflow-gate} \\
 2 change-management workflows with 4 distinct approvals bound to 2 passed blocking gates; missing-gate bypass and gate-report hash drift refuted & \gate{change-management-integration-gate} \\
+7-event public false-negative drill with disclosure/remediation deadlines, 4 distinct roles, regression-gate hash binding, and private-marker controls & \gate{incident-response-drill-gate} \\
 2 public-safe adversarial migrations scored from verified artifacts and analyzer-backed high-risk proofs; embargoed publication refuted & \gate{adversarial-challenge-gate} \\
 3 private benchmark cases published as signed aggregate-only metrics; tampering/leakage rejected & \gate{federated-benchmark-split-gate} \\
 3 payout-approved minimized false-negative/ecosystem-gap bounty reproductions; unsupported bounty rejected & \gate{open-problem-bounty-board-gate} \\
@@ -1733,7 +1744,7 @@ Generalization & \code{framework-holdout-gate}, \code{perturbation-robustness-ga
 Trust stack & \code{signed-provenance-chain-gate}, \code{reproducible-build-attestation-gate},
 \code{merkle-audit-log-gate}, \code{sbom-pinned-deps-gate}, \code{red-team-adversarial-gate},
 \code{evidence-governance-board-gate}, \code{evidence-appeal-workflow-gate},
-\code{change-management-integration-gate} \\
+\code{change-management-integration-gate}, \code{incident-response-drill-gate} \\
 Reviewer \& community & \code{quickstart-sixty-seconds-gate}, \code{inline-review-surface-gate},
 \code{ci-pr-bot-gate}, \code{governance-policy-gate}, \code{citation-doi-gate} \\
 Research frontier & \code{learned-risk-model-gate}, \code{neuro-symbolic-verdict-gate},

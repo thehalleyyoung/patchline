@@ -1,0 +1,1 @@
+Triage confirms the missed signal: a nullable billing column was introduced without a bounded backfill and without a guard on invoice finalization reads. The drill classifies the event as a Patchline false negative and assigns the detector owner.

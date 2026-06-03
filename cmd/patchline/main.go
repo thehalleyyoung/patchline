@@ -44,6 +44,7 @@ import (
 	"github.com/thehalleyyoung/patchline/internal/gate"
 	"github.com/thehalleyyoung/patchline/internal/goldenfixture"
 	"github.com/thehalleyyoung/patchline/internal/historical"
+	"github.com/thehalleyyoung/patchline/internal/incidentdrill"
 	"github.com/thehalleyyoung/patchline/internal/incidentpostmortem"
 	"github.com/thehalleyyoung/patchline/internal/intake"
 	"github.com/thehalleyyoung/patchline/internal/invariant"
@@ -435,6 +436,8 @@ func run(args []string) error {
 		return repairEscrowCommand(args[1:], hasFlag(args[1:], "--json"))
 	case "incident-postmortem-import":
 		return incidentPostmortemImportCommand(args[1:], hasFlag(args[1:], "--json"))
+	case "incident-response-drill":
+		return incidentResponseDrillCommand(args[1:], hasFlag(args[1:], "--json"))
 	case "multi-service-rollback-plan":
 		return multiServiceRollbackPlanCommand(args[1:], hasFlag(args[1:], "--json"))
 	case "remediation-cost":
@@ -595,6 +598,7 @@ Usage:
   patchline canary-validate --spec canary-validation.json --before before.json --after after.json --out dir [--json]
   patchline repair-escrow --spec repair-escrow.json --out dir [--json]
   patchline incident-postmortem-import --spec incident-postmortem-import.json --out dir [--json]
+  patchline incident-response-drill --spec incident-response-drill.json --root repo-root --out dir [--json]
   patchline multi-service-rollback-plan --spec multi-service-rollback-plan.json --out dir [--json]
   patchline remediation-cost --spec remediation-cost-optimizer.json --out dir [--json]
   patchline patch-series-verify --spec patch-series.json --out dir [--json]
@@ -14927,6 +14931,39 @@ func incidentPostmortemImportCommand(args []string, jsonOut bool) error {
 		return writeJSON(os.Stdout, report)
 	}
 	fmt.Printf("wrote incident-postmortem importer report cases=%d regressions=%d detectors=%d to %s\n", report.Summary.Cases, report.Summary.Regressions, report.Summary.Detectors, outPath)
+	return nil
+}
+
+func incidentResponseDrillCommand(args []string, jsonOut bool) error {
+	usage := "patchline incident-response-drill --spec incident-response-drill.json --root repo-root --out <dir> [--json]"
+	specPath, outPath, err := feedbackSpecOut(args, usage)
+	if err != nil {
+		return err
+	}
+	rootPath := "."
+	if value, ok := flagValue(args, "--root"); ok && value != "" {
+		rootPath = value
+	}
+	file, err := os.Open(specPath)
+	if err != nil {
+		return err
+	}
+	defer file.Close()
+	spec, err := incidentdrill.ReadSpec(file)
+	if err != nil {
+		return err
+	}
+	report, err := incidentdrill.BuildReport(spec, rootPath)
+	if err != nil {
+		return err
+	}
+	if err := incidentdrill.WriteArtifacts(outPath, report); err != nil {
+		return err
+	}
+	if jsonOut {
+		return writeJSON(os.Stdout, report)
+	}
+	fmt.Printf("wrote incident-response drill ok=%t timeline_events=%d disclosures=%d remediations=%d counterexamples=%d to %s\n", report.OK, report.Summary.TimelineEvents, report.Summary.Disclosures, report.Summary.Remediations, report.Summary.Counterexamples, outPath)
 	return nil
 }
 

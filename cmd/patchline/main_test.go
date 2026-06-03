@@ -23,6 +23,7 @@ import (
 	"github.com/thehalleyyoung/patchline/internal/evidencemarketplace"
 	"github.com/thehalleyyoung/patchline/internal/expandcontract"
 	"github.com/thehalleyyoung/patchline/internal/feedback"
+	"github.com/thehalleyyoung/patchline/internal/incidentdrill"
 	"github.com/thehalleyyoung/patchline/internal/incidentpostmortem"
 	"github.com/thehalleyyoung/patchline/internal/intake"
 	"github.com/thehalleyyoung/patchline/internal/patchseries"
@@ -576,6 +577,108 @@ func TestIncidentPostmortemImportCommandWritesReports(t *testing.T) {
 		if stat, err := os.Stat(filepath.Join(out, filepath.FromSlash(rel))); err != nil || stat.Size() == 0 {
 			t.Fatalf("expected %s to be written, stat=%#v err=%v", rel, stat, err)
 		}
+	}
+}
+
+func TestIncidentResponseDrillCommandWritesReports(t *testing.T) {
+	root := t.TempDir()
+	for rel, contents := range map[string]string{
+		"evidence/public-report.md":            "Public report for a Patchline false negative drill.\n",
+		"evidence/detection-log.json":          `{"reproduced":true}` + "\n",
+		"evidence/triage.md":                   "Triage confirmed missed nullable-column hazard.\n",
+		"evidence/status.md":                   "Public status update with mitigation and remediation timing.\n",
+		"evidence/mitigation.md":               "Mitigation queued writes behind a safety guard.\n",
+		"evidence/remediation.md":              "Remediation adds detector regression and repair notes.\n",
+		"evidence/regression-gate-report.json": `{"version":"patchline.gate-report/v1","gate_id":"incident-postmortem-importer-gate","status":"pass","checked_at":"2026-02-02T00:30:00Z"}` + "\n",
+		"evidence/postmortem.md":               "Public postmortem with disclosure and remediation timeline.\n",
+		"evidence/incident-commander.md":       "Incident commander ownership evidence.\n",
+		"evidence/database-responder.md":       "Database responder ownership evidence.\n",
+		"evidence/communications-owner.md":     "Communications owner evidence.\n",
+		"evidence/data-repair-owner.md":        "Data repair owner evidence.\n",
+	} {
+		writeMainTestFile(t, root, rel, contents)
+	}
+	gateHash := mainTestFileHash(t, filepath.Join(root, "evidence/regression-gate-report.json"))
+	specPath := filepath.Join(root, "incident-response-drill.json")
+	writeMainTestFile(t, root, "incident-response-drill.json", fmt.Sprintf(`{
+  "version": "patchline.incident-response-drill/v1",
+  "name": "main test incident-response drill",
+  "criteria": {
+    "max_detection_minutes": 60,
+    "max_public_disclosure_hours": 6,
+    "max_mitigation_hours": 12,
+    "max_remediation_hours": 48,
+    "min_distinct_roles": 4,
+    "require_public_disclosure": true,
+    "require_customer_impact_statement": true,
+    "require_regression_gate": true,
+    "require_postmortem": true
+  },
+  "drill": {
+    "drill_id": "fn-drill-main-test",
+    "title": "Main test Patchline false negative drill",
+    "scenario": "Patchline under-escalated a nullable billing migration and rehearses public response.",
+    "severity": "high",
+    "false_negative": {
+      "detector_id": "db-semantics-nullability",
+      "missed_signal_id": "nullable-column-backfill-gap",
+      "original_patchline_command": "patchline repo analyze --github example/billing --subpath db/migrate --no-llm",
+      "public_report_at": "2026-02-01T12:00:00Z",
+      "discovered_at": "2026-02-01T13:00:00Z",
+      "affected_systems": ["billing"],
+      "customer_impact": "Invoices may be delayed until the guarded backfill completes."
+    },
+    "timeline": [
+      {"id":"detected","phase":"detected","at":"2026-02-01T12:30:00Z","owner":"incident-commander","summary":"Report reproduced against the pinned migration.","evidence_path":"evidence/detection-log.json"},
+      {"id":"triaged","phase":"triaged","at":"2026-02-01T13:15:00Z","owner":"database-responder","summary":"False negative classified and routed.","evidence_path":"evidence/triage.md"},
+      {"id":"public-disclosure","phase":"public_disclosure","at":"2026-02-01T15:00:00Z","owner":"communications-owner","summary":"Public disclosure posted with mitigation timing.","evidence_path":"evidence/status.md"},
+      {"id":"mitigated","phase":"mitigated","at":"2026-02-01T17:00:00Z","owner":"data-repair-owner","summary":"Guarded writes until backfill completed.","evidence_path":"evidence/mitigation.md"},
+      {"id":"regression-added","phase":"regression_added","at":"2026-02-02T00:30:00Z","owner":"database-responder","summary":"Regression gate added.","evidence_path":"evidence/regression-gate-report.json"},
+      {"id":"remediated","phase":"remediated","at":"2026-02-02T01:00:00Z","owner":"database-responder","summary":"Detector remediation complete.","evidence_path":"evidence/remediation.md"},
+      {"id":"postmortem-published","phase":"postmortem_published","at":"2026-02-02T18:00:00Z","owner":"incident-commander","summary":"Public postmortem published.","evidence_path":"evidence/postmortem.md"}
+    ],
+    "disclosures": [
+      {"id":"status-page","audience":"public","channel":"status page","planned_at":"2026-02-01T14:30:00Z","published_at":"2026-02-01T15:00:00Z","summary":"Public update names impact, mitigation, and remediation timing.","evidence_path":"evidence/status.md"}
+    ],
+    "remediations": [
+      {"id":"detector-regression","kind":"regression_gate","owner":"database-responder","due_at":"2026-02-03T13:00:00Z","completed_at":"2026-02-02T01:00:00Z","command":"make incident-postmortem-importer-gate","gate_report_path":"evidence/regression-gate-report.json","gate_report_sha256":"%s","evidence_path":"evidence/remediation.md"},
+      {"id":"customer-mitigation","kind":"customer_repair","owner":"data-repair-owner","due_at":"2026-02-02T13:00:00Z","completed_at":"2026-02-01T17:00:00Z","command":"make canary-validation-gate","evidence_path":"evidence/mitigation.md"}
+    ],
+    "roles": [
+      {"role":"incident commander","owner":"ivy-incident","backup":"sam-backup","evidence_path":"evidence/incident-commander.md"},
+      {"role":"database responder","owner":"robin-db","backup":"devon-db","evidence_path":"evidence/database-responder.md"},
+      {"role":"communications owner","owner":"casey-comms","backup":"lee-comms","evidence_path":"evidence/communications-owner.md"},
+      {"role":"data repair owner","owner":"drew-data","backup":"riley-data","evidence_path":"evidence/data-repair-owner.md"}
+    ],
+    "evidence_paths": ["evidence/public-report.md", "evidence/postmortem.md"]
+  }
+}`, gateHash))
+	out := filepath.Join(t.TempDir(), "incident-response-drill")
+	if err := run([]string{"incident-response-drill", "--spec", specPath, "--root", root, "--out", out, "--json"}); err != nil {
+		t.Fatalf("incident-response-drill failed: %v", err)
+	}
+	var report incidentdrill.Report
+	readMainTestJSON(t, filepath.Join(out, "incident-response-drill.json"), &report)
+	if !report.OK || report.Summary.RegressionGates != 1 || report.Summary.PublicDisclosureHours != 2 {
+		t.Fatalf("unexpected incident-response drill report: %#v", report)
+	}
+	if !mainTestHasMatchingIncidentRegressionGate(report) {
+		t.Fatalf("expected regression gate hash to match: %#v", report.Drill.Remediations)
+	}
+	if stat, err := os.Stat(filepath.Join(out, "incident-response-drill.md")); err != nil || stat.Size() == 0 {
+		t.Fatalf("expected incident-response-drill.md to be written, stat=%#v err=%v", stat, err)
+	}
+
+	badSpecPath := filepath.Join(root, "incident-response-drill.bad.json")
+	writeMainTestFile(t, root, "incident-response-drill.bad.json", strings.ReplaceAll(mustReadMainTestFile(t, specPath), `"published_at":"2026-02-01T15:00:00Z"`, `"published_at":"2026-02-03T03:00:00Z"`))
+	badOut := filepath.Join(t.TempDir(), "bad-incident-response-drill")
+	if err := run([]string{"incident-response-drill", "--spec", badSpecPath, "--root", root, "--out", badOut, "--json"}); err != nil {
+		t.Fatalf("incident-response-drill negative control should write an ok=false report, got %v", err)
+	}
+	var rejected incidentdrill.Report
+	readMainTestJSON(t, filepath.Join(badOut, "incident-response-drill.json"), &rejected)
+	if rejected.OK || !mainTestHasIncidentDrillCounterexample(rejected, "public_disclosure_deadline_exceeded") {
+		t.Fatalf("expected rejected incident drill report, got %#v", rejected)
 	}
 }
 
@@ -3207,6 +3310,24 @@ func mainTestFileHash(t *testing.T, path string) string {
 	}
 	sum := sha256.Sum256(data)
 	return "sha256:" + hex.EncodeToString(sum[:])
+}
+
+func mainTestHasIncidentDrillCounterexample(report incidentdrill.Report, kind string) bool {
+	for _, counterexample := range report.Counterexamples {
+		if counterexample.Kind == kind {
+			return true
+		}
+	}
+	return false
+}
+
+func mainTestHasMatchingIncidentRegressionGate(report incidentdrill.Report) bool {
+	for _, remediation := range report.Drill.Remediations {
+		if remediation.Kind == "regression_gate" && remediation.HashMatches {
+			return true
+		}
+	}
+	return false
 }
 
 func containsString(values []string, want string) bool {

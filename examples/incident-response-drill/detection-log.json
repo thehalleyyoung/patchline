@@ -1,0 +1,1 @@
+{"case":"fn-drill-2026-02-billing-nullability","reproduced":true,"migration":"2026020101_nullable_invoice_state.sql","checked_at":"2026-02-01T12:30:00Z"}

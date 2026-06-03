@@ -1,0 +1,154 @@
+{
+  "version": "patchline.incident-response-drill/v1",
+  "name": "Public false-negative incident-response drill",
+  "criteria": {
+    "max_detection_minutes": 60,
+    "max_public_disclosure_hours": 6,
+    "max_mitigation_hours": 12,
+    "max_remediation_hours": 48,
+    "min_distinct_roles": 4,
+    "require_public_disclosure": true,
+    "require_customer_impact_statement": true,
+    "require_regression_gate": true,
+    "require_postmortem": true
+  },
+  "drill": {
+    "drill_id": "fn-drill-2026-02-billing-nullability",
+    "title": "Billing nullable-column false negative drill",
+    "scenario": "Patchline under-escalated a nullable billing migration and rehearses public response, disclosure, mitigation, remediation, and regression-gate closure.",
+    "severity": "high",
+    "false_negative": {
+      "detector_id": "db-semantics-nullability",
+      "missed_signal_id": "nullable-column-backfill-gap",
+      "original_patchline_command": "patchline repo analyze --github example/billing --subpath db/migrate --no-llm",
+      "public_report_at": "2026-02-01T12:00:00Z",
+      "discovered_at": "2026-02-01T13:00:00Z",
+      "affected_systems": [
+        "billing",
+        "invoice-finalization"
+      ],
+      "customer_impact": "Invoices generated during the drill window could be delayed until a safe backfill guard shipped."
+    },
+    "timeline": [
+      {
+        "id": "detected",
+        "phase": "detected",
+        "at": "2026-02-01T12:30:00Z",
+        "owner": "incident-commander",
+        "summary": "Public report reproduced against the pinned migration fixture.",
+        "evidence_path": "examples/incident-response-drill/detection-log.json"
+      },
+      {
+        "id": "triaged",
+        "phase": "triaged",
+        "at": "2026-02-01T13:15:00Z",
+        "owner": "database-responder",
+        "summary": "False negative classified as a missed nullable-column backfill hazard.",
+        "evidence_path": "examples/incident-response-drill/triage-notes.md"
+      },
+      {
+        "id": "public-disclosure",
+        "phase": "public_disclosure",
+        "at": "2026-02-01T15:00:00Z",
+        "owner": "communications-owner",
+        "summary": "Status page disclosed the hypothetical false negative and mitigation window.",
+        "evidence_path": "examples/incident-response-drill/status-page.md"
+      },
+      {
+        "id": "mitigated",
+        "phase": "mitigated",
+        "at": "2026-02-01T17:00:00Z",
+        "owner": "data-repair-owner",
+        "summary": "Guarded writes and queued invoice finalization until backfill completed.",
+        "evidence_path": "examples/incident-response-drill/mitigation-runbook.md"
+      },
+      {
+        "id": "regression-added",
+        "phase": "regression_added",
+        "at": "2026-02-02T00:30:00Z",
+        "owner": "database-responder",
+        "summary": "Focused regression gate added before closure.",
+        "evidence_path": "examples/incident-response-drill/regression-gate-report.json"
+      },
+      {
+        "id": "remediated",
+        "phase": "remediated",
+        "at": "2026-02-02T01:00:00Z",
+        "owner": "database-responder",
+        "summary": "Detector regression and remediation patch completed.",
+        "evidence_path": "examples/incident-response-drill/remediation-pr.md"
+      },
+      {
+        "id": "postmortem-published",
+        "phase": "postmortem_published",
+        "at": "2026-02-02T18:00:00Z",
+        "owner": "incident-commander",
+        "summary": "Public postmortem published with lessons and follow-up owners.",
+        "evidence_path": "examples/incident-response-drill/postmortem.md"
+      }
+    ],
+    "disclosures": [
+      {
+        "id": "status-page-update",
+        "audience": "public maintainers and adopters",
+        "channel": "status page",
+        "planned_at": "2026-02-01T14:30:00Z",
+        "published_at": "2026-02-01T15:00:00Z",
+        "summary": "Patchline disclosed a hypothetical false negative, customer impact, mitigation, and expected remediation window.",
+        "evidence_path": "examples/incident-response-drill/status-page.md"
+      }
+    ],
+    "remediations": [
+      {
+        "id": "detector-regression",
+        "kind": "regression_gate",
+        "owner": "database-responder",
+        "due_at": "2026-02-03T13:00:00Z",
+        "completed_at": "2026-02-02T01:00:00Z",
+        "command": "make incident-postmortem-importer-gate",
+        "gate_report_path": "examples/incident-response-drill/regression-gate-report.json",
+        "gate_report_sha256": "45f9e817f3e9848b2371b113fee168055e74ffab14532790736e1df79839bc4d",
+        "evidence_path": "examples/incident-response-drill/remediation-pr.md"
+      },
+      {
+        "id": "customer-mitigation",
+        "kind": "customer_repair",
+        "owner": "data-repair-owner",
+        "due_at": "2026-02-02T13:00:00Z",
+        "completed_at": "2026-02-01T17:00:00Z",
+        "command": "make canary-validation-gate",
+        "evidence_path": "examples/incident-response-drill/mitigation-runbook.md"
+      }
+    ],
+    "roles": [
+      {
+        "role": "incident commander",
+        "owner": "ivy-incident",
+        "backup": "sam-backup",
+        "evidence_path": "examples/incident-response-drill/incident-commander.md"
+      },
+      {
+        "role": "database responder",
+        "owner": "robin-db",
+        "backup": "devon-db",
+        "evidence_path": "examples/incident-response-drill/database-responder.md"
+      },
+      {
+        "role": "communications owner",
+        "owner": "casey-comms",
+        "backup": "lee-comms",
+        "evidence_path": "examples/incident-response-drill/communications-owner.md"
+      },
+      {
+        "role": "data repair owner",
+        "owner": "drew-data",
+        "backup": "riley-data",
+        "evidence_path": "examples/incident-response-drill/data-repair-owner.md"
+      }
+    ],
+    "evidence_paths": [
+      "examples/incident-response-drill/public-report.md",
+      "examples/incident-response-drill/postmortem.md"
+    ]
+  }
+}
