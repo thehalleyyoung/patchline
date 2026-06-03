@@ -174,6 +174,52 @@ func TestPublishRegistryComputesGateReputationOnlyFromAllowedSignals(t *testing.
 	}
 }
 
+func TestPublishChallengeTrackScoresAnalyzerBackedAdversarialMigrations(t *testing.T) {
+	registry, root := validChallengeRegistry(t)
+	report, err := PublishChallengeTrack(registry, root)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !report.OK || report.Summary.Accepted != 1 || report.Summary.ScoreboardEntries != 1 || report.Summary.Rejected != 0 {
+		t.Fatalf("unexpected challenge report: %#v", report)
+	}
+	entry := report.Scoreboard[0]
+	if entry.Score != 100 || entry.Tier != "gold" || !entry.ScoreboardEligible {
+		t.Fatalf("expected full deterministic score, got %#v", entry)
+	}
+	if entry.MigrationAnalysis.HighRisk != 1 || !entry.MigrationAnalysis.AnalyzerMatched || entry.MigrationAnalysis.ActualBehavior != "flag-high-risk-migration" {
+		t.Fatalf("challenge did not run the migration analyzer against the proof artifact: %#v", entry.MigrationAnalysis)
+	}
+	if entry.Breakdown.AnalyzerSignal != 40 || entry.Breakdown.ResponsibleDisclosure != 10 {
+		t.Fatalf("unexpected score breakdown: %#v", entry.Breakdown)
+	}
+	if report.Hash == "" || report.Markdown == "" {
+		t.Fatalf("expected tamper-evident rendered report: %#v", report)
+	}
+}
+
+func TestPublishChallengeTrackRejectsEmbargoedPublicSubmissions(t *testing.T) {
+	registry, root := validChallengeRegistry(t)
+	registry.Examples[0].Challenge.Disclosure.Status = "embargoed"
+	registry.Examples[0].Challenge.Disclosure.PublicReleaseAllowed = false
+	registry.Examples[0].Certificate.SubjectHash = ExpectedSubjectHash(registry.Examples[0])
+	report, err := PublishChallengeTrack(registry, root)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if report.OK || report.Summary.Rejected != 1 || len(report.Scoreboard) != 0 {
+		t.Fatalf("expected embargoed public challenge to be rejected: %#v", report)
+	}
+	var reasons []string
+	for _, rejected := range report.Rejected {
+		reasons = append(reasons, rejected.Reasons...)
+	}
+	joinedReasons := strings.Join(reasons, "\n")
+	if !strings.Contains(joinedReasons, "disclosure.status must be public-safe") || !strings.Contains(joinedReasons, "public_release_allowed must be true") {
+		t.Fatalf("expected responsible-disclosure rejection, got %#v", report.Rejected)
+	}
+}
+
 func TestCertificateHashNormalizesSetLikeFields(t *testing.T) {
 	registry, _ := validRegistry(t)
 	example := registry.Examples[0]
@@ -494,6 +540,76 @@ func validRegistry(t *testing.T) (Registry, string) {
 		},
 		Examples: []Example{example},
 	}
+	return registry, root
+}
+
+func validChallengeRegistry(t *testing.T) (Registry, string) {
+	t.Helper()
+	registry, root := validRegistry(t)
+	writeFile(t, root, "artifacts/adversarial.sql", "UPDATE accounts SET status = 'active';\n")
+	example := registry.Examples[0]
+	example.ID = "redacted-adversarial-broad-update"
+	example.Title = "Redacted adversarial broad update"
+	example.Artifacts = append(example.Artifacts, Artifact{
+		Path:     "artifacts/adversarial.sql",
+		Role:     "adversarial-migration",
+		SHA256:   fileHash(t, filepath.Join(root, "artifacts/adversarial.sql")),
+		Redacted: true,
+	})
+	example.Certificate.ID = "cert-redacted-adversarial-broad-update"
+	example.Certificate.Obligations = append(example.Certificate.Obligations, "responsible-disclosure-cleared")
+	example.Reproduction = []string{
+		"go run ./cmd/patchline evidence-marketplace challenge --registry examples/evidence-marketplace/challenge-registry.json --out results/generated/adversarial-challenge --json",
+		"jq -e '.summary.scoreboard_entries >= 1' results/generated/adversarial-challenge/challenge.json",
+	}
+	example.GateReputation = &GateReputationInput{
+		ReproducibleRuns: 8,
+		FirstVerifiedAt:  "2025-01-01T00:00:00Z",
+		LastVerifiedAt:   "2025-07-01T00:00:00Z",
+		IndependentConfirmations: []string{
+			"Independent Artifact Review Lab",
+			"Migration Safety Working Group",
+		},
+	}
+	example.Challenge = &ChallengeSubmission{
+		TrackID:                  "patchline-adversarial-migrations-2026",
+		AdversarialGoal:          "Preserve a high-risk broad data rewrite in a tiny public-safe migration proof.",
+		AttackSurface:            "SQL migration analyzer and public benchmark importer",
+		ExpectedDetectorBehavior: "flag-high-risk-migration",
+		MigrationArtifact:        "artifacts/adversarial.sql",
+		MaxPublicProofLines:      4,
+		NoveltyStatement:         "The proof isolates the update-without-row-key hazard into one redacted migration statement.",
+		Disclosure: ChallengeDisclosureStatus{
+			Status:               "public-safe",
+			PublicReleaseAllowed: true,
+			CoordinatedWith:      "Patchline Public Challenge Maintainers",
+			ReportedAt:           "2026-06-02T21:00:00Z",
+			FullExploitHash:      "sha256:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
+		},
+	}
+	example.Certificate.SubjectHash = ExpectedSubjectHash(example)
+	registry.ChallengeTrack = &ChallengeTrack{
+		ID:       "patchline-adversarial-migrations-2026",
+		Name:     "Patchline public adversarial migration challenge",
+		RulesURL: "docs/evidence-marketplace.md#adversarial-migration-challenge",
+		ResponsibleDisclosure: ResponsibleDisclosurePolicy{
+			Contact:                 "security@patchline.example",
+			PolicyURL:               "docs/evidence-marketplace.md#responsible-disclosure-rules",
+			EmbargoDays:             90,
+			PublicSafeArtifactsOnly: true,
+		},
+		Scoring: ChallengeScoringPolicy{
+			MinScoreboardScore: 75,
+			Weights: ChallengeScoreWeights{
+				AnalyzerSignal:        40,
+				Reproducibility:       20,
+				Minimization:          15,
+				Novelty:               15,
+				ResponsibleDisclosure: 10,
+			},
+		},
+	}
+	registry.Examples = []Example{example}
 	return registry, root
 }
 

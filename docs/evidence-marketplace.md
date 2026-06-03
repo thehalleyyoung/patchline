@@ -61,6 +61,36 @@ preserves source, certificate, evidence-hash, and artifact-hash provenance.
 Non-representative duplicate examples are listed under `deduplicated` and are
 not imported as additional benchmark cases, preventing prevalence inflation.
 
+## Adversarial migration challenge
+
+```bash
+go run ./cmd/patchline evidence-marketplace challenge \
+  --registry examples/evidence-marketplace/challenge-registry.json \
+  --out results/generated/adversarial-challenge \
+  --json
+```
+
+The public adversarial migration challenge is a separate marketplace track for
+redacted, certificate-backed migrations designed to stress detectors without
+publishing private exploit context. Its deterministic scoring is
+certificate-bound, and
+scoreboard entries are sorted deterministically by score, then ID. The score is
+computed from verified artifact hashes, the migration analyzer's actual
+high-risk result on the public-safe SQL proof, reproduction evidence, duplicate
+novelty, minimization against `max_public_proof_lines`, and
+responsible-disclosure checks. Submitter-provided labels do not directly grant
+scoreboard credit.
+
+### Responsible-disclosure rules
+
+Committed challenge artifacts must be public-safe and redacted. Embargoed or
+non-public exploit details can appear only as a `sha256:` reference hash; an
+entry with `disclosure.status` other than `public-safe` or
+`public_release_allowed=false` is rejected before it can appear on the
+scoreboard. Each challenge certificate must include the conditional
+`responsible-disclosure-cleared` obligation, and the track must publish contact,
+policy URL, embargo length, scoring weights, and the minimum scoreboard score.
+
 ## Admission contract
 
 Each public example must include:
@@ -94,10 +124,13 @@ Scores below 50 are `emerging`, 50-74 are `reviewable`, and 75 or above are
 
 ```bash
 make evidence-marketplace-gate
+make adversarial-challenge-gate
 ```
 
 The gate publishes the fixture marketplace, checks the duplicate-collapsed
 prevalence contract, imports representative examples into a runnable benchmark
 manifest, validates and runs that manifest, then corrupts a copied certificate
 hash and proves the bad submission is rejected without modifying tracked
-fixtures.
+fixtures. The challenge gate scores public-safe adversarial migrations from real
+redacted SQL artifacts, verifies analyzer-backed high-risk proofs, and runs the
+embargo/publication negative controls in focused tests.

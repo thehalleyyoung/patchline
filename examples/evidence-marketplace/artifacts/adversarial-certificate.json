@@ -1,0 +1,11 @@
+{
+  "version": "patchline.redacted-certificate-witness/v1",
+  "checks": [
+    "redaction-reviewed",
+    "license-cleared",
+    "artifact-hashes-verified",
+    "reproducible-without-private-data",
+    "responsible-disclosure-cleared"
+  ],
+  "public_safe_challenge": true
+}

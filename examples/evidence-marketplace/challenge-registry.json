@@ -1,0 +1,199 @@
+{
+  "version": "patchline.evidence-marketplace/v1",
+  "claim": "Patchline's public adversarial migration challenge admits only redacted, certificate-backed, responsible-disclosure-cleared examples, then scores them deterministically from verified artifacts and analyzer behavior.",
+  "marketplace": {
+    "name": "Patchline public adversarial migration challenge",
+    "maintainer": "Patchline maintainers",
+    "policy_url": "docs/evidence-marketplace.md#adversarial-migration-challenge"
+  },
+  "challenge_track": {
+    "id": "patchline-adversarial-migrations-2026",
+    "name": "Patchline public adversarial migration challenge",
+    "rules_url": "docs/evidence-marketplace.md#adversarial-migration-challenge",
+    "responsible_disclosure": {
+      "contact": "security@patchline.example",
+      "policy_url": "docs/evidence-marketplace.md#responsible-disclosure-rules",
+      "embargo_days": 90,
+      "public_safe_artifacts_only": true
+    },
+    "scoring": {
+      "min_scoreboard_score": 75,
+      "weights": {
+        "analyzer_signal": 40,
+        "reproducibility": 20,
+        "minimization": 15,
+        "novelty": 15,
+        "responsible_disclosure": 10
+      }
+    }
+  },
+  "examples": [
+    {
+      "id": "adversarial-redacted-broad-update",
+      "title": "Public-safe adversarial broad update",
+      "organization": "Patchline Public Corpus",
+      "ecosystem": "postgres",
+      "hazard_class": "broad-update-without-row-key",
+      "source": {
+        "host": "github",
+        "repo": "lobsters/lobsters",
+        "ref": "3b80b47aa5aaba37ec44413e7d1dc96fcf1585b6",
+        "commit": "3b80b47aa5aaba37ec44413e7d1dc96fcf1585b6",
+        "subpath": "db/migrate",
+        "url": "https://github.com/lobsters/lobsters/tree/3b80b47aa5aaba37ec44413e7d1dc96fcf1585b6/db/migrate"
+      },
+      "license_spdx": "CC-BY-4.0",
+      "consent": "Patchline Public Corpus approved publication of this redacted adversarial migration challenge example and certificate under the declared public license.",
+      "redaction": {
+        "redaction_reviewed": true,
+        "raw_data_shared": false,
+        "method": "project identifiers, table names, owners, literal values, and row data replaced with stable placeholders while preserving SQL hazard shape",
+        "fields": ["identifiers", "literals", "owners", "row values"],
+        "reviewer": "artifact-review"
+      },
+      "artifacts": [
+        {
+          "path": "artifacts/adversarial-broad-update.sql",
+          "role": "adversarial-migration",
+          "sha256": "sha256:1862d280b065b3cbd0c6fda8c92344c195c4bf4e2cd74ac25fd32e65f1bab295",
+          "redacted": true
+        },
+        {
+          "path": "artifacts/adversarial-certificate.json",
+          "role": "certificate-witness",
+          "sha256": "sha256:a1016c861764b5759221003f105e967f291c5f5bbaaa1612352210323719df46",
+          "redacted": true
+        }
+      ],
+      "certificate": {
+        "id": "cert-adversarial-redacted-broad-update",
+        "issuer": "patchline-public-adversarial-challenge",
+        "issued_at": "2026-06-02T22:34:33Z",
+        "subject_hash": "sha256:2762f67603083c6af0597bec5fe581dc18cad7c2f3df154f84c67d5189e4a3d0",
+        "obligations": [
+          "redaction-reviewed",
+          "license-cleared",
+          "artifact-hashes-verified",
+          "reproducible-without-private-data",
+          "responsible-disclosure-cleared"
+        ]
+      },
+      "reproduction": [
+        "go run ./cmd/patchline evidence-marketplace challenge --registry examples/evidence-marketplace/challenge-registry.json --out results/generated/adversarial-challenge --json",
+        "jq -e '.summary.scoreboard_entries >= 2' results/generated/adversarial-challenge/challenge.json"
+      ],
+      "gate_reputation": {
+        "reproducible_runs": 11,
+        "first_verified_at": "2025-01-01T00:00:00Z",
+        "last_verified_at": "2025-08-01T00:00:00Z",
+        "independent_confirmations": [
+          "Database Reliability Guild",
+          "Independent Artifact Review Lab",
+          "Migration Safety Working Group"
+        ]
+      },
+      "challenge_submission": {
+        "track_id": "patchline-adversarial-migrations-2026",
+        "adversarial_goal": "Reduce the public proof to the smallest SQL statement that still rewrites a persistent table without a row key.",
+        "attack_surface": "SQL migration analyzer, duplicate-safe challenge scoring, and responsible-disclosure publication",
+        "expected_detector_behavior": "flag-high-risk-migration",
+        "migration_artifact": "artifacts/adversarial-broad-update.sql",
+        "max_public_proof_lines": 4,
+        "novelty_statement": "The public-safe proof isolates the update-without-row-key hazard into one redacted migration statement.",
+        "disclosure": {
+          "status": "public-safe",
+          "public_release_allowed": true,
+          "coordinated_with": "Patchline Public Challenge Maintainers",
+          "reported_at": "2026-06-02T21:00:00Z",
+          "full_exploit_hash": "sha256:1111111111111111111111111111111111111111111111111111111111111111"
+        }
+      },
+      "limitations": [
+        "The public artifact is intentionally redacted and minimized; it proves challenge scoring mechanics rather than disclosing private exploit context."
+      ]
+    },
+    {
+      "id": "adversarial-redacted-truncate",
+      "title": "Public-safe adversarial truncate",
+      "organization": "Patchline Public Corpus",
+      "ecosystem": "mysql",
+      "hazard_class": "destructive-ddl-without-rollback",
+      "source": {
+        "host": "github",
+        "repo": "bytebase/bytebase",
+        "ref": "4f86b4f8c2a0d0f4a3b2c1d0e9f8a7b6c5d4e3f2",
+        "commit": "4f86b4f8c2a0d0f4a3b2c1d0e9f8a7b6c5d4e3f2",
+        "subpath": "backend/migrator/migration",
+        "url": "https://github.com/bytebase/bytebase/tree/4f86b4f8c2a0d0f4a3b2c1d0e9f8a7b6c5d4e3f2/backend/migrator/migration"
+      },
+      "license_spdx": "CC-BY-4.0",
+      "consent": "Patchline Public Corpus approved publication of this redacted adversarial migration challenge example and certificate under the declared public license.",
+      "redaction": {
+        "redaction_reviewed": true,
+        "raw_data_shared": false,
+        "method": "project identifiers, table names, owners, literal values, and row data replaced with stable placeholders while preserving destructive DDL shape",
+        "fields": ["identifiers", "literals", "owners", "row values"],
+        "reviewer": "artifact-review"
+      },
+      "artifacts": [
+        {
+          "path": "artifacts/adversarial-truncate.sql",
+          "role": "adversarial-migration",
+          "sha256": "sha256:5571d284af430fd553361abaa54d2219d7461e019773940a7e7413777351b72b",
+          "redacted": true
+        },
+        {
+          "path": "artifacts/adversarial-certificate.json",
+          "role": "certificate-witness",
+          "sha256": "sha256:a1016c861764b5759221003f105e967f291c5f5bbaaa1612352210323719df46",
+          "redacted": true
+        }
+      ],
+      "certificate": {
+        "id": "cert-adversarial-redacted-truncate",
+        "issuer": "patchline-public-adversarial-challenge",
+        "issued_at": "2026-06-02T22:34:33Z",
+        "subject_hash": "sha256:be6b6b11ce0054071ae52cbc696f138c0c2009e1430dd9dd397c62731ba5fa14",
+        "obligations": [
+          "redaction-reviewed",
+          "license-cleared",
+          "artifact-hashes-verified",
+          "reproducible-without-private-data",
+          "responsible-disclosure-cleared"
+        ]
+      },
+      "reproduction": [
+        "go run ./cmd/patchline evidence-marketplace challenge --registry examples/evidence-marketplace/challenge-registry.json --out results/generated/adversarial-challenge --json",
+        "jq -e '.scoreboard | length >= 2' results/generated/adversarial-challenge/challenge.json"
+      ],
+      "gate_reputation": {
+        "reproducible_runs": 9,
+        "first_verified_at": "2025-02-01T00:00:00Z",
+        "last_verified_at": "2025-08-15T00:00:00Z",
+        "independent_confirmations": [
+          "Independent Artifact Review Lab",
+          "Migration Safety Working Group"
+        ]
+      },
+      "challenge_submission": {
+        "track_id": "patchline-adversarial-migrations-2026",
+        "adversarial_goal": "Preserve a destructive DDL hazard as a public-safe one-line migration proof.",
+        "attack_surface": "SQL migration analyzer, deterministic score sorting, and public-safe artifact policy",
+        "expected_detector_behavior": "flag-high-risk-migration",
+        "migration_artifact": "artifacts/adversarial-truncate.sql",
+        "max_public_proof_lines": 4,
+        "novelty_statement": "The public-safe proof isolates destructive table truncation into one redacted migration statement.",
+        "disclosure": {
+          "status": "public-safe",
+          "public_release_allowed": true,
+          "coordinated_with": "Patchline Public Challenge Maintainers",
+          "reported_at": "2026-06-02T21:30:00Z",
+          "full_exploit_hash": "sha256:2222222222222222222222222222222222222222222222222222222222222222"
+        }
+      },
+      "limitations": [
+        "The public artifact omits real table names and operational context while preserving the analyzer-visible destructive shape."
+      ]
+    }
+  ]
+}

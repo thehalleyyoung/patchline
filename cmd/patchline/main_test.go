@@ -103,6 +103,43 @@ func TestEvidenceMarketplacePublishCommandWritesReports(t *testing.T) {
 	}
 }
 
+func TestEvidenceMarketplaceChallengeCommandWritesScoreboard(t *testing.T) {
+	root := t.TempDir()
+	registry := mainTestChallengeRegistry(t, root)
+	registryPath := filepath.Join(root, "challenge-registry.json")
+	writeMainTestJSONFile(t, registryPath, registry)
+	out := filepath.Join(t.TempDir(), "challenge")
+	if err := run([]string{"evidence-marketplace", "challenge", "--registry", registryPath, "--out", out, "--json"}); err != nil {
+		t.Fatalf("evidence marketplace challenge failed: %v", err)
+	}
+	var report evidencemarketplace.ChallengeReport
+	readMainTestJSON(t, filepath.Join(out, "challenge.json"), &report)
+	if !report.OK || report.Summary.ScoreboardEntries != 1 || report.Scoreboard[0].MigrationAnalysis.HighRisk != 1 {
+		t.Fatalf("unexpected challenge report: %#v", report)
+	}
+	for _, rel := range []string{"challenge.json", "challenge.md", "index.html"} {
+		if stat, err := os.Stat(filepath.Join(out, rel)); err != nil || stat.Size() == 0 {
+			t.Fatalf("expected %s to be written, stat=%#v err=%v", rel, stat, err)
+		}
+	}
+
+	bad := registry
+	bad.Examples[0].Challenge.Disclosure.Status = "embargoed"
+	bad.Examples[0].Challenge.Disclosure.PublicReleaseAllowed = false
+	bad.Examples[0].Certificate.SubjectHash = evidencemarketplace.ExpectedSubjectHash(bad.Examples[0])
+	badPath := filepath.Join(root, "challenge-registry.bad.json")
+	writeMainTestJSONFile(t, badPath, bad)
+	badOut := filepath.Join(t.TempDir(), "bad-challenge")
+	if err := run([]string{"evidence-marketplace", "challenge", "--registry", badPath, "--out", badOut, "--json"}); err == nil || exitCode(err) != 2 {
+		t.Fatalf("expected rejected challenge with exit code 2, got %v", err)
+	}
+	var rejected evidencemarketplace.ChallengeReport
+	readMainTestJSON(t, filepath.Join(badOut, "challenge.json"), &rejected)
+	if rejected.OK || len(rejected.Rejected) != 1 {
+		t.Fatalf("expected rejected challenge report, got %#v", rejected)
+	}
+}
+
 func TestArtifactBenchmarkImportMarketplaceCommandWritesRunnableBenchmark(t *testing.T) {
 	root := t.TempDir()
 	registry := mainTestEvidenceMarketplaceRegistry(t, root)
@@ -2664,6 +2701,76 @@ func mainTestEvidenceMarketplaceRegistry(t *testing.T, root string) evidencemark
 		},
 		Examples: []evidencemarketplace.Example{example},
 	}
+}
+
+func mainTestChallengeRegistry(t *testing.T, root string) evidencemarketplace.Registry {
+	t.Helper()
+	registry := mainTestEvidenceMarketplaceRegistry(t, root)
+	writeMainTestFile(t, root, "artifacts/adversarial.sql", "UPDATE accounts SET status = 'active';\n")
+	example := registry.Examples[0]
+	example.ID = "redacted-cli-adversarial-broad-update"
+	example.Title = "Redacted CLI adversarial broad update"
+	example.Artifacts = append(example.Artifacts, evidencemarketplace.Artifact{
+		Path:     "artifacts/adversarial.sql",
+		Role:     "adversarial-migration",
+		SHA256:   mainTestFileHash(t, filepath.Join(root, "artifacts/adversarial.sql")),
+		Redacted: true,
+	})
+	example.Certificate.ID = "cert-redacted-cli-adversarial-broad-update"
+	example.Certificate.Obligations = append(example.Certificate.Obligations, "responsible-disclosure-cleared")
+	example.Reproduction = []string{
+		"go run ./cmd/patchline evidence-marketplace challenge --registry examples/evidence-marketplace/challenge-registry.json --out results/generated/adversarial-challenge --json",
+		"jq -e '.summary.scoreboard_entries >= 1' results/generated/adversarial-challenge/challenge.json",
+	}
+	example.GateReputation = &evidencemarketplace.GateReputationInput{
+		ReproducibleRuns: 8,
+		FirstVerifiedAt:  "2025-01-01T00:00:00Z",
+		LastVerifiedAt:   "2025-07-01T00:00:00Z",
+		IndependentConfirmations: []string{
+			"Independent Artifact Review Lab",
+			"Migration Safety Working Group",
+		},
+	}
+	example.Challenge = &evidencemarketplace.ChallengeSubmission{
+		TrackID:                  "patchline-adversarial-migrations-2026",
+		AdversarialGoal:          "Preserve a high-risk broad data rewrite in a tiny public-safe migration proof.",
+		AttackSurface:            "SQL migration analyzer and public benchmark importer",
+		ExpectedDetectorBehavior: "flag-high-risk-migration",
+		MigrationArtifact:        "artifacts/adversarial.sql",
+		MaxPublicProofLines:      4,
+		NoveltyStatement:         "The proof isolates the update-without-row-key hazard into one redacted migration statement.",
+		Disclosure: evidencemarketplace.ChallengeDisclosureStatus{
+			Status:               "public-safe",
+			PublicReleaseAllowed: true,
+			CoordinatedWith:      "Patchline Public Challenge Maintainers",
+			ReportedAt:           "2026-06-02T21:00:00Z",
+			FullExploitHash:      "sha256:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
+		},
+	}
+	example.Certificate.SubjectHash = evidencemarketplace.ExpectedSubjectHash(example)
+	registry.ChallengeTrack = &evidencemarketplace.ChallengeTrack{
+		ID:       "patchline-adversarial-migrations-2026",
+		Name:     "Patchline public adversarial migration challenge",
+		RulesURL: "docs/evidence-marketplace.md#adversarial-migration-challenge",
+		ResponsibleDisclosure: evidencemarketplace.ResponsibleDisclosurePolicy{
+			Contact:                 "security@patchline.example",
+			PolicyURL:               "docs/evidence-marketplace.md#responsible-disclosure-rules",
+			EmbargoDays:             90,
+			PublicSafeArtifactsOnly: true,
+		},
+		Scoring: evidencemarketplace.ChallengeScoringPolicy{
+			MinScoreboardScore: 75,
+			Weights: evidencemarketplace.ChallengeScoreWeights{
+				AnalyzerSignal:        40,
+				Reproducibility:       20,
+				Minimization:          15,
+				Novelty:               15,
+				ResponsibleDisclosure: 10,
+			},
+		},
+	}
+	registry.Examples = []evidencemarketplace.Example{example}
+	return registry
 }
 
 func mainTestFileHash(t *testing.T, path string) string {

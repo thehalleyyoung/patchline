@@ -51,10 +51,11 @@ var highSignalPrivateMarkers = []string{
 }
 
 type Registry struct {
-	Version     string    `json:"version"`
-	Claim       string    `json:"claim"`
-	Marketplace Metadata  `json:"marketplace"`
-	Examples    []Example `json:"examples"`
+	Version        string          `json:"version"`
+	Claim          string          `json:"claim"`
+	Marketplace    Metadata        `json:"marketplace"`
+	ChallengeTrack *ChallengeTrack `json:"challenge_track,omitempty"`
+	Examples       []Example       `json:"examples"`
 }
 
 type Metadata struct {
@@ -77,7 +78,56 @@ type Example struct {
 	Certificate    Certificate          `json:"certificate"`
 	Reproduction   []string             `json:"reproduction"`
 	GateReputation *GateReputationInput `json:"gate_reputation,omitempty"`
+	Challenge      *ChallengeSubmission `json:"challenge_submission,omitempty"`
 	Limitations    []string             `json:"limitations,omitempty"`
+}
+
+type ChallengeTrack struct {
+	ID                    string                      `json:"id"`
+	Name                  string                      `json:"name"`
+	RulesURL              string                      `json:"rules_url"`
+	ResponsibleDisclosure ResponsibleDisclosurePolicy `json:"responsible_disclosure"`
+	Scoring               ChallengeScoringPolicy      `json:"scoring"`
+}
+
+type ResponsibleDisclosurePolicy struct {
+	Contact                 string `json:"contact"`
+	PolicyURL               string `json:"policy_url"`
+	EmbargoDays             int    `json:"embargo_days"`
+	PublicSafeArtifactsOnly bool   `json:"public_safe_artifacts_only"`
+}
+
+type ChallengeScoringPolicy struct {
+	MinScoreboardScore int                   `json:"min_scoreboard_score"`
+	Weights            ChallengeScoreWeights `json:"weights"`
+}
+
+type ChallengeScoreWeights struct {
+	AnalyzerSignal        int `json:"analyzer_signal"`
+	Reproducibility       int `json:"reproducibility"`
+	Minimization          int `json:"minimization"`
+	Novelty               int `json:"novelty"`
+	ResponsibleDisclosure int `json:"responsible_disclosure"`
+}
+
+type ChallengeSubmission struct {
+	TrackID                  string                    `json:"track_id"`
+	AdversarialGoal          string                    `json:"adversarial_goal"`
+	AttackSurface            string                    `json:"attack_surface"`
+	ExpectedDetectorBehavior string                    `json:"expected_detector_behavior"`
+	MigrationArtifact        string                    `json:"migration_artifact"`
+	MaxPublicProofLines      int                       `json:"max_public_proof_lines"`
+	NoveltyStatement         string                    `json:"novelty_statement"`
+	Disclosure               ChallengeDisclosureStatus `json:"disclosure"`
+}
+
+type ChallengeDisclosureStatus struct {
+	Status               string `json:"status"`
+	PublicReleaseAllowed bool   `json:"public_release_allowed"`
+	CoordinatedWith      string `json:"coordinated_with"`
+	ReportedAt           string `json:"reported_at"`
+	EmbargoEndsAt        string `json:"embargo_ends_at,omitempty"`
+	FullExploitHash      string `json:"full_exploit_hash,omitempty"`
 }
 
 type Source struct {
@@ -221,6 +271,7 @@ type PublishedExample struct {
 	Reproduction           []string                `json:"reproduction"`
 	GateReputation         GateReputationReport    `json:"gate_reputation"`
 	DuplicateAnalysis      DuplicateAnalysisReport `json:"duplicate_analysis"`
+	Challenge              *ChallengeSubmission    `json:"challenge_submission,omitempty"`
 	Limitations            []string                `json:"limitations,omitempty"`
 }
 
@@ -243,29 +294,31 @@ type Count struct {
 }
 
 type certificateSubject struct {
-	Version      string     `json:"version"`
-	ExampleID    string     `json:"example_id"`
-	Source       Source     `json:"source"`
-	Ecosystem    string     `json:"ecosystem"`
-	HazardClass  string     `json:"hazard_class"`
-	LicenseSPDX  string     `json:"license_spdx"`
-	Consent      string     `json:"consent"`
-	Redaction    Redaction  `json:"redaction"`
-	Artifacts    []Artifact `json:"artifacts"`
-	Obligations  []string   `json:"obligations"`
-	Reproduction []string   `json:"reproduction"`
+	Version      string               `json:"version"`
+	ExampleID    string               `json:"example_id"`
+	Source       Source               `json:"source"`
+	Ecosystem    string               `json:"ecosystem"`
+	HazardClass  string               `json:"hazard_class"`
+	LicenseSPDX  string               `json:"license_spdx"`
+	Consent      string               `json:"consent"`
+	Redaction    Redaction            `json:"redaction"`
+	Artifacts    []Artifact           `json:"artifacts"`
+	Obligations  []string             `json:"obligations"`
+	Reproduction []string             `json:"reproduction"`
+	Challenge    *ChallengeSubmission `json:"challenge_submission,omitempty"`
 }
 
 type evidenceSubject struct {
-	Version      string     `json:"version"`
-	ExampleID    string     `json:"example_id"`
-	Source       Source     `json:"source"`
-	Ecosystem    string     `json:"ecosystem"`
-	HazardClass  string     `json:"hazard_class"`
-	LicenseSPDX  string     `json:"license_spdx"`
-	Redaction    Redaction  `json:"redaction"`
-	Artifacts    []Artifact `json:"artifacts"`
-	Reproduction []string   `json:"reproduction"`
+	Version      string               `json:"version"`
+	ExampleID    string               `json:"example_id"`
+	Source       Source               `json:"source"`
+	Ecosystem    string               `json:"ecosystem"`
+	HazardClass  string               `json:"hazard_class"`
+	LicenseSPDX  string               `json:"license_spdx"`
+	Redaction    Redaction            `json:"redaction"`
+	Artifacts    []Artifact           `json:"artifacts"`
+	Reproduction []string             `json:"reproduction"`
+	Challenge    *ChallengeSubmission `json:"challenge_submission,omitempty"`
 }
 
 type exactDuplicateSubject struct {
@@ -436,6 +489,7 @@ func EvidenceHash(example Example) string {
 		Redaction:    normalizeRedaction(example.Redaction),
 		Artifacts:    normalizeArtifacts(example.Artifacts),
 		Reproduction: normalizeStringList(example.Reproduction, false),
+		Challenge:    normalizeChallengeSubmission(example.Challenge),
 	})
 }
 
@@ -511,6 +565,7 @@ func validateExample(example Example, root string, seen map[string]bool) (Publis
 		Reproduction:           normalizeStringList(example.Reproduction, false),
 		GateReputation:         gateReputation,
 		DuplicateAnalysis:      duplicateAnalysis,
+		Challenge:              normalizeChallengeSubmission(example.Challenge),
 		Limitations:            normalizeStringList(example.Limitations, false),
 	}, nil
 }
@@ -829,6 +884,9 @@ func metadataStrings(example Example) []string {
 		)
 		values = append(values, example.GateReputation.IndependentConfirmations...)
 	}
+	if example.Challenge != nil {
+		values = append(values, challengeStrings(*example.Challenge)...)
+	}
 	values = append(values, example.Limitations...)
 	return values
 }
@@ -846,6 +904,47 @@ func certificateSubjectFor(example Example) certificateSubject {
 		Artifacts:    normalizeArtifacts(example.Artifacts),
 		Obligations:  normalizeStringList(example.Certificate.Obligations, true),
 		Reproduction: normalizeStringList(example.Reproduction, false),
+		Challenge:    normalizeChallengeSubmission(example.Challenge),
+	}
+}
+
+func normalizeChallengeSubmission(challenge *ChallengeSubmission) *ChallengeSubmission {
+	if challenge == nil {
+		return nil
+	}
+	normalized := &ChallengeSubmission{
+		TrackID:                  strings.TrimSpace(challenge.TrackID),
+		AdversarialGoal:          strings.TrimSpace(challenge.AdversarialGoal),
+		AttackSurface:            strings.TrimSpace(challenge.AttackSurface),
+		ExpectedDetectorBehavior: strings.TrimSpace(challenge.ExpectedDetectorBehavior),
+		MigrationArtifact:        filepath.ToSlash(strings.TrimSpace(challenge.MigrationArtifact)),
+		MaxPublicProofLines:      challenge.MaxPublicProofLines,
+		NoveltyStatement:         strings.TrimSpace(challenge.NoveltyStatement),
+		Disclosure: ChallengeDisclosureStatus{
+			Status:               strings.TrimSpace(challenge.Disclosure.Status),
+			PublicReleaseAllowed: challenge.Disclosure.PublicReleaseAllowed,
+			CoordinatedWith:      strings.TrimSpace(challenge.Disclosure.CoordinatedWith),
+			ReportedAt:           strings.TrimSpace(challenge.Disclosure.ReportedAt),
+			EmbargoEndsAt:        strings.TrimSpace(challenge.Disclosure.EmbargoEndsAt),
+			FullExploitHash:      strings.TrimSpace(challenge.Disclosure.FullExploitHash),
+		},
+	}
+	return normalized
+}
+
+func challengeStrings(challenge ChallengeSubmission) []string {
+	return []string{
+		challenge.TrackID,
+		challenge.AdversarialGoal,
+		challenge.AttackSurface,
+		challenge.ExpectedDetectorBehavior,
+		challenge.MigrationArtifact,
+		challenge.NoveltyStatement,
+		challenge.Disclosure.Status,
+		challenge.Disclosure.CoordinatedWith,
+		challenge.Disclosure.ReportedAt,
+		challenge.Disclosure.EmbargoEndsAt,
+		challenge.Disclosure.FullExploitHash,
 	}
 }
 

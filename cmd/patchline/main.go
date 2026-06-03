@@ -577,6 +577,7 @@ Usage:
   patchline ingest-evidence <events.jsonl> [--json] [--out graph.json]
   patchline adapt-evidence <otlp|datadog|postgres|github|migration-runner|jira|linear> <input.json> [--json] [--out events.jsonl]
   patchline evidence-marketplace publish --registry registry.json --out dir [--json]
+  patchline evidence-marketplace challenge --registry registry.json --out dir [--json]
   patchline expand-contract-template --spec expand-contract.json --out dir [--json]
   patchline backfill-plan --spec backfill-plan.json --store store.json --out dir [--json]
   patchline canary-validate --spec canary-validation.json --before before.json --after after.json --out dir [--json]

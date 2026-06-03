@@ -65,7 +65,9 @@ release checks, scores community-gate reputation solely from reproducible runs, 
 windows, and independent confirmations, collapses exact and near-duplicate submissions before
 prevalence accounting, and imports only prevalence representatives into runnable benchmarks while
 recording submitter labels as untrusted and deriving cases from independent redacted evidence cues;
-private adopters can then run federated benchmark splits locally and publish only signed,
+the same marketplace now hosts a public adversarial-migration challenge whose certificate-bound,
+public-safe submissions are scored from verified artifacts, analyzer behavior, minimization, novelty,
+and responsible disclosure; private adopters can then run federated benchmark splits locally and publish only signed,
 k-thresholded aggregate metrics.
 Critically,
 every capability in \tool{} is backed by a reproducible \emph{gate}: a script that proves the
@@ -136,8 +138,8 @@ ranks the risks, and prints the next commands that can run immediately.
   exports (Section~\ref{sec:runtime}).
   \item A \textbf{gate-backed reproducibility and evaluation methodology}---over 610 gates, blinded
   false-positive adjudication, seeded false-negative recall, ablations, standardized effect sizes,
-  severity calibration, a duplicate-safe certificate-backed public evidence marketplace, and signed
-  federated benchmark aggregates for private adopters---designed for artifact
+  severity calibration, a duplicate-safe certificate-backed public evidence marketplace, deterministic
+  adversarial-challenge scoring, and signed federated benchmark aggregates for private adopters---designed for artifact
   evaluation and best-paper-grade rigor
   (Sections~\ref{sec:repro}--\ref{sec:eval}).
 \end{enumerate}
@@ -241,6 +243,10 @@ checks pass, then import only prevalence representatives into runnable benchmark
 registry or artifact hazard labels. &
 \code{marketplace.json},
 \code{marketplace-import.json}, generated manifest/ground truth \\
+\code{evidence-marketplace challenge} & Score certificate-bound, public-safe adversarial migration
+submissions from verified artifact hashes, the SQL analyzer's actual high-risk result, reproduction
+evidence, duplicate novelty, minimization, and responsible-disclosure clearance; exclude below-threshold
+entries without trusting submitter labels. & \code{challenge.json}, \code{challenge.md} \\
 \code{artifact-benchmark federated-split/run/verify} & Validate an adopter-local private benchmark
 partition, execute it locally, suppress below-threshold metric buckets, and publish only a signed
 aggregate bound to the manifest and salted split commitments. & local \code{split.json}, public
@@ -778,6 +784,20 @@ weight one, imports both into a runnable benchmark manifest, validates and runs 
 corrupts a copied certificate hash; the bad marketplace must be rejected while the tracked fixture
 remains untouched.
 
+The same machinery now publishes an adversarial challenge track without weakening the marketplace's
+privacy contract. A challenge entry must carry a conditional
+\code{responsible-disclosure-cleared} certificate obligation, reference only public-safe redacted proof
+artifacts, and publish contact, policy URL, embargo length, scoring weights, and a minimum scoreboard
+threshold. \tool{} recomputes the certificate subject over the challenge metadata, resolves the
+\code{adversarial-migration} artifact through the same symlink-safe verifier, runs the migration analyzer
+on that public SQL proof, and assigns deterministic points for analyzer match, reproducibility,
+minimization, duplicate novelty, and disclosure readiness. Embargoed entries or entries whose public
+release is not allowed are rejected before rendering. The \gate{adversarial-challenge-gate} scores two
+redacted one-line adversarial migrations into a scoreboard, checks that each has an analyzer-backed
+high-risk proof and hash-bound artifact, scans the JSON/Markdown/HTML outputs for high-signal private
+markers, and relies on focused negative controls that recompute certificate hashes while proving
+embargoed submissions are excluded.
+
 \paragraph{Federated private benchmark aggregates.} A public benchmark alone cannot measure private
 adopter failure modes without either collecting source code or leaking case-level outcomes. The
 \code{artifact-benchmark federated-split}, \code{federated-run}, and \code{federated-verify} commands
@@ -885,6 +905,7 @@ owner-routed rollback playbooks for broad writes & \gate{remediation-playbook-ga
 5 migration-PR states preserve invariants; unsafe drop refuted & \gate{patch-series-verifier-gate} \\
 9 paired maintainer reviews; 38.55\% faster with full uncertainty recall; hidden-control refuted & \gate{maintainer-acceptance-study-gate} \\
 2 public-release-eligible examples with reviewable gate reputation and duplicate-collapsed prevalence imported into runnable benchmarks; corrupted certificate rejected & \gate{evidence-marketplace-gate} \\
+2 public-safe adversarial migrations scored from verified artifacts and analyzer-backed high-risk proofs; embargoed publication refuted & \gate{adversarial-challenge-gate} \\
 3 private benchmark cases published as signed aggregate-only metrics; tampering/leakage rejected & \gate{federated-benchmark-split-gate} \\
 3 payout-approved minimized false-negative/ecosystem-gap bounty reproductions; unsupported bounty rejected & \gate{open-problem-bounty-board-gate} \\
 9 Cassandra changes incl.\ destructive drops & \code{laaksomavrick/twitter-go} \\
