@@ -1,0 +1,1 @@
+Incident commander approval: emergency CHG-2026-002 may proceed only until the declared expiry and only with the Patchline emergency blocker passing.

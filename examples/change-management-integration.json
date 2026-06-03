@@ -1,0 +1,122 @@
+{
+  "version": "patchline.change-management/v1",
+  "name": "Patchline change-management integration over approval workflows",
+  "criteria": {
+    "min_approval_steps": 2,
+    "require_distinct_approvers": true,
+    "require_evidence_hashes": true,
+    "require_patchline_gate_binding": true,
+    "require_change_ticket": true,
+    "require_rollback_plan": true,
+    "require_emergency_expiry": true,
+    "require_workflow_evidence_paths": true
+  },
+  "workflows": [
+    {
+      "workflow_id": "chg-2026-001-expand-contract",
+      "title": "Customer expand/contract migration",
+      "change_ticket": "CHG-2026-001",
+      "risk_level": "high",
+      "patchline_findings": [
+        "PL-DB-001",
+        "PL-DB-002"
+      ],
+      "gates": [
+        {
+          "gate_id": "patchline-reviewer-fairness",
+          "command": "make reviewer-fairness-audit-gate",
+          "status": "pass",
+          "report_path": "examples/change-management/gate-report.json",
+          "report_sha256": "a18bca3d1246e293c1091af2a180d4a080d123fcf1d0f3f54ee5826e1f85d286",
+          "blocks_change": true
+        }
+      ],
+      "approvals": [
+        {
+          "step_id": "database-review",
+          "role": "database reliability",
+          "approver": "robin-db",
+          "approved_at": "2026-01-15T13:00:00Z",
+          "decision": "approved",
+          "evidence_path": "examples/change-management/cab-approval.txt",
+          "gate_ids": [
+            "patchline-reviewer-fairness"
+          ]
+        },
+        {
+          "step_id": "service-owner",
+          "role": "service owner",
+          "approver": "sam-service",
+          "approved_at": "2026-01-15T13:10:00Z",
+          "decision": "approved",
+          "evidence_path": "examples/change-management/service-approval.txt",
+          "gate_ids": [
+            "patchline-reviewer-fairness"
+          ]
+        }
+      ],
+      "deployment_controls": {
+        "change_window": "2026-01-15T22:00:00Z/2026-01-15T23:00:00Z",
+        "rollback_plan_path": "examples/change-management/rollback-runbook.txt"
+      },
+      "evidence_paths": [
+        "examples/change-management/change-ticket.md",
+        "docs/accountable-use-policy.md",
+        "docs/reviewer-fairness-audit.md"
+      ]
+    },
+    {
+      "workflow_id": "chg-2026-002-emergency-guard",
+      "title": "Emergency guard before customer repair",
+      "change_ticket": "CHG-2026-002",
+      "risk_level": "emergency",
+      "patchline_findings": [
+        "PL-DB-009"
+      ],
+      "gates": [
+        {
+          "gate_id": "patchline-emergency-blocker",
+          "command": "go run ./cmd/patchline reviewer-fairness-audit --spec examples/reviewer-fairness-audit.json --root . --out results/generated/reviewer-fairness-audit --json",
+          "status": "pass",
+          "report_path": "examples/change-management/emergency-gate-report.json",
+          "report_sha256": "8ba69894882d6c83acec817b0ff22152a11b066b3888ef058ae74e978ad74ee0",
+          "blocks_change": true
+        }
+      ],
+      "approvals": [
+        {
+          "step_id": "incident-commander",
+          "role": "incident commander",
+          "approver": "ivy-incident",
+          "approved_at": "2026-01-16T09:40:00Z",
+          "decision": "approved",
+          "evidence_path": "examples/change-management/incident-commander-approval.txt",
+          "gate_ids": [
+            "patchline-emergency-blocker"
+          ]
+        },
+        {
+          "step_id": "security-owner",
+          "role": "security owner",
+          "approver": "sky-security",
+          "approved_at": "2026-01-16T09:45:00Z",
+          "decision": "approved",
+          "evidence_path": "examples/change-management/security-approval.txt",
+          "gate_ids": [
+            "patchline-emergency-blocker"
+          ]
+        }
+      ],
+      "deployment_controls": {
+        "change_window": "2026-01-16T10:00:00Z/2026-01-16T11:00:00Z",
+        "rollback_plan_path": "examples/change-management/emergency-rollback-runbook.txt",
+        "emergency_until": "2026-01-16T18:00:00Z"
+      },
+      "evidence_paths": [
+        "examples/change-management/emergency-ticket.md",
+        "docs/accountable-use-policy.md",
+        "docs/evidence-appeal-workflow.md"
+      ]
+    }
+  ]
+}

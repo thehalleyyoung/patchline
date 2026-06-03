@@ -1,0 +1,1 @@
+Emergency rollback plan: disable the guard, restore affected rows from the incident snapshot, rerun Patchline verification, and page the service owners.

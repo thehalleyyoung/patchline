@@ -1,0 +1,1 @@
+Service owner approval: customer service owner accepted the same Patchline gate evidence and will own rollback validation.

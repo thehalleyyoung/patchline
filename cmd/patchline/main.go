@@ -33,6 +33,7 @@ import (
 	"github.com/thehalleyyoung/patchline/internal/certlang"
 	"github.com/thehalleyyoung/patchline/internal/certplugfest"
 	"github.com/thehalleyyoung/patchline/internal/certrevocation"
+	"github.com/thehalleyyoung/patchline/internal/changemanagement"
 	"github.com/thehalleyyoung/patchline/internal/dbdryrun"
 	"github.com/thehalleyyoung/patchline/internal/demo"
 	"github.com/thehalleyyoung/patchline/internal/diagnostics"
@@ -444,6 +445,8 @@ func run(args []string) error {
 		return maintainerAcceptanceStudyCommand(args[1:], hasFlag(args[1:], "--json"))
 	case "reviewer-fairness-audit":
 		return reviewerFairnessAuditCommand(args[1:], hasFlag(args[1:], "--json"))
+	case "change-management-verify":
+		return changeManagementVerifyCommand(args[1:], hasFlag(args[1:], "--json"))
 	case "feedback":
 		return feedbackCommand(args[1:])
 	case "security":
@@ -597,6 +600,7 @@ Usage:
   patchline patch-series-verify --spec patch-series.json --out dir [--json]
   patchline maintainer-acceptance-study --spec maintainer-acceptance-study.json --root repo-root --out dir [--json]
   patchline reviewer-fairness-audit --spec reviewer-fairness-audit.json --root repo-root --out dir [--json]
+  patchline change-management-verify --spec change-management.json --root repo-root --out dir [--json]
   patchline feedback counterfactual-log --feedback live-feedback.json --history policy-history.json --out dir [--json]
   patchline feedback online-eval --feedback live-feedback.json --spec online-evaluation.json --out dir [--json]
   patchline feedback active-learning-queue --spec active-learning.json --out dir [--json]
@@ -15076,6 +15080,39 @@ func reviewerFairnessAuditCommand(args []string, jsonOut bool) error {
 		return writeJSON(os.Stdout, report)
 	}
 	fmt.Printf("wrote reviewer fairness audit ok=%t reviews=%d teams=%d ecosystems=%d counterexamples=%d to %s\n", report.OK, report.Summary.Reviews, report.Summary.Teams, report.Summary.Ecosystems, report.Summary.Counterexamples, outPath)
+	return nil
+}
+
+func changeManagementVerifyCommand(args []string, jsonOut bool) error {
+	usage := "patchline change-management-verify --spec change-management.json --root repo-root --out <dir> [--json]"
+	specPath, outPath, err := feedbackSpecOut(args, usage)
+	if err != nil {
+		return err
+	}
+	rootPath := "."
+	if value, ok := flagValue(args, "--root"); ok && value != "" {
+		rootPath = value
+	}
+	file, err := os.Open(specPath)
+	if err != nil {
+		return err
+	}
+	defer file.Close()
+	spec, err := changemanagement.ReadSpec(file)
+	if err != nil {
+		return err
+	}
+	report, err := changemanagement.BuildReport(spec, rootPath)
+	if err != nil {
+		return err
+	}
+	if err := changemanagement.WriteArtifacts(outPath, report); err != nil {
+		return err
+	}
+	if jsonOut {
+		return writeJSON(os.Stdout, report)
+	}
+	fmt.Printf("wrote change-management verification ok=%t workflows=%d blocking_gates=%d approved_steps=%d counterexamples=%d to %s\n", report.OK, report.Summary.Workflows, report.Summary.BlockingGates, report.Summary.ApprovedSteps, report.Summary.Counterexamples, outPath)
 	return nil
 }
 

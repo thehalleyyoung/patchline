@@ -1,0 +1,1 @@
+Rollback plan: restore the pre-migration snapshot, revert the expand/contract PR, rerun Patchline compare, and notify database reliability.

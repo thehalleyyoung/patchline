@@ -18,6 +18,7 @@ import (
 	"github.com/thehalleyyoung/patchline/internal/attest"
 	"github.com/thehalleyyoung/patchline/internal/backfillplanner"
 	"github.com/thehalleyyoung/patchline/internal/canaryvalidate"
+	"github.com/thehalleyyoung/patchline/internal/changemanagement"
 	"github.com/thehalleyyoung/patchline/internal/evidence"
 	"github.com/thehalleyyoung/patchline/internal/evidencemarketplace"
 	"github.com/thehalleyyoung/patchline/internal/expandcontract"
@@ -832,6 +833,76 @@ func TestReviewerFairnessAuditCommandWritesReports(t *testing.T) {
 	}
 	if stat, err := os.Stat(filepath.Join(out, "reviewer-fairness-audit.md")); err != nil || stat.Size() == 0 {
 		t.Fatalf("expected reviewer-fairness-audit.md to be written, stat=%#v err=%v", stat, err)
+	}
+}
+
+func TestChangeManagementVerifyCommandWritesReports(t *testing.T) {
+	root := t.TempDir()
+	writeMainTestFile(t, root, "evidence/gate-report.json", `{"version":"patchline.gate-report/v1","gate_id":"patchline-reviewer-fairness","status":"pass","finding_ids":["PL-DB-001"],"checked_at":"2026-01-15T12:00:00Z"}`+"\n")
+	writeMainTestFile(t, root, "evidence/approval-db.txt", "database reliability approval reviewed the passed Patchline gate\n")
+	writeMainTestFile(t, root, "evidence/approval-svc.txt", "service owner approval reviewed the same gate and rollback plan\n")
+	writeMainTestFile(t, root, "evidence/rollback.md", "rollback plan restores the pre-change snapshot\n")
+	writeMainTestFile(t, root, "evidence/change-ticket.md", "CHG-2026-001 binds Patchline gate evidence to CAB approval\n")
+	gateHash := mainTestFileHash(t, filepath.Join(root, "evidence/gate-report.json"))
+	specPath := filepath.Join(root, "change-management.json")
+	writeMainTestFile(t, root, "change-management.json", fmt.Sprintf(`{
+  "version": "patchline.change-management/v1",
+  "name": "main test change-management integration",
+  "criteria": {
+    "min_approval_steps": 2,
+    "require_distinct_approvers": true,
+    "require_evidence_hashes": true,
+    "require_patchline_gate_binding": true,
+    "require_change_ticket": true,
+    "require_rollback_plan": true,
+    "require_emergency_expiry": true,
+    "require_workflow_evidence_paths": true
+  },
+  "workflows": [
+    {
+      "workflow_id": "chg-2026-001-expand-contract",
+      "title": "Customers expand-contract migration",
+      "change_ticket": "CHG-2026-001",
+      "risk_level": "high",
+      "patchline_findings": ["PL-DB-001"],
+      "gates": [
+        {"gate_id":"patchline-reviewer-fairness","command":"make reviewer-fairness-audit-gate","status":"pass","report_path":"evidence/gate-report.json","report_sha256":"%s","blocks_change":true}
+      ],
+      "approvals": [
+        {"step_id":"database-review","role":"database reliability","approver":"robin-db","approved_at":"2026-01-15T13:00:00Z","decision":"approved","evidence_path":"evidence/approval-db.txt","gate_ids":["patchline-reviewer-fairness"]},
+        {"step_id":"service-owner","role":"service owner","approver":"sam-service","approved_at":"2026-01-15T13:10:00Z","decision":"approved","evidence_path":"evidence/approval-svc.txt","gate_ids":["patchline-reviewer-fairness"]}
+      ],
+      "deployment_controls": {"change_window":"2026-01-15T22:00:00Z/2026-01-15T23:00:00Z","rollback_plan_path":"evidence/rollback.md"},
+      "evidence_paths": ["evidence/change-ticket.md"]
+    }
+  ]
+}`, gateHash))
+	out := filepath.Join(t.TempDir(), "change-management")
+	if err := run([]string{"change-management-verify", "--spec", specPath, "--root", root, "--out", out, "--json"}); err != nil {
+		t.Fatalf("change-management-verify failed: %v", err)
+	}
+	var report changemanagement.Report
+	readMainTestJSON(t, filepath.Join(out, "change-management.json"), &report)
+	if !report.OK || report.Summary.Workflows != 1 || report.Summary.PassedBlockingGates != 1 || report.Summary.ApprovedSteps != 2 {
+		t.Fatalf("unexpected change-management report: %#v", report)
+	}
+	if report.Workflows[0].Gates[0].Report == nil || !report.Workflows[0].Gates[0].HashMatches {
+		t.Fatalf("expected hashed gate report evidence, got %#v", report.Workflows[0].Gates[0])
+	}
+	if stat, err := os.Stat(filepath.Join(out, "change-management.md")); err != nil || stat.Size() == 0 {
+		t.Fatalf("expected change-management.md to be written, stat=%#v err=%v", stat, err)
+	}
+
+	badSpecPath := filepath.Join(root, "change-management.bad.json")
+	writeMainTestFile(t, root, "change-management.bad.json", strings.ReplaceAll(mustReadMainTestFile(t, specPath), `"gate_ids":["patchline-reviewer-fairness"]`, `"gate_ids":["missing-gate"]`))
+	badOut := filepath.Join(t.TempDir(), "bad-change-management")
+	if err := run([]string{"change-management-verify", "--spec", badSpecPath, "--root", root, "--out", badOut, "--json"}); err != nil {
+		t.Fatalf("change-management-verify negative control should write an ok=false report, got %v", err)
+	}
+	var rejected changemanagement.Report
+	readMainTestJSON(t, filepath.Join(badOut, "change-management.json"), &rejected)
+	if rejected.OK || rejected.Summary.Counterexamples == 0 {
+		t.Fatalf("expected rejected change-management report, got %#v", rejected)
 	}
 }
 
@@ -2690,6 +2761,15 @@ func recomputeMainTestCanonicalHash(s string) string {
 		}
 	}
 	return s
+}
+
+func mustReadMainTestFile(t *testing.T, path string) string {
+	t.Helper()
+	bytes, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return string(bytes)
 }
 
 func TestPhaseCheckInputKindResolvesImplicitInputs(t *testing.T) {
