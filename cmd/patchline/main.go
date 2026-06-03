@@ -311,6 +311,8 @@ func run(args []string) error {
 			return errors.New("usage: patchline db-dry-run <manifest.json> --dialect <postgres|mysql> [--dsn local-dsn] [--execute] [--json]")
 		}
 		return dbDryRun(args[1], args[2:], hasFlag(args[2:], "--json"))
+	case "db-semantics", "database-semantics":
+		return dbSemanticsCommand(args[1:])
 	case "repair-semantics", "step-trace":
 		if len(args) < 2 {
 			return errors.New("usage: patchline repair-semantics <manifest.json> [--store store.json] [--json]")
@@ -545,6 +547,7 @@ Usage:
   patchline migration-outcomes <evidence.jsonl> <migration.sql> [--repair manifest.json] [--policy policy.json] [--benchmark suite.json] [--source-sql path] [--json]
   patchline dry-run <manifest.json> [--store store.json] [--json]
   patchline db-dry-run <manifest.json> --dialect <postgres|mysql> [--dsn local-dsn] [--execute] [--json]
+  patchline db-semantics --engine postgres|mysql|sqlite|sqlserver|oracle|bigquery|snowflake|clickhouse [--version version] --sql <sql-or-path> [--out report.json] [--json]
   patchline repair-semantics <manifest.json> [--store store.json] [--json]
   patchline snapshot-drift <manifest.json> <before-store.json> <after-store.json> [--json]
   patchline effect-summary <manifest.json> [--json]

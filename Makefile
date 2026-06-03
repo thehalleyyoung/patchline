@@ -1371,6 +1371,10 @@ adversarial-challenge-gate:
 evidence-governance-board-gate:
 	bash scripts/evidence-governance-board-gate.sh
 
+.PHONY: db-version-semantics-gate
+db-version-semantics-gate:
+	bash scripts/db-version-semantics-gate.sh
+
 federated-benchmark-split-gate:
 	bash scripts/federated-benchmark-split-gate.sh
 
