@@ -12,17 +12,17 @@
 \contentsline {paragraph}{Resumability, offline operation, resilience, and release trust.}{10}{table.1}%
 \contentsline {subsection}{\numberline {3.1}Artifact contract}{10}{subsection.3.1}%
 \contentsline {section}{\numberline {4}The Project-Native Fact Layer}{11}{section.4}%
-\contentsline {paragraph}{Sources and reproducibility.}{11}{section.4}%
+\contentsline {paragraph}{Sources and reproducibility.}{12}{section.4}%
 \contentsline {section}{\numberline {5}Breadth of Data-Change Analysis}{12}{section.5}%
 \contentsline {subsection}{\numberline {5.1}Relational migrations across nine ecosystems}{12}{subsection.5.1}%
 \contentsline {paragraph}{Versioned production database semantics.}{12}{subsection.5.1}%
 \contentsline {subsection}{\numberline {5.2}NoSQL change detection across five engines}{13}{subsection.5.2}%
 \contentsline {subsection}{\numberline {5.3}Data-pipeline repair evidence across four frameworks}{13}{subsection.5.3}%
-\contentsline {subsection}{\numberline {5.4}Schema-registry and protobuf/Avro compatibility}{13}{subsection.5.4}%
+\contentsline {subsection}{\numberline {5.4}Schema-registry and protobuf/Avro compatibility}{14}{subsection.5.4}%
 \contentsline {subsection}{\numberline {5.5}Infrastructure/data ordering}{14}{subsection.5.5}%
 \contentsline {subsection}{\numberline {5.6}Monorepo package boundaries}{14}{subsection.5.6}%
 \contentsline {paragraph}{Summary.}{14}{subsection.5.6}%
-\contentsline {section}{\numberline {6}Bounded Interventions and Deterministic Rejection}{14}{section.6}%
+\contentsline {section}{\numberline {6}Bounded Interventions and Deterministic Rejection}{15}{section.6}%
 \contentsline {paragraph}{Budgets.}{15}{section.6}%
 \contentsline {paragraph}{Quarantine.}{15}{section.6}%
 \contentsline {paragraph}{Deterministic rejection.}{15}{section.6}%
@@ -38,24 +38,24 @@
 \contentsline {paragraph}{Patch-series invariant preservation.}{17}{section.6}%
 \contentsline {paragraph}{Maintainer acceptance without uncertainty laundering.}{17}{section.6}%
 \contentsline {paragraph}{The accept/reject decision.}{17}{section.6}%
-\contentsline {section}{\numberline {7}Runtime and Observability Evidence}{17}{section.7}%
+\contentsline {section}{\numberline {7}Runtime and Observability Evidence}{18}{section.7}%
 \contentsline {subsection}{\numberline {7.1}Performance and scale}{18}{subsection.7.1}%
 \contentsline {section}{\numberline {8}Formal and Decision-Theoretic Guarantees}{18}{section.8}%
 \contentsline {paragraph}{Formal invariant extraction.}{18}{section.8}%
 \contentsline {paragraph}{Bounded symbolic execution and model checking.}{18}{section.8}%
-\contentsline {paragraph}{Causal attribution and counterfactual sensitivity.}{18}{section.8}%
+\contentsline {paragraph}{Causal attribution and counterfactual sensitivity.}{19}{section.8}%
 \contentsline {paragraph}{Decision economics and abstention.}{19}{section.8}%
 \contentsline {paragraph}{Multi-agent review and interoperability.}{19}{section.8}%
 \contentsline {paragraph}{Release engineering as evidence.}{19}{section.8}%
-\contentsline {section}{\numberline {9}Reproducibility and the Gate Methodology}{19}{section.9}%
-\contentsline {paragraph}{Anatomy of a gate.}{19}{section.9}%
+\contentsline {section}{\numberline {9}Reproducibility and the Gate Methodology}{20}{section.9}%
+\contentsline {paragraph}{Anatomy of a gate.}{20}{section.9}%
 \contentsline {paragraph}{Robustness.}{20}{section.9}%
 \contentsline {paragraph}{Minimal reproductions.}{20}{section.9}%
 \contentsline {paragraph}{Drift protection.}{20}{table.caption.4}%
 \contentsline {paragraph}{Shared evidence without trust erosion.}{20}{table.caption.4}%
 \contentsline {paragraph}{Federated private benchmark aggregates.}{22}{table.caption.4}%
 \contentsline {paragraph}{Paying for minimized missing evidence.}{22}{table.caption.4}%
-\contentsline {paragraph}{Certification that tracks a moving target.}{22}{table.caption.4}%
+\contentsline {paragraph}{Certification that tracks a moving target.}{23}{table.caption.4}%
 \contentsline {section}{\numberline {10}Evaluation Methodology}{23}{section.10}%
 \contentsline {paragraph}{Blinded false-positive adjudication.}{23}{section.10}%
 \contentsline {paragraph}{Seeded false-negative recall.}{23}{section.10}%
@@ -64,7 +64,7 @@
 \contentsline {paragraph}{Stratification.}{23}{section.10}%
 \contentsline {paragraph}{Workforce impact without vanity metrics.}{23}{section.10}%
 \contentsline {paragraph}{Baselines.}{23}{section.10}%
-\contentsline {paragraph}{Headline measured results.}{23}{table.caption.5}%
+\contentsline {paragraph}{Headline measured results.}{24}{table.caption.5}%
 \contentsline {section}{\numberline {11}From Analyzer to Trustworthy Artifact}{24}{section.11}%
 \contentsline {subsection}{\numberline {11.1}Empirical generalization and external replication}{24}{subsection.11.1}%
 \contentsline {subsection}{\numberline {11.2}Supply-chain trust and provenance}{24}{subsection.11.2}%
@@ -74,14 +74,14 @@
 \contentsline {paragraph}{Mechanized formal foundations.}{25}{section.12}%
 \contentsline {paragraph}{Ecosystem-scale evidence.}{25}{section.12}%
 \contentsline {paragraph}{A definitive evaluation design.}{25}{section.12}%
-\contentsline {paragraph}{Product-grade adoption.}{25}{section.12}%
+\contentsline {paragraph}{Product-grade adoption.}{26}{section.12}%
 \contentsline {paragraph}{A learned-but-verified frontier.}{26}{section.12}%
 \contentsline {paragraph}{A lasting-impact dossier.}{26}{section.12}%
 \contentsline {section}{\numberline {13}From Field-Defining to Field-Standard: The 501--600 Frontier}{26}{section.13}%
 \contentsline {paragraph}{A deeper formal core.}{26}{section.13}%
 \contentsline {paragraph}{Planet-scale evidence.}{26}{section.13}%
 \contentsline {paragraph}{Causal and field rigor.}{26}{section.13}%
-\contentsline {paragraph}{Trustworthy autonomy.}{26}{section.13}%
+\contentsline {paragraph}{Trustworthy autonomy.}{27}{section.13}%
 \contentsline {paragraph}{Definitional adoption and a learned-but-checkable frontier.}{27}{section.13}%
 \contentsline {paragraph}{Definitive artifact and lasting impact.}{27}{section.13}%
 \contentsline {paragraph}{From field-defining system to generational artifact (601--700).}{27}{table.caption.8}%

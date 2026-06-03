@@ -16,6 +16,7 @@
 .PHONY: offline-deploy-gate
 .PHONY: resilient-analysis-gate
 .PHONY: hardware-signing-gate
+.PHONY: disaster-recovery-exercise-gate
 
 build:
 	go build -o bin/patchline ./cmd/patchline
@@ -1223,6 +1224,9 @@ resilient-analysis-gate:
 
 hardware-signing-gate:
 	bash scripts/hardware-signing-gate.sh
+
+disaster-recovery-exercise-gate:
+	bash scripts/disaster-recovery-exercise-gate.sh
 
 industry-working-group-gate:
 	bash scripts/industry-working-group-gate.sh

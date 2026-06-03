@@ -387,7 +387,11 @@ off its task to a surviving worker, corrupt cache bytes must be detected by SHA-
 before a rebuilt result is accepted, and tasks affected by a recovered partition must still complete
 exactly once. \code{hardware-signing} extends the same evidence discipline to releases: archives, gate
 outputs, and certificate ledgers must be threshold-signed by attested hardware identities and backed by
-offline-root recovery shares plus key-rotation, recovery, and revocation drills.
+offline-root recovery shares plus key-rotation, recovery, and revocation drills. The
+\code{disaster-recovery-exercise} gate closes the loop by rebuilding the public corpus, hosted docs,
+release manifest, and certificate logs, publishing each to checksum-covered mirrors, corrupting three
+primary mirrors, restoring from the first valid mirror, replaying the restored certificate log, and
+rejecting an all-mirrors-lost negative control.
 
 \subsection{Artifact contract}
 Every stage writes a stable set of files so that downstream stages, gates, and reviewers can rely on
@@ -1174,6 +1178,7 @@ owner-routed rollback playbooks for broad writes & \gate{remediation-playbook-ga
 7-event public false-negative drill with disclosure/remediation deadlines, 4 distinct roles, regression-gate hash binding, and private-marker controls & \gate{incident-response-drill-gate} \\
 2 public-safe adversarial migrations scored from verified artifacts and analyzer-backed high-risk proofs; embargoed publication refuted & \gate{adversarial-challenge-gate} \\
 3 private benchmark cases published as signed aggregate-only metrics; tampering/leakage rejected & \gate{federated-benchmark-split-gate} \\
+4 public artifact classes restored from checksum mirrors; 3 primary mirror failures and an all-mirrors-lost certificate-log control rejected & \gate{disaster-recovery-exercise-gate} \\
 3 payout-approved minimized false-negative/ecosystem-gap bounty reproductions; unsupported bounty rejected & \gate{open-problem-bounty-board-gate} \\
 9 Cassandra changes incl.\ destructive drops & \code{laaksomavrick/twitter-go} \\
 17 $\rightarrow$ 1 line, 1-minimal reproduction & delta-debugging oracle \\
@@ -1883,7 +1888,8 @@ Trust stack & \code{signed-provenance-chain-gate}, \code{reproducible-build-atte
 \code{evidence-governance-board-gate}, \code{evidence-appeal-workflow-gate},
 \code{change-management-integration-gate}, \code{governance-risk-register-gate},
 \code{ethics-review-template-gate}, \code{explainability-audit-gate}, \code{misuse-resistance-gate},
-\code{detector-deprecation-gate}, \code{incident-response-drill-gate} \\
+\code{detector-deprecation-gate}, \code{incident-response-drill-gate},
+\code{disaster-recovery-exercise-gate} \\
 Reviewer \& community & \code{quickstart-sixty-seconds-gate}, \code{inline-review-surface-gate},
 \code{ci-pr-bot-gate}, \code{governance-policy-gate}, \code{citation-doi-gate} \\
 Research frontier & \code{learned-risk-model-gate}, \code{neuro-symbolic-verdict-gate},

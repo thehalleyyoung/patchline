@@ -1,0 +1,77 @@
+{
+  "version": "patchline.disaster-recovery-exercise-gate/v1",
+  "claim": "Patchline runs a disaster recovery exercise over live generated artifacts instead of a paper checklist: it rebuilds the public corpus release, hosted docs site, artifact release manifest, and signed certificate revocation log; publishes each component to two checksum-covered mirrors; corrupts or deletes primary-mirror copies for three components; restores every component from the first mirror whose full file manifest verifies; replays the restored certificate log; and rejects a negative control where every mirror has lost the required certificate-log bundle. This proves the public corpus, docs, releases, and certificate logs are restorable from mirrors with checksum failover and explicit unrecoverable-failure detection.",
+  "real_repo": "patchline (self): mirror restore over generated corpus, docs, release, and certificate artifacts",
+  "mirrors": [
+    "primary",
+    "secondary"
+  ],
+  "components": [
+    {
+      "id": "public-corpus",
+      "source_spec": "examples/corpus-release-gates.json",
+      "description": "Signed public corpus release rebuilt from the existing corpus release gate.",
+      "required_files": [
+        "release.json",
+        "release.md",
+        "checksums.sha256",
+        "checksums.attestation.json",
+        "reports/dataset-cards/index.json"
+      ],
+      "primary_failure": {
+        "action": "none"
+      }
+    },
+    {
+      "id": "docs-site",
+      "source_spec": "examples/docs-site-gate.json",
+      "description": "Hosted documentation site with generated public-demo evidence.",
+      "required_files": [
+        "site/site-manifest.json",
+        "site/index.html",
+        "site/sitemap.xml",
+        "site/artifacts/public-demo.json"
+      ],
+      "primary_failure": {
+        "action": "tamper",
+        "path": "site/site-manifest.json"
+      }
+    },
+    {
+      "id": "release-manifest",
+      "source_spec": "examples/artifact-release-manifest-gate.json",
+      "description": "Deterministic artifact DOI/release manifest with refs, archives, checksums, and command versions.",
+      "required_files": [
+        "artifact-release-manifest.json",
+        "artifact-release-manifest.md",
+        "archives.json",
+        "command-versions.json",
+        "artifact-checksums.sha256"
+      ],
+      "primary_failure": {
+        "action": "delete",
+        "path": "artifact-release-manifest.json"
+      }
+    },
+    {
+      "id": "certificate-logs",
+      "description": "Signed certificate revocation replay bundle plus hardware-signing certificate log.",
+      "required_files": [
+        "revocation-bundle.json",
+        "replay.json",
+        "hardware-certificate-log.jsonl",
+        "generation.json",
+        "disaster-recovery-certlog.plci"
+      ],
+      "primary_failure": {
+        "action": "tamper",
+        "path": "replay.json"
+      }
+    }
+  ],
+  "negative_control": {
+    "component": "certificate-logs",
+    "action": "delete",
+    "path": "revocation-bundle.json"
+  }
+}
