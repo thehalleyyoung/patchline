@@ -460,6 +460,8 @@ func run(args []string) error {
 		return longitudinalEducationStudyCommand(args[1:], hasFlag(args[1:], "--json"))
 	case "contributor-apprenticeship":
 		return contributorApprenticeshipCommand(args[1:], hasFlag(args[1:], "--json"))
+	case "skills-taxonomy":
+		return skillsTaxonomyCommand(args[1:], hasFlag(args[1:], "--json"))
 	case "reviewer-fairness-audit":
 		return reviewerFairnessAuditCommand(args[1:], hasFlag(args[1:], "--json"))
 	case "change-management-verify":
@@ -629,6 +631,7 @@ Usage:
   patchline classroom-lab-kits --spec classroom-lab-kits.json --root repo-root --out dir [--json]
   patchline longitudinal-education-study --spec longitudinal-education-study.json --root repo-root --out dir [--json]
   patchline contributor-apprenticeship --spec contributor-apprenticeship.json --root repo-root --out dir [--json]
+  patchline skills-taxonomy --spec skills-taxonomy.json --root repo-root --out dir [--json]
   patchline reviewer-fairness-audit --spec reviewer-fairness-audit.json --root repo-root --out dir [--json]
   patchline change-management-verify --spec change-management.json --root repo-root --out dir [--json]
   patchline governance-risk-register --spec governance-risk-register.json --root repo-root --out dir [--json]
@@ -15246,6 +15249,39 @@ func contributorApprenticeshipCommand(args []string, jsonOut bool) error {
 		return writeJSON(os.Stdout, report)
 	}
 	fmt.Printf("wrote contributor apprenticeship ok=%t tracks=%d graduated=%d deliverables=%d evidence=%d counterexamples=%d to %s\n", report.OK, report.Summary.Tracks, report.Summary.GraduatedTracks, report.Summary.DeliverablesVerified, report.Summary.EvidenceArtifacts, report.Summary.Counterexamples, outPath)
+	return nil
+}
+
+func skillsTaxonomyCommand(args []string, jsonOut bool) error {
+	usage := "patchline skills-taxonomy --spec skills-taxonomy.json --root repo-root --out <dir> [--json]"
+	specPath, outPath, err := feedbackSpecOut(args, usage)
+	if err != nil {
+		return err
+	}
+	rootPath := "."
+	if value, ok := flagValue(args, "--root"); ok && value != "" {
+		rootPath = value
+	}
+	file, err := os.Open(specPath)
+	if err != nil {
+		return err
+	}
+	defer file.Close()
+	spec, err := education.ReadSkillsTaxonomySpec(file)
+	if err != nil {
+		return err
+	}
+	report, err := education.BuildSkillsTaxonomyReport(spec, rootPath)
+	if err != nil {
+		return err
+	}
+	if err := education.WriteSkillsTaxonomyArtifacts(outPath, report); err != nil {
+		return err
+	}
+	if jsonOut {
+		return writeJSON(os.Stdout, report)
+	}
+	fmt.Printf("wrote skills taxonomy ok=%t hazard_classes=%d concepts=%d audiences=%d gate_backed=%d evidence=%d counterexamples=%d to %s\n", report.OK, report.Summary.HazardClasses, report.Summary.Concepts, report.Summary.ReviewerAudiences, report.Summary.GateBackedHazards, report.Summary.EvidenceArtifacts, report.Summary.Counterexamples, outPath)
 	return nil
 }
 

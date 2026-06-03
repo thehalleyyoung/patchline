@@ -1201,6 +1201,104 @@ func mainApprenticeshipTrack(id, hazard, detectorPath, symbol, signal, gate, doc
 	}
 }
 
+func TestSkillsTaxonomyCommandWritesReports(t *testing.T) {
+	root := t.TempDir()
+	gates := []string{"staged-backfill-planner-gate", "query-plan-regression-gate", "online-schema-change-adapters-gate", "data-retention-privacy-gate", "infra-ordering-gate"}
+	var makefile strings.Builder
+	for _, gate := range gates {
+		fmt.Fprintf(&makefile, "%s:\n\tbash scripts/%s.sh\n\n", gate, gate)
+		writeMainTestFile(t, root, "scripts/"+gate+".sh", "#!/usr/bin/env bash\nset -euo pipefail\n")
+	}
+	writeMainTestFile(t, root, "Makefile", makefile.String())
+	writeMainTestFile(t, root, "docs/staged-backfill-planner.md", "Backfill proof.\n")
+	writeMainTestFile(t, root, "examples/staged-backfill-plan.json", `{"version":"patchline.backfill-plan/v1"}`)
+	writeMainTestFile(t, root, "docs/query-plan-regression.md", "Query-plan proof.\n")
+	writeMainTestFile(t, root, "examples/query-plan-regression-gate.json", `{"version":"patchline.query-plan-regression-gate/v1"}`)
+	writeMainTestFile(t, root, "docs/online-schema-change-adapters.md", "Online schema proof.\n")
+	writeMainTestFile(t, root, "examples/online-schema-change-adapters-gate.json", `{"version":"patchline.online-schema-change-adapters-gate/v1"}`)
+	writeMainTestFile(t, root, "docs/privacy-impact.md", "Privacy proof.\n")
+	writeMainTestFile(t, root, "examples/data-retention-privacy-hazards.json", `{"version":"patchline.data-retention-privacy-hazards/v1"}`)
+	writeMainTestFile(t, root, "docs/infra-ordering.md", "Infra ordering proof.\n")
+	writeMainTestFile(t, root, "examples/infra-ordering-gate.json", `{"version":"patchline.infra-ordering-gate/v1"}`)
+
+	specPath := filepath.Join(root, "skills-taxonomy.json")
+	writeMainTestJSONFile(t, specPath, education.SkillsTaxonomySpec{
+		Version: education.SkillsTaxonomySpecVersion,
+		Name:    "main test skills taxonomy",
+		Claim:   "Patchline maps gate-backed data-change hazard classes to reviewer concepts, prerequisites, assessment prompts, role audiences, evidence hashes, certification crosswalks, and negative controls.",
+		Criteria: education.SkillsTaxonomyCriteria{
+			RequiredAudiences:             []string{"app-developer", "dba", "sre", "security-reviewer", "engineering-manager"},
+			MinHazardClasses:              5,
+			MinConceptsPerHazard:          2,
+			MinPrerequisitesPerConcept:    2,
+			MinEvidenceArtifactsPerHazard: 3,
+			RequireGate:                   true,
+			RequireReproducibleCommand:    true,
+			RequireNegativeControl:        true,
+			RequireAssessmentPrompt:       true,
+			RequireCrosswalk:              true,
+		},
+		HazardClasses: []education.SkillHazardClass{
+			mainSkillHazard("partial-backfill", []string{"app-developer", "dba"}, "staged-backfill-planner-gate", "docs/staged-backfill-planner.md", "examples/staged-backfill-plan.json", "scripts/staged-backfill-planner-gate.sh"),
+			mainSkillHazard("query-plan-regression", []string{"app-developer", "dba"}, "query-plan-regression-gate", "docs/query-plan-regression.md", "examples/query-plan-regression-gate.json", "scripts/query-plan-regression-gate.sh"),
+			mainSkillHazard("online-schema-change", []string{"dba", "sre"}, "online-schema-change-adapters-gate", "docs/online-schema-change-adapters.md", "examples/online-schema-change-adapters-gate.json", "scripts/online-schema-change-adapters-gate.sh"),
+			mainSkillHazard("data-retention-privacy", []string{"security-reviewer", "engineering-manager"}, "data-retention-privacy-gate", "docs/privacy-impact.md", "examples/data-retention-privacy-hazards.json", "scripts/data-retention-privacy-gate.sh"),
+			mainSkillHazard("migration-job-ordering", []string{"sre", "engineering-manager"}, "infra-ordering-gate", "docs/infra-ordering.md", "examples/infra-ordering-gate.json", "scripts/infra-ordering-gate.sh"),
+		},
+	})
+	out := filepath.Join(t.TempDir(), "skills-taxonomy")
+	if err := run([]string{"skills-taxonomy", "--spec", specPath, "--root", root, "--out", out, "--json"}); err != nil {
+		t.Fatalf("skills-taxonomy failed: %v", err)
+	}
+	var report education.SkillsTaxonomyReport
+	readMainTestJSON(t, filepath.Join(out, "skills-taxonomy.json"), &report)
+	if !report.OK || report.Summary.HazardClasses != 5 || report.Summary.Concepts != 10 || report.Summary.GateBackedHazards != 5 {
+		t.Fatalf("unexpected skills taxonomy report: %#v", report)
+	}
+	if report.Summary.EvidenceArtifacts != 15 || len(report.HazardClasses[0].Evidence[0].SHA256) != 64 {
+		t.Fatalf("expected evidence hashes, got %#v", report.Summary)
+	}
+	if stat, err := os.Stat(filepath.Join(out, "skills-taxonomy.md")); err != nil || stat.Size() == 0 {
+		t.Fatalf("expected skills-taxonomy.md to be written, stat=%#v err=%v", stat, err)
+	}
+}
+
+func mainSkillHazard(hazard string, audiences []string, gate, docPath, fixturePath, scriptPath string) education.SkillHazardClass {
+	return education.SkillHazardClass{
+		HazardClass:       hazard,
+		Title:             hazard + " skills",
+		SeverityBand:      "high",
+		ReviewerAudiences: audiences,
+		Concepts: []education.ReviewerConcept{{
+			ID:               hazard + "-evidence",
+			Title:            "Trace " + hazard + " evidence",
+			Description:      "Reviewer can trace evidence to the hazard class.",
+			Prerequisites:    []string{"repo evidence navigation", "data-change failure modes"},
+			AssessmentPrompt: "Explain the evidence hash for " + hazard + ".",
+			EvidencePaths:    []string{docPath},
+		}, {
+			ID:               hazard + "-control",
+			Title:            "Apply " + hazard + " control",
+			Description:      "Reviewer can apply the negative control for the hazard.",
+			Prerequisites:    []string{"gate output reading", "negative-control reasoning"},
+			AssessmentPrompt: "Run the gate and describe the negative control for " + hazard + ".",
+			EvidencePaths:    []string{fixturePath},
+		}},
+		Gates: []education.TaxonomyGate{{
+			Name:          gate,
+			Commands:      []string{"make " + gate},
+			EvidencePaths: []string{scriptPath},
+			NegativeControls: []education.TaxonomyNegativeControl{{
+				ID:                     "negative",
+				Mutation:               "remove required taxonomy evidence",
+				ExpectedCounterexample: "missing evidence is rejected",
+			}},
+		}},
+		RelatedTutorials:              []string{"tutorial:" + hazard},
+		RelatedCertificationScenarios: []string{"certification:" + hazard},
+	}
+}
+
 func TestReviewerFairnessAuditCommandWritesReports(t *testing.T) {
 	root := t.TempDir()
 	writeMainTestFile(t, root, "docs/acceptance-study.md", "paired reviews with adjudicated false positives\n")

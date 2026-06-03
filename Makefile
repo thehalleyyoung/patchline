@@ -8,6 +8,7 @@
 .PHONY: classroom-lab-kits-gate
 .PHONY: longitudinal-education-study-gate
 .PHONY: contributor-apprenticeship-gate
+.PHONY: skills-taxonomy-gate
 
 build:
 	go build -o bin/patchline ./cmd/patchline
@@ -1402,6 +1403,9 @@ longitudinal-education-study-gate:
 
 contributor-apprenticeship-gate:
 	bash scripts/contributor-apprenticeship-gate.sh
+
+skills-taxonomy-gate:
+	bash scripts/skills-taxonomy-gate.sh
 
 evidence-marketplace-gate:
 	bash scripts/evidence-marketplace-gate.sh

@@ -147,6 +147,8 @@ Run `longitudinal-education-study --spec examples/longitudinal-education-study.j
 
 Run `contributor-apprenticeship --spec examples/contributor-apprenticeship.json` to graduate contributors only after detector code, a Make-backed gate, docs, minimized positive/negative fixtures, mentor signoff, and reviewer evidence all verify; reproduce it with `make contributor-apprenticeship-gate`.
 
+Reviewer skills taxonomy (`make skills-taxonomy-gate`) maps each hazard class to concepts, prerequisites, assessment prompts, evidence, gates, negative controls, and tutorial/certification crosswalks.
+
 Run `explainability-audit --spec examples/explainability-audit.json` to verify independent reviewers agree evidence trails support stated verdicts, with hash-mismatch and disagreement negative controls; reproduce it with `make explainability-audit-gate`.
 
 Run `change-management-verify --spec <spec>` to prove organizational approvals are bound to passed Patchline gates, hash-pinned reports, rollback evidence, and emergency expiry; reproduce it with `make change-management-integration-gate`.

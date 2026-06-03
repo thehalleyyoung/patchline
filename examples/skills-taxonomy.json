@@ -1,0 +1,330 @@
+{
+  "version": "patchline.skills-taxonomy/v1",
+  "name": "Patchline reviewer skills taxonomy",
+  "claim": "Patchline publishes a public reviewer skills taxonomy that maps gate-backed data-change hazard classes to concepts reviewers must understand, prerequisite knowledge, assessment prompts, evidence hashes, role-specific tutorial crosswalks, certification scenarios, and negative controls. The taxonomy is deliberately executable: missing evidence, missing gates, weak prerequisites, and uncrosswalked hazard classes become deterministic counterexamples instead of silently becoming curriculum drift.",
+  "criteria": {
+    "required_audiences": [
+      "app-developer",
+      "dba",
+      "sre",
+      "security-reviewer",
+      "engineering-manager"
+    ],
+    "min_hazard_classes": 5,
+    "min_concepts_per_hazard": 2,
+    "min_prerequisites_per_concept": 2,
+    "min_evidence_artifacts_per_hazard": 3,
+    "require_gate": true,
+    "require_reproducible_command": true,
+    "require_negative_control": true,
+    "require_assessment_prompt": true,
+    "require_crosswalk": true
+  },
+  "hazard_classes": [
+    {
+      "hazard_class": "partial-backfill",
+      "title": "Partial backfill before contract migration",
+      "severity_band": "high",
+      "reviewer_audiences": [
+        "app-developer",
+        "dba"
+      ],
+      "concepts": [
+        {
+          "id": "backfill-completeness",
+          "title": "Prove every legacy row is covered before a contract step",
+          "description": "Reviewer can explain why a NOT NULL or compatibility-code deletion must wait for complete replay-store evidence.",
+          "prerequisites": [
+            "migration phases",
+            "row-level invariant reasoning"
+          ],
+          "assessment_prompt": "Use the staged backfill plan to decide whether the contract stage can proceed and cite the missing-row negative control.",
+          "evidence_paths": [
+            "docs/staged-backfill-planner.md"
+          ]
+        },
+        {
+          "id": "contract-staging",
+          "title": "Separate expand, backfill, contract, and cleanup evidence",
+          "description": "Reviewer can distinguish a safe staged contract from a patch that deletes compatibility code too early.",
+          "prerequisites": [
+            "expand-contract rollout",
+            "compatibility-code ownership"
+          ],
+          "assessment_prompt": "Name the proof that blocks compatibility-code deletion until validation is exhaustive.",
+          "evidence_paths": [
+            "examples/staged-backfill-plan.json"
+          ]
+        }
+      ],
+      "gates": [
+        {
+          "name": "staged-backfill-planner-gate",
+          "commands": [
+            "make staged-backfill-planner-gate"
+          ],
+          "evidence_paths": [
+            "scripts/staged-backfill-planner-gate.sh"
+          ],
+          "negative_controls": [
+            {
+              "id": "missing-row-proof",
+              "mutation": "Use the incomplete replay store so one legacy invoice has no target value.",
+              "expected_counterexample": "contract and compatibility deletion remain blocked with the missing row witness"
+            }
+          ]
+        }
+      ],
+      "related_tutorials": [
+        "role-specific-tutorials:dba:partial-backfill"
+      ],
+      "related_certification_scenarios": [
+        "practitioner-certification:backfill-contract"
+      ]
+    },
+    {
+      "hazard_class": "query-plan-regression",
+      "title": "Representative workload regression from schema changes",
+      "severity_band": "medium",
+      "reviewer_audiences": [
+        "app-developer",
+        "dba"
+      ],
+      "concepts": [
+        {
+          "id": "plan-shape-diff",
+          "title": "Compare before/after representative query shapes",
+          "description": "Reviewer can identify when an index or column change requires qualitative workload checks.",
+          "prerequisites": [
+            "index selection",
+            "representative workload sampling"
+          ],
+          "assessment_prompt": "Explain why the gate reports qualitative plan-shape risk without inventing measured EXPLAIN costs.",
+          "evidence_paths": [
+            "docs/query-plan-regression.md"
+          ]
+        },
+        {
+          "id": "measurement-honesty",
+          "title": "Refuse unmeasured cost claims",
+          "description": "Reviewer can separate static plan-shape evidence from measured database runtime claims.",
+          "prerequisites": [
+            "EXPLAIN limitations",
+            "database dry-run handoff"
+          ],
+          "assessment_prompt": "Identify which checks must hand off to db-dry-run before a measured performance claim is allowed.",
+          "evidence_paths": [
+            "examples/query-plan-regression-gate.json"
+          ]
+        }
+      ],
+      "gates": [
+        {
+          "name": "query-plan-regression-gate",
+          "commands": [
+            "make query-plan-regression-gate"
+          ],
+          "evidence_paths": [
+            "scripts/query-plan-regression-gate.sh"
+          ],
+          "negative_controls": [
+            {
+              "id": "plain-add-column-control",
+              "mutation": "Replace a query-plan regression case with a plain ADD COLUMN control.",
+              "expected_counterexample": "the detector stays quiet instead of fabricating a regression"
+            }
+          ]
+        }
+      ],
+      "related_tutorials": [
+        "role-specific-tutorials:app-developer:query-plan-regression"
+      ],
+      "related_certification_scenarios": [
+        "practitioner-certification:query-plan-regression"
+      ]
+    },
+    {
+      "hazard_class": "online-schema-change",
+      "title": "Online schema-change adapter cutover risk",
+      "severity_band": "high",
+      "reviewer_audiences": [
+        "dba",
+        "sre"
+      ],
+      "concepts": [
+        {
+          "id": "adapter-obligations",
+          "title": "Recognize adapter-specific safety obligations",
+          "description": "Reviewer can distinguish pt-osc, gh-ost, native concurrent indexes, and framework helpers from ordinary DDL.",
+          "prerequisites": [
+            "DDL lock modes",
+            "online migration adapters"
+          ],
+          "assessment_prompt": "Name the trigger, binlog, or cutover obligation that makes the adapter reviewable.",
+          "evidence_paths": [
+            "docs/online-schema-change-adapters.md"
+          ]
+        },
+        {
+          "id": "cutover-risk",
+          "title": "Review cutover and rollback gaps",
+          "description": "Reviewer can explain why non-atomic online migration phases still require explicit rollback and validation.",
+          "prerequisites": [
+            "non-atomic execution",
+            "rollback obligation tracking"
+          ],
+          "assessment_prompt": "Use the adapter fixture to list the cutover obligations that must be reviewed manually.",
+          "evidence_paths": [
+            "examples/online-schema-change-adapters-gate.json"
+          ]
+        }
+      ],
+      "gates": [
+        {
+          "name": "online-schema-change-adapters-gate",
+          "commands": [
+            "make online-schema-change-adapters-gate"
+          ],
+          "evidence_paths": [
+            "scripts/online-schema-change-adapters-gate.sh"
+          ],
+          "negative_controls": [
+            {
+              "id": "plain-alter-control",
+              "mutation": "Remove the adapter marker from an otherwise ordinary ALTER TABLE fixture.",
+              "expected_counterexample": "the detector does not classify the statement as online schema change"
+            }
+          ]
+        }
+      ],
+      "related_tutorials": [
+        "role-specific-tutorials:sre:online-schema-change"
+      ],
+      "related_certification_scenarios": [
+        "practitioner-certification:online-schema-change"
+      ]
+    },
+    {
+      "hazard_class": "data-retention-privacy",
+      "title": "Broad retention and privacy-impact data change",
+      "severity_band": "critical",
+      "reviewer_audiences": [
+        "security-reviewer",
+        "engineering-manager"
+      ],
+      "concepts": [
+        {
+          "id": "data-minimization",
+          "title": "Identify broad deletes, anonymization, and export retention hazards",
+          "description": "Reviewer can connect a data-retention change to privacy obligations and review scope.",
+          "prerequisites": [
+            "privacy impact review",
+            "data-retention policy"
+          ],
+          "assessment_prompt": "Classify whether the fixture describes deletion, anonymization, export retention, or rollback-gap risk.",
+          "evidence_paths": [
+            "docs/privacy-impact.md"
+          ]
+        },
+        {
+          "id": "rollback-retention-gap",
+          "title": "Check rollback evidence for privacy-sensitive broad writes",
+          "description": "Reviewer can spot when a privacy-sensitive operation lacks enough rollback or validation evidence.",
+          "prerequisites": [
+            "rollback planning",
+            "privacy-safe evidence hashing"
+          ],
+          "assessment_prompt": "Explain which rollback or validation obligation is missing from the negative control.",
+          "evidence_paths": [
+            "examples/data-retention-privacy-hazards.json"
+          ]
+        }
+      ],
+      "gates": [
+        {
+          "name": "data-retention-privacy-gate",
+          "commands": [
+            "make data-retention-privacy-gate"
+          ],
+          "evidence_paths": [
+            "scripts/data-retention-privacy-gate.sh"
+          ],
+          "negative_controls": [
+            {
+              "id": "non-sensitive-control",
+              "mutation": "Replace a broad privacy-sensitive change with a scoped non-sensitive control.",
+              "expected_counterexample": "the privacy hazard count does not inflate from ordinary scoped DML"
+            }
+          ]
+        }
+      ],
+      "related_tutorials": [
+        "role-specific-tutorials:security-reviewer:data-retention-privacy"
+      ],
+      "related_certification_scenarios": [
+        "practitioner-certification:data-retention-privacy"
+      ]
+    },
+    {
+      "hazard_class": "migration-job-ordering",
+      "title": "Migration job deploy-ordering race",
+      "severity_band": "high",
+      "reviewer_audiences": [
+        "sre",
+        "engineering-manager"
+      ],
+      "concepts": [
+        {
+          "id": "deploy-ordering",
+          "title": "Verify migration jobs are sequenced before dependent deploys",
+          "description": "Reviewer can connect Helm hooks, sync waves, init containers, and Terraform dependencies to migration safety.",
+          "prerequisites": [
+            "Kubernetes job lifecycle",
+            "deployment dependency ordering"
+          ],
+          "assessment_prompt": "Use the infra-ordering evidence to explain why a migration job is sequenced or unordered.",
+          "evidence_paths": [
+            "docs/infra-ordering.md"
+          ]
+        },
+        {
+          "id": "race-negative-control",
+          "title": "Recognize unordered migration job controls",
+          "description": "Reviewer can explain why removing an ordering marker should produce an unsafe deployment race.",
+          "prerequisites": [
+            "Helm hook semantics",
+            "negative-control reasoning"
+          ],
+          "assessment_prompt": "Name the ordering marker whose removal makes the negative control fail.",
+          "evidence_paths": [
+            "examples/infra-ordering-gate.json"
+          ]
+        }
+      ],
+      "gates": [
+        {
+          "name": "infra-ordering-gate",
+          "commands": [
+            "make infra-ordering-gate"
+          ],
+          "evidence_paths": [
+            "scripts/infra-ordering-gate.sh"
+          ],
+          "negative_controls": [
+            {
+              "id": "remove-hook",
+              "mutation": "Remove the Helm hook or sync-wave marker from the migration job.",
+              "expected_counterexample": "the job is classified as unordered and must not be accepted"
+            }
+          ]
+        }
+      ],
+      "related_tutorials": [
+        "role-specific-tutorials:sre:migration-job-ordering"
+      ],
+      "related_certification_scenarios": [
+        "practitioner-certification:migration-job-ordering"
+      ]
+    }
+  ]
+}
