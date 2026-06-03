@@ -10,6 +10,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"regexp"
 	"sort"
 	"strings"
 	"time"
@@ -142,26 +143,56 @@ type ReleaseAdmissionReport struct {
 	PublicReleaseEligible    bool   `json:"public_release_eligible"`
 }
 
+type DuplicateAnalysisReport struct {
+	ExactFingerprint         string `json:"exact_fingerprint"`
+	NearFingerprint          string `json:"near_fingerprint"`
+	ExactGroupID             string `json:"exact_group_id,omitempty"`
+	ExactGroupSize           int    `json:"exact_group_size"`
+	NearGroupID              string `json:"near_group_id,omitempty"`
+	NearGroupSize            int    `json:"near_group_size"`
+	PrevalenceGroupID        string `json:"prevalence_group_id"`
+	PrevalenceGroupKind      string `json:"prevalence_group_kind"`
+	PrevalenceRepresentative bool   `json:"prevalence_representative"`
+	PrevalenceWeight         int    `json:"prevalence_weight"`
+	DuplicateOf              string `json:"duplicate_of,omitempty"`
+}
+
+type DuplicateGroup struct {
+	ID                        string   `json:"id"`
+	Kind                      string   `json:"kind"`
+	Fingerprint               string   `json:"fingerprint"`
+	RepresentativeID          string   `json:"representative_id"`
+	ExampleIDs                []string `json:"example_ids"`
+	Count                     int      `json:"count"`
+	DistinctExactFingerprints int      `json:"distinct_exact_fingerprints"`
+}
+
 type Report struct {
-	Version          string             `json:"version"`
-	OK               bool               `json:"ok"`
-	RegistryHash     string             `json:"registry_hash"`
-	Hash             string             `json:"hash"`
-	Summary          Summary            `json:"summary"`
-	Marketplace      Metadata           `json:"marketplace"`
-	Examples         []PublishedExample `json:"examples"`
-	Rejected         []RejectedExample  `json:"rejected,omitempty"`
-	ByHazard         []Count            `json:"by_hazard"`
-	ByEcosystem      []Count            `json:"by_ecosystem"`
-	ByLicense        []Count            `json:"by_license"`
-	ByReputationTier []Count            `json:"by_reputation_tier"`
-	Markdown         string             `json:"markdown,omitempty"`
+	Version            string             `json:"version"`
+	OK                 bool               `json:"ok"`
+	RegistryHash       string             `json:"registry_hash"`
+	Hash               string             `json:"hash"`
+	Summary            Summary            `json:"summary"`
+	Marketplace        Metadata           `json:"marketplace"`
+	Examples           []PublishedExample `json:"examples"`
+	Rejected           []RejectedExample  `json:"rejected,omitempty"`
+	DuplicateGroups    []DuplicateGroup   `json:"duplicate_groups,omitempty"`
+	ByHazard           []Count            `json:"by_hazard"`
+	ByHazardPrevalence []Count            `json:"by_hazard_prevalence"`
+	ByEcosystem        []Count            `json:"by_ecosystem"`
+	ByLicense          []Count            `json:"by_license"`
+	ByReputationTier   []Count            `json:"by_reputation_tier"`
+	Markdown           string             `json:"markdown,omitempty"`
 }
 
 type Summary struct {
 	Submitted                 int `json:"submitted"`
 	Published                 int `json:"published"`
 	Rejected                  int `json:"rejected"`
+	PrevalenceExamples        int `json:"prevalence_examples"`
+	DuplicateInflation        int `json:"duplicate_inflation"`
+	ExactDuplicateGroups      int `json:"exact_duplicate_groups"`
+	NearDuplicateGroups       int `json:"near_duplicate_groups"`
 	CertificateBacked         int `json:"certificate_backed"`
 	RedactionReviewed         int `json:"redaction_reviewed"`
 	ClearLicensed             int `json:"clear_licensed"`
@@ -174,22 +205,23 @@ type Summary struct {
 }
 
 type PublishedExample struct {
-	ID                     string                 `json:"id"`
-	Title                  string                 `json:"title"`
-	Organization           string                 `json:"organization"`
-	Ecosystem              string                 `json:"ecosystem"`
-	HazardClass            string                 `json:"hazard_class"`
-	Source                 Source                 `json:"source"`
-	LicenseSPDX            string                 `json:"license_spdx"`
-	ReleaseAdmission       ReleaseAdmissionReport `json:"release_admission"`
-	CertificateID          string                 `json:"certificate_id"`
-	CertificateIssuer      string                 `json:"certificate_issuer"`
-	CertificateSubjectHash string                 `json:"certificate_subject_hash"`
-	EvidenceHash           string                 `json:"evidence_hash"`
-	Artifacts              []ArtifactSummary      `json:"artifacts"`
-	Reproduction           []string               `json:"reproduction"`
-	GateReputation         GateReputationReport   `json:"gate_reputation"`
-	Limitations            []string               `json:"limitations,omitempty"`
+	ID                     string                  `json:"id"`
+	Title                  string                  `json:"title"`
+	Organization           string                  `json:"organization"`
+	Ecosystem              string                  `json:"ecosystem"`
+	HazardClass            string                  `json:"hazard_class"`
+	Source                 Source                  `json:"source"`
+	LicenseSPDX            string                  `json:"license_spdx"`
+	ReleaseAdmission       ReleaseAdmissionReport  `json:"release_admission"`
+	CertificateID          string                  `json:"certificate_id"`
+	CertificateIssuer      string                  `json:"certificate_issuer"`
+	CertificateSubjectHash string                  `json:"certificate_subject_hash"`
+	EvidenceHash           string                  `json:"evidence_hash"`
+	Artifacts              []ArtifactSummary       `json:"artifacts"`
+	Reproduction           []string                `json:"reproduction"`
+	GateReputation         GateReputationReport    `json:"gate_reputation"`
+	DuplicateAnalysis      DuplicateAnalysisReport `json:"duplicate_analysis"`
+	Limitations            []string                `json:"limitations,omitempty"`
 }
 
 type ArtifactSummary struct {
@@ -235,6 +267,53 @@ type evidenceSubject struct {
 	Artifacts    []Artifact `json:"artifacts"`
 	Reproduction []string   `json:"reproduction"`
 }
+
+type exactDuplicateSubject struct {
+	Version     string                   `json:"version"`
+	Kind        string                   `json:"kind"`
+	Source      Source                   `json:"source"`
+	Ecosystem   string                   `json:"ecosystem"`
+	HazardClass string                   `json:"hazard_class"`
+	Artifacts   []exactDuplicateArtifact `json:"artifacts"`
+}
+
+type exactDuplicateArtifact struct {
+	Role   string `json:"role"`
+	SHA256 string `json:"sha256"`
+}
+
+type nearDuplicateSubject struct {
+	Version     string              `json:"version"`
+	Kind        string              `json:"kind"`
+	Source      nearDuplicateSource `json:"source"`
+	Ecosystem   string              `json:"ecosystem"`
+	HazardClass string              `json:"hazard_class"`
+	Cues        []string            `json:"cues"`
+}
+
+type nearDuplicateSource struct {
+	Host    string `json:"host"`
+	Repo    string `json:"repo"`
+	Subpath string `json:"subpath"`
+}
+
+type duplicateHazardArtifact struct {
+	Summary     string                    `json:"summary"`
+	Finding     string                    `json:"finding"`
+	HazardClass string                    `json:"hazard_class"`
+	Evidence    []duplicateHazardEvidence `json:"evidence"`
+}
+
+type duplicateHazardEvidence struct {
+	Path    string `json:"path"`
+	Snippet string `json:"snippet"`
+}
+
+var (
+	anglePlaceholderRE = regexp.MustCompile(`<[^>]+>`)
+	decimalRE          = regexp.MustCompile(`[0-9]+`)
+	nonTokenRE         = regexp.MustCompile(`[^a-z0-9_]+`)
+)
 
 func ReadRegistry(reader io.Reader) (Registry, error) {
 	decoder := json.NewDecoder(reader)
@@ -312,8 +391,10 @@ func PublishRegistry(registry Registry, root string) (Report, error) {
 	sort.Slice(report.Examples, func(i, j int) bool {
 		return report.Examples[i].ID < report.Examples[j].ID
 	})
+	applyDuplicateAnalysis(&report)
 	report.Summary.Rejected = len(report.Rejected)
 	report.ByHazard = counts(report.Examples, func(example PublishedExample) string { return example.HazardClass })
+	report.ByHazardPrevalence = counts(prevalenceExamples(report.Examples), func(example PublishedExample) string { return example.HazardClass })
 	report.ByEcosystem = counts(report.Examples, func(example PublishedExample) string { return example.Ecosystem })
 	report.ByLicense = counts(report.Examples, func(example PublishedExample) string { return example.LicenseSPDX })
 	report.ByReputationTier = counts(report.Examples, func(example PublishedExample) string { return example.GateReputation.Tier })
@@ -406,6 +487,8 @@ func validateExample(example Example, root string, seen map[string]bool) (Publis
 	reasons = append(reasons, validateReproduction(example.Reproduction)...)
 	gateReputation, reputationReasons := evaluateGateReputation(example)
 	reasons = append(reasons, reputationReasons...)
+	duplicateAnalysis, duplicateReasons := duplicateAnalysisForExample(example, root, artifactSummaries)
+	reasons = append(reasons, duplicateReasons...)
 	reasons = append(reasons, scanPublicStrings("metadata", metadataStrings(example))...)
 	if len(reasons) > 0 {
 		sort.Strings(reasons)
@@ -427,6 +510,7 @@ func validateExample(example Example, root string, seen map[string]bool) (Publis
 		Artifacts:              artifactSummaries,
 		Reproduction:           normalizeStringList(example.Reproduction, false),
 		GateReputation:         gateReputation,
+		DuplicateAnalysis:      duplicateAnalysis,
 		Limitations:            normalizeStringList(example.Limitations, false),
 	}, nil
 }
@@ -866,6 +950,280 @@ func sha256File(path string) (string, int64, error) {
 	return hex.EncodeToString(sum[:]), int64(len(data)), nil
 }
 
+func duplicateAnalysisForExample(example Example, root string, artifacts []ArtifactSummary) (DuplicateAnalysisReport, []string) {
+	exactArtifacts, cues, reasons := duplicateArtifactMaterial(root, artifacts)
+	if len(reasons) > 0 {
+		sort.Strings(reasons)
+		return DuplicateAnalysisReport{}, reasons
+	}
+	if len(exactArtifacts) == 0 || len(cues) == 0 {
+		return DuplicateAnalysisReport{}, []string{"duplicate detection requires at least one non-certificate redacted artifact"}
+	}
+	source := normalizeSource(example.Source)
+	analysis := DuplicateAnalysisReport{
+		ExactFingerprint: "sha256:" + canonical.Hash(exactDuplicateSubject{
+			Version:     RegistryVersion,
+			Kind:        "exact",
+			Source:      source,
+			Ecosystem:   strings.TrimSpace(example.Ecosystem),
+			HazardClass: strings.TrimSpace(example.HazardClass),
+			Artifacts:   exactArtifacts,
+		}),
+		NearFingerprint: "sha256:" + canonical.Hash(nearDuplicateSubject{
+			Version: RegistryVersion,
+			Kind:    "near",
+			Source: nearDuplicateSource{
+				Host:    source.Host,
+				Repo:    source.Repo,
+				Subpath: source.Subpath,
+			},
+			Ecosystem:   strings.TrimSpace(example.Ecosystem),
+			HazardClass: strings.TrimSpace(example.HazardClass),
+			Cues:        cues,
+		}),
+	}
+	return analysis, nil
+}
+
+func duplicateArtifactMaterial(root string, artifacts []ArtifactSummary) ([]exactDuplicateArtifact, []string, []string) {
+	selected := duplicateRelevantArtifacts(artifacts)
+	var exact []exactDuplicateArtifact
+	var cues []string
+	var reasons []string
+	for _, artifact := range selected {
+		path, err := resolveArtifact(root, artifact.Path)
+		if err != nil {
+			reasons = append(reasons, "duplicate detection artifact "+artifact.Path+": "+err.Error())
+			continue
+		}
+		content, err := os.ReadFile(path)
+		if err != nil {
+			reasons = append(reasons, "duplicate detection artifact "+artifact.Path+": "+err.Error())
+			continue
+		}
+		exact = append(exact, exactDuplicateArtifact{Role: artifact.Role, SHA256: artifact.SHA256})
+		cues = append(cues, nearDuplicateCue(content))
+	}
+	sort.Slice(exact, func(i, j int) bool {
+		if exact[i].Role != exact[j].Role {
+			return exact[i].Role < exact[j].Role
+		}
+		return exact[i].SHA256 < exact[j].SHA256
+	})
+	sort.Strings(cues)
+	return exact, cues, reasons
+}
+
+func duplicateRelevantArtifacts(artifacts []ArtifactSummary) []ArtifactSummary {
+	var hazard []ArtifactSummary
+	for _, artifact := range artifacts {
+		if artifact.Role == "redacted-hazard-example" {
+			hazard = append(hazard, artifact)
+		}
+	}
+	if len(hazard) > 0 {
+		return hazard
+	}
+	var selected []ArtifactSummary
+	for _, artifact := range artifacts {
+		if artifact.Role != "certificate-witness" {
+			selected = append(selected, artifact)
+		}
+	}
+	return selected
+}
+
+func nearDuplicateCue(content []byte) string {
+	var hazard duplicateHazardArtifact
+	if err := json.Unmarshal(content, &hazard); err == nil {
+		parts := []string{hazard.HazardClass}
+		for _, evidence := range hazard.Evidence {
+			parts = append(parts, evidence.Path, evidence.Snippet)
+		}
+		if len(hazard.Evidence) == 0 {
+			parts = append(parts, hazard.Summary, hazard.Finding)
+		}
+		if normalized := normalizeNearDuplicateText(strings.Join(parts, "\n")); normalized != "" {
+			return normalized
+		}
+	}
+	return normalizeNearDuplicateText(string(content))
+}
+
+func normalizeNearDuplicateText(value string) string {
+	value = strings.ToLower(value)
+	value = anglePlaceholderRE.ReplaceAllString(value, " redacted ")
+	value = decimalRE.ReplaceAllString(value, " 0 ")
+	value = nonTokenRE.ReplaceAllString(value, " ")
+	return strings.Join(strings.Fields(value), " ")
+}
+
+func applyDuplicateAnalysis(report *Report) {
+	exactGroups := map[string][]int{}
+	nearGroups := map[string][]int{}
+	for i := range report.Examples {
+		analysis := &report.Examples[i].DuplicateAnalysis
+		analysis.ExactGroupSize = 1
+		analysis.NearGroupSize = 1
+		analysis.PrevalenceGroupKind = "unique"
+		analysis.PrevalenceGroupID = duplicateGroupID("unique", analysis.NearFingerprint)
+		analysis.PrevalenceRepresentative = true
+		analysis.PrevalenceWeight = 1
+		exactGroups[analysis.ExactFingerprint] = append(exactGroups[analysis.ExactFingerprint], i)
+		nearGroups[analysis.NearFingerprint] = append(nearGroups[analysis.NearFingerprint], i)
+	}
+
+	exactGroupIDs := map[string]string{}
+	exactGroupSizes := map[string]int{}
+	for _, fingerprint := range sortedGroupKeys(exactGroups) {
+		indices := exactGroups[fingerprint]
+		if len(indices) <= 1 {
+			continue
+		}
+		groupID := duplicateGroupID("exact", fingerprint)
+		exactGroupIDs[fingerprint] = groupID
+		exactGroupSizes[fingerprint] = len(indices)
+		ids := exampleIDsFor(report.Examples, indices)
+		report.DuplicateGroups = append(report.DuplicateGroups, DuplicateGroup{
+			ID:                        groupID,
+			Kind:                      "exact",
+			Fingerprint:               fingerprint,
+			RepresentativeID:          ids[0],
+			ExampleIDs:                ids,
+			Count:                     len(ids),
+			DistinctExactFingerprints: 1,
+		})
+		report.Summary.ExactDuplicateGroups++
+		for _, index := range indices {
+			report.Examples[index].DuplicateAnalysis.ExactGroupID = groupID
+			report.Examples[index].DuplicateAnalysis.ExactGroupSize = len(indices)
+		}
+	}
+
+	nearGroupIDs := map[string]string{}
+	nearGroupSizes := map[string]int{}
+	nearGroupDistinctExact := map[string]int{}
+	for _, fingerprint := range sortedGroupKeys(nearGroups) {
+		indices := nearGroups[fingerprint]
+		if len(indices) <= 1 {
+			continue
+		}
+		distinctExact := distinctExactFingerprints(report.Examples, indices)
+		if distinctExact <= 1 {
+			continue
+		}
+		groupID := duplicateGroupID("near", fingerprint)
+		nearGroupIDs[fingerprint] = groupID
+		nearGroupSizes[fingerprint] = len(indices)
+		nearGroupDistinctExact[fingerprint] = distinctExact
+		ids := exampleIDsFor(report.Examples, indices)
+		report.DuplicateGroups = append(report.DuplicateGroups, DuplicateGroup{
+			ID:                        groupID,
+			Kind:                      "near",
+			Fingerprint:               fingerprint,
+			RepresentativeID:          ids[0],
+			ExampleIDs:                ids,
+			Count:                     len(ids),
+			DistinctExactFingerprints: distinctExact,
+		})
+		report.Summary.NearDuplicateGroups++
+		for _, index := range indices {
+			report.Examples[index].DuplicateAnalysis.NearGroupID = groupID
+			report.Examples[index].DuplicateAnalysis.NearGroupSize = len(indices)
+		}
+	}
+
+	for i := range report.Examples {
+		example := &report.Examples[i]
+		analysis := &example.DuplicateAnalysis
+		groupKind := "unique"
+		groupID := duplicateGroupID("unique", analysis.NearFingerprint)
+		var indices []int
+		if nearGroupID := nearGroupIDs[analysis.NearFingerprint]; nearGroupID != "" {
+			groupKind = "near"
+			groupID = nearGroupID
+			indices = nearGroups[analysis.NearFingerprint]
+		} else if exactGroupID := exactGroupIDs[analysis.ExactFingerprint]; exactGroupID != "" {
+			groupKind = "exact"
+			groupID = exactGroupID
+			indices = exactGroups[analysis.ExactFingerprint]
+		} else {
+			indices = []int{i}
+		}
+		ids := exampleIDsFor(report.Examples, indices)
+		representative := ids[0]
+		analysis.PrevalenceGroupKind = groupKind
+		analysis.PrevalenceGroupID = groupID
+		analysis.PrevalenceRepresentative = example.ID == representative
+		if analysis.PrevalenceRepresentative {
+			analysis.PrevalenceWeight = 1
+			analysis.DuplicateOf = ""
+			report.Summary.PrevalenceExamples++
+		} else {
+			analysis.PrevalenceWeight = 0
+			analysis.DuplicateOf = representative
+		}
+		if groupKind == "exact" {
+			analysis.ExactGroupSize = exactGroupSizes[analysis.ExactFingerprint]
+		}
+		if groupKind == "near" {
+			analysis.NearGroupSize = nearGroupSizes[analysis.NearFingerprint]
+			_ = nearGroupDistinctExact[analysis.NearFingerprint]
+		}
+	}
+	report.Summary.DuplicateInflation = report.Summary.Published - report.Summary.PrevalenceExamples
+	sort.Slice(report.DuplicateGroups, func(i, j int) bool {
+		return report.DuplicateGroups[i].ID < report.DuplicateGroups[j].ID
+	})
+}
+
+func sortedGroupKeys(groups map[string][]int) []string {
+	keys := make([]string, 0, len(groups))
+	for key := range groups {
+		keys = append(keys, key)
+	}
+	sort.Strings(keys)
+	return keys
+}
+
+func exampleIDsFor(examples []PublishedExample, indices []int) []string {
+	ids := make([]string, 0, len(indices))
+	for _, index := range indices {
+		ids = append(ids, examples[index].ID)
+	}
+	sort.Strings(ids)
+	return ids
+}
+
+func distinctExactFingerprints(examples []PublishedExample, indices []int) int {
+	seen := map[string]bool{}
+	for _, index := range indices {
+		seen[examples[index].DuplicateAnalysis.ExactFingerprint] = true
+	}
+	return len(seen)
+}
+
+func duplicateGroupID(kind, fingerprint string) string {
+	fingerprint = strings.TrimPrefix(fingerprint, "sha256:")
+	if len(fingerprint) > 16 {
+		fingerprint = fingerprint[:16]
+	}
+	if fingerprint == "" {
+		fingerprint = "missing"
+	}
+	return kind + "-" + fingerprint
+}
+
+func prevalenceExamples(examples []PublishedExample) []PublishedExample {
+	out := make([]PublishedExample, 0, len(examples))
+	for _, example := range examples {
+		if example.DuplicateAnalysis.PrevalenceRepresentative {
+			out = append(out, example)
+		}
+	}
+	return out
+}
+
 func counts(examples []PublishedExample, key func(PublishedExample) string) []Count {
 	values := map[string]int{}
 	for _, example := range examples {
@@ -912,6 +1270,10 @@ func RenderMarkdown(report Report) string {
 	fmt.Fprintf(&b, "| Metric | Count |\n| --- | ---: |\n")
 	fmt.Fprintf(&b, "| Submitted examples | %d |\n", report.Summary.Submitted)
 	fmt.Fprintf(&b, "| Published examples | %d |\n", report.Summary.Published)
+	fmt.Fprintf(&b, "| Duplicate-collapsed prevalence examples | %d |\n", report.Summary.PrevalenceExamples)
+	fmt.Fprintf(&b, "| Duplicate inflation prevented | %d |\n", report.Summary.DuplicateInflation)
+	fmt.Fprintf(&b, "| Exact duplicate groups | %d |\n", report.Summary.ExactDuplicateGroups)
+	fmt.Fprintf(&b, "| Near-duplicate groups | %d |\n", report.Summary.NearDuplicateGroups)
 	fmt.Fprintf(&b, "| Rejected examples | %d |\n", report.Summary.Rejected)
 	fmt.Fprintf(&b, "| Verified artifacts | %d |\n", report.Summary.ArtifactsVerified)
 	fmt.Fprintf(&b, "| Public-release eligible | %d |\n", report.Summary.PublicReleaseEligible)
@@ -922,19 +1284,35 @@ func RenderMarkdown(report Report) string {
 	if len(report.Examples) == 0 {
 		fmt.Fprintf(&b, "No examples cleared publication checks.\n\n")
 	} else {
-		fmt.Fprintf(&b, "| ID | Hazard | Ecosystem | License | Release | Gate reputation | Certificate | Evidence |\n")
-		fmt.Fprintf(&b, "| --- | --- | --- | --- | --- | ---: | --- | --- |\n")
+		fmt.Fprintf(&b, "| ID | Hazard | Ecosystem | Prevalence | License | Release | Gate reputation | Certificate | Evidence |\n")
+		fmt.Fprintf(&b, "| --- | --- | --- | ---: | --- | --- | ---: | --- | --- |\n")
 		for _, example := range report.Examples {
-			fmt.Fprintf(&b, "| `%s` | %s | %s | `%s` | %t | %s (%d) | `%s` | `%s` |\n",
+			fmt.Fprintf(&b, "| `%s` | %s | %s | %d | `%s` | %t | %s (%d) | `%s` | `%s` |\n",
 				escapePipe(example.ID),
 				escapePipe(example.HazardClass),
 				escapePipe(example.Ecosystem),
+				example.DuplicateAnalysis.PrevalenceWeight,
 				escapePipe(example.LicenseSPDX),
 				example.ReleaseAdmission.PublicReleaseEligible,
 				escapePipe(example.GateReputation.Tier),
 				example.GateReputation.Score,
 				escapePipe(example.CertificateSubjectHash),
 				escapePipe(example.EvidenceHash),
+			)
+		}
+		fmt.Fprintf(&b, "\n")
+	}
+	if len(report.DuplicateGroups) > 0 {
+		fmt.Fprintf(&b, "## Duplicate groups\n\n")
+		fmt.Fprintf(&b, "| Group | Kind | Representative | Count | Examples |\n")
+		fmt.Fprintf(&b, "| --- | --- | --- | ---: | --- |\n")
+		for _, group := range report.DuplicateGroups {
+			fmt.Fprintf(&b, "| `%s` | %s | `%s` | %d | %s |\n",
+				escapePipe(group.ID),
+				escapePipe(group.Kind),
+				escapePipe(group.RepresentativeID),
+				group.Count,
+				escapePipe(strings.Join(group.ExampleIDs, ", ")),
 			)
 		}
 		fmt.Fprintf(&b, "\n")
@@ -954,11 +1332,11 @@ func RenderHTML(report Report) (string, error) {
 <meta charset="utf-8">
 <title>Patchline public evidence marketplace</title>
 <h1>Patchline public evidence marketplace</h1>
-<p>Published {{.Summary.Published}} redacted, certificate-backed hazard examples; rejected {{.Summary.Rejected}}.</p>
+<p>Published {{.Summary.Published}} redacted, certificate-backed hazard examples; {{.Summary.PrevalenceExamples}} duplicate-collapsed prevalence examples; rejected {{.Summary.Rejected}}.</p>
 <table>
-<thead><tr><th>ID</th><th>Title</th><th>Hazard</th><th>Ecosystem</th><th>License</th><th>Release</th><th>Gate reputation</th><th>Certificate</th></tr></thead>
+<thead><tr><th>ID</th><th>Title</th><th>Hazard</th><th>Ecosystem</th><th>Prevalence</th><th>License</th><th>Release</th><th>Gate reputation</th><th>Certificate</th></tr></thead>
 <tbody>
-{{range .Examples}}<tr><td><code>{{.ID}}</code></td><td>{{.Title}}</td><td>{{.HazardClass}}</td><td>{{.Ecosystem}}</td><td><code>{{.LicenseSPDX}}</code></td><td>{{.ReleaseAdmission.PublicReleaseEligible}}</td><td>{{.GateReputation.Tier}} ({{.GateReputation.Score}})</td><td><code>{{.CertificateSubjectHash}}</code></td></tr>
+{{range .Examples}}<tr><td><code>{{.ID}}</code></td><td>{{.Title}}</td><td>{{.HazardClass}}</td><td>{{.Ecosystem}}</td><td>{{.DuplicateAnalysis.PrevalenceWeight}}</td><td><code>{{.LicenseSPDX}}</code></td><td>{{.ReleaseAdmission.PublicReleaseEligible}}</td><td>{{.GateReputation.Tier}} ({{.GateReputation.Score}})</td><td><code>{{.CertificateSubjectHash}}</code></td></tr>
 {{end}}</tbody>
 </table>
 `

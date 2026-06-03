@@ -62,10 +62,11 @@ declared schema invariants, while a maintainer acceptance study measures paired 
 fails generated remediation plans that hide uncertainty or inflate confidence, and a public evidence
 marketplace admits only redacted, certificate-backed hazard examples after automated license/consent
 release checks, scores community-gate reputation solely from reproducible runs, elapsed verification
-windows, and independent confirmations, and imports examples into runnable benchmarks while recording
-submitter labels as untrusted and deriving cases from independent redacted evidence cues; private
-adopters can then run federated benchmark splits locally and publish only signed, k-thresholded
-aggregate metrics.
+windows, and independent confirmations, collapses exact and near-duplicate submissions before
+prevalence accounting, and imports only prevalence representatives into runnable benchmarks while
+recording submitter labels as untrusted and deriving cases from independent redacted evidence cues;
+private adopters can then run federated benchmark splits locally and publish only signed,
+k-thresholded aggregate metrics.
 Critically,
 every capability in \tool{} is backed by a reproducible \emph{gate}: a script that proves the
 capability against real, pinned public code and fails loudly on drift. \tool{} currently ships more
@@ -135,8 +136,8 @@ ranks the risks, and prints the next commands that can run immediately.
   exports (Section~\ref{sec:runtime}).
   \item A \textbf{gate-backed reproducibility and evaluation methodology}---over 610 gates, blinded
   false-positive adjudication, seeded false-negative recall, ablations, standardized effect sizes,
-  severity calibration, a certificate-backed public evidence marketplace, and signed federated
-  benchmark aggregates for private adopters---designed for artifact
+  severity calibration, a duplicate-safe certificate-backed public evidence marketplace, and signed
+  federated benchmark aggregates for private adopters---designed for artifact
   evaluation and best-paper-grade rigor
   (Sections~\ref{sec:repro}--\ref{sec:eval}).
 \end{enumerate}
@@ -235,8 +236,9 @@ against generated plans while hashing the real artifacts reviewed and failing hi
 \code{maintainer-acceptance-study.json}, \code{.md} \\
 \code{evidence-marketplace} / \code{artifact-benchmark import-marketplace} & Publish redacted public
 hazard examples only after automated license/consent release admission, symlink-safe artifact-hash,
-certificate-obligation, public-data reproduction, and deterministic reputation checks pass, then import
-published examples into runnable benchmark cases without trusting registry or artifact hazard labels. &
+certificate-obligation, public-data reproduction, deterministic reputation, and exact/near-duplicate
+checks pass, then import only prevalence representatives into runnable benchmark cases without trusting
+registry or artifact hazard labels. &
 \code{marketplace.json},
 \code{marketplace-import.json}, generated manifest/ground truth \\
 \code{artifact-benchmark federated-split/run/verify} & Validate an adopter-local private benchmark
@@ -762,13 +764,18 @@ redaction, artifact, obligation, license, and reproduction metadata. Community-g
 separate from the certificate subject because it is intentionally mutable; it is scored deterministically
 from only three signals---reproducible run count, the registry-supplied first/last verification window,
 and independent confirmations---and is still covered by the publication report hash. The benchmark
-importer then reuses the published report, rehashes the artifact it actually reads, records both
-registry and artifact \code{hazard\_class} values as untrusted submitter labels, derives labels from a
-closed table of redacted snippet cues, and emits SQL fixtures plus ground truth with certificate,
-evidence-hash, and artifact-hash provenance. The \gate{evidence-marketplace-gate} publishes two
-redacted public-corpus examples, proves both have public-release eligibility and reviewable-or-better
-gate reputation, imports both into a runnable benchmark manifest, validates and runs that manifest, and
-then corrupts a copied certificate hash; the bad marketplace must be rejected while the tracked fixture
+publication report also computes an exact fingerprint from the source, hazard metadata, and redacted
+hazard-artifact hashes, plus a near-duplicate fingerprint from the source repository/subpath and
+normalized redacted evidence cue; raw submission counts remain visible, but
+\code{by\_hazard\_prevalence} and benchmark import use only the representative of each near-duplicate
+group. The benchmark importer then reuses the published report, skips non-representative duplicates,
+rehashes the artifact it actually reads, records both registry and artifact \code{hazard\_class} values
+as untrusted submitter labels, derives labels from a closed table of redacted snippet cues, and emits
+SQL fixtures plus ground truth with certificate, evidence-hash, and artifact-hash provenance. The
+\gate{evidence-marketplace-gate} publishes two redacted public-corpus examples, proves both have
+public-release eligibility, reviewable-or-better gate reputation, and duplicate-collapsed prevalence
+weight one, imports both into a runnable benchmark manifest, validates and runs that manifest, and then
+corrupts a copied certificate hash; the bad marketplace must be rejected while the tracked fixture
 remains untouched.
 
 \paragraph{Federated private benchmark aggregates.} A public benchmark alone cannot measure private
@@ -877,7 +884,7 @@ owner-routed rollback playbooks for broad writes & \gate{remediation-playbook-ga
 4 expected-loss remediation choices; unsafe residual-loss bound refuted & \gate{remediation-cost-optimizer-gate} \\
 5 migration-PR states preserve invariants; unsafe drop refuted & \gate{patch-series-verifier-gate} \\
 9 paired maintainer reviews; 38.55\% faster with full uncertainty recall; hidden-control refuted & \gate{maintainer-acceptance-study-gate} \\
-2 public-release-eligible examples with reviewable gate reputation imported into runnable benchmarks; corrupted certificate rejected & \gate{evidence-marketplace-gate} \\
+2 public-release-eligible examples with reviewable gate reputation and duplicate-collapsed prevalence imported into runnable benchmarks; corrupted certificate rejected & \gate{evidence-marketplace-gate} \\
 3 private benchmark cases published as signed aggregate-only metrics; tampering/leakage rejected & \gate{federated-benchmark-split-gate} \\
 3 payout-approved minimized false-negative/ecosystem-gap bounty reproductions; unsupported bounty rejected & \gate{open-problem-bounty-board-gate} \\
 9 Cassandra changes incl.\ destructive drops & \code{laaksomavrick/twitter-go} \\
@@ -1357,7 +1364,7 @@ safety cases, standards hooks, privacy-preserving reviewer-outcome aggregation, 
 evidence. The remaining frontier is not another isolated detector; it is the transition from a
 generational artifact to shared infrastructure. The open roadmap items around this transition include:
 production-grade remediation loops for rollback, repair escrow, and patch-series safety; a
-federated, deduplicated, archived, challenge-ready public evidence marketplace with explicit
+federated, archived, challenge-ready public evidence marketplace with explicit
 governance; engine-version semantics for production databases, locks, replication, partitioning, and
 online schema change;
 socio-technical accountability for appeals, fairness, ethics, and detector deprecation; education and

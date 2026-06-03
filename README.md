@@ -137,7 +137,7 @@ Run `patch-series-verify --spec <spec>` to prove every modeled migration-PR inte
 
 Run `maintainer-acceptance-study --spec <spec>` to measure paired maintainer review-time reduction for generated remediation plans while failing hidden uncertainty or overconfidence; reproduce it with `make maintainer-acceptance-study-gate`.
 
-Run `evidence-marketplace publish --registry <registry>` and `artifact-benchmark import-marketplace --registry <registry>` to publish redacted, certificate-backed hazard examples with automated license/consent release checks and reproducibility/longevity/independent-confirmation reputation, then import them into runnable benchmarks without trusting submitter labels; reproduce it with `make evidence-marketplace-gate`.
+Run `evidence-marketplace publish --registry <registry>` and `artifact-benchmark import-marketplace --registry <registry>` to publish redacted, certificate-backed hazard examples with automated license/consent release checks, duplicate-collapsed prevalence counts, and reproducibility/longevity/independent-confirmation reputation, then import only prevalence representatives into runnable benchmarks without trusting submitter labels; reproduce it with `make evidence-marketplace-gate`.
 
 Run `artifact-benchmark federated-split`, `federated-run`, and `federated-verify` so private adopters evaluate local benchmark cases while publishing only signed aggregate metrics; reproduce it with `make federated-benchmark-split-gate`.
 

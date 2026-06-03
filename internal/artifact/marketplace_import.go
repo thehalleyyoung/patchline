@@ -23,26 +23,28 @@ type MarketplaceBenchmarkImportOptions struct {
 }
 
 type MarketplaceBenchmarkImportReport struct {
-	Version               string                               `json:"version"`
-	OK                    bool                                 `json:"ok"`
-	DatasetID             string                               `json:"dataset_id"`
-	Registry              string                               `json:"registry"`
-	RegistryHash          string                               `json:"registry_hash"`
-	MarketplaceReportHash string                               `json:"marketplace_report_hash"`
-	Manifest              string                               `json:"manifest"`
-	Summary               MarketplaceBenchmarkImportSummary    `json:"summary"`
-	Cases                 []MarketplaceBenchmarkImportedCase   `json:"cases"`
-	Rejected              []MarketplaceBenchmarkRejectedImport `json:"rejected,omitempty"`
-	Hash                  string                               `json:"hash"`
-	Markdown              string                               `json:"markdown,omitempty"`
+	Version               string                                   `json:"version"`
+	OK                    bool                                     `json:"ok"`
+	DatasetID             string                                   `json:"dataset_id"`
+	Registry              string                                   `json:"registry"`
+	RegistryHash          string                                   `json:"registry_hash"`
+	MarketplaceReportHash string                                   `json:"marketplace_report_hash"`
+	Manifest              string                                   `json:"manifest"`
+	Summary               MarketplaceBenchmarkImportSummary        `json:"summary"`
+	Cases                 []MarketplaceBenchmarkImportedCase       `json:"cases"`
+	Rejected              []MarketplaceBenchmarkRejectedImport     `json:"rejected,omitempty"`
+	Deduplicated          []MarketplaceBenchmarkDeduplicatedImport `json:"deduplicated,omitempty"`
+	Hash                  string                                   `json:"hash"`
+	Markdown              string                                   `json:"markdown,omitempty"`
 }
 
 type MarketplaceBenchmarkImportSummary struct {
-	Published          int `json:"published"`
-	Imported           int `json:"imported"`
-	Rejected           int `json:"rejected"`
-	ArtifactsVerified  int `json:"artifacts_verified"`
-	LabelDisagreements int `json:"label_disagreements"`
+	Published               int `json:"published"`
+	Imported                int `json:"imported"`
+	Rejected                int `json:"rejected"`
+	DuplicateImportsSkipped int `json:"duplicate_imports_skipped"`
+	ArtifactsVerified       int `json:"artifacts_verified"`
+	LabelDisagreements      int `json:"label_disagreements"`
 }
 
 type MarketplaceBenchmarkImportedCase struct {
@@ -68,6 +70,15 @@ type MarketplaceBenchmarkImportedCase struct {
 type MarketplaceBenchmarkRejectedImport struct {
 	ID      string   `json:"id"`
 	Reasons []string `json:"reasons"`
+}
+
+type MarketplaceBenchmarkDeduplicatedImport struct {
+	ID                  string `json:"id"`
+	DuplicateOf         string `json:"duplicate_of"`
+	PrevalenceGroupID   string `json:"prevalence_group_id"`
+	PrevalenceGroupKind string `json:"prevalence_group_kind"`
+	PrevalenceGroupSize int    `json:"prevalence_group_size"`
+	Reason              string `json:"reason"`
 }
 
 type marketplaceHazardArtifact struct {
@@ -174,6 +185,10 @@ func ImportMarketplaceBenchmark(options MarketplaceBenchmarkImportOptions) (Mark
 	}
 	seenCaseIDs := map[string]bool{}
 	for _, example := range published.Examples {
+		if deduplicated, ok := marketplaceDeduplicatedImport(example); ok {
+			report.Deduplicated = append(report.Deduplicated, deduplicated)
+			continue
+		}
 		caseID := "marketplace-" + slugForBenchmarkCase(example.ID)
 		if seenCaseIDs[caseID] {
 			report.Rejected = append(report.Rejected, MarketplaceBenchmarkRejectedImport{ID: example.ID, Reasons: []string{"duplicate imported case_id " + caseID}})
@@ -199,6 +214,9 @@ func ImportMarketplaceBenchmark(options MarketplaceBenchmarkImportOptions) (Mark
 		}
 		return strings.Join(report.Rejected[i].Reasons, "\n") < strings.Join(report.Rejected[j].Reasons, "\n")
 	})
+	sort.Slice(report.Deduplicated, func(i, j int) bool {
+		return report.Deduplicated[i].ID < report.Deduplicated[j].ID
+	})
 
 	manifestPath := filepath.Join(outDir, "manifests", "marketplace-import.json")
 	if err := writeArtifactJSON(manifestPath, manifest); err != nil {
@@ -207,6 +225,7 @@ func ImportMarketplaceBenchmark(options MarketplaceBenchmarkImportOptions) (Mark
 	report.Manifest = filepath.ToSlash(filepath.Join("manifests", "marketplace-import.json"))
 	report.Summary.Imported = len(report.Cases)
 	report.Summary.Rejected = len(report.Rejected)
+	report.Summary.DuplicateImportsSkipped = len(report.Deduplicated)
 	report.OK = report.Summary.Imported > 0 && report.Summary.Rejected == 0
 	report.Hash = marketplaceBenchmarkImportHash(report)
 	report.Markdown = renderMarketplaceBenchmarkImportMarkdown(report)
@@ -214,6 +233,25 @@ func ImportMarketplaceBenchmark(options MarketplaceBenchmarkImportOptions) (Mark
 		return MarketplaceBenchmarkImportReport{}, err
 	}
 	return report, nil
+}
+
+func marketplaceDeduplicatedImport(example evidencemarketplace.PublishedExample) (MarketplaceBenchmarkDeduplicatedImport, bool) {
+	analysis := example.DuplicateAnalysis
+	if analysis.PrevalenceGroupID == "" || analysis.PrevalenceRepresentative {
+		return MarketplaceBenchmarkDeduplicatedImport{}, false
+	}
+	groupSize := analysis.NearGroupSize
+	if groupSize == 0 {
+		groupSize = analysis.ExactGroupSize
+	}
+	return MarketplaceBenchmarkDeduplicatedImport{
+		ID:                  example.ID,
+		DuplicateOf:         analysis.DuplicateOf,
+		PrevalenceGroupID:   analysis.PrevalenceGroupID,
+		PrevalenceGroupKind: analysis.PrevalenceGroupKind,
+		PrevalenceGroupSize: groupSize,
+		Reason:              "duplicate or near-duplicate marketplace example skipped so benchmark prevalence is not inflated",
+	}, true
 }
 
 func importMarketplaceExample(registryRoot, outDir string, example evidencemarketplace.PublishedExample) (MarketplaceBenchmarkImportedCase, ManifestCase, []string) {
@@ -446,6 +484,7 @@ func renderMarketplaceBenchmarkImportMarkdown(report MarketplaceBenchmarkImportR
 	fmt.Fprintf(&b, "| Metric | Count |\n| --- | ---: |\n")
 	fmt.Fprintf(&b, "| Published examples | %d |\n", report.Summary.Published)
 	fmt.Fprintf(&b, "| Imported cases | %d |\n", report.Summary.Imported)
+	fmt.Fprintf(&b, "| Duplicate imports skipped | %d |\n", report.Summary.DuplicateImportsSkipped)
 	fmt.Fprintf(&b, "| Rejected imports | %d |\n", report.Summary.Rejected)
 	fmt.Fprintf(&b, "| Label disagreements preserved | %d |\n", report.Summary.LabelDisagreements)
 	fmt.Fprintf(&b, "\n| Case | Claimed label | Derived label | Cue | Trusted submitter labels |\n")
@@ -458,6 +497,13 @@ func renderMarketplaceBenchmarkImportMarkdown(report MarketplaceBenchmarkImportR
 		fmt.Fprintf(&b, "| ID | Reasons |\n| --- | --- |\n")
 		for _, rejected := range report.Rejected {
 			fmt.Fprintf(&b, "| `%s` | %s |\n", rejected.ID, strings.Join(rejected.Reasons, "; "))
+		}
+	}
+	if len(report.Deduplicated) > 0 {
+		fmt.Fprintf(&b, "\n## Deduplicated imports\n\n")
+		fmt.Fprintf(&b, "| ID | Duplicate of | Group | Reason |\n| --- | --- | --- | --- |\n")
+		for _, duplicate := range report.Deduplicated {
+			fmt.Fprintf(&b, "| `%s` | `%s` | `%s` | %s |\n", duplicate.ID, duplicate.DuplicateOf, duplicate.PrevalenceGroupID, duplicate.Reason)
 		}
 	}
 	return b.String()

@@ -24,11 +24,100 @@ func TestPublishRegistryPublishesCertificateBackedExamples(t *testing.T) {
 	if report.Examples[0].EvidenceHash == "" || report.Hash == "" || report.RegistryHash == "" {
 		t.Fatalf("expected stable hashes in report: %#v", report)
 	}
+	if report.Summary.PrevalenceExamples != 1 || report.Summary.DuplicateInflation != 0 {
+		t.Fatalf("single unique example should count once for prevalence: %#v", report.Summary)
+	}
+	if len(report.ByHazardPrevalence) != 1 || report.ByHazardPrevalence[0].Count != 1 {
+		t.Fatalf("unexpected prevalence hazard counts: %#v", report.ByHazardPrevalence)
+	}
+	if !report.Examples[0].DuplicateAnalysis.PrevalenceRepresentative || report.Examples[0].DuplicateAnalysis.PrevalenceWeight != 1 {
+		t.Fatalf("unique example should be a prevalence representative: %#v", report.Examples[0].DuplicateAnalysis)
+	}
 	if report.Summary.PublicReleaseEligible != 1 || !report.Examples[0].ReleaseAdmission.PublicReleaseEligible {
 		t.Fatalf("expected automated release admission to pass: %#v", report.Examples[0].ReleaseAdmission)
 	}
 	if report.Examples[0].GateReputation.Submitted || report.Examples[0].GateReputation.Score != 0 || report.Examples[0].GateReputation.Tier != "emerging" {
 		t.Fatalf("omitted gate reputation should publish as zero-score emerging metadata: %#v", report.Examples[0].GateReputation)
+	}
+	assertStableReportHash(t, registry, root, report.Hash)
+}
+
+func TestPublishRegistryCollapsesExactAndNearDuplicatesForPrevalence(t *testing.T) {
+	registry, root := validRegistry(t)
+
+	exact := registry.Examples[0]
+	exact.Artifacts = append([]Artifact(nil), exact.Artifacts...)
+	exact.ID = "redacted-backfill-guard-resubmission"
+	exact.Title = "Resubmitted redacted broad backfill missing a guard"
+	exact.Certificate.ID = "cert-redacted-backfill-guard-resubmission"
+	exact.Certificate.SubjectHash = ExpectedSubjectHash(exact)
+
+	writeFile(t, root, "artifacts/hazard-near.json", `{
+  "version": "patchline.redacted-hazard-example/v1",
+  "finding": "second submitter described the same redacted backfill risk in different words",
+  "repo": "public/example",
+  "evidence": [{
+    "path": "db/migrate/20260101010101_backfill_accounts.sql",
+    "line": 99,
+    "snippet": "UPDATE <table> SET <column> = <redacted> WHERE <guard> IS NULL"
+  }],
+  "review_note": "same public evidence cue, reformatted by a second submitter"
+}
+`)
+	near := registry.Examples[0]
+	near.Artifacts = append([]Artifact(nil), near.Artifacts...)
+	near.ID = "redacted-backfill-guard-near-duplicate"
+	near.Title = "Near-duplicate redacted broad backfill missing a guard"
+	near.Artifacts[0].Path = "artifacts/hazard-near.json"
+	near.Artifacts[0].SHA256 = fileHash(t, filepath.Join(root, "artifacts/hazard-near.json"))
+	near.Certificate.ID = "cert-redacted-backfill-guard-near-duplicate"
+	near.Certificate.SubjectHash = ExpectedSubjectHash(near)
+
+	registry.Examples = []Example{registry.Examples[0], exact, near}
+	report, err := PublishRegistry(registry, root)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !report.OK || report.Summary.Published != 3 || report.Summary.Rejected != 0 {
+		t.Fatalf("unexpected duplicate publication report: %#v", report)
+	}
+	if report.Summary.PrevalenceExamples != 1 || report.Summary.DuplicateInflation != 2 {
+		t.Fatalf("duplicates should collapse to one prevalence example: %#v", report.Summary)
+	}
+	if report.Summary.ExactDuplicateGroups != 1 || report.Summary.NearDuplicateGroups != 1 {
+		t.Fatalf("expected one exact group and one near group: %#v", report.Summary)
+	}
+	if len(report.ByHazard) != 1 || report.ByHazard[0].Count != 3 {
+		t.Fatalf("raw hazard count should preserve all submissions: %#v", report.ByHazard)
+	}
+	if len(report.ByHazardPrevalence) != 1 || report.ByHazardPrevalence[0].Count != 1 {
+		t.Fatalf("prevalence hazard count should collapse duplicates: %#v", report.ByHazardPrevalence)
+	}
+	if len(report.DuplicateGroups) != 2 {
+		t.Fatalf("expected exact and near duplicate groups, got %#v", report.DuplicateGroups)
+	}
+
+	representatives := 0
+	weights := 0
+	nearGroupIDs := map[string]bool{}
+	for _, example := range report.Examples {
+		analysis := example.DuplicateAnalysis
+		if analysis.ExactFingerprint == "" || analysis.NearFingerprint == "" {
+			t.Fatalf("missing duplicate fingerprints for %s: %#v", example.ID, analysis)
+		}
+		if analysis.NearGroupSize != 3 || analysis.PrevalenceGroupKind != "near" || analysis.PrevalenceGroupID == "" {
+			t.Fatalf("expected all examples in a near prevalence group: %s %#v", example.ID, analysis)
+		}
+		nearGroupIDs[analysis.NearGroupID] = true
+		if analysis.PrevalenceRepresentative {
+			representatives++
+		} else if analysis.DuplicateOf == "" || analysis.PrevalenceWeight != 0 {
+			t.Fatalf("non-representative duplicate should point at representative with zero weight: %#v", analysis)
+		}
+		weights += analysis.PrevalenceWeight
+	}
+	if representatives != 1 || weights != 1 || len(nearGroupIDs) != 1 {
+		t.Fatalf("unexpected representative/weight assignment: representatives=%d weights=%d groups=%v", representatives, weights, nearGroupIDs)
 	}
 	assertStableReportHash(t, registry, root, report.Hash)
 }

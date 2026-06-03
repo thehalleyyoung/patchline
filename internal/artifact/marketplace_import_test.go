@@ -101,6 +101,48 @@ func TestImportMarketplaceBenchmarkRejectsUnsupportedEvidenceCue(t *testing.T) {
 	}
 }
 
+func TestImportMarketplaceBenchmarkSkipsDuplicatePrevalenceExamples(t *testing.T) {
+	root := t.TempDir()
+	registry := marketplaceImportTestRegistry(t, root, marketplaceImportTestRegistryOptions{
+		ExampleID:           "community-backfill",
+		RegistryHazardClass: "broad-backfill-without-guard",
+		ArtifactHazardClass: "broad-backfill-without-guard",
+		EvidencePath:        "db/migrate/20260101010101_backfill_accounts.rb",
+		EvidenceSnippet:     "<model>.find_each { |row| row.update!(<redacted_column>: <redacted_value>) }",
+	})
+	duplicate := registry.Examples[0]
+	duplicate.ID = "community-backfill-resubmission"
+	duplicate.Title = "Resubmitted marketplace import fixture"
+	duplicate.Certificate.ID = "cert-community-backfill-resubmission"
+	duplicate.Certificate.SubjectHash = evidencemarketplace.ExpectedSubjectHash(duplicate)
+	registry.Examples = append(registry.Examples, duplicate)
+
+	registryPath := filepath.Join(root, "registry.json")
+	if err := writeArtifactJSON(registryPath, registry); err != nil {
+		t.Fatal(err)
+	}
+
+	out := filepath.Join(t.TempDir(), "marketplace-import-deduplicated")
+	report, err := ImportMarketplaceBenchmark(MarketplaceBenchmarkImportOptions{RegistryPath: registryPath, OutDir: out})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !report.OK || report.Summary.Published != 2 || report.Summary.Imported != 1 || report.Summary.DuplicateImportsSkipped != 1 || report.Summary.Rejected != 0 {
+		t.Fatalf("expected duplicate submission to be skipped without failing import: %#v", report)
+	}
+	if len(report.Deduplicated) != 1 || report.Deduplicated[0].DuplicateOf == "" || report.Deduplicated[0].PrevalenceGroupKind != "exact" {
+		t.Fatalf("unexpected deduplicated import metadata: %#v", report.Deduplicated)
+	}
+	manifestPath := filepath.Join(out, filepath.FromSlash(report.Manifest))
+	runReport, err := RunBenchmarkManifest(manifestPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !runReport.OK || runReport.Metrics.Total != 1 {
+		t.Fatalf("duplicate marketplace examples should produce one runnable case: %#v", runReport)
+	}
+}
+
 type marketplaceImportTestRegistryOptions struct {
 	ExampleID           string
 	RegistryHazardClass string

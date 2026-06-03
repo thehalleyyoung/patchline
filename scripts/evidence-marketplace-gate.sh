@@ -54,6 +54,10 @@ jq -e '
   .summary.redaction_reviewed == .summary.published and
   .summary.clear_licensed == .summary.published and
   .summary.public_release_eligible == .summary.published and
+  .summary.prevalence_examples == .summary.published and
+  .summary.duplicate_inflation == 0 and
+  .summary.exact_duplicate_groups == 0 and
+  .summary.near_duplicate_groups == 0 and
   .summary.artifacts_verified >= 4 and
   .summary.gate_reputation_submitted == .summary.published and
   .summary.gate_reputation_reviewable == .summary.published and
@@ -71,9 +75,14 @@ jq -e '
     (.gate_reputation.reproducibility_points >= 28) and
     (.gate_reputation.longevity_points >= 15) and
     (.gate_reputation.confirmation_points >= 20) and
+    (.duplicate_analysis.prevalence_representative == true) and
+    (.duplicate_analysis.prevalence_weight == 1) and
+    (.duplicate_analysis.exact_fingerprint | startswith("sha256:")) and
+    (.duplicate_analysis.near_fingerprint | startswith("sha256:")) and
     (.artifacts | all(.redacted == true and (.sha256 | startswith("sha256:"))))
   )) and
   (.by_hazard | length) >= 2 and
+  (.by_hazard_prevalence | length) >= 2 and
   (.by_ecosystem | length) >= 2 and
   (.by_reputation_tier | length) >= 2
 ' "$OUT/published/marketplace.json" > /dev/null
@@ -97,6 +106,7 @@ jq -e '
   .ok == true and
   .summary.imported >= 2 and
   .summary.rejected == 0 and
+  .summary.duplicate_imports_skipped == 0 and
   (.cases | all(
     .submitter_labels_trusted == false and
     .label_source == "artifact-evidence-cue" and
@@ -143,6 +153,8 @@ jq -n \
   --slurpfile i "$OUT/imported-benchmark/marketplace-import.json" '{
   version: "patchline.evidence-marketplace-gate-results/v1",
   published: $r[0].summary.published,
+  prevalence_examples: $r[0].summary.prevalence_examples,
+  duplicate_inflation: $r[0].summary.duplicate_inflation,
   artifacts_verified: $r[0].summary.artifacts_verified,
   public_release_eligible: $r[0].summary.public_release_eligible,
   gate_reputation_reviewable: $r[0].summary.gate_reputation_reviewable,
@@ -152,4 +164,4 @@ jq -n \
   verified: true
 }' > "$OUT/gate-summary.json"
 
-echo "evidence-marketplace gate passed: $(jq -r .summary.published "$OUT/published/marketplace.json") redacted certificate-backed examples published; $(jq -r .summary.gate_reputation_reviewable "$OUT/published/marketplace.json") reviewable gate reputations scored; $(jq -r .summary.imported "$OUT/imported-benchmark/marketplace-import.json") imported into runnable benchmarks; corrupted certificate rejected"
+echo "evidence-marketplace gate passed: $(jq -r .summary.published "$OUT/published/marketplace.json") redacted certificate-backed examples published; $(jq -r .summary.prevalence_examples "$OUT/published/marketplace.json") prevalence examples after duplicate collapse; $(jq -r .summary.gate_reputation_reviewable "$OUT/published/marketplace.json") reviewable gate reputations scored; $(jq -r .summary.imported "$OUT/imported-benchmark/marketplace-import.json") imported into runnable benchmarks; corrupted certificate rejected"
