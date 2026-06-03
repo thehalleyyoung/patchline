@@ -195,6 +195,52 @@ func TestEvidenceMarketplaceGovernCommandWritesBoardReview(t *testing.T) {
 	}
 }
 
+func TestEvidenceMarketplaceAppealCommandWritesAppealWorkflow(t *testing.T) {
+	root := t.TempDir()
+	registry := mainTestGovernanceRegistry(t, root)
+	registryPath := filepath.Join(root, "governance-registry.json")
+	writeMainTestJSONFile(t, registryPath, registry)
+	boardSpec := mainTestBoardReviewSpec(registry)
+	boardPath := filepath.Join(root, "governance-board.json")
+	writeMainTestJSONFile(t, boardPath, boardSpec)
+	spec := mainTestAppealWorkflowSpec(t, registry, root)
+	specPath := filepath.Join(root, "appeal-workflow.json")
+	writeMainTestJSONFile(t, specPath, spec)
+
+	out := filepath.Join(t.TempDir(), "appeal")
+	if err := run([]string{"evidence-marketplace", "appeal", "--spec", specPath, "--out", out, "--json"}); err != nil {
+		t.Fatalf("evidence marketplace appeal failed: %v", err)
+	}
+	var report evidencemarketplace.AppealWorkflowReport
+	readMainTestJSON(t, filepath.Join(out, "appeal-workflow.json"), &report)
+	if !report.OK || report.Summary.ProcessedAppeals != 3 || report.Summary.Upheld != 1 || report.Summary.Modified != 1 || report.Summary.Overturned != 1 {
+		t.Fatalf("unexpected appeal workflow report: %#v", report.Summary)
+	}
+	if report.Summary.PreservedArtifacts != 6 || report.Summary.ReviewerRationales != 9 || report.Summary.BoardBindings != 3 {
+		t.Fatalf("appeal workflow did not preserve the expected audit trail: %#v", report.Summary)
+	}
+	for _, rel := range []string{"appeal-workflow.json", "appeal-workflow.md", "index.html"} {
+		if stat, err := os.Stat(filepath.Join(out, rel)); err != nil || stat.Size() == 0 {
+			t.Fatalf("expected %s to be written, stat=%#v err=%v", rel, stat, err)
+		}
+	}
+
+	bad := spec
+	bad.Appeals[0].ReviewerRationales[0].Reviewer.Name = "Database Reliability Guild"
+	bad.Appeals[0].ReviewerRationales[0].Reviewer.Affiliation = "Database Reliability Guild"
+	badPath := filepath.Join(root, "appeal-workflow.bad.json")
+	writeMainTestJSONFile(t, badPath, bad)
+	badOut := filepath.Join(t.TempDir(), "bad-appeal")
+	if err := run([]string{"evidence-marketplace", "appeal", "--spec", badPath, "--out", badOut, "--json"}); err == nil || exitCode(err) != 2 {
+		t.Fatalf("expected rejected appeal workflow with exit code 2, got %v", err)
+	}
+	var rejected evidencemarketplace.AppealWorkflowReport
+	readMainTestJSON(t, filepath.Join(badOut, "appeal-workflow.json"), &rejected)
+	if rejected.OK || len(rejected.Rejected) == 0 {
+		t.Fatalf("expected rejected appeal workflow, got %#v", rejected)
+	}
+}
+
 func TestArtifactBenchmarkImportMarketplaceCommandWritesRunnableBenchmark(t *testing.T) {
 	root := t.TempDir()
 	registry := mainTestEvidenceMarketplaceRegistry(t, root)
@@ -2925,6 +2971,111 @@ func mainTestBoardDecision(example evidencemarketplace.Example, status string) e
 		}
 	}
 	return decision
+}
+
+func mainTestAppealWorkflowSpec(t *testing.T, registry evidencemarketplace.Registry, root string) evidencemarketplace.AppealWorkflowSpec {
+	t.Helper()
+	preservation := mainTestAppealPreservation(t, registry, root)
+	return evidencemarketplace.AppealWorkflowSpec{
+		Version:            evidencemarketplace.AppealWorkflowSpecVersion,
+		Claim:              "The Patchline CLI appeal workflow fixture proves disputed findings preserve archive evidence, bind to governance-board decisions, collect independent reviewer rationales, and publish resolution audit trails.",
+		RegistryPath:       "governance-registry.json",
+		BoardDecisionsPath: "governance-board.json",
+		Board: evidencemarketplace.BoardPolicy{
+			ID:                      "patchline-cli-evidence-appeal-board",
+			Name:                    "Patchline CLI evidence appeal board",
+			CharterURL:              "docs/evidence-appeal-workflow.md",
+			ConflictPolicy:          "Appeal reviewers must be independent of the evidence submitter and original board approvers.",
+			Quorum:                  3,
+			MinIndependentApprovers: 2,
+		},
+		Appeals: []evidencemarketplace.AppealInput{
+			mainTestAppealInput(registry.Examples[0], preservation[registry.Examples[0].ID], "cli-appeal-accepted", "false-positive", "overturned", "upheld"),
+			mainTestAppealInput(registry.Examples[1], preservation[registry.Examples[1].ID], "cli-appeal-deprecated", "severity", "modified", "modified"),
+			mainTestAppealInput(registry.Examples[2], preservation[registry.Examples[2].ID], "cli-appeal-quarantined", "evidence-integrity", "overturned", "overturned"),
+		},
+	}
+}
+
+func mainTestAppealPreservation(t *testing.T, registry evidencemarketplace.Registry, root string) map[string][]evidencemarketplace.BoardArchivePreservation {
+	t.Helper()
+	base, err := evidencemarketplace.PublishRegistry(registry, root)
+	if err != nil {
+		t.Fatal(err)
+	}
+	out := map[string][]evidencemarketplace.BoardArchivePreservation{}
+	for _, entry := range base.ArchiveMirror.Entries {
+		out[entry.ExampleID] = append(out[entry.ExampleID], evidencemarketplace.BoardArchivePreservation{
+			ExampleID:                       entry.ExampleID,
+			ArtifactPath:                    entry.ArtifactPath,
+			MirrorPath:                      entry.MirrorPath,
+			Checksum:                        entry.Checksum,
+			WithdrawalID:                    entry.Withdrawal.WithdrawalID,
+			TombstoneRequired:               entry.Withdrawal.TombstoneRequired,
+			PreserveChecksumAfterWithdrawal: entry.Withdrawal.PreserveChecksumAfterWithdrawal,
+			ReviewRequired:                  entry.Withdrawal.ReviewRequired,
+			ReplacementAllowed:              entry.Withdrawal.ReplacementAllowed,
+		})
+	}
+	return out
+}
+
+func mainTestAppealInput(example evidencemarketplace.Example, preserved []evidencemarketplace.BoardArchivePreservation, appealID, disputeType, requested, resolved string) evidencemarketplace.AppealInput {
+	evidenceRef := preserved[0].ArtifactPath
+	checksumRef := preserved[0].Checksum
+	return evidencemarketplace.AppealInput{
+		AppealID:               appealID,
+		EvidenceID:             example.ID,
+		DisputedFinding:        "The CLI appeal fixture disputes the published migration-safety finding and requires a second review of the archived evidence.",
+		DisputeType:            disputeType,
+		SubmittedBy:            "CLI Adopter Reliability Team",
+		SubmittedAt:            "2026-06-03T12:00:00Z",
+		Rationale:              "The appeal rationale explains why the original finding should be rechecked against preserved evidence without changing the underlying archive artifact.",
+		RequestedResolution:    requested,
+		EvidenceHash:           evidencemarketplace.EvidenceHash(example),
+		CertificateSubjectHash: evidencemarketplace.ExpectedSubjectHash(example),
+		PreservedArtifacts:     preserved,
+		ReviewerRationales: []evidencemarketplace.AppealReviewerRationale{
+			{
+				Reviewer:           evidencemarketplace.BoardReviewer{Name: "CLI Appeal Ombuds", Role: "appeal-chair", Affiliation: "CLI Appeal Ombuds Office", Vote: "approve"},
+				Rationale:          "The preserved artifact path and checksum are sufficient for an independent appeal judgment.",
+				EvidenceReferences: []string{evidenceRef, checksumRef},
+			},
+			{
+				Reviewer:           evidencemarketplace.BoardReviewer{Name: "External CLI Migration Clinic", Role: "migration-reviewer", Affiliation: "External CLI Migration Clinic", Vote: "approve"},
+				Rationale:          "The redacted evidence preserves the disputed migration shape and supports a reproducible review.",
+				EvidenceReferences: []string{evidenceRef},
+			},
+			{
+				Reviewer:           evidencemarketplace.BoardReviewer{Name: "CLI Appeal Clerk", Role: "appeal-clerk", Affiliation: "Patchline Maintainers", Vote: "abstain"},
+				Rationale:          "The clerk records completeness while abstaining from the independent technical judgment.",
+				EvidenceReferences: []string{checksumRef},
+			},
+		},
+		Resolution: evidencemarketplace.AppealResolution{
+			Status:     resolved,
+			Rationale:  mainTestAppealResolutionRationale(resolved),
+			ResolvedAt: "2026-06-04T15:30:00Z",
+			Resolver:   "Patchline CLI Appeal Panel",
+			FollowUpActions: []string{
+				"Publish the appeal workflow report with the governance-board output.",
+				"Retain reviewer rationales and preserved checksums in the audit trail.",
+			},
+		},
+	}
+}
+
+func mainTestAppealResolutionRationale(status string) string {
+	switch status {
+	case "upheld":
+		return "The appeal is processed but the original governance finding remains unchanged after independent review of preserved evidence."
+	case "modified":
+		return "The appeal narrows the finding language while preserving the original evidence and reviewer rationale trail."
+	case "overturned":
+		return "The appeal overturns the disputed interpretation and records the preserved evidence needed for follow-up audit."
+	default:
+		return "The appeal records a final resolution with preserved evidence and independent reviewer rationale."
+	}
 }
 
 func mainTestFileHash(t *testing.T, path string) string {

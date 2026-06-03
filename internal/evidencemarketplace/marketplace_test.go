@@ -321,6 +321,114 @@ func TestEvaluateBoardReviewRejectsWeakOrUnsafeDecisions(t *testing.T) {
 	}
 }
 
+func TestEvaluateAppealWorkflowProcessesDisputedFindingsWithAuditTrails(t *testing.T) {
+	registry, root := validGovernanceRegistry(t)
+	boardSpec := validBoardReviewSpec(registry)
+	boardReport, err := EvaluateBoardReview(boardSpec, registry, root)
+	if err != nil {
+		t.Fatal(err)
+	}
+	spec := validAppealWorkflowSpec(t, registry, root, boardReport)
+	report, err := EvaluateAppealWorkflow(spec, registry, root, boardReport)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !report.OK || report.Summary.ProcessedAppeals != 3 || report.Summary.Upheld != 1 || report.Summary.Modified != 1 || report.Summary.Overturned != 1 {
+		t.Fatalf("unexpected appeal summary: %#v", report.Summary)
+	}
+	if report.Summary.BoardBindings != 3 || report.Summary.PreservedArtifacts != 6 || report.Summary.ReviewerRationales != 9 || report.Summary.IndependentReviews != 6 {
+		t.Fatalf("appeal workflow did not preserve evidence/reviewer audit trail: %#v", report.Summary)
+	}
+	for _, appeal := range report.Appeals {
+		if appeal.BoardDecision.EvidenceHash != appeal.EvidenceHash || appeal.BoardDecision.CertificateSubjectHash != appeal.CertificateSubjectHash {
+			t.Fatalf("appeal lost stable board binding: %#v", appeal.BoardDecision)
+		}
+		if len(appeal.PreservedArtifacts) != 2 || len(appeal.ReviewerRationales) != 3 {
+			t.Fatalf("appeal lost preserved artifacts or reviewer rationales: %#v", appeal)
+		}
+		for _, rationale := range appeal.ReviewerRationales {
+			if containsString(appeal.BoardDecision.OriginalApprovers, rationale.Reviewer.Name) {
+				t.Fatalf("appeal reviewer reused original board approver: %#v", rationale.Reviewer)
+			}
+		}
+	}
+	next, err := EvaluateAppealWorkflow(spec, registry, root, boardReport)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if next.Hash != report.Hash {
+		t.Fatalf("appeal report hash changed: got %s want %s", next.Hash, report.Hash)
+	}
+}
+
+func TestEvaluateAppealWorkflowRejectsUnsafeAppeals(t *testing.T) {
+	tests := []struct {
+		name string
+		edit func(*AppealWorkflowSpec)
+		want string
+	}{
+		{
+			name: "missing preserved artifact",
+			edit: func(spec *AppealWorkflowSpec) {
+				spec.Appeals[0].PreservedArtifacts = spec.Appeals[0].PreservedArtifacts[:1]
+			},
+			want: "preserved_artifacts must include every marketplace archive mirror entry",
+		},
+		{
+			name: "original approver reused",
+			edit: func(spec *AppealWorkflowSpec) {
+				spec.Appeals[0].ReviewerRationales[0].Reviewer.Name = "Database Reliability Guild"
+				spec.Appeals[0].ReviewerRationales[0].Reviewer.Affiliation = "Database Reliability Guild"
+			},
+			want: "appeal reviewers must be independent of original board approvers",
+		},
+		{
+			name: "private marker in resolution",
+			edit: func(spec *AppealWorkflowSpec) {
+				spec.Appeals[0].Resolution.Rationale = "The final appeal rationale accidentally includes token=not-public and must be rejected before publication."
+			},
+			want: "private marker token=",
+		},
+		{
+			name: "resolution before submission",
+			edit: func(spec *AppealWorkflowSpec) {
+				spec.Appeals[0].Resolution.ResolvedAt = "2026-05-31T00:00:00Z"
+			},
+			want: "resolution.resolved_at must not be before submitted_at",
+		},
+		{
+			name: "hash mismatch",
+			edit: func(spec *AppealWorkflowSpec) {
+				spec.Appeals[0].EvidenceHash = "sha256:0000000000000000000000000000000000000000000000000000000000000000"
+			},
+			want: "evidence_hash must match published evidence hash",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			registry, root := validGovernanceRegistry(t)
+			boardSpec := validBoardReviewSpec(registry)
+			boardReport, err := EvaluateBoardReview(boardSpec, registry, root)
+			if err != nil {
+				t.Fatal(err)
+			}
+			spec := validAppealWorkflowSpec(t, registry, root, boardReport)
+			tt.edit(&spec)
+			report, err := EvaluateAppealWorkflow(spec, registry, root, boardReport)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if report.OK {
+				t.Fatalf("expected appeal workflow to fail: %#v", report)
+			}
+			if !strings.Contains(strings.Join(appealRejectionReasons(report), "\n"), tt.want) {
+				t.Fatalf("expected rejection containing %q, got %#v", tt.want, report.Rejected)
+			}
+		})
+	}
+}
+
 func TestCertificateHashNormalizesSetLikeFields(t *testing.T) {
 	registry, _ := validRegistry(t)
 	example := registry.Examples[0]
@@ -896,6 +1004,92 @@ func boardDecisionFor(example Example, status string) BoardDecisionInput {
 	return decision
 }
 
+func validAppealWorkflowSpec(t *testing.T, registry Registry, root string, boardReport BoardReviewReport) AppealWorkflowSpec {
+	t.Helper()
+	base, err := PublishRegistry(registry, root)
+	if err != nil {
+		t.Fatal(err)
+	}
+	preservation := archivePreservationByExample(base.ArchiveMirror)
+	return AppealWorkflowSpec{
+		Version:            AppealWorkflowSpecVersion,
+		Claim:              "Patchline's evidence appeal workflow processes disputed findings without deleting the original certificate-backed evidence, requiring preserved archive artifacts, independent reviewer rationales, stable board-decision bindings, and resolution audit trails.",
+		RegistryPath:       "governance-registry.json",
+		BoardDecisionsPath: "governance-board.json",
+		Board: BoardPolicy{
+			ID:                      "patchline-evidence-appeal-board",
+			Name:                    "Patchline evidence appeal board",
+			CharterURL:              "docs/evidence-appeal-workflow.md",
+			ConflictPolicy:          "Appeal reviewers must be independent of the evidence submitter and must not reuse original board approvers for the disputed finding.",
+			Quorum:                  3,
+			MinIndependentApprovers: 2,
+		},
+		Appeals: []AppealInput{
+			appealFor(boardReport.Decisions[0], registry.Examples[0], preservation[registry.Examples[0].ID], "appeal-accepted-backfill", "false-positive", "overturned", "upheld"),
+			appealFor(boardReport.Decisions[1], registry.Examples[1], preservation[registry.Examples[1].ID], "appeal-deprecated-nullability", "severity", "modified", "modified"),
+			appealFor(boardReport.Decisions[2], registry.Examples[2], preservation[registry.Examples[2].ID], "appeal-quarantined-replica-lag", "evidence-integrity", "overturned", "overturned"),
+		},
+	}
+}
+
+func appealFor(_ BoardDecisionReport, example Example, preserved []BoardArchivePreservation, appealID, disputeType, requested, resolved string) AppealInput {
+	evidenceRef := preserved[0].ArtifactPath
+	checksumRef := preserved[0].Checksum
+	return AppealInput{
+		AppealID:               appealID,
+		EvidenceID:             example.ID,
+		DisputedFinding:        "The appellant disputes the published migration-safety finding and asks reviewers to re-check the redacted evidence trail, certificate hash, and governance rationale.",
+		DisputeType:            disputeType,
+		SubmittedBy:            "Independent Adopter Reliability Team",
+		SubmittedAt:            "2026-06-03T12:00:00Z",
+		Rationale:              "The appeal supplies a public-safe rationale explaining why the original finding may overstate, understate, or mischaracterize the migration hazard without altering the archived evidence.",
+		RequestedResolution:    requested,
+		EvidenceHash:           EvidenceHash(example),
+		CertificateSubjectHash: ExpectedSubjectHash(example),
+		PreservedArtifacts:     preserved,
+		ReviewerRationales: []AppealReviewerRationale{
+			{
+				Reviewer:           BoardReviewer{Name: "Appeal Evidence Ombuds", Role: "appeal-chair", Affiliation: "Appeal Evidence Ombuds Office", Vote: "approve"},
+				Rationale:          "The preserved archive entry and checksum support an independent appeal judgment without depending on mutable marketplace metadata.",
+				EvidenceReferences: []string{evidenceRef, checksumRef},
+			},
+			{
+				Reviewer:           BoardReviewer{Name: "External Migration Review Clinic", Role: "migration-reviewer", Affiliation: "External Migration Review Clinic", Vote: "approve"},
+				Rationale:          "The cited redacted artifact preserves enough migration structure to evaluate the disputed finding and resolution request.",
+				EvidenceReferences: []string{evidenceRef},
+			},
+			{
+				Reviewer:           BoardReviewer{Name: "Patchline Appeal Clerk", Role: "appeal-clerk", Affiliation: "Patchline Maintainers", Vote: "abstain"},
+				Rationale:          "The clerk confirms the appeal package is complete while abstaining from the independent technical judgment.",
+				EvidenceReferences: []string{checksumRef},
+			},
+		},
+		Resolution: AppealResolution{
+			Status:     resolved,
+			Rationale:  appealResolutionRationale(resolved),
+			ResolvedAt: "2026-06-04T15:30:00Z",
+			Resolver:   "Patchline Appeal Resolution Panel",
+			FollowUpActions: []string{
+				"Publish the signed appeal report next to the governance-board report.",
+				"Retain all preserved artifact checksums and reviewer rationales in the public audit trail.",
+			},
+		},
+	}
+}
+
+func appealResolutionRationale(status string) string {
+	switch status {
+	case "upheld":
+		return "The appeal is upheld as a valid process but the original finding remains unchanged because preserved evidence still supports the board decision."
+	case "modified":
+		return "The appeal modifies the finding language to narrow severity while preserving the original evidence and reviewer rationale trail."
+	case "overturned":
+		return "The appeal overturns the active interpretation of the finding and records the preserved evidence needed for future audit."
+	default:
+		return "The appeal resolution records a final outcome with preserved evidence and independent reviewer rationale."
+	}
+}
+
 func writeFile(t *testing.T, root, rel, content string) {
 	t.Helper()
 	path := filepath.Join(root, filepath.FromSlash(rel))
@@ -931,6 +1125,23 @@ func boardRejectionReasons(report BoardReviewReport) []string {
 		out = append(out, rejected.Reasons...)
 	}
 	return out
+}
+
+func appealRejectionReasons(report AppealWorkflowReport) []string {
+	var out []string
+	for _, rejected := range report.Rejected {
+		out = append(out, rejected.Reasons...)
+	}
+	return out
+}
+
+func containsString(values []string, want string) bool {
+	for _, value := range values {
+		if value == want {
+			return true
+		}
+	}
+	return false
 }
 
 func assertStableReportHash(t *testing.T, registry Registry, root string, want string) {

@@ -1,0 +1,259 @@
+{
+  "version": "patchline.evidence-appeal-workflow/v1",
+  "claim": "Patchline's evidence appeal workflow processes disputed findings without deleting the original certificate-backed evidence, requiring preserved archive artifacts, independent reviewer rationales, stable governance-board bindings, and resolution audit trails.",
+  "registry_path": "governance-registry.json",
+  "board_decisions_path": "governance-board.json",
+  "board": {
+    "id": "patchline-evidence-appeal-board",
+    "name": "Patchline evidence appeal board",
+    "charter_url": "docs/evidence-appeal-workflow.md",
+    "conflict_policy": "Appeal reviewers must be independent of the evidence submitter and must not reuse original board approvers for the disputed finding.",
+    "quorum": 3,
+    "min_independent_approvers": 2
+  },
+  "appeals": [
+    {
+      "appeal_id": "appeal-rails-backfill-upheld",
+      "evidence_id": "redacted-rails-backfill-guard",
+      "disputed_finding": "The appellant disputes the Rails backfill finding and asks reviewers to re-check the redacted evidence trail, certificate hash, and governance rationale.",
+      "dispute_type": "false-positive",
+      "submitted_by": "Independent Adopter Reliability Team",
+      "submitted_at": "2026-06-03T12:00:00Z",
+      "rationale": "The appeal supplies a public-safe rationale explaining why the original finding may overstate the migration hazard without altering the archived evidence.",
+      "requested_resolution": "overturned",
+      "evidence_hash": "sha256:417a072130fcd660a5f99e309a8825eb88e8e0d593ccd4835a10c8c849fe4fcb",
+      "certificate_subject_hash": "sha256:c791b7e2986a194402b75023aaff4658ced7416c82f00be1aa0ed7738e57145f",
+      "preserved_artifacts": [
+        {
+          "example_id": "redacted-rails-backfill-guard",
+          "artifact_path": "artifacts/rails-backfill-certificate.json",
+          "mirror_path": "archive/sha256/0895d03a2b4490a6b6137899138258e1a31794862c8b389c38040812fffe147d",
+          "checksum": "sha256:0895d03a2b4490a6b6137899138258e1a31794862c8b389c38040812fffe147d",
+          "withdrawal_id": "sha256:fd99165bd8b4c44c439d833168463b4493f6b54d544ad50a3175914d2735da89",
+          "tombstone_required": true,
+          "preserve_checksum_after_withdrawal": true,
+          "review_required": true,
+          "replacement_allowed": true
+        },
+        {
+          "example_id": "redacted-rails-backfill-guard",
+          "artifact_path": "artifacts/rails-backfill-hazard.json",
+          "mirror_path": "archive/sha256/8f73b4b1e2f67a038343b53f43cee512266c5ef3d19b407753d0787e319341ba",
+          "checksum": "sha256:8f73b4b1e2f67a038343b53f43cee512266c5ef3d19b407753d0787e319341ba",
+          "withdrawal_id": "sha256:6312036e1c2ef19dbd51b7d91ea7603dd5908caa460a9f2820cf746c390f37ef",
+          "tombstone_required": true,
+          "preserve_checksum_after_withdrawal": true,
+          "review_required": true,
+          "replacement_allowed": true
+        }
+      ],
+      "reviewer_rationales": [
+        {
+          "reviewer": {
+            "name": "Appeal Evidence Ombuds",
+            "role": "appeal-chair",
+            "affiliation": "Appeal Evidence Ombuds Office",
+            "conflict_disclosed": false,
+            "vote": "approve"
+          },
+          "rationale": "The preserved archive entry and checksum support an independent appeal judgment without depending on mutable marketplace metadata.",
+          "evidence_references": ["artifacts/rails-backfill-hazard.json", "sha256:8f73b4b1e2f67a038343b53f43cee512266c5ef3d19b407753d0787e319341ba"]
+        },
+        {
+          "reviewer": {
+            "name": "External Migration Review Clinic",
+            "role": "migration-reviewer",
+            "affiliation": "External Migration Review Clinic",
+            "conflict_disclosed": false,
+            "vote": "approve"
+          },
+          "rationale": "The cited redacted artifact preserves enough migration structure to evaluate the disputed finding and resolution request.",
+          "evidence_references": ["artifacts/rails-backfill-hazard.json"]
+        },
+        {
+          "reviewer": {
+            "name": "Patchline Appeal Clerk",
+            "role": "appeal-clerk",
+            "affiliation": "Patchline Maintainers",
+            "conflict_disclosed": false,
+            "vote": "abstain"
+          },
+          "rationale": "The clerk confirms the appeal package is complete while abstaining from the independent technical judgment.",
+          "evidence_references": ["sha256:8f73b4b1e2f67a038343b53f43cee512266c5ef3d19b407753d0787e319341ba"]
+        }
+      ],
+      "resolution": {
+        "status": "upheld",
+        "rationale": "The appeal is processed, but the original finding remains unchanged because preserved evidence still supports the board decision.",
+        "resolved_at": "2026-06-04T15:30:00Z",
+        "resolver": "Patchline Appeal Resolution Panel",
+        "follow_up_actions": [
+          "Publish the signed appeal report next to the governance-board report.",
+          "Retain all preserved artifact checksums and reviewer rationales in the public audit trail."
+        ]
+      }
+    },
+    {
+      "appeal_id": "appeal-django-nullability-modified",
+      "evidence_id": "redacted-django-nullability-backfill",
+      "disputed_finding": "The appellant disputes the Django nullability finding and asks reviewers to re-check severity wording against the redacted evidence trail.",
+      "dispute_type": "severity",
+      "submitted_by": "Independent Adopter Reliability Team",
+      "submitted_at": "2026-06-03T12:10:00Z",
+      "rationale": "The appeal supplies a public-safe rationale explaining why the original deprecated finding should be narrowed without changing the archived artifact.",
+      "requested_resolution": "modified",
+      "evidence_hash": "sha256:4b8a7c7a578da1f1f4426aa4fd8f8ed08863ba083510ff4ed8b15f38e749322f",
+      "certificate_subject_hash": "sha256:7dfb658cddbbb31b27a4cb837be53746c79e2ea4f5766a5bbc41b6bb9b01421e",
+      "preserved_artifacts": [
+        {
+          "example_id": "redacted-django-nullability-backfill",
+          "artifact_path": "artifacts/django-nullability-certificate.json",
+          "mirror_path": "archive/sha256/8cd73b67f6e679f640e273675ad5f60159a24e1af36691114dcb9ac711fb911f",
+          "checksum": "sha256:8cd73b67f6e679f640e273675ad5f60159a24e1af36691114dcb9ac711fb911f",
+          "withdrawal_id": "sha256:d31282a7d31ea7ab2fb30e50ab86a71e886f261df5dad4ae4aa14211a7629355",
+          "tombstone_required": true,
+          "preserve_checksum_after_withdrawal": true,
+          "review_required": true,
+          "replacement_allowed": true
+        },
+        {
+          "example_id": "redacted-django-nullability-backfill",
+          "artifact_path": "artifacts/django-nullability-hazard.json",
+          "mirror_path": "archive/sha256/05a0a800053837c44d8a09757c1087e3c3e3bc9884e64aca25277d40387b0ad1",
+          "checksum": "sha256:05a0a800053837c44d8a09757c1087e3c3e3bc9884e64aca25277d40387b0ad1",
+          "withdrawal_id": "sha256:825393fff8807165d7748522fc59cc03088c452f9c56c3adbfb5dee74e78ad43",
+          "tombstone_required": true,
+          "preserve_checksum_after_withdrawal": true,
+          "review_required": true,
+          "replacement_allowed": true
+        }
+      ],
+      "reviewer_rationales": [
+        {
+          "reviewer": {
+            "name": "Appeal Evidence Ombuds",
+            "role": "appeal-chair",
+            "affiliation": "Appeal Evidence Ombuds Office",
+            "conflict_disclosed": false,
+            "vote": "approve"
+          },
+          "rationale": "The preserved archive entry and checksum support a narrower severity statement without changing the evidence record.",
+          "evidence_references": ["artifacts/django-nullability-hazard.json", "sha256:05a0a800053837c44d8a09757c1087e3c3e3bc9884e64aca25277d40387b0ad1"]
+        },
+        {
+          "reviewer": {
+            "name": "External Migration Review Clinic",
+            "role": "migration-reviewer",
+            "affiliation": "External Migration Review Clinic",
+            "conflict_disclosed": false,
+            "vote": "approve"
+          },
+          "rationale": "The cited redacted artifact preserves migration ordering and supports a modified rather than deleted finding.",
+          "evidence_references": ["artifacts/django-nullability-hazard.json"]
+        },
+        {
+          "reviewer": {
+            "name": "Patchline Appeal Clerk",
+            "role": "appeal-clerk",
+            "affiliation": "Patchline Maintainers",
+            "conflict_disclosed": false,
+            "vote": "abstain"
+          },
+          "rationale": "The clerk confirms the appeal package is complete while abstaining from the independent technical judgment.",
+          "evidence_references": ["sha256:05a0a800053837c44d8a09757c1087e3c3e3bc9884e64aca25277d40387b0ad1"]
+        }
+      ],
+      "resolution": {
+        "status": "modified",
+        "rationale": "The appeal modifies the finding language to narrow severity while preserving the original evidence and reviewer rationale trail.",
+        "resolved_at": "2026-06-04T15:40:00Z",
+        "resolver": "Patchline Appeal Resolution Panel",
+        "follow_up_actions": [
+          "Publish the modified finding language with the appeal report.",
+          "Keep the deprecated evidence tombstone and checksum references intact."
+        ]
+      }
+    },
+    {
+      "appeal_id": "appeal-sqlalchemy-replication-overturned",
+      "evidence_id": "redacted-sqlalchemy-replication-lag",
+      "disputed_finding": "The appellant disputes the SQLAlchemy replica-lag finding and asks reviewers to re-check source-host provenance against preserved evidence.",
+      "dispute_type": "evidence-integrity",
+      "submitted_by": "Independent Adopter Reliability Team",
+      "submitted_at": "2026-06-03T12:20:00Z",
+      "rationale": "The appeal supplies a public-safe rationale explaining why the quarantined interpretation should be overturned while retaining the archived proof.",
+      "requested_resolution": "overturned",
+      "evidence_hash": "sha256:fd5add86bb7acde219ff9584fc6acc6ada65a5b278e4d434403912671b87e5aa",
+      "certificate_subject_hash": "sha256:ea28e00ecf69d7856a4ad52f515f94e172f380d44cb85726f005e2cf2b4195e3",
+      "preserved_artifacts": [
+        {
+          "example_id": "redacted-sqlalchemy-replication-lag",
+          "artifact_path": "artifacts/sqlalchemy-replication-certificate.json",
+          "mirror_path": "archive/sha256/6bf743a7b41a2f7f0259e92fbad6caefda5206bfa99505f7d725ea6ed1d5e755",
+          "checksum": "sha256:6bf743a7b41a2f7f0259e92fbad6caefda5206bfa99505f7d725ea6ed1d5e755",
+          "withdrawal_id": "sha256:52e57ee06e0f2c5d46c2726ad24223c29411443b87443c7c44e633d9545d22d2",
+          "tombstone_required": true,
+          "preserve_checksum_after_withdrawal": true,
+          "review_required": true,
+          "replacement_allowed": true
+        },
+        {
+          "example_id": "redacted-sqlalchemy-replication-lag",
+          "artifact_path": "artifacts/sqlalchemy-replication-hazard.json",
+          "mirror_path": "archive/sha256/634803700a123ca81ad866cbcedea25dc0b6bf6bee68fc4cdd1bc71bd5936fea",
+          "checksum": "sha256:634803700a123ca81ad866cbcedea25dc0b6bf6bee68fc4cdd1bc71bd5936fea",
+          "withdrawal_id": "sha256:2f0f9997c910dbedb64bc1e6f646c5dd2434b4aae1b56222b6945e441d211982",
+          "tombstone_required": true,
+          "preserve_checksum_after_withdrawal": true,
+          "review_required": true,
+          "replacement_allowed": true
+        }
+      ],
+      "reviewer_rationales": [
+        {
+          "reviewer": {
+            "name": "Appeal Evidence Ombuds",
+            "role": "appeal-chair",
+            "affiliation": "Appeal Evidence Ombuds Office",
+            "conflict_disclosed": false,
+            "vote": "approve"
+          },
+          "rationale": "The preserved archive entry and checksum support overturning the active interpretation while keeping the evidence auditable.",
+          "evidence_references": ["artifacts/sqlalchemy-replication-hazard.json", "sha256:634803700a123ca81ad866cbcedea25dc0b6bf6bee68fc4cdd1bc71bd5936fea"]
+        },
+        {
+          "reviewer": {
+            "name": "External Migration Review Clinic",
+            "role": "migration-reviewer",
+            "affiliation": "External Migration Review Clinic",
+            "conflict_disclosed": false,
+            "vote": "approve"
+          },
+          "rationale": "The cited redacted artifact preserves the disputed replica-lag cue and supports an overturned interpretation.",
+          "evidence_references": ["artifacts/sqlalchemy-replication-hazard.json"]
+        },
+        {
+          "reviewer": {
+            "name": "Patchline Appeal Clerk",
+            "role": "appeal-clerk",
+            "affiliation": "Patchline Maintainers",
+            "conflict_disclosed": false,
+            "vote": "abstain"
+          },
+          "rationale": "The clerk confirms the appeal package is complete while abstaining from the independent technical judgment.",
+          "evidence_references": ["sha256:634803700a123ca81ad866cbcedea25dc0b6bf6bee68fc4cdd1bc71bd5936fea"]
+        }
+      ],
+      "resolution": {
+        "status": "overturned",
+        "rationale": "The appeal overturns the active interpretation of the finding and records the preserved evidence needed for future audit.",
+        "resolved_at": "2026-06-04T15:50:00Z",
+        "resolver": "Patchline Appeal Resolution Panel",
+        "follow_up_actions": [
+          "Publish the overturned interpretation with the appeal report.",
+          "Preserve the quarantine tombstone and checksum references for historical audit."
+        ]
+      }
+    }
+  ]
+}

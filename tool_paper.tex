@@ -67,7 +67,8 @@ prevalence accounting, mirrors every accepted artifact by checksum with license 
 and imports only prevalence representatives into runnable benchmarks while recording submitter labels as
 untrusted and deriving cases from independent redacted evidence cues;
 a shared-evidence governance board then accepts, deprecates, or quarantines published records only after
-quorum, conflict checks, hash binding, and archive-preserving tombstones;
+quorum, conflict checks, hash binding, and archive-preserving tombstones, and an appeal workflow resolves
+disputed findings with preserved evidence, independent reviewer rationales, and resolution audit trails;
 the same marketplace now hosts a public adversarial-migration challenge whose certificate-bound,
 public-safe submissions are scored from verified artifacts, analyzer behavior, minimization, novelty,
 and responsible disclosure; private adopters can then run federated benchmark splits locally and publish only signed,
@@ -147,7 +148,7 @@ ranks the risks, and prints the next commands that can run immediately.
   \item A \textbf{gate-backed reproducibility and evaluation methodology}---over 611 gates, blinded
   false-positive adjudication, seeded false-negative recall, ablations, standardized effect sizes,
   severity calibration, a duplicate-safe certificate-backed public evidence marketplace, deterministic
-  governance-board lifecycle decisions, adversarial-challenge scoring, signed federated benchmark
+  governance-board lifecycle decisions, hash-bound appeal resolution, adversarial-challenge scoring, signed federated benchmark
   aggregates for private adopters, and accountable-use mappings from autonomous or blocking capabilities
   to required human oversight---designed for artifact
   evaluation and best-paper-grade rigor
@@ -261,6 +262,9 @@ entries without trusting submitter labels. & \code{challenge.json}, \code{challe
 \code{evidence-marketplace govern} & Accept, deprecate, or quarantine already-published shared
 evidence only after quorum, independent non-conflicted approvals, evidence/certificate hash binding,
 and archive-preserving tombstones are verified. & \code{governance-board.json}, \code{.md} \\
+\code{evidence-marketplace appeal} & Resolve disputed findings by binding appeals to published evidence,
+certificate hashes, governance-board decisions, preserved archive mirror entries, independent reviewer
+rationales, and final upheld/modified/overturned audit trails. & \code{appeal-workflow.json}, \code{.md} \\
 \code{artifact-benchmark federated-split/run/verify} & Validate an adopter-local private benchmark
 partition, execute it locally, suppress below-threshold metric buckets, and publish only a signed
 aggregate bound to the manifest and salted split commitments. & local \code{split.json}, public
@@ -869,6 +873,14 @@ one deprecated with a replacement, and one quarantined while four archive artifa
 checksum-preserved. Its negative controls prove weak quorum, conflicted approval, and missing tombstone
 preservation are rejected.
 
+Appeals extend that lifecycle without rewriting history. The \code{evidence-marketplace appeal} command
+loads the same registry and governance-board spec, then requires each disputed finding to preserve every
+archive mirror entry for the evidence, cite those entries from independent reviewer rationales, exclude
+original board approvers from appeal approval, and record a final upheld, modified, or overturned
+resolution after the submission time. The \gate{evidence-appeal-workflow-gate} processes three appeals
+with six preserved artifacts and nine reviewer rationales, then proves that missing preservation, reused
+original approvers, and private markers in resolution text are rejected.
+
 The same machinery now publishes an adversarial challenge track without weakening the marketplace's
 privacy contract. A challenge entry must carry a conditional
 \code{responsible-disclosure-cleared} certificate obligation, reference only public-safe redacted proof
@@ -992,6 +1004,7 @@ owner-routed rollback playbooks for broad writes & \gate{remediation-playbook-ga
 9 paired maintainer reviews; 38.55\% faster with full uncertainty recall; hidden-control refuted & \gate{maintainer-acceptance-study-gate} \\
 2 public-release-eligible examples with reviewable gate reputation, duplicate-collapsed prevalence, and 4 mirrored artifacts imported into runnable benchmarks; corrupted certificate rejected & \gate{evidence-marketplace-gate} \\
 1 accepted, 1 deprecated, and 1 quarantined shared-evidence record; 4 archive artifacts preserved with tombstones; weak quorum/conflict/missing-tombstone controls rejected & \gate{evidence-governance-board-gate} \\
+3 disputed findings resolved with 6 preserved artifacts, 9 reviewer rationales, and controls for missing preservation, original approver reuse, and private markers & \gate{evidence-appeal-workflow-gate} \\
 2 public-safe adversarial migrations scored from verified artifacts and analyzer-backed high-risk proofs; embargoed publication refuted & \gate{adversarial-challenge-gate} \\
 3 private benchmark cases published as signed aggregate-only metrics; tampering/leakage rejected & \gate{federated-benchmark-split-gate} \\
 3 payout-approved minimized false-negative/ecosystem-gap bounty reproductions; unsupported bounty rejected & \gate{open-problem-bounty-board-gate} \\
@@ -1483,9 +1496,9 @@ evidence. The remaining frontier is not another isolated detector; it is the tra
 generational artifact to shared infrastructure. The open roadmap items around this transition include:
 production-grade remediation loops for rollback, repair escrow, and patch-series safety; a
 federated, checksum-mirrored, withdrawal-aware, challenge-ready public evidence marketplace with
-externally adopted governance; deeper rollback, query-plan, data-volume, and engine-negative-control semantics
+externally adopted governance and appeal audit trails; deeper rollback, query-plan, data-volume, and engine-negative-control semantics
 on top of the new versioned production-database profiles;
-socio-technical accountability beyond the new accountable-use mapping, including appeals, fairness,
+socio-technical accountability beyond the new accountable-use mapping, including fairness,
 ethics, and detector deprecation; education and
 certification materials that make migration safety teachable; resilient offline, edge, confidential,
 and disaster-recovery deployments; and an award-to-standard transition that externalizes benchmarks,
@@ -1700,7 +1713,7 @@ Generalization & \code{framework-holdout-gate}, \code{perturbation-robustness-ga
 \code{historical-replay-study-gate}, \code{external-replication-kit-gate} \\
 Trust stack & \code{signed-provenance-chain-gate}, \code{reproducible-build-attestation-gate},
 \code{merkle-audit-log-gate}, \code{sbom-pinned-deps-gate}, \code{red-team-adversarial-gate},
-\code{evidence-governance-board-gate} \\
+\code{evidence-governance-board-gate}, \code{evidence-appeal-workflow-gate} \\
 Reviewer \& community & \code{quickstart-sixty-seconds-gate}, \code{inline-review-surface-gate},
 \code{ci-pr-bot-gate}, \code{governance-policy-gate}, \code{citation-doi-gate} \\
 Research frontier & \code{learned-risk-model-gate}, \code{neuro-symbolic-verdict-gate},

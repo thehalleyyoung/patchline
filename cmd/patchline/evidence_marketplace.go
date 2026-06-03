@@ -10,7 +10,7 @@ import (
 
 func evidenceMarketplaceCommand(args []string) error {
 	if len(args) == 0 {
-		return errors.New("usage: patchline evidence-marketplace <publish|challenge|govern> (--registry registry.json | --spec governance-board.json) --out dir [--json]")
+		return errors.New("usage: patchline evidence-marketplace <publish|challenge|govern|appeal> (--registry registry.json | --spec spec.json) --out dir [--json]")
 	}
 	switch args[0] {
 	case "publish":
@@ -19,6 +19,8 @@ func evidenceMarketplaceCommand(args []string) error {
 		return evidenceMarketplaceChallenge(args[1:], hasFlag(args[1:], "--json"))
 	case "govern":
 		return evidenceMarketplaceGovern(args[1:], hasFlag(args[1:], "--json"))
+	case "appeal":
+		return evidenceMarketplaceAppeal(args[1:], hasFlag(args[1:], "--json"))
 	default:
 		return fmt.Errorf("unknown evidence-marketplace command %q", args[0])
 	}
@@ -80,6 +82,36 @@ func evidenceMarketplaceGovern(args []string, jsonOut bool) error {
 	}
 	if !jsonOut {
 		fmt.Printf("governed shared evidence: %d accepted, %d deprecated, %d quarantined in %s\n", report.Summary.Accepted, report.Summary.Deprecated, report.Summary.Quarantined, outPath)
+	}
+	return nil
+}
+
+func evidenceMarketplaceAppeal(args []string, jsonOut bool) error {
+	specPath, ok := flagValue(args, "--spec")
+	if !ok || specPath == "" {
+		return errors.New("usage: patchline evidence-marketplace appeal --spec appeal-workflow.json --out dir [--json]")
+	}
+	outPath, ok := flagValue(args, "--out")
+	if !ok || outPath == "" {
+		return errors.New("usage: patchline evidence-marketplace appeal --spec appeal-workflow.json --out dir [--json]")
+	}
+	report, err := evidencemarketplace.EvaluateAppealWorkflowFile(specPath)
+	if err != nil {
+		return err
+	}
+	if err := evidencemarketplace.WriteAppealWorkflowReport(outPath, report); err != nil {
+		return err
+	}
+	if jsonOut {
+		if err := writeJSON(os.Stdout, report); err != nil {
+			return err
+		}
+	}
+	if !report.OK {
+		return codedError{code: 2, err: fmt.Errorf("evidence appeal workflow rejected %d appeal(s)", report.Summary.Rejected)}
+	}
+	if !jsonOut {
+		fmt.Printf("processed %d evidence appeal(s): %d upheld, %d modified, %d overturned in %s\n", report.Summary.ProcessedAppeals, report.Summary.Upheld, report.Summary.Modified, report.Summary.Overturned, outPath)
 	}
 	return nil
 }
