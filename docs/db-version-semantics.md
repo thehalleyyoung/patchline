@@ -13,6 +13,8 @@ go run ./cmd/patchline db-semantics \
   --json
 ```
 
+`db-semantics-reproducibility` aggregates those per-engine JSON reports into a reviewer-facing artifact that pins the resolved engine versions, local engine/emulator image references where available, embedded or managed-service profiles where no ordinary engine image exists, and the observed profile/rule/lock/rollback/query-plan/runtime/replication/partition evidence rows that came from the generated reports.
+
 The gate demonstrates version-specific behavior with real code:
 
 - PostgreSQL 10 flags `ADD COLUMN ... DEFAULT` as a table rewrite, while PostgreSQL 11+ records metadata-only default semantics.
@@ -33,4 +35,5 @@ make db-version-semantics-gate
 make db-rollback-feasibility-gate
 make query-plan-regression-gate
 make data-volume-runtime-gate
+make db-semantics-reproducibility-gate
 ```

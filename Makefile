@@ -1375,6 +1375,10 @@ evidence-governance-board-gate:
 db-version-semantics-gate:
 	bash scripts/db-version-semantics-gate.sh
 
+.PHONY: db-semantics-reproducibility-gate
+db-semantics-reproducibility-gate:
+	bash scripts/db-version-semantics-gate.sh
+
 .PHONY: online-schema-change-adapters-gate
 online-schema-change-adapters-gate:
 	bash scripts/online-schema-change-adapters-gate.sh

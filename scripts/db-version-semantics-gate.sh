@@ -42,6 +42,40 @@ if go run ./cmd/patchline db-semantics --engine toydb --version 1 --sql "$SQL" -
   exit 1
 fi
 
+repro_args=(
+  --report "$OUT/postgres10.json"
+  --report "$OUT/postgres15.json"
+  --report "$OUT/mysql57.json"
+  --report "$OUT/mysql80.json"
+  --report "$OUT/sqlite345.json"
+  --report "$OUT/sqlserver2022.json"
+  --report "$OUT/oracle23.json"
+  --report "$OUT/bigquery2024.json"
+  --report "$OUT/snowflake820.json"
+  --report "$OUT/clickhouse241.json"
+)
+go run ./cmd/patchline db-semantics-reproducibility "${repro_args[@]}" \
+  --out "$OUT/reproducibility-report.json" \
+  --markdown "$OUT/reproducibility-report.md" \
+  --json > "$OUT/reproducibility-report.stdout.json"
+
+jq -e '
+  .version == "patchline.db-semantics-reproducibility/v1" and
+  .summary.engines == 8 and
+  .summary.engine_version_pins == 10 and
+  .summary.container_images >= 8 and
+  .summary.profile_evidence >= 8 and
+  .summary.lock_simulations >= 10 and
+  .summary.container_smoke_fixtures >= 10 and
+  .summary.engine_negative_controls >= 4 and
+  (.hash|length) > 20 and
+  any(.engine_pins[]; .engine=="postgres" and .resolved_version=="15" and .container_image=="postgres:15") and
+  any(.engine_pins[]; .engine=="clickhouse" and .container_image=="clickhouse/clickhouse-server:24.1") and
+  any(.observations[]; .observation_kind=="engine_negative_control" and .rule_id=="postgres.pre11_table_rewrite_default") and
+  any(.observations[]; .observation_kind=="rollback_feasibility") and
+  any(.observations[]; .observation_kind=="query_plan_regression")
+' "$OUT/reproducibility-report.json" > /dev/null
+
 jq -n \
   --slurpfile pg10 "$OUT/postgres10.json" \
   --slurpfile pg15 "$OUT/postgres15.json" \
@@ -53,13 +87,14 @@ jq -n \
   --slurpfile bigquery "$OUT/bigquery2024.json" \
   --slurpfile snowflake "$OUT/snowflake820.json" \
   --slurpfile clickhouse "$OUT/clickhouse241.json" \
-  '{version:"patchline.db-version-semantics-gate/v1", ok:true, engines:["postgres","mysql","sqlite","sqlserver","oracle","bigquery","snowflake","clickhouse"], reports:[$pg10[0].hash,$pg15[0].hash,$mysql57[0].hash,$mysql80[0].hash,$sqlite[0].hash,$sqlserver[0].hash,$oracle[0].hash,$bigquery[0].hash,$snowflake[0].hash,$clickhouse[0].hash], engine_negative_controls:($pg15[0].summary.engine_negative_controls + $mysql80[0].summary.engine_negative_controls + $sqlserver[0].summary.engine_negative_controls), unsupported_engine_rejected:true}' \
+  --slurpfile repro "$OUT/reproducibility-report.json" \
+  '{version:"patchline.db-version-semantics-gate/v1", ok:true, engines:["postgres","mysql","sqlite","sqlserver","oracle","bigquery","snowflake","clickhouse"], reports:[$pg10[0].hash,$pg15[0].hash,$mysql57[0].hash,$mysql80[0].hash,$sqlite[0].hash,$sqlserver[0].hash,$oracle[0].hash,$bigquery[0].hash,$snowflake[0].hash,$clickhouse[0].hash], engine_negative_controls:($pg15[0].summary.engine_negative_controls + $mysql80[0].summary.engine_negative_controls + $sqlserver[0].summary.engine_negative_controls), reproducibility_report:$repro[0].hash, reproducibility_observations:$repro[0].summary.observations, unsupported_engine_rejected:true}' \
   > "$OUT/gate-summary.json"
 
 cat > "$OUT/README.md" <<'EOF'
 # Database version semantics gate
 
-This gate evaluates one real SQL fixture across PostgreSQL, MySQL, SQLite, SQL Server, Oracle, BigQuery, Snowflake, and ClickHouse profiles. It proves that version-specific rules change verdicts, that safe-looking or lower-impact migrations carry computed unsafe counter-profile controls, that cloud/analytical engines carry distinct replacement or async-mutation semantics, and that an unsupported engine is rejected.
+This gate evaluates one real SQL fixture across PostgreSQL, MySQL, SQLite, SQL Server, Oracle, BigQuery, Snowflake, and ClickHouse profiles. It proves that version-specific rules change verdicts, that safe-looking or lower-impact migrations carry computed unsafe counter-profile controls, that cloud/analytical engines carry distinct replacement or async-mutation semantics, that an unsupported engine is rejected, and that the database-semantics reproducibility report pins engine runtimes/images plus observed behavioral evidence from the generated reports.
 EOF
 
-echo "db-version-semantics gate passed: 8 engines, version-specific verdicts, engine negative controls, unsupported engine rejected"
+echo "db-version-semantics gate passed: 8 engines, version-specific verdicts, engine negative controls, reproducibility report, unsupported engine rejected"

@@ -1,6 +1,7 @@
 package main
 
 import (
+	"os"
 	"path/filepath"
 	"testing"
 
@@ -133,6 +134,50 @@ func TestDBSemanticsCommandWritesRuntimeEstimateFromTableHints(t *testing.T) {
 	}
 }
 
+func TestDBSemanticsReproducibilityCommandWritesPinnedEvidenceReport(t *testing.T) {
+	root := t.TempDir()
+	reportsDir := filepath.Join(root, "reports")
+	cases := []struct {
+		name    string
+		engine  string
+		version string
+		sql     string
+	}{
+		{"postgres", "postgres", "16", "CREATE INDEX CONCURRENTLY idx_accounts_status ON accounts(status);"},
+		{"mysql", "mysql", "8.0.34", "ALTER TABLE accounts ADD COLUMN status varchar(20) DEFAULT 'active';"},
+		{"sqlite", "sqlite", "3.45.1", "PRAGMA foreign_keys = OFF;"},
+		{"sqlserver", "sqlserver", "2022", "CREATE INDEX idx_accounts_status ON accounts(status) WITH (ONLINE=ON);"},
+		{"oracle", "oracle", "23", "ALTER TABLE accounts MODIFY status NOT NULL;"},
+		{"bigquery", "bigquery", "2024.2", "CREATE OR REPLACE TABLE analytics.daily AS SELECT * FROM analytics.stage;"},
+		{"snowflake", "snowflake", "8.20", "CREATE OR REPLACE TABLE analytics.daily AS SELECT * FROM analytics.stage;"},
+		{"clickhouse", "clickhouse", "24.1", "ALTER TABLE events DELETE WHERE created_at < now() - interval 30 day;"},
+	}
+	for _, tc := range cases {
+		sqlPath := filepath.Join(root, tc.name+".sql")
+		writeMainTestFile(t, root, tc.name+".sql", tc.sql)
+		reportPath := filepath.Join(reportsDir, tc.name+".json")
+		if err := run([]string{"db-semantics", "--engine", tc.engine, "--version", tc.version, "--sql", sqlPath, "--out", reportPath, "--json"}); err != nil {
+			t.Fatalf("%s db-semantics command failed: %v", tc.name, err)
+		}
+	}
+	outPath := filepath.Join(root, "repro.json")
+	mdPath := filepath.Join(root, "repro.md")
+	if err := run([]string{"db-semantics-reproducibility", "--reports", reportsDir, "--out", outPath, "--markdown", mdPath, "--json"}); err != nil {
+		t.Fatalf("db-semantics reproducibility command failed: %v", err)
+	}
+	var report dbsemantics.ReproducibilityReport
+	readMainTestJSON(t, outPath, &report)
+	if report.Summary.Engines != 8 || report.Summary.ContainerImages < 5 || report.Summary.Observations < 40 {
+		t.Fatalf("unexpected reproducibility summary: %#v", report.Summary)
+	}
+	if !mainDBSemanticsReproHasImage(report, "postgres:16") || !mainDBSemanticsReproHasObservation(report, "engine_negative_control") {
+		t.Fatalf("expected pinned image and negative-control evidence, got pins=%#v observations=%#v", report.EnginePins, report.Observations)
+	}
+	if stat, err := os.Stat(mdPath); err != nil || stat.Size() == 0 {
+		t.Fatalf("expected markdown report, stat=%#v err=%v", stat, err)
+	}
+}
+
 func TestDBSemanticsCommandRejectsUnknownEngine(t *testing.T) {
 	err := run([]string{"db-semantics", "--engine", "toydb", "--version", "1", "--sql", "select 1;", "--json"})
 	if err == nil {
@@ -146,6 +191,24 @@ func mainDBSemanticsHasRule(report dbsemantics.Report, id string) bool {
 			if rule.ID == id {
 				return true
 			}
+		}
+	}
+	return false
+}
+
+func mainDBSemanticsReproHasImage(report dbsemantics.ReproducibilityReport, image string) bool {
+	for _, pin := range report.EnginePins {
+		if pin.ContainerImage == image {
+			return true
+		}
+	}
+	return false
+}
+
+func mainDBSemanticsReproHasObservation(report dbsemantics.ReproducibilityReport, kind string) bool {
+	for _, observation := range report.Observations {
+		if observation.ObservationKind == kind {
+			return true
 		}
 	}
 	return false

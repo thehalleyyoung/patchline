@@ -147,7 +147,7 @@ Run `artifact-benchmark federated-split`, `federated-run`, and `federated-verify
 
 Run `golden-fixture generate --github owner/repo --ref <sha> --subpath <path> --out <dir>` to turn a real-repo slice into a tiny deterministic Go test without vendoring the full repository; see [docs/golden-fixtures.md](docs/golden-fixtures.md).
 
-Run `db-semantics --engine <engine> --sql <sql-or-path>` to get versioned DDL semantics, lock conflicts, rollback feasibility, unsafe counter-profile controls, and evidence-backed data-volume-aware runtime estimates via `--table-hints`; reproduce with `make lock-mode-simulator-gate`, `make db-rollback-feasibility-gate`, and `make data-volume-runtime-gate`.
+Run `db-semantics --engine <engine> --sql <sql-or-path>` to get versioned DDL semantics, lock conflicts, rollback feasibility, unsafe counter-profile controls, and evidence-backed runtime estimates; `db-semantics-reproducibility` then pins engine runtimes/images plus observed behavior rows. Reproduce with `make db-semantics-reproducibility-gate`, `make lock-mode-simulator-gate`, and `make data-volume-runtime-gate`.
 
 Run `make query-plan-regression-gate` to prove `db-semantics` emits before/after representative workload checks for index and column query-plan regression risk without inventing measured `EXPLAIN` costs.
 
@@ -579,7 +579,7 @@ Run `make work-stealing-scheduler-gate` for a distributed **work-stealing** sche
 Run `make incremental-hazard-index-gate` for an incremental index enabling **sub-second** hazard queries at scale, rejecting an over-budget query; see [docs/incremental-hazard-index.md](docs/incremental-hazard-index.md).
 Run `make git-history-streaming-gate` for a streaming-from-**git history** mode that analyzes every historical migration, rejecting a skipped commit; see [docs/git-history-streaming.md](docs/git-history-streaming.md).
 Run `make multi-engine-matrix-gate` for a multi-engine matrix with **per-engine** semantics across Postgres/MySQL/SQLite/SQL Server, rejecting an undefined engine; see [docs/multi-engine-matrix.md](docs/multi-engine-matrix.md).
-Run `make db-version-semantics-gate` for **versioned database semantics** across PostgreSQL, MySQL, SQLite, SQL Server, Oracle, BigQuery, Snowflake, and ClickHouse, proving version-specific verdicts and rejecting an unsupported engine; see [docs/db-version-semantics.md](docs/db-version-semantics.md).
+Run `make db-version-semantics-gate` for **versioned database semantics** across PostgreSQL, MySQL, SQLite, SQL Server, Oracle, BigQuery, Snowflake, and ClickHouse, proving version-specific verdicts, unsafe counter-profiles, a pinned reproducibility report, and unsupported-engine rejection; see [docs/db-version-semantics.md](docs/db-version-semantics.md) and [docs/db-semantics-reproducibility.md](docs/db-semantics-reproducibility.md).
 Run `make polyglot-orm-frontend-gate` for a polyglot ORM front-end covering eight-plus **framework**s on a shared core, rejecting a framework with no extractor; see [docs/polyglot-orm-frontend.md](docs/polyglot-orm-frontend.md).
 Run `make prevalence-estimator-gate` for a sampling-theory estimator of hazard prevalence with **confidence** bounds, rejecting an out-of-interval estimate; see [docs/prevalence-estimator.md](docs/prevalence-estimator.md).
 Run `make corpus-refresh-pipeline-gate` for a weekly corpus-refresh pipeline with **drift** alerts, rejecting a cycle that skips drift detection; see [docs/corpus-refresh-pipeline.md](docs/corpus-refresh-pipeline.md).

@@ -76,7 +76,7 @@ Critically,
 every capability in \tool{} is backed by a reproducible \emph{gate}: a script that proves the
 capability against real, pinned public code and fails loudly on drift. \tool{} currently ships more
 than 600 such gates over 560 documented capabilities, spanning relational migrations across nine
-ecosystems, versioned database semantics with computed unsafe counter-profile controls, lock-mode simulations, online-schema-change adapters,
+ecosystems, versioned database semantics with pinned reproducibility reports, computed unsafe counter-profile controls, lock-mode simulations, online-schema-change adapters,
 conditional replication-lag analysis, query-plan regression preflight, data-volume-aware runtime estimates, partition/shard routing semantics, and rollback-feasibility verdicts
 across eight production engines, five NoSQL engines,
 four data-pipeline frameworks, protobuf/Avro schema compatibility,
@@ -133,7 +133,7 @@ ranks the risks, and prints the next commands that can run immediately.
   \item A \textbf{deterministic, provenance-carrying fact layer} for data-change risk that is derived
   from real repositories without pre-authored schemas (Section~\ref{sec:facts}).
   \item A \textbf{breadth of analysis} that unifies relational migrations (nine ecosystems),
-  versioned database semantics with engine/version negative controls, online-schema-change adapters, query-plan regression preflight, data-volume-aware runtime estimates, partition/shard routing semantics, rollback feasibility, and lock-mode conflict simulations
+  versioned database semantics with pinned runtime/image reproducibility reports, engine/version negative controls, online-schema-change adapters, query-plan regression preflight, data-volume-aware runtime estimates, partition/shard routing semantics, rollback feasibility, and lock-mode conflict simulations
   (eight engines), NoSQL changes (five engines), data pipelines
   (four frameworks), protobuf/Avro schema compatibility, and
   infrastructure/data ordering under one fact model (Section~\ref{sec:breadth}).
@@ -264,6 +264,11 @@ and archive-preserving tombstones are verified. & \code{governance-board.json}, 
 partition, execute it locally, suppress below-threshold metric buckets, and publish only a signed
 aggregate bound to the manifest and salted split commitments. & local \code{split.json}, public
 \code{aggregate.json} \\
+\code{db-semantics-reproducibility} & Aggregate generated per-engine database-semantics reports into a
+deterministic reviewer artifact that pins engine versions, local runtime or emulator image references
+where available, embedded/managed-service profiles where not, and observed profile, rule, lock,
+rollback, query-plan, runtime, replication, and partition evidence rows. &
+\code{reproducibility-report.json}, \code{.md} \\
 \code{propose} & Generate bounded interventions (guards, tests) within an explicit budget; quarantine
 them as untrusted artifacts. & \code{proposal.patch}, \code{patchline-proposals/} \\
 \code{compare} & Deterministically re-analyze proposed changes; accept or reject by evidence delta. &
@@ -421,7 +426,11 @@ fields, hazards, evidence, and obligations, while an ordinary tenant-scoped upda
 compensation, time-travel recovery, irreversible metadata restore, async mutation cleanup, before-image
 DML compensation, and snapshot-required bulk changes with a read-only negative control. The
 \code{db-version-semantics-gate} exercises one checked SQL fixture across all eight engines plus an
-unsupported-engine negative control and the computed unsafe counter-profile controls.
+unsupported-engine negative control, computed unsafe counter-profile controls, and a
+\code{db-semantics-reproducibility} artifact that rejects missing engines or duplicate engine/version
+inputs while pinning PostgreSQL, MySQL, SQL Server, Oracle, BigQuery-emulator, and ClickHouse image
+references, SQLite's embedded profile, Snowflake's managed-service profile, and every observed
+behavior row back to the source report hash.
 
 \subsection{NoSQL change detection across five engines}
 Destructive data changes in NoSQL stores look nothing like \code{DROP TABLE}. \tool{} recognizes
@@ -489,7 +498,7 @@ the real repository each is proven against.
 \textbf{Surface} & \textbf{Fact kinds} & \textbf{Real-repo proof} \\
 \midrule
 Relational migrations & \code{schema\_evolution}, \code{migration\_root} & \code{laravel/laravel}, \code{lobsters/lobsters} \\
-Database engine semantics & \code{db\_semantics}, \code{engine\_profile}, \code{lock\_simulation}, \code{online\_schema\_change}, \code{replication\_lag\_risk}, \code{runtime\_estimate}, \code{partition\_sharding}, \code{rollback\_feasibility}, \code{engine\_negative\_control} & 8-engine versioned fixture + lock-mode simulator + online-schema-change adapter gate + replication-lag risk gate + data-volume runtime gate + partition/sharding semantics gate + rollback-feasibility gate + unsafe counter-profile and unsupported-engine negative controls \\
+Database engine semantics & \code{db\_semantics}, \code{engine\_profile}, \code{lock\_simulation}, \code{online\_schema\_change}, \code{replication\_lag\_risk}, \code{runtime\_estimate}, \code{partition\_sharding}, \code{rollback\_feasibility}, \code{engine\_negative\_control}, \code{db\_semantics\_reproducibility} & 8-engine versioned fixture + lock-mode simulator + online-schema-change adapter gate + replication-lag risk gate + data-volume runtime gate + partition/sharding semantics gate + rollback-feasibility gate + pinned image/runtime reproducibility report + unsafe counter-profile and unsupported-engine negative controls \\
 NoSQL changes & \code{nosql\_change} & \code{laaksomavrick/twitter-go} \\
 Data pipelines & \code{data\_pipeline\_change} & \code{harrydevforlife/building-lakehouse} \\
 Schema compatibility & \code{schema\_compatibility} & \code{apache/avro} \\
@@ -1737,6 +1746,7 @@ Section~\ref{sec:breadth} against pinned public repositories:
 \begin{quote}\small\ttfamily
 make multi-ecosystem-migration-gate \quad\# Laravel + 7-framework matrix\\
 make db-version-semantics-gate \quad\# 8 versioned production DB profiles\\
+make db-semantics-reproducibility-gate \quad\# pinned runtime/image evidence report\\
 make data-volume-runtime-gate \quad\# hint-backed runtime estimates + controls\\
 make nosql-change-gate \hspace{3.05em}\# Cassandra DROP on twitter-go + 5-engine matrix\\
 make data-pipeline-gate \hspace{2.4em}\# Airflow+dbt+Spark on building-lakehouse\\
