@@ -1375,6 +1375,10 @@ evidence-governance-board-gate:
 db-version-semantics-gate:
 	bash scripts/db-version-semantics-gate.sh
 
+.PHONY: online-schema-change-adapters-gate
+online-schema-change-adapters-gate:
+	bash scripts/online-schema-change-adapters-gate.sh
+
 federated-benchmark-split-gate:
 	bash scripts/federated-benchmark-split-gate.sh
 

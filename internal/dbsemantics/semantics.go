@@ -67,15 +67,16 @@ type Report struct {
 }
 
 type StatementSemantics struct {
-	Index       int             `json:"index"`
-	Kind        string          `json:"kind"`
-	Table       string          `json:"table,omitempty"`
-	Normalized  string          `json:"normalized_sql"`
-	Risk        string          `json:"risk"`
-	Rules       []RuleFinding   `json:"rules"`
-	Obligations []string        `json:"obligations,omitempty"`
-	EngineFacts EngineFactSlice `json:"engine_facts"`
-	Lock        LockSimulation  `json:"lock_simulation"`
+	Index              int                 `json:"index"`
+	Kind               string              `json:"kind"`
+	Table              string              `json:"table,omitempty"`
+	Normalized         string              `json:"normalized_sql"`
+	Risk               string              `json:"risk"`
+	Rules              []RuleFinding       `json:"rules"`
+	Obligations        []string            `json:"obligations,omitempty"`
+	EngineFacts        EngineFactSlice     `json:"engine_facts"`
+	Lock               LockSimulation      `json:"lock_simulation"`
+	OnlineSchemaChange *OnlineSchemaChange `json:"online_schema_change,omitempty"`
 }
 
 type RuleFinding struct {
@@ -93,17 +94,18 @@ type EngineFact struct {
 type EngineFactSlice []EngineFact
 
 type Summary struct {
-	Statements           int      `json:"statements"`
-	HighRisk             int      `json:"high_risk"`
-	MediumRisk           int      `json:"medium_risk"`
-	LowRisk              int      `json:"low_risk"`
-	VersionSpecificRules int      `json:"version_specific_rules"`
-	ProofObligations     int      `json:"proof_obligations"`
-	LockSimulations      int      `json:"lock_simulations"`
-	ReaderBlockingLocks  int      `json:"reader_blocking_locks"`
-	WriterBlockingLocks  int      `json:"writer_blocking_locks"`
-	DDLBlockingLocks     int      `json:"ddl_blocking_locks"`
-	Tables               []string `json:"tables"`
+	Statements                 int      `json:"statements"`
+	HighRisk                   int      `json:"high_risk"`
+	MediumRisk                 int      `json:"medium_risk"`
+	LowRisk                    int      `json:"low_risk"`
+	VersionSpecificRules       int      `json:"version_specific_rules"`
+	ProofObligations           int      `json:"proof_obligations"`
+	LockSimulations            int      `json:"lock_simulations"`
+	ReaderBlockingLocks        int      `json:"reader_blocking_locks"`
+	WriterBlockingLocks        int      `json:"writer_blocking_locks"`
+	DDLBlockingLocks           int      `json:"ddl_blocking_locks"`
+	OnlineSchemaChangeAdapters int      `json:"online_schema_change_adapters,omitempty"`
+	Tables                     []string `json:"tables"`
 }
 
 type LockSimulation struct {
@@ -133,6 +135,21 @@ type ContainerSmokeTest struct {
 	Command     string `json:"command"`
 	Observation string `json:"observation"`
 	Status      string `json:"status"`
+}
+
+type OnlineSchemaChange struct {
+	Adapter                string     `json:"adapter"`
+	Mechanism              string     `json:"mechanism"`
+	Risk                   string     `json:"risk"`
+	Table                  string     `json:"table,omitempty"`
+	Online                 bool       `json:"online"`
+	UsesShadowTable        bool       `json:"uses_shadow_table"`
+	UsesTriggers           bool       `json:"uses_triggers"`
+	UsesBinlog             bool       `json:"uses_binlog"`
+	RequiresCutover        bool       `json:"requires_cutover"`
+	RequiresManualRollback bool       `json:"requires_manual_rollback"`
+	Evidence               []Evidence `json:"evidence"`
+	Obligations            []string   `json:"obligations"`
 }
 
 func SupportedEngines() []Engine {
@@ -192,6 +209,9 @@ func Evaluate(engine Engine, version, source string, content []byte) (Report, er
 			if statement.Lock.BlocksDDL {
 				report.Summary.DDLBlockingLocks++
 			}
+		}
+		if statement.OnlineSchemaChange != nil {
+			report.Summary.OnlineSchemaChangeAdapters++
 		}
 		report.Summary.VersionSpecificRules += len(statement.Rules)
 		report.Summary.ProofObligations += len(statement.Obligations)
@@ -338,6 +358,12 @@ func evaluateStatement(index int, sql string, profile Profile) StatementSemantic
 			{"implicit_ddl_commit", strconv.FormatBool(profile.ImplicitDDLCommit)},
 			{"atomic_ddl", strconv.FormatBool(profile.AtomicDDL)},
 		},
+	}
+	if osc := detectOnlineSchemaChange(sql, tokens, profile, kind, table); osc != nil {
+		statement.OnlineSchemaChange = osc
+		statement.addRule(onlineSchemaChangeRuleID(osc.Adapter), osc.Risk, "checked", osc.Mechanism)
+		statement.Obligations = append(statement.Obligations, osc.Obligations...)
+		statement.EngineFacts = append(statement.EngineFacts, EngineFact{"online_schema_change_adapter", osc.Adapter})
 	}
 	statement.Lock = simulateLock(statement, tokens, profile)
 	if isDDL(kind) {
@@ -534,6 +560,10 @@ func simulateLock(statement StatementSemantics, tokens []string, profile Profile
 	case EngineClickHouse:
 		applyClickHouseLock(&lock, statement, tokens)
 	}
+	if statement.OnlineSchemaChange != nil {
+		applyOnlineSchemaChangeLock(&lock, statement)
+		lock.DocumentedBehavior = append(lock.DocumentedBehavior, statement.OnlineSchemaChange.Evidence...)
+	}
 	lock.Conflicts = []LockConflict{
 		{Workload: "readers", Blocked: lock.BlocksReaders, Reason: conflictReason("readers", lock)},
 		{Workload: "writers", Blocked: lock.BlocksWriters, Reason: conflictReason("writers", lock)},
@@ -697,6 +727,59 @@ func applyClickHouseLock(lock *LockSimulation, statement StatementSemantics, tok
 	}
 }
 
+func applyOnlineSchemaChangeLock(lock *LockSimulation, statement StatementSemantics) {
+	osc := statement.OnlineSchemaChange
+	if osc == nil {
+		return
+	}
+	switch osc.Adapter {
+	case "pt-online-schema-change":
+		lock.Mode = "online schema change trigger cutover barrier"
+		lock.BlocksReaders = false
+		lock.BlocksWriters = false
+		lock.BlocksDDL = true
+		lock.DurationClass = "chunked-copy-plus-cutover"
+		lock.Online = true
+		lock.PhaseNotes = []string{
+			"pt-online-schema-change copies rows into a shadow table in chunks while triggers mirror writes",
+			"the final table swap is modeled as a brief writer-sensitive cutover requiring rollback evidence",
+		}
+	case "gh-ost":
+		lock.Mode = "online schema change binlog cutover barrier"
+		lock.BlocksReaders = false
+		lock.BlocksWriters = false
+		lock.BlocksDDL = true
+		lock.DurationClass = "chunked-copy-plus-cutover"
+		lock.Online = true
+		lock.PhaseNotes = []string{
+			"gh-ost streams row changes from the binary log while copying into a ghost table",
+			"cutover remains a coordinated metadata rename that must be throttled, audited, and reversible by procedure",
+		}
+	case "rails-strong-migrations", "django-add-index-concurrently":
+		lock.Mode = "SHARE UPDATE EXCLUSIVE"
+		lock.BlocksReaders = false
+		lock.BlocksWriters = false
+		lock.BlocksDDL = true
+		lock.DurationClass = "brief-phase-barrier"
+		lock.Online = true
+		lock.PhaseNotes = []string{
+			"framework adapter maps to a PostgreSQL concurrent-index path with brief phase barriers",
+			"the migration must run outside a wrapping transaction and preserve the framework-specific safety guard",
+		}
+	case "mysql-native-online-ddl":
+		lock.Mode = "online DDL metadata barrier"
+		lock.BlocksReaders = false
+		lock.BlocksWriters = false
+		lock.BlocksDDL = true
+		lock.DurationClass = "brief-phase-barrier"
+		lock.Online = true
+		lock.PhaseNotes = []string{
+			"MySQL native online DDL still crosses metadata-lock phase barriers",
+			"eligibility and fallback behavior must be proven for the requested ALGORITHM and LOCK clauses",
+		}
+	}
+}
+
 func defaultLockMode(engine Engine, kind string) string {
 	if !isDDL(kind) {
 		return "statement-level data locks"
@@ -834,6 +917,218 @@ func baselineRisk(kind string, tokens []string) string {
 	default:
 		return "low"
 	}
+}
+
+func detectOnlineSchemaChange(sql string, tokens []string, profile Profile, kind, table string) *OnlineSchemaChange {
+	lower := strings.ToLower(sql)
+	switch {
+	case strings.Contains(lower, "pt-online-schema-change") || strings.Contains(lower, "pt-osc") || hasTokenSequence(tokens, []string{"pt", "online", "schema", "change"}) || hasTokenSequence(tokens, []string{"pt", "osc"}):
+		return &OnlineSchemaChange{
+			Adapter:                "pt-online-schema-change",
+			Mechanism:              "Percona pt-online-schema-change trigger-backed shadow-table copy with chunked row movement and atomic cutover",
+			Risk:                   "medium",
+			Table:                  table,
+			Online:                 true,
+			UsesShadowTable:        true,
+			UsesTriggers:           true,
+			RequiresCutover:        true,
+			RequiresManualRollback: true,
+			Evidence: []Evidence{
+				{"percona.pt_online_schema_change", "pt-online-schema-change creates a shadow table, mirrors writes with triggers, copies rows in chunks, and swaps tables at cutover"},
+				{"mysql.metadata_locks", "cutover and DDL metadata changes still require metadata-lock review"},
+			},
+			Obligations: []string{
+				"prove trigger and foreign-key compatibility before running pt-online-schema-change",
+				"record chunk, throttle, max-lag, and cutover settings for replay",
+				"document manual rollback or table-restore procedure for failed cutover",
+			},
+		}
+	case strings.Contains(lower, "gh-ost") || hasTokenSequence(tokens, []string{"gh", "ost"}):
+		return &OnlineSchemaChange{
+			Adapter:                "gh-ost",
+			Mechanism:              "gh-ost binlog-driven ghost-table copy with throttled rowcopy and controlled cutover",
+			Risk:                   "medium",
+			Table:                  table,
+			Online:                 true,
+			UsesShadowTable:        true,
+			UsesBinlog:             true,
+			RequiresCutover:        true,
+			RequiresManualRollback: true,
+			Evidence: []Evidence{
+				{"github.gh_ost", "gh-ost migrates through a ghost table using binary-log change capture before cutover"},
+				{"mysql.metadata_locks", "online cutover still requires metadata-lock and replica-lag review"},
+			},
+			Obligations: []string{
+				"prove binary-log row image, replica-lag, and throttling settings are safe for the target table",
+				"record cutover timeout, panic flag, and postponed-cutover controls",
+				"document manual rollback or ghost-table cleanup procedure",
+			},
+		}
+	case profile.Engine == EnginePostgres && kind == "create" && contains(tokens, "index") && contains(tokens, "concurrently"):
+		return &OnlineSchemaChange{
+			Adapter:   "postgres-native-concurrent-index",
+			Mechanism: "PostgreSQL native concurrent index build with narrower lock phases than plain CREATE INDEX",
+			Risk:      "low",
+			Table:     table,
+			Online:    true,
+			Evidence:  []Evidence{{"postgres.create_index_concurrently", "CREATE INDEX CONCURRENTLY avoids the long writer-blocking SHARE lock but cannot run inside a transaction block"}},
+			Obligations: []string{
+				"run outside an explicit transaction block",
+				"record retry or cleanup procedure for invalid concurrent indexes",
+			},
+		}
+	case profile.Engine == EngineSQLServer && kind == "create" && contains(tokens, "index") && contains(tokens, "online") && contains(tokens, "on"):
+		return &OnlineSchemaChange{
+			Adapter:   "sqlserver-native-online-index",
+			Mechanism: "SQL Server ONLINE=ON index operation with schema-modification phase barriers",
+			Risk:      "low",
+			Table:     table,
+			Online:    true,
+			Evidence:  []Evidence{{"sqlserver.online_index", "ONLINE=ON reduces but does not eliminate lock barriers for supported index operations"}},
+			Obligations: []string{
+				"prove edition and index operation support ONLINE=ON",
+				"record lock-timeout and resumable-operation policy when available",
+			},
+		}
+	case profile.Engine == EngineOracle && isDDL(kind) && contains(tokens, "online"):
+		return &OnlineSchemaChange{
+			Adapter:                "oracle-native-online-ddl",
+			Mechanism:              "Oracle online DDL/redefinition path with dictionary-lock synchronization and implicit commit",
+			Risk:                   "medium",
+			Table:                  table,
+			Online:                 true,
+			RequiresManualRollback: true,
+			Evidence:               []Evidence{{"oracle.online_redefinition", "online clauses reduce blocking for eligible DDL while DDL still autocommits"}},
+			Obligations: []string{
+				"prove the object and operation are eligible for Oracle online DDL",
+				"record compensating rollback because DDL autocommits",
+			},
+		}
+	case profile.Engine == EngineMySQL && isDDL(kind) && (contains(tokens, "algorithm") && (contains(tokens, "inplace") || contains(tokens, "instant")) || contains(tokens, "lock") && contains(tokens, "none")):
+		return &OnlineSchemaChange{
+			Adapter:         "mysql-native-online-ddl",
+			Mechanism:       "MySQL native online or instant ALTER path with metadata-lock phase barriers",
+			Risk:            "low",
+			Table:           table,
+			Online:          true,
+			RequiresCutover: false,
+			Evidence: []Evidence{
+				{"mysql.online_ddl", "InnoDB online DDL clauses can avoid copy-duration blocking for eligible operations"},
+				{"mysql.metadata_locks", "online DDL still acquires metadata locks at phase boundaries"},
+			},
+			Obligations: []string{
+				"prove ALGORITHM and LOCK clauses are supported for the exact engine version and operation",
+				"record fallback behavior if the database cannot honor the requested online algorithm",
+			},
+		}
+	case isRailsStrongMigrationsConcurrentIndex(lower, tokens):
+		frameworkTable := nonEmptyString(table, frameworkTable(tokens))
+		return &OnlineSchemaChange{
+			Adapter:   "rails-strong-migrations",
+			Mechanism: "Rails strong_migrations concurrent-index guard around PostgreSQL CREATE INDEX CONCURRENTLY",
+			Risk:      "low",
+			Table:     frameworkTable,
+			Online:    true,
+			Evidence: []Evidence{
+				{"rails.strong_migrations", "strong_migrations routes dangerous migration helpers toward safer concurrent patterns"},
+				{"postgres.create_index_concurrently", "Rails algorithm: :concurrently maps to CREATE INDEX CONCURRENTLY for PostgreSQL"},
+			},
+			Obligations: []string{
+				"prove disable_ddl_transaction! or equivalent non-transactional migration execution is present",
+				"keep safety_assured rationale when bypassing a strong_migrations warning",
+			},
+		}
+	case isDjangoConcurrentIndex(lower, tokens):
+		frameworkTable := nonEmptyString(table, frameworkTable(tokens))
+		return &OnlineSchemaChange{
+			Adapter:   "django-add-index-concurrently",
+			Mechanism: "Django PostgreSQL AddIndexConcurrently/RemoveIndexConcurrently operation emitted outside atomic migrations",
+			Risk:      "low",
+			Table:     frameworkTable,
+			Online:    true,
+			Evidence: []Evidence{
+				{"django.contrib.postgres.operations", "Django exposes AddIndexConcurrently and RemoveIndexConcurrently for PostgreSQL concurrent index operations"},
+				{"postgres.create_index_concurrently", "PostgreSQL concurrent index creation must not run in a transaction block"},
+			},
+			Obligations: []string{
+				"prove the Django migration is non-atomic before using AddIndexConcurrently",
+				"record cleanup procedure for invalid concurrent indexes after failed builds",
+			},
+		}
+	default:
+		return nil
+	}
+}
+
+func isRailsStrongMigrationsConcurrentIndex(lower string, tokens []string) bool {
+	if !(contains(tokens, "add_index") && contains(tokens, "algorithm") && contains(tokens, "concurrently")) {
+		return false
+	}
+	return strings.Contains(lower, "strong_migrations") || contains(tokens, "safety_assured") || contains(tokens, "disable_ddl_transaction")
+}
+
+func isDjangoConcurrentIndex(lower string, tokens []string) bool {
+	return strings.Contains(lower, "addindexconcurrently") || strings.Contains(lower, "removeindexconcurrently") || contains(tokens, "addindexconcurrently") || contains(tokens, "removeindexconcurrently")
+}
+
+func frameworkTable(tokens []string) string {
+	for i, token := range tokens {
+		switch token {
+		case "add_index", "remove_index":
+			if i+1 < len(tokens) {
+				return cleanIdentifier(tokens[i+1])
+			}
+		case "model_name":
+			if i+1 < len(tokens) {
+				return cleanIdentifier(tokens[i+1])
+			}
+		}
+	}
+	return ""
+}
+
+func onlineSchemaChangeRuleID(adapter string) string {
+	var b strings.Builder
+	b.WriteString("osc.")
+	lastUnderscore := false
+	for _, r := range strings.ToLower(adapter) {
+		if unicode.IsLetter(r) || unicode.IsDigit(r) {
+			b.WriteRune(r)
+			lastUnderscore = false
+			continue
+		}
+		if !lastUnderscore {
+			b.WriteByte('_')
+			lastUnderscore = true
+		}
+	}
+	return strings.TrimRight(b.String(), "_")
+}
+
+func hasTokenSequence(tokens, sequence []string) bool {
+	if len(sequence) == 0 || len(sequence) > len(tokens) {
+		return false
+	}
+	for i := 0; i <= len(tokens)-len(sequence); i++ {
+		matched := true
+		for j := range sequence {
+			if tokens[i+j] != sequence[j] {
+				matched = false
+				break
+			}
+		}
+		if matched {
+			return true
+		}
+	}
+	return false
+}
+
+func nonEmptyString(value, fallback string) string {
+	if value != "" {
+		return value
+	}
+	return fallback
 }
 
 func kindAndTable(tokens []string) (string, string) {

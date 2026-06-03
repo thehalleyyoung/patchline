@@ -197,6 +197,119 @@ func TestLockModeSimulatorSQLServerOnlineIndexAndClickHouseMutation(t *testing.T
 	}
 }
 
+func TestOnlineSchemaChangeAdaptersCoverToolsNativeAndFrameworks(t *testing.T) {
+	cases := []struct {
+		name            string
+		engine          Engine
+		version         string
+		sql             string
+		adapter         string
+		mode            string
+		duration        string
+		table           string
+		usesShadowTable bool
+		usesTriggers    bool
+		usesBinlog      bool
+	}{
+		{
+			name:    "pt-online-schema-change",
+			engine:  EngineMySQL,
+			version: "8.0.34",
+			sql: `ALTER TABLE accounts ADD COLUMN status varchar(20) DEFAULT 'active'
+  /* pt-online-schema-change --alter 'ADD COLUMN status varchar(20)' D=app,t=accounts --max-lag=2 --chunk-time=0.5 */;`,
+			adapter:         "pt-online-schema-change",
+			mode:            "online schema change trigger cutover barrier",
+			duration:        "chunked-copy-plus-cutover",
+			table:           "accounts",
+			usesShadowTable: true,
+			usesTriggers:    true,
+		},
+		{
+			name:    "gh-ost",
+			engine:  EngineMySQL,
+			version: "8.0.34",
+			sql: `ALTER TABLE accounts ADD COLUMN last_seen_at datetime
+  /* gh-ost --database app --table accounts --alter 'ADD COLUMN last_seen_at datetime' --max-lag-millis 1500 */;`,
+			adapter:         "gh-ost",
+			mode:            "online schema change binlog cutover barrier",
+			duration:        "chunked-copy-plus-cutover",
+			table:           "accounts",
+			usesShadowTable: true,
+			usesBinlog:      true,
+		},
+		{
+			name:     "postgres-native-concurrent-index",
+			engine:   EnginePostgres,
+			version:  "16",
+			sql:      "CREATE INDEX CONCURRENTLY idx_accounts_status ON accounts(status);",
+			adapter:  "postgres-native-concurrent-index",
+			mode:     "SHARE UPDATE EXCLUSIVE",
+			duration: "brief-phase-barrier",
+			table:    "accounts",
+		},
+		{
+			name:    "rails-strong-migrations",
+			engine:  EnginePostgres,
+			version: "16",
+			sql: `disable_ddl_transaction!
+class AddUsersEmailIndex < ActiveRecord::Migration[7.0]
+  def change
+    safety_assured { add_index :users, :email, algorithm: :concurrently }
+  end
+end`,
+			adapter:  "rails-strong-migrations",
+			mode:     "SHARE UPDATE EXCLUSIVE",
+			duration: "brief-phase-barrier",
+			table:    "users",
+		},
+		{
+			name:    "django-add-index-concurrently",
+			engine:  EnginePostgres,
+			version: "16",
+			sql: `from django.contrib.postgres.operations import AddIndexConcurrently
+class Migration(migrations.Migration):
+    atomic = False
+    operations = [AddIndexConcurrently(model_name="user", index=models.Index(fields=["email"], name="user_email_idx"))]`,
+			adapter:  "django-add-index-concurrently",
+			mode:     "SHARE UPDATE EXCLUSIVE",
+			duration: "brief-phase-barrier",
+			table:    "user",
+		},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			report, err := Evaluate(tc.engine, tc.version, tc.name+".sql", []byte(tc.sql))
+			if err != nil {
+				t.Fatal(err)
+			}
+			if report.Summary.OnlineSchemaChangeAdapters != 1 {
+				t.Fatalf("expected one online schema-change adapter, got summary=%#v statements=%#v", report.Summary, report.Statements)
+			}
+			statement := report.Statements[0]
+			osc := statement.OnlineSchemaChange
+			if osc == nil {
+				t.Fatalf("missing online schema-change record: %#v", statement)
+			}
+			if osc.Adapter != tc.adapter || osc.Table != tc.table || !osc.Online {
+				t.Fatalf("unexpected adapter record: %#v", osc)
+			}
+			if osc.UsesShadowTable != tc.usesShadowTable || osc.UsesTriggers != tc.usesTriggers || osc.UsesBinlog != tc.usesBinlog {
+				t.Fatalf("unexpected adapter mechanism flags: %#v", osc)
+			}
+			if len(osc.Evidence) == 0 || len(osc.Obligations) == 0 {
+				t.Fatalf("adapter should carry evidence and obligations: %#v", osc)
+			}
+			if statement.Lock.Mode != tc.mode || statement.Lock.DurationClass != tc.duration || !statement.Lock.Online || statement.Lock.BlocksWriters {
+				t.Fatalf("unexpected lock simulation for %s: %#v", tc.adapter, statement.Lock)
+			}
+			if !hasRule(report, onlineSchemaChangeRuleID(tc.adapter)) {
+				t.Fatalf("missing online schema-change rule for %s in %#v", tc.adapter, statement.Rules)
+			}
+		})
+	}
+}
+
 func TestRejectsUnsupportedEngineAndBadVersion(t *testing.T) {
 	if _, err := ResolveProfile(Engine("db2"), "11"); err == nil {
 		t.Fatal("expected unsupported engine error")

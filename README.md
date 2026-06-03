@@ -149,6 +149,8 @@ Run `golden-fixture generate --github owner/repo --ref <sha> --subpath <path> --
 
 Run `db-semantics --engine <engine> --sql <sql-or-path>` to get versioned DDL semantics plus lock-mode simulator conflicts; reproduce all engines with `make lock-mode-simulator-gate`.
 
+Run `make online-schema-change-adapters-gate` to prove `db-semantics` recognizes online-schema-change adapters: pt-online-schema-change (pt-osc), gh-ost, native concurrent indexes, and Rails/Django helpers with cutover obligations.
+
 <details>
 <summary><strong>Full verification catalog</strong> — 600+ reproducible <code>make &lt;name&gt;-gate</code> checks, each with a positive proof and a negative control on real public-repo data (click to expand)</summary>
 

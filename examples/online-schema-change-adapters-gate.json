@@ -1,0 +1,77 @@
+{
+  "version": "patchline.online-schema-change-adapters-gate/v1",
+  "claim": "Patchline recognizes online-schema-change adapters as explicit database semantics, not comments around DDL. The gate drives the real db-semantics CLI over pt-online-schema-change, gh-ost, PostgreSQL CREATE INDEX CONCURRENTLY, Rails strong_migrations, and Django AddIndexConcurrently examples; every case must emit adapter evidence, proof obligations, conservative online lock simulation, and a summary count.",
+  "minimum_cases": 5,
+  "cases": [
+    {
+      "id": "pt-online-schema-change",
+      "engine": "mysql",
+      "version": "8.0.34",
+      "sql": "ALTER TABLE accounts ADD COLUMN status varchar(20) DEFAULT 'active'\n  /* pt-online-schema-change --alter 'ADD COLUMN status varchar(20)' D=app,t=accounts --max-lag=2 --chunk-time=0.5 */;",
+      "expect": {
+        "adapter": "pt-online-schema-change",
+        "mode": "online schema change trigger cutover barrier",
+        "duration_class": "chunked-copy-plus-cutover",
+        "uses_shadow_table": true,
+        "uses_triggers": true,
+        "uses_binlog": false
+      }
+    },
+    {
+      "id": "gh-ost",
+      "engine": "mysql",
+      "version": "8.0.34",
+      "sql": "ALTER TABLE accounts ADD COLUMN last_seen_at datetime\n  /* gh-ost --database app --table accounts --alter 'ADD COLUMN last_seen_at datetime' --max-lag-millis 1500 */;",
+      "expect": {
+        "adapter": "gh-ost",
+        "mode": "online schema change binlog cutover barrier",
+        "duration_class": "chunked-copy-plus-cutover",
+        "uses_shadow_table": true,
+        "uses_triggers": false,
+        "uses_binlog": true
+      }
+    },
+    {
+      "id": "postgres-concurrent-index",
+      "engine": "postgres",
+      "version": "16",
+      "sql": "CREATE INDEX CONCURRENTLY idx_accounts_status ON accounts(status);",
+      "expect": {
+        "adapter": "postgres-native-concurrent-index",
+        "mode": "SHARE UPDATE EXCLUSIVE",
+        "duration_class": "brief-phase-barrier",
+        "uses_shadow_table": false,
+        "uses_triggers": false,
+        "uses_binlog": false
+      }
+    },
+    {
+      "id": "rails-strong-migrations",
+      "engine": "postgres",
+      "version": "16",
+      "sql": "disable_ddl_transaction!\nclass AddUsersEmailIndex < ActiveRecord::Migration[7.0]\n  def change\n    safety_assured { add_index :users, :email, algorithm: :concurrently }\n  end\nend",
+      "expect": {
+        "adapter": "rails-strong-migrations",
+        "mode": "SHARE UPDATE EXCLUSIVE",
+        "duration_class": "brief-phase-barrier",
+        "uses_shadow_table": false,
+        "uses_triggers": false,
+        "uses_binlog": false
+      }
+    },
+    {
+      "id": "django-add-index-concurrently",
+      "engine": "postgres",
+      "version": "16",
+      "sql": "from django.contrib.postgres.operations import AddIndexConcurrently\nclass Migration(migrations.Migration):\n    atomic = False\n    operations = [AddIndexConcurrently(model_name=\"user\", index=models.Index(fields=[\"email\"], name=\"user_email_idx\"))]",
+      "expect": {
+        "adapter": "django-add-index-concurrently",
+        "mode": "SHARE UPDATE EXCLUSIVE",
+        "duration_class": "brief-phase-barrier",
+        "uses_shadow_table": false,
+        "uses_triggers": false,
+        "uses_binlog": false
+      }
+    }
+  ]
+}

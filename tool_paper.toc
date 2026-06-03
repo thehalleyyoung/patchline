@@ -25,7 +25,7 @@
 \contentsline {section}{\numberline {6}Bounded Interventions and Deterministic Rejection}{11}{section.6}%
 \contentsline {paragraph}{Budgets.}{11}{section.6}%
 \contentsline {paragraph}{Quarantine.}{11}{section.6}%
-\contentsline {paragraph}{Deterministic rejection.}{11}{section.6}%
+\contentsline {paragraph}{Deterministic rejection.}{12}{section.6}%
 \contentsline {paragraph}{Generator-agnostic.}{12}{section.6}%
 \contentsline {paragraph}{Invariant-backed expand/contract templates.}{12}{section.6}%
 \contentsline {paragraph}{Staged backfill planning.}{12}{section.6}%
@@ -35,31 +35,31 @@
 \contentsline {paragraph}{Postmortem lessons as detector regressions.}{13}{section.6}%
 \contentsline {paragraph}{Verified multi-service rollback planning.}{13}{section.6}%
 \contentsline {paragraph}{Expected-loss remediation selection.}{13}{section.6}%
-\contentsline {paragraph}{Patch-series invariant preservation.}{13}{section.6}%
+\contentsline {paragraph}{Patch-series invariant preservation.}{14}{section.6}%
 \contentsline {paragraph}{Maintainer acceptance without uncertainty laundering.}{14}{section.6}%
 \contentsline {paragraph}{The accept/reject decision.}{14}{section.6}%
 \contentsline {section}{\numberline {7}Runtime and Observability Evidence}{14}{section.7}%
 \contentsline {subsection}{\numberline {7.1}Performance and scale}{15}{subsection.7.1}%
 \contentsline {section}{\numberline {8}Formal and Decision-Theoretic Guarantees}{15}{section.8}%
 \contentsline {paragraph}{Formal invariant extraction.}{15}{section.8}%
-\contentsline {paragraph}{Bounded symbolic execution and model checking.}{15}{section.8}%
+\contentsline {paragraph}{Bounded symbolic execution and model checking.}{16}{section.8}%
 \contentsline {paragraph}{Causal attribution and counterfactual sensitivity.}{16}{section.8}%
 \contentsline {paragraph}{Decision economics and abstention.}{16}{section.8}%
 \contentsline {paragraph}{Multi-agent review and interoperability.}{16}{section.8}%
-\contentsline {paragraph}{Release engineering as evidence.}{16}{section.8}%
+\contentsline {paragraph}{Release engineering as evidence.}{17}{section.8}%
 \contentsline {section}{\numberline {9}Reproducibility and the Gate Methodology}{17}{section.9}%
 \contentsline {paragraph}{Anatomy of a gate.}{17}{section.9}%
 \contentsline {paragraph}{Robustness.}{17}{section.9}%
 \contentsline {paragraph}{Minimal reproductions.}{17}{section.9}%
-\contentsline {paragraph}{Drift protection.}{17}{table.caption.4}%
-\contentsline {paragraph}{Shared evidence without trust erosion.}{17}{table.caption.4}%
+\contentsline {paragraph}{Drift protection.}{18}{table.caption.4}%
+\contentsline {paragraph}{Shared evidence without trust erosion.}{18}{table.caption.4}%
 \contentsline {paragraph}{Federated private benchmark aggregates.}{19}{table.caption.4}%
 \contentsline {paragraph}{Paying for minimized missing evidence.}{19}{table.caption.4}%
 \contentsline {section}{\numberline {10}Evaluation Methodology}{19}{section.10}%
 \contentsline {paragraph}{Blinded false-positive adjudication.}{19}{section.10}%
 \contentsline {paragraph}{Seeded false-negative recall.}{19}{section.10}%
 \contentsline {paragraph}{Ablations and effect sizes.}{19}{section.10}%
-\contentsline {paragraph}{Severity calibration.}{19}{section.10}%
+\contentsline {paragraph}{Severity calibration.}{20}{section.10}%
 \contentsline {paragraph}{Stratification.}{20}{section.10}%
 \contentsline {paragraph}{Baselines.}{20}{section.10}%
 \contentsline {paragraph}{Headline measured results.}{20}{table.caption.5}%
@@ -76,7 +76,7 @@
 \contentsline {paragraph}{A learned-but-verified frontier.}{22}{section.12}%
 \contentsline {paragraph}{A lasting-impact dossier.}{22}{section.12}%
 \contentsline {section}{\numberline {13}From Field-Defining to Field-Standard: The 501--600 Frontier}{22}{section.13}%
-\contentsline {paragraph}{A deeper formal core.}{22}{section.13}%
+\contentsline {paragraph}{A deeper formal core.}{23}{section.13}%
 \contentsline {paragraph}{Planet-scale evidence.}{23}{section.13}%
 \contentsline {paragraph}{Causal and field rigor.}{23}{section.13}%
 \contentsline {paragraph}{Trustworthy autonomy.}{23}{section.13}%

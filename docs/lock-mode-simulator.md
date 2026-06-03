@@ -4,8 +4,9 @@ Patchline's **lock-mode simulator** turns normalized migration SQL into an
 engine-specific lock/conflict model. It distinguishes PostgreSQL `SHARE` from
 `SHARE UPDATE EXCLUSIVE`, MySQL copy-duration metadata locks from instant
 metadata barriers, SQL Server offline `Sch-M` from online index phase barriers,
-and cloud engines whose documented behavior is metadata-job or transactional
-metadata concurrency rather than classic row locks.
+online-schema-change adapter cutover barriers for `pt-online-schema-change` and
+`gh-ost`, and cloud engines whose documented behavior is metadata-job or
+transactional metadata concurrency rather than classic row locks.
 
 Each simulated statement reports the modeled mode, scope, duration class,
 reader/writer/DDL conflicts, phase notes, documented behavior references, and a
