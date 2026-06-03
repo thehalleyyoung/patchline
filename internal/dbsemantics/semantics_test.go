@@ -843,6 +843,104 @@ func TestQueryPlanRegressionHasAddColumnControlAndStableHash(t *testing.T) {
 	}
 }
 
+func TestRuntimeEstimatesUseExplicitTableHints(t *testing.T) {
+	sql := []byte("ALTER TABLE public.accounts ADD COLUMN status text DEFAULT 'active';")
+	options := AnalysisOptions{RuntimeHints: RuntimeHints{
+		Source: "catalog-snapshot.json",
+		Tables: map[string]RuntimeTableHint{
+			"accounts": {
+				Table:      "accounts",
+				Rows:       12_500_000,
+				Bytes:      12 * 1024 * 1024 * 1024,
+				Source:     "postgres.pg_class.reltuples+pg_total_relation_size",
+				SourceKind: "public_statistic",
+			},
+		},
+	}}
+	first, err := EvaluateWithOptions(EnginePostgres, "10", "pg10.sql", sql, options)
+	if err != nil {
+		t.Fatal(err)
+	}
+	second, err := EvaluateWithOptions(EnginePostgres, "10", "pg10.sql", sql, options)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if first.Hash != second.Hash {
+		t.Fatalf("expected deterministic runtime estimate hash, got %s and %s", first.Hash, second.Hash)
+	}
+	if first.RuntimeHintHash == "" || first.Summary.RuntimeEstimates != 1 || first.Summary.HighRuntimeEstimates != 1 {
+		t.Fatalf("expected high runtime summary with hint hash, got %#v hash=%q", first.Summary, first.RuntimeHintHash)
+	}
+	estimate := first.Statements[0].RuntimeEstimate
+	if estimate == nil {
+		t.Fatalf("missing runtime estimate: %#v", first.Statements[0])
+	}
+	if estimate.Class != "table_rewrite_estimate" || estimate.Operation != "add_column_default_table_rewrite" || estimate.Table != "public.accounts" {
+		t.Fatalf("unexpected runtime estimate: %#v", estimate)
+	}
+	if estimate.RowsUpperBound != 12_500_000 || estimate.BytesUpperBound != 12*1024*1024*1024 || estimate.SourceKind != "public_statistic" {
+		t.Fatalf("runtime estimate did not preserve explicit bounds and source: %#v", estimate)
+	}
+	if estimate.HintHash == "" || len(estimate.Evidence) < 3 || len(estimate.Obligations) < 4 || len(estimate.Assumptions) < 3 {
+		t.Fatalf("runtime estimate should carry hash, evidence, obligations, and assumptions: %#v", estimate)
+	}
+	if !hasRule(first, "runtime.table_rewrite_estimate") {
+		t.Fatalf("missing runtime estimate rule in %#v", first.Statements[0].Rules)
+	}
+}
+
+func TestRuntimeEstimatesUseFixtureInlineBounds(t *testing.T) {
+	sql := []byte("CREATE INDEX idx_accounts_status ON accounts(status) /* patchline: table accounts rows=24000 bytes=6400000 source=fixture:accounts_sample source_kind=fixture */;")
+	report, err := Evaluate(EnginePostgres, "16", "fixture.sql", sql)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if report.RuntimeHintHash != "" {
+		t.Fatalf("inline hints should be covered by input hash, not report-level external hint hash: %q", report.RuntimeHintHash)
+	}
+	if report.Summary.RuntimeEstimates != 1 || report.Summary.HighRuntimeEstimates != 0 {
+		t.Fatalf("unexpected runtime summary: %#v", report.Summary)
+	}
+	estimate := report.Statements[0].RuntimeEstimate
+	if estimate == nil || estimate.Class != "index_build_estimate" || estimate.SourceKind != "fixture" {
+		t.Fatalf("unexpected inline fixture runtime estimate: %#v", estimate)
+	}
+	if estimate.EstimatedDurationClass != "seconds_to_minutes" || estimate.Confidence != "point_bound_from_fixture" {
+		t.Fatalf("unexpected duration/confidence: %#v", estimate)
+	}
+}
+
+func TestRuntimeEstimatesRequireHintsAndSkipPointLookup(t *testing.T) {
+	noHint, err := Evaluate(EnginePostgres, "16", "bulk.sql", []byte("UPDATE accounts SET status = 'closed';"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if noHint.Summary.RuntimeEstimates != 0 || noHint.Statements[0].RuntimeEstimate != nil {
+		t.Fatalf("unhinted statement should not invent a runtime estimate: %#v", noHint.Statements[0])
+	}
+
+	pointSQL := []byte("UPDATE accounts SET status = 'closed' WHERE id = 42 /* patchline: table accounts rows=12000000 source=fixture */;")
+	point, err := Evaluate(EnginePostgres, "16", "point.sql", pointSQL)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if point.Summary.RuntimeEstimates != 0 || point.Statements[0].RuntimeEstimate != nil {
+		t.Fatalf("point lookup should not become table-volume runtime estimate: %#v", point.Statements[0])
+	}
+}
+
+func TestRuntimeHintsRejectMalformedInput(t *testing.T) {
+	if _, err := ParseRuntimeHints("bad.json", []byte(`{"version":"patchline.data-volume-runtime-hints/v1","tables":{"accounts":{"rows":0,"source":"missing volume"}}}`)); err == nil {
+		t.Fatal("expected missing positive volume to be rejected")
+	}
+	if _, err := ParseRuntimeHints("bad.json", []byte(`{"version":"patchline.data-volume-runtime-hints/v1","tables":{"accounts":{"rows":1,"source":"x","source_kind":"telepathy"}}}`)); err == nil {
+		t.Fatal("expected unsupported source_kind to be rejected")
+	}
+	if _, err := Evaluate(EnginePostgres, "16", "bad-inline.sql", []byte("UPDATE accounts SET status='x'; /* patchline: table accounts rows=bad source=fixture */")); err == nil {
+		t.Fatal("expected malformed inline runtime hint to be rejected")
+	}
+}
+
 func TestRejectsUnsupportedEngineAndBadVersion(t *testing.T) {
 	if _, err := ResolveProfile(Engine("db2"), "11"); err == nil {
 		t.Fatal("expected unsupported engine error")

@@ -13,18 +13,33 @@ import (
 func dbSemanticsCommand(args []string) error {
 	engineValue, ok := flagValue(args, "--engine")
 	if !ok || strings.TrimSpace(engineValue) == "" {
-		return errors.New("usage: patchline db-semantics --engine postgres|mysql|sqlite|sqlserver|oracle|bigquery|snowflake|clickhouse [--version version] --sql <sql-or-path> [--out report.json] [--json]")
+		return errors.New("usage: patchline db-semantics --engine postgres|mysql|sqlite|sqlserver|oracle|bigquery|snowflake|clickhouse [--version version] --sql <sql-or-path> [--table-hints hints.json] [--out report.json] [--json]")
 	}
 	sqlValue, ok := flagValue(args, "--sql")
 	if !ok || strings.TrimSpace(sqlValue) == "" {
-		return errors.New("usage: patchline db-semantics --engine postgres|mysql|sqlite|sqlserver|oracle|bigquery|snowflake|clickhouse [--version version] --sql <sql-or-path> [--out report.json] [--json]")
+		return errors.New("usage: patchline db-semantics --engine postgres|mysql|sqlite|sqlserver|oracle|bigquery|snowflake|clickhouse [--version version] --sql <sql-or-path> [--table-hints hints.json] [--out report.json] [--json]")
 	}
 	version, _ := flagValue(args, "--version")
 	source, content, err := readDBSemanticsSQL(sqlValue)
 	if err != nil {
 		return err
 	}
-	report, err := dbsemantics.Evaluate(dbsemantics.Engine(engineValue), version, source, content)
+	options := dbsemantics.AnalysisOptions{}
+	if hintsPath, ok := flagValue(args, "--table-hints"); ok {
+		if strings.TrimSpace(hintsPath) == "" {
+			return errors.New("--table-hints requires a JSON path")
+		}
+		hintContent, err := os.ReadFile(hintsPath)
+		if err != nil {
+			return fmt.Errorf("read runtime table hints %q: %w", hintsPath, err)
+		}
+		hints, err := dbsemantics.ParseRuntimeHints(filepath.ToSlash(hintsPath), hintContent)
+		if err != nil {
+			return err
+		}
+		options.RuntimeHints = hints
+	}
+	report, err := dbsemantics.EvaluateWithOptions(dbsemantics.Engine(engineValue), version, source, content, options)
 	if err != nil {
 		return err
 	}
@@ -74,6 +89,15 @@ func dbSemanticsCommand(args []string) error {
 				queryPlan.ChangeKind,
 				len(queryPlan.RepresentativeWorkloads),
 				len(queryPlan.Regressions),
+			)
+		}
+		if runtime := statement.RuntimeEstimate; runtime != nil {
+			fmt.Printf("      runtime class=%s duration=%s rows=%d bytes=%d source=%s\n",
+				runtime.Class,
+				runtime.EstimatedDurationClass,
+				runtime.RowsUpperBound,
+				runtime.BytesUpperBound,
+				runtime.SourceKind,
 			)
 		}
 		for _, rule := range statement.Rules {

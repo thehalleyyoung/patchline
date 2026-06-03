@@ -547,7 +547,7 @@ Usage:
   patchline migration-outcomes <evidence.jsonl> <migration.sql> [--repair manifest.json] [--policy policy.json] [--benchmark suite.json] [--source-sql path] [--json]
   patchline dry-run <manifest.json> [--store store.json] [--json]
   patchline db-dry-run <manifest.json> --dialect <postgres|mysql> [--dsn local-dsn] [--execute] [--json]
-  patchline db-semantics --engine postgres|mysql|sqlite|sqlserver|oracle|bigquery|snowflake|clickhouse [--version version] --sql <sql-or-path> [--out report.json] [--json]
+  patchline db-semantics --engine postgres|mysql|sqlite|sqlserver|oracle|bigquery|snowflake|clickhouse [--version version] --sql <sql-or-path> [--table-hints hints.json] [--out report.json] [--json]
   patchline repair-semantics <manifest.json> [--store store.json] [--json]
   patchline snapshot-drift <manifest.json> <before-store.json> <after-store.json> [--json]
   patchline effect-summary <manifest.json> [--json]

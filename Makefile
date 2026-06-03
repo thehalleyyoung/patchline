@@ -1394,6 +1394,10 @@ db-rollback-feasibility-gate:
 query-plan-regression-gate:
 	bash scripts/query-plan-regression-gate.sh
 
+.PHONY: data-volume-runtime-gate
+data-volume-runtime-gate:
+	bash scripts/data-volume-runtime-gate.sh
+
 federated-benchmark-split-gate:
 	bash scripts/federated-benchmark-split-gate.sh
 

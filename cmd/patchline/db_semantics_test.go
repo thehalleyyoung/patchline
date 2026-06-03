@@ -99,6 +99,40 @@ func TestDBSemanticsCommandWritesQueryPlanRegressionReport(t *testing.T) {
 	}
 }
 
+func TestDBSemanticsCommandWritesRuntimeEstimateFromTableHints(t *testing.T) {
+	root := t.TempDir()
+	sqlPath := filepath.Join(root, "migration.sql")
+	hintsPath := filepath.Join(root, "hints.json")
+	writeMainTestFile(t, root, "migration.sql", "ALTER TABLE accounts ADD COLUMN status text DEFAULT 'active';")
+	writeMainTestFile(t, root, "hints.json", `{
+  "version": "patchline.data-volume-runtime-hints/v1",
+  "tables": {
+    "accounts": {
+      "rows": 12500000,
+      "bytes": 12884901888,
+      "source": "postgres.pg_class.reltuples+pg_total_relation_size",
+      "source_kind": "public_statistic"
+    }
+  }
+}`)
+	outPath := filepath.Join(root, "runtime-report.json")
+	if err := run([]string{"db-semantics", "--engine", "postgres", "--version", "10", "--sql", sqlPath, "--table-hints", hintsPath, "--out", outPath, "--json"}); err != nil {
+		t.Fatalf("db-semantics command failed: %v", err)
+	}
+	var report dbsemantics.Report
+	readMainTestJSON(t, outPath, &report)
+	if report.RuntimeHintHash == "" || report.Summary.RuntimeEstimates != 1 || report.Summary.HighRuntimeEstimates != 1 {
+		t.Fatalf("expected runtime hint summary, got hash=%q summary=%#v", report.RuntimeHintHash, report.Summary)
+	}
+	runtime := report.Statements[0].RuntimeEstimate
+	if runtime == nil || runtime.Class != "table_rewrite_estimate" || runtime.RowsUpperBound != 12500000 || runtime.SourceKind != "public_statistic" {
+		t.Fatalf("unexpected runtime estimate: %#v", runtime)
+	}
+	if !mainDBSemanticsHasRule(report, "runtime.table_rewrite_estimate") {
+		t.Fatalf("expected runtime estimate rule, got %#v", report.Statements[0].Rules)
+	}
+}
+
 func TestDBSemanticsCommandRejectsUnknownEngine(t *testing.T) {
 	err := run([]string{"db-semantics", "--engine", "toydb", "--version", "1", "--sql", "select 1;", "--json"})
 	if err == nil {

@@ -1,0 +1,86 @@
+{
+  "version": "patchline.data-volume-runtime-gate/v1",
+  "claim": "Patchline's database-semantics layer now emits data-volume-aware runtime estimates only when the migration carries auditable volume evidence: public catalog statistics, production-like fixture bounds, or an explicit user-provided table-hints file. The gate proves high-volume rewrites, online copies, and analytical table replacements while retaining negative controls for unhinted bulk SQL and point-lookups that should not be promoted into table-wide runtime claims.",
+  "minimum_estimates": 3,
+  "cases": [
+    {
+      "id": "postgres-rewrite-public-statistic",
+      "engine": "postgres",
+      "version": "10",
+      "sql": "ALTER TABLE accounts ADD COLUMN status text DEFAULT 'active';",
+      "table_hints": {
+        "accounts": {
+          "rows": 12500000,
+          "bytes": 12884901888,
+          "source": "postgres.pg_class.reltuples+pg_total_relation_size",
+          "source_kind": "public_statistic"
+        }
+      },
+      "expect": {
+        "estimate": true,
+        "class": "table_rewrite_estimate",
+        "severity": "high",
+        "duration": "long_running_or_maintenance_window",
+        "source_kind": "public_statistic",
+        "table": "accounts",
+        "min_rows": 12000000
+      }
+    },
+    {
+      "id": "mysql-gh-ost-fixture-copy",
+      "engine": "mysql",
+      "version": "8.0.34",
+      "sql": "ALTER TABLE accounts ADD COLUMN last_seen_at datetime /* gh-ost --database app --table accounts --alter 'ADD COLUMN last_seen_at datetime' --max-lag-millis 1500 */ /* patchline: table accounts rows=2500000 bytes=2147483648 source=fixture:mysql-account-sample source_kind=fixture */;",
+      "expect": {
+        "estimate": true,
+        "class": "online_schema_change_copy_estimate",
+        "severity": "medium",
+        "duration": "minutes_to_hours",
+        "source_kind": "fixture",
+        "table": "accounts",
+        "min_rows": 2500000
+      }
+    },
+    {
+      "id": "bigquery-replace-source-statistic",
+      "engine": "bigquery",
+      "version": "2024.2",
+      "sql": "CREATE OR REPLACE TABLE analytics.daily AS SELECT * FROM analytics.stage;",
+      "table_hints": {
+        "analytics.stage": {
+          "rows": 50000000,
+          "bytes": 107374182400,
+          "source": "bigquery.INFORMATION_SCHEMA.TABLES",
+          "source_kind": "public_statistic"
+        }
+      },
+      "expect": {
+        "estimate": true,
+        "class": "table_replacement_estimate",
+        "severity": "high",
+        "duration": "long_running_or_maintenance_window",
+        "source_kind": "public_statistic",
+        "table": "analytics.stage",
+        "min_rows": 50000000
+      }
+    },
+    {
+      "id": "unhinted-bulk-control",
+      "engine": "postgres",
+      "version": "16",
+      "sql": "UPDATE accounts SET status = 'closed';",
+      "expect": {
+        "estimate": false
+      }
+    },
+    {
+      "id": "point-lookup-hint-control",
+      "engine": "postgres",
+      "version": "16",
+      "sql": "UPDATE accounts SET status = 'closed' WHERE id = 42 /* patchline: table accounts rows=12000000 source=fixture:accounts source_kind=fixture */;",
+      "expect": {
+        "estimate": false
+      }
+    }
+  ]
+}

@@ -61,6 +61,7 @@ type Report struct {
 	Version          string               `json:"version"`
 	Source           string               `json:"source"`
 	InputHash        string               `json:"input_hash"`
+	RuntimeHintHash  string               `json:"runtime_hint_hash,omitempty"`
 	Profile          Profile              `json:"profile"`
 	Statements       []StatementSemantics `json:"statements"`
 	Summary          Summary              `json:"summary"`
@@ -83,6 +84,7 @@ type StatementSemantics struct {
 	PartitionSharding   *PartitionSharding   `json:"partition_sharding,omitempty"`
 	RollbackFeasibility *RollbackFeasibility `json:"rollback_feasibility,omitempty"`
 	QueryPlanRegression *QueryPlanRegression `json:"query_plan_regression,omitempty"`
+	RuntimeEstimate     *RuntimeEstimate     `json:"runtime_estimate,omitempty"`
 }
 
 type RuleFinding struct {
@@ -121,6 +123,8 @@ type Summary struct {
 	RefutedRollbacks              int      `json:"refuted_rollbacks,omitempty"`
 	QueryPlanRegressionChecks     int      `json:"query_plan_regression_checks,omitempty"`
 	QueryPlanRegressions          int      `json:"query_plan_regressions,omitempty"`
+	RuntimeEstimates              int      `json:"runtime_estimates,omitempty"`
+	HighRuntimeEstimates          int      `json:"high_runtime_estimates,omitempty"`
 	Tables                        []string `json:"tables"`
 }
 
@@ -280,14 +284,20 @@ func SupportedEngines() []Engine {
 }
 
 func Evaluate(engine Engine, version, source string, content []byte) (Report, error) {
+	return EvaluateWithOptions(engine, version, source, content, AnalysisOptions{})
+}
+
+func EvaluateWithOptions(engine Engine, version, source string, content []byte, options AnalysisOptions) (Report, error) {
 	profile, err := ResolveProfile(engine, version)
 	if err != nil {
 		return Report{}, err
 	}
+	options = normalizeAnalysisOptions(options)
 	report := Report{
 		Version:          ReportVersion,
 		Source:           source,
 		InputHash:        canonical.Hash(string(content)),
+		RuntimeHintHash:  options.RuntimeHints.Hash,
 		Profile:          profile,
 		SupportedEngines: SupportedEngines(),
 	}
@@ -297,7 +307,10 @@ func Evaluate(engine Engine, version, source string, content []byte) (Report, er
 		if sql == "" {
 			continue
 		}
-		statement := evaluateStatement(index, sql, profile)
+		statement, err := evaluateStatement(index, sql, profile, options)
+		if err != nil {
+			return Report{}, fmt.Errorf("statement %d: %w", index, err)
+		}
 		report.Statements = append(report.Statements, statement)
 		if statement.Table != "" {
 			tables[statement.Table] = true
@@ -352,6 +365,12 @@ func Evaluate(engine Engine, version, source string, content []byte) (Report, er
 		if queryPlan := statement.QueryPlanRegression; queryPlan != nil {
 			report.Summary.QueryPlanRegressionChecks++
 			report.Summary.QueryPlanRegressions += len(queryPlan.Regressions)
+		}
+		if runtime := statement.RuntimeEstimate; runtime != nil {
+			report.Summary.RuntimeEstimates++
+			if runtime.Severity == "high" {
+				report.Summary.HighRuntimeEstimates++
+			}
 		}
 		report.Summary.VersionSpecificRules += len(statement.Rules)
 		report.Summary.ProofObligations += len(statement.Obligations)
@@ -481,7 +500,7 @@ func ResolveProfile(engine Engine, version string) (Profile, error) {
 	return profile, nil
 }
 
-func evaluateStatement(index int, sql string, profile Profile) StatementSemantics {
+func evaluateStatement(index int, sql string, profile Profile, options AnalysisOptions) (StatementSemantics, error) {
 	normalized := normalizeSQL(sql, profile.Engine)
 	tokens := tokenize(normalizeTokenSQL(sql, profile.Engine))
 	kind, table := kindAndTable(tokens)
@@ -539,9 +558,12 @@ func evaluateStatement(index int, sql string, profile Profile) StatementSemantic
 	applyPartitionSharding(&statement, sql, tokens, profile)
 	applyRollbackFeasibility(&statement, tokens, profile)
 	applyQueryPlanRegression(&statement, sql, tokens, profile)
+	if err := applyRuntimeEstimate(&statement, sql, tokens, profile, options); err != nil {
+		return StatementSemantics{}, err
+	}
 	sort.Slice(statement.Rules, func(i, j int) bool { return statement.Rules[i].ID < statement.Rules[j].ID })
 	sort.Strings(statement.Obligations)
-	return statement
+	return statement, nil
 }
 
 func applyPostgres(statement *StatementSemantics, tokens []string, profile Profile) {
