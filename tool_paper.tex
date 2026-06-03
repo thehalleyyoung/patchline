@@ -61,7 +61,8 @@ patch-series verifier proves every modeled SQL statement boundary in a migration
 declared schema invariants, while a maintainer acceptance study measures paired review-time savings and
 fails generated remediation plans that hide uncertainty or inflate confidence, and a public evidence
 marketplace admits only redacted, certificate-backed hazard examples with clear licenses, verified
-artifact hashes, explicit consent, and reproducible commands.
+artifact hashes, explicit consent, reproducible commands, and a benchmark-import path that records
+submitter labels as untrusted while deriving runnable cases from independent redacted evidence cues.
 Critically,
 every capability in \tool{} is backed by a reproducible \emph{gate}: a script that proves the
 capability against real, pinned public code and fails loudly on drift. \tool{} currently ships more
@@ -228,9 +229,11 @@ invariants at the initial state and every intermediate state. & \code{patch-seri
 \code{maintainer-acceptance-study} & Compare paired maintainer reviews of baseline remediation material
 against generated plans while hashing the real artifacts reviewed and failing hidden uncertainty. &
 \code{maintainer-acceptance-study.json}, \code{.md} \\
-\code{evidence-marketplace} & Publish redacted public hazard examples only after clear-license,
-consent, symlink-safe artifact-hash, certificate-obligation, and public-data reproduction checks pass. &
-\code{marketplace.json}, \code{marketplace.md}, \code{index.html} \\
+\code{evidence-marketplace} / \code{artifact-benchmark import-marketplace} & Publish redacted public
+hazard examples only after clear-license, consent, symlink-safe artifact-hash, certificate-obligation,
+and public-data reproduction checks pass, then import published examples into runnable benchmark cases
+without trusting registry or artifact hazard labels. & \code{marketplace.json},
+\code{marketplace-import.json}, generated manifest/ground truth \\
 \code{propose} & Generate bounded interventions (guards, tests) within an explicit budget; quarantine
 them as untrusted artifacts. & \code{proposal.patch}, \code{patchline-proposals/} \\
 \code{compare} & Deterministically re-analyze proposed changes; accept or reject by evidence delta. &
@@ -745,10 +748,14 @@ methodology from project-owned fixtures to contributed examples. A registry entr
 if the declared SPDX license is accepted, the consent statement is explicit, all artifact paths stay
 inside the registry after symlink resolution, every artifact hash recomputes, redaction is reviewed,
 raw data is absent, and the certificate subject hash recomputes from normalized source, redaction,
-artifact, obligation, license, and reproduction metadata. The
-\gate{evidence-marketplace-gate} publishes two redacted public-corpus examples and then corrupts a
-copied certificate hash; the bad marketplace must be rejected while the tracked fixture remains
-untouched.
+artifact, obligation, license, and reproduction metadata. The benchmark importer then reuses the
+published report, rehashes the artifact it actually reads, records both registry and artifact
+\code{hazard\_class} values as untrusted submitter labels, derives labels from a closed table of
+redacted snippet cues, and emits SQL fixtures plus ground truth with certificate, evidence-hash, and
+artifact-hash provenance. The \gate{evidence-marketplace-gate} publishes two redacted public-corpus
+examples, imports both into a runnable benchmark manifest, validates and runs that manifest, and then
+corrupts a copied certificate hash; the bad marketplace must be rejected while the tracked fixture
+remains untouched.
 
 %======================================================================
 \section{Evaluation Methodology}
@@ -835,7 +842,7 @@ owner-routed rollback playbooks for broad writes & \gate{remediation-playbook-ga
 4 expected-loss remediation choices; unsafe residual-loss bound refuted & \gate{remediation-cost-optimizer-gate} \\
 5 migration-PR states preserve invariants; unsafe drop refuted & \gate{patch-series-verifier-gate} \\
 9 paired maintainer reviews; 38.55\% faster with full uncertainty recall; hidden-control refuted & \gate{maintainer-acceptance-study-gate} \\
-2 redacted, certificate-backed public evidence examples; corrupted certificate rejected & \gate{evidence-marketplace-gate} \\
+2 certificate-backed examples imported into runnable benchmarks; corrupted certificate rejected & \gate{evidence-marketplace-gate} \\
 9 Cassandra changes incl.\ destructive drops & \code{laaksomavrick/twitter-go} \\
 17 $\rightarrow$ 1 line, 1-minimal reproduction & delta-debugging oracle \\
 3 pipeline frameworks in one repo & \code{harrydevforlife/building-lakehouse} \\

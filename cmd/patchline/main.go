@@ -387,7 +387,7 @@ func run(args []string) error {
 		return artifactScale(args[1], outPath, hasFlag(args[2:], "--json"))
 	case "artifact-benchmark":
 		if len(args) < 3 {
-			return errors.New("usage: patchline artifact-benchmark <validate|run|compare> <args> [--json] [--out path]")
+			return errors.New("usage: patchline artifact-benchmark <validate|run|compare|import-marketplace> <args> [--json] [--out path]")
 		}
 		return artifactBenchmark(args[1:])
 	case "artifact-study":
@@ -570,6 +570,7 @@ Usage:
   patchline artifact-benchmark validate <manifest.json> [--json]
   patchline artifact-benchmark run <manifest.json> [--out report.json] [--json]
   patchline artifact-benchmark compare <actual.json> <expected.json> [--json]
+  patchline artifact-benchmark import-marketplace --registry registry.json --out benchmark-dir [--dataset-id id] [--json]
   patchline ingest-evidence <events.jsonl> [--json] [--out graph.json]
   patchline adapt-evidence <otlp|datadog|postgres|github|migration-runner|jira|linear> <input.json> [--json] [--out events.jsonl]
   patchline evidence-marketplace publish --registry registry.json --out dir [--json]
@@ -14240,6 +14241,38 @@ func artifactBenchmark(args []string) error {
 		}
 		if !report.OK {
 			return errors.New("artifact benchmark comparison failed")
+		}
+		return nil
+	case "import-marketplace":
+		registryPath, ok := flagValue(args[1:], "--registry")
+		if !ok || registryPath == "" {
+			return errors.New("usage: patchline artifact-benchmark import-marketplace --registry registry.json --out benchmark-dir [--dataset-id id] [--json]")
+		}
+		outDir, ok := flagValue(args[1:], "--out")
+		if !ok || outDir == "" {
+			return errors.New("usage: patchline artifact-benchmark import-marketplace --registry registry.json --out benchmark-dir [--dataset-id id] [--json]")
+		}
+		datasetID, _ := flagValue(args[1:], "--dataset-id")
+		report, err := artifact.ImportMarketplaceBenchmark(artifact.MarketplaceBenchmarkImportOptions{
+			RegistryPath: registryPath,
+			OutDir:       outDir,
+			DatasetID:    datasetID,
+		})
+		if err != nil {
+			return err
+		}
+		if hasFlag(args[1:], "--json") {
+			if err := writeJSON(os.Stdout, report); err != nil {
+				return err
+			}
+		} else {
+			fmt.Printf("marketplace benchmark import dataset=%s ok=%t imported=%d rejected=%d manifest=%s\n", report.DatasetID, report.OK, report.Summary.Imported, report.Summary.Rejected, filepath.Join(outDir, filepath.FromSlash(report.Manifest)))
+			for _, c := range report.Cases {
+				fmt.Printf("  case=%s claimed=%s derived=%s cue=%s trusted_submitter_labels=%t\n", c.CaseID, c.ClaimedHazardClass, c.DerivedHazardClass, c.CueID, c.SubmitterLabelsTrusted)
+			}
+		}
+		if !report.OK {
+			return errors.New("marketplace benchmark import failed")
 		}
 		return nil
 	default:

@@ -20,6 +20,23 @@ The command writes `marketplace.json`, `marketplace.md`, and `index.html`.
 Rejected examples stay in the report with reason codes; they are not silently
 dropped.
 
+## Import into benchmarks
+
+```bash
+go run ./cmd/patchline artifact-benchmark import-marketplace \
+  --registry examples/evidence-marketplace/registry.json \
+  --out results/generated/marketplace-benchmark \
+  --json
+go run ./cmd/patchline artifact-benchmark run \
+  results/generated/marketplace-benchmark/manifests/marketplace-import.json
+```
+
+The importer first reuses marketplace publication checks, then rehashes the
+artifact it reads. It records registry and artifact `hazard_class` values as
+untrusted submitter labels, derives benchmark labels only from a closed table of
+redacted evidence cues, and emits runnable SQL fixtures plus ground truth that
+preserves source, certificate, evidence-hash, and artifact-hash provenance.
+
 ## Admission contract
 
 Each public example must include:
@@ -38,6 +55,7 @@ Each public example must include:
 make evidence-marketplace-gate
 ```
 
-The gate publishes the fixture marketplace, checks the generated JSON/Markdown
-and HTML, then corrupts a copied certificate hash and proves the bad submission
-is rejected without modifying tracked fixtures.
+The gate publishes the fixture marketplace, imports the published examples into
+a runnable benchmark manifest, validates and runs that manifest, then corrupts a
+copied certificate hash and proves the bad submission is rejected without
+modifying tracked fixtures.

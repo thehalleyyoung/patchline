@@ -9,7 +9,7 @@
 \contentsline {paragraph}{P4: Never over-claim.}{5}{section.2}%
 \contentsline {paragraph}{P5: Everything is gated.}{5}{section.2}%
 \contentsline {section}{\numberline {3}System Architecture}{5}{section.3}%
-\contentsline {paragraph}{Resumability and offline operation.}{6}{table.1}%
+\contentsline {paragraph}{Resumability and offline operation.}{7}{table.1}%
 \contentsline {subsection}{\numberline {3.1}Artifact contract}{7}{subsection.3.1}%
 \contentsline {section}{\numberline {4}The Project-Native Fact Layer}{7}{section.4}%
 \contentsline {paragraph}{Sources and reproducibility.}{8}{section.4}%
@@ -55,7 +55,7 @@
 \contentsline {section}{\numberline {10}Evaluation Methodology}{16}{section.10}%
 \contentsline {paragraph}{Blinded false-positive adjudication.}{16}{section.10}%
 \contentsline {paragraph}{Seeded false-negative recall.}{16}{section.10}%
-\contentsline {paragraph}{Ablations and effect sizes.}{16}{section.10}%
+\contentsline {paragraph}{Ablations and effect sizes.}{17}{section.10}%
 \contentsline {paragraph}{Severity calibration.}{17}{section.10}%
 \contentsline {paragraph}{Stratification.}{17}{section.10}%
 \contentsline {paragraph}{Baselines.}{17}{section.10}%

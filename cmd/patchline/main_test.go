@@ -103,6 +103,41 @@ func TestEvidenceMarketplacePublishCommandWritesReports(t *testing.T) {
 	}
 }
 
+func TestArtifactBenchmarkImportMarketplaceCommandWritesRunnableBenchmark(t *testing.T) {
+	root := t.TempDir()
+	registry := mainTestEvidenceMarketplaceRegistry(t, root)
+	registry.Examples[0].HazardClass = "submitter-claimed-safe-maintenance"
+	registry.Examples[0].Certificate.SubjectHash = evidencemarketplace.ExpectedSubjectHash(registry.Examples[0])
+	registryPath := filepath.Join(root, "registry.json")
+	writeMainTestJSONFile(t, registryPath, registry)
+
+	out := filepath.Join(t.TempDir(), "marketplace-benchmark")
+	if err := run([]string{"artifact-benchmark", "import-marketplace", "--registry", registryPath, "--out", out, "--json"}); err != nil {
+		t.Fatalf("marketplace import failed: %v", err)
+	}
+	var report artifact.MarketplaceBenchmarkImportReport
+	readMainTestJSON(t, filepath.Join(out, "marketplace-import.json"), &report)
+	if !report.OK || report.Summary.Imported != 1 || report.Cases[0].SubmitterLabelsTrusted {
+		t.Fatalf("unexpected marketplace benchmark import report: %#v", report)
+	}
+	if report.Cases[0].ClaimedHazardClass == report.Cases[0].DerivedHazardClass {
+		t.Fatalf("expected importer to derive an independent label: %#v", report.Cases[0])
+	}
+	manifestPath := filepath.Join(out, filepath.FromSlash(report.Manifest))
+	if err := run([]string{"artifact-benchmark", "validate", manifestPath, "--json"}); err != nil {
+		t.Fatalf("generated marketplace benchmark did not validate: %v", err)
+	}
+	runOut := filepath.Join(out, "run.json")
+	if err := run([]string{"artifact-benchmark", "run", manifestPath, "--out", runOut, "--json"}); err != nil {
+		t.Fatalf("generated marketplace benchmark did not run: %v", err)
+	}
+	var benchmark artifact.BenchmarkRunReport
+	readMainTestJSON(t, runOut, &benchmark)
+	if !benchmark.OK || benchmark.Metrics.Total != 1 || benchmark.Cases[0].ActualResult != artifact.ResultFlag {
+		t.Fatalf("unexpected generated benchmark report: %#v", benchmark)
+	}
+}
+
 func TestExpandContractTemplateCommandWritesReports(t *testing.T) {
 	root := t.TempDir()
 	writeMainTestFile(t, root, "rails/app/models/invoice.rb", `class Invoice < ApplicationRecord
@@ -2500,7 +2535,8 @@ func mainTestEvidenceMarketplaceRegistry(t *testing.T, root string) evidencemark
 	writeMainTestFile(t, root, "artifacts/redacted-hazard.json", `{
   "version": "patchline.redacted-hazard-example/v1",
   "finding": "redacted stable-risk for unsafe migration guard",
-  "evidence": [{"path": "migrations/20260101010101_add_status.sql", "snippet": "ALTER TABLE <table> ADD COLUMN <column>"}]
+  "hazard_class": "redacted-submitter-label",
+  "evidence": [{"path": "db/migrate/20260101010101_backfill_accounts.rb", "snippet": "<model>.find_each { |row| row.update!(<redacted_column>: <redacted_value>) }"}]
 }
 `)
 	writeMainTestFile(t, root, "artifacts/cert-witness.json", `{

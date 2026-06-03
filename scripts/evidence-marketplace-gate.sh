@@ -30,7 +30,8 @@ for phrase in "evidence marketplace" "redacted, certificate-backed" "make eviden
 done
 
 go test ./internal/evidencemarketplace -run 'TestPublishRegistry|TestCertificateHash|TestRenderHTML'
-go test ./cmd/patchline -run TestEvidenceMarketplacePublishCommandWritesReports
+go test ./internal/artifact -run TestImportMarketplaceBenchmark
+go test ./cmd/patchline -run 'TestEvidenceMarketplacePublishCommandWritesReports|TestArtifactBenchmarkImportMarketplaceCommandWritesRunnableBenchmark'
 
 go run ./cmd/patchline evidence-marketplace publish \
   --registry "$REGISTRY" \
@@ -65,6 +66,40 @@ if grep -Eiq 'password=|Authorization:|AWS_SECRET_ACCESS_KEY|source_code|BEGIN P
   exit 1
 fi
 
+go run ./cmd/patchline artifact-benchmark import-marketplace \
+  --registry "$REGISTRY" \
+  --out "$OUT/imported-benchmark" \
+  --json > "$OUT/imported-benchmark.stdout.json"
+
+test -s "$OUT/imported-benchmark/marketplace-import.json"
+test -s "$OUT/imported-benchmark/manifests/marketplace-import.json"
+
+jq -e '
+  .version == "patchline.marketplace-benchmark-import/v1" and
+  .ok == true and
+  .summary.imported >= 2 and
+  .summary.rejected == 0 and
+  (.cases | all(
+    .submitter_labels_trusted == false and
+    .label_source == "artifact-evidence-cue" and
+    (.certificate_subject_hash | startswith("sha256:")) and
+    (.marketplace_artifact_hash | startswith("sha256:")) and
+    (.fixture_sha256 | startswith("sha256:")) and
+    (.ground_truth_sha256 | startswith("sha256:"))
+  ))
+' "$OUT/imported-benchmark/marketplace-import.json" > /dev/null
+
+go run ./cmd/patchline artifact-benchmark validate \
+  "$OUT/imported-benchmark/manifests/marketplace-import.json" \
+  --json > "$OUT/imported-benchmark.validate.json"
+go run ./cmd/patchline artifact-benchmark run \
+  "$OUT/imported-benchmark/manifests/marketplace-import.json" \
+  --out "$OUT/imported-benchmark/run.json" \
+  --json > "$OUT/imported-benchmark.run.stdout.json"
+
+jq -e '.ok == true and .metrics.total >= 2 and .metrics.failed == 0 and (.cases | all(.actual_result == "flag"))' \
+  "$OUT/imported-benchmark/run.json" > /dev/null
+
 NEG="$OUT/negative-fixture"
 mkdir -p "$NEG"
 cp -R examples/evidence-marketplace/. "$NEG/"
@@ -85,12 +120,15 @@ fi
 jq -e '.ok == false and (.rejected | length) >= 1 and (.rejected[]?.reasons[]? | contains("certificate.subject_hash mismatch"))' \
   "$OUT/rejected/marketplace.json" > /dev/null
 
-jq -n --slurpfile r "$OUT/published/marketplace.json" '{
+jq -n \
+  --slurpfile r "$OUT/published/marketplace.json" \
+  --slurpfile i "$OUT/imported-benchmark/marketplace-import.json" '{
   version: "patchline.evidence-marketplace-gate-results/v1",
   published: $r[0].summary.published,
   artifacts_verified: $r[0].summary.artifacts_verified,
+  imported_benchmark_cases: $i[0].summary.imported,
   negative_control_rejected: true,
   verified: true
 }' > "$OUT/gate-summary.json"
 
-echo "evidence-marketplace gate passed: $(jq -r .summary.published "$OUT/published/marketplace.json") redacted certificate-backed examples published; corrupted certificate rejected"
+echo "evidence-marketplace gate passed: $(jq -r .summary.published "$OUT/published/marketplace.json") redacted certificate-backed examples published; $(jq -r .summary.imported "$OUT/imported-benchmark/marketplace-import.json") imported into runnable benchmarks; corrupted certificate rejected"

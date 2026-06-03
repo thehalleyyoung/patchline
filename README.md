@@ -137,7 +137,7 @@ Run `patch-series-verify --spec <spec>` to prove every modeled migration-PR inte
 
 Run `maintainer-acceptance-study --spec <spec>` to measure paired maintainer review-time reduction for generated remediation plans while failing hidden uncertainty or overconfidence; reproduce it with `make maintainer-acceptance-study-gate`.
 
-Run `evidence-marketplace publish --registry <registry>` to publish redacted, certificate-backed public hazard examples only after license, consent, artifact-hash, and certificate checks pass; reproduce it with `make evidence-marketplace-gate`.
+Run `evidence-marketplace publish --registry <registry>` and `artifact-benchmark import-marketplace --registry <registry>` to publish redacted, certificate-backed hazard examples and import them into runnable benchmarks without trusting submitter labels; reproduce it with `make evidence-marketplace-gate`.
 
 Run `golden-fixture generate --github owner/repo --ref <sha> --subpath <path> --out <dir>` to turn a real-repo slice into a tiny deterministic Go test without vendoring the full repository; see [docs/golden-fixtures.md](docs/golden-fixtures.md).
 
