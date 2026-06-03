@@ -560,6 +560,154 @@ func TestPartitionShardingSemanticsHasNegativeControlAndStableHash(t *testing.T)
 	}
 }
 
+func TestRollbackFeasibilityDistinguishesEngineSemantics(t *testing.T) {
+	cases := []struct {
+		name          string
+		engine        Engine
+		version       string
+		sql           string
+		class         string
+		status        string
+		feasible      bool
+		transactional bool
+		implicit      bool
+		irreversible  bool
+		beforeImage   bool
+		snapshot      bool
+		timeTravel    bool
+	}{
+		{
+			name:          "postgres-transactional-ddl",
+			engine:        EnginePostgres,
+			version:       "16",
+			sql:           "ALTER TABLE accounts ADD COLUMN status text;",
+			class:         "transactional_ddl",
+			status:        "checked",
+			feasible:      true,
+			transactional: true,
+		},
+		{
+			name:     "postgres-concurrent-index-cleanup",
+			engine:   EnginePostgres,
+			version:  "16",
+			sql:      "CREATE INDEX CONCURRENTLY idx_accounts_status ON accounts(status);",
+			class:    "non_transactional_ddl_cleanup",
+			status:   "conditional",
+			feasible: false,
+		},
+		{
+			name:     "mysql-implicit-commit",
+			engine:   EngineMySQL,
+			version:  "8.0.34",
+			sql:      "ALTER TABLE accounts ADD COLUMN status varchar(20) DEFAULT 'active';",
+			class:    "implicit_commit_compensation",
+			status:   "conditional",
+			implicit: true,
+			snapshot: true,
+		},
+		{
+			name:         "bigquery-irrevocable-replace",
+			engine:       EngineBigQuery,
+			version:      "2024.2",
+			sql:          "CREATE OR REPLACE TABLE analytics.daily AS SELECT * FROM analytics.stage;",
+			class:        "irreversible_metadata",
+			status:       "refuted",
+			irreversible: true,
+			snapshot:     true,
+		},
+		{
+			name:         "snowflake-time-travel-replace",
+			engine:       EngineSnowflake,
+			version:      "8.20",
+			sql:          "CREATE OR REPLACE TABLE analytics.daily AS SELECT * FROM analytics.stage;",
+			class:        "irreversible_metadata",
+			status:       "conditional",
+			feasible:     true,
+			implicit:     true,
+			irreversible: true,
+			snapshot:     true,
+			timeTravel:   true,
+		},
+		{
+			name:     "clickhouse-async-mutation",
+			engine:   EngineClickHouse,
+			version:  "24.1",
+			sql:      "ALTER TABLE events DELETE WHERE created_at < now() - interval 30 day;",
+			class:    "async_mutation_recovery",
+			status:   "conditional",
+			snapshot: true,
+		},
+		{
+			name:        "point-dml-compensation",
+			engine:      EnginePostgres,
+			version:     "16",
+			sql:         "UPDATE accounts SET status = 'closed' WHERE id = 42;",
+			class:       "compensating_dml",
+			status:      "conditional",
+			feasible:    true,
+			beforeImage: true,
+		},
+		{
+			name:     "bulk-dml-snapshot",
+			engine:   EnginePostgres,
+			version:  "16",
+			sql:      "UPDATE accounts SET status = 'closed';",
+			class:    "snapshot_required",
+			status:   "conditional",
+			snapshot: true,
+		},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			report, err := Evaluate(tc.engine, tc.version, tc.name+".sql", []byte(tc.sql))
+			if err != nil {
+				t.Fatal(err)
+			}
+			if report.Summary.RollbackFeasibilityChecks != 1 {
+				t.Fatalf("expected one rollback feasibility check, got summary=%#v statements=%#v", report.Summary, report.Statements)
+			}
+			rollback := report.Statements[0].RollbackFeasibility
+			if rollback == nil {
+				t.Fatalf("missing rollback feasibility: %#v", report.Statements[0])
+			}
+			if rollback.Class != tc.class || rollback.Status != tc.status || rollback.Feasible != tc.feasible {
+				t.Fatalf("unexpected rollback verdict for %s: %#v", tc.name, rollback)
+			}
+			if rollback.TransactionalRollback != tc.transactional || rollback.ImplicitCommit != tc.implicit || rollback.IrreversibleMetadata != tc.irreversible {
+				t.Fatalf("unexpected rollback engine flags for %s: %#v", tc.name, rollback)
+			}
+			if rollback.RequiresBeforeImage != tc.beforeImage || rollback.RequiresSnapshot != tc.snapshot || rollback.TimeTravelEligible != tc.timeTravel {
+				t.Fatalf("unexpected rollback evidence requirements for %s: %#v", tc.name, rollback)
+			}
+			if rollback.RecoveryMechanism == "" || len(rollback.Evidence) == 0 || len(rollback.Obligations) < 2 || len(rollback.FailureModes) == 0 {
+				t.Fatalf("rollback verdict should carry recovery, evidence, obligations, and failure modes: %#v", rollback)
+			}
+			if !hasRule(report, "rollback."+tc.class) {
+				t.Fatalf("missing rollback rule for %s in %#v", tc.class, report.Statements[0].Rules)
+			}
+		})
+	}
+}
+
+func TestRollbackFeasibilityHasSelectControlAndStableHash(t *testing.T) {
+	sql := []byte("SELECT * FROM accounts WHERE id = 42;")
+	first, err := Evaluate(EnginePostgres, "16", "select.sql", sql)
+	if err != nil {
+		t.Fatal(err)
+	}
+	second, err := Evaluate(EnginePostgres, "16", "select.sql", sql)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if first.Hash != second.Hash {
+		t.Fatalf("expected deterministic rollback feasibility hash, got %s and %s", first.Hash, second.Hash)
+	}
+	if first.Summary.RollbackFeasibilityChecks != 0 || first.Statements[0].RollbackFeasibility != nil {
+		t.Fatalf("read-only control should not emit rollback feasibility: %#v", first.Statements[0])
+	}
+}
+
 func TestRejectsUnsupportedEngineAndBadVersion(t *testing.T) {
 	if _, err := ResolveProfile(Engine("db2"), "11"); err == nil {
 		t.Fatal("expected unsupported engine error")

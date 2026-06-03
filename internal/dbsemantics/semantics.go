@@ -69,18 +69,19 @@ type Report struct {
 }
 
 type StatementSemantics struct {
-	Index              int                 `json:"index"`
-	Kind               string              `json:"kind"`
-	Table              string              `json:"table,omitempty"`
-	Normalized         string              `json:"normalized_sql"`
-	Risk               string              `json:"risk"`
-	Rules              []RuleFinding       `json:"rules"`
-	Obligations        []string            `json:"obligations,omitempty"`
-	EngineFacts        EngineFactSlice     `json:"engine_facts"`
-	Lock               LockSimulation      `json:"lock_simulation"`
-	OnlineSchemaChange *OnlineSchemaChange `json:"online_schema_change,omitempty"`
-	ReplicationLagRisk *ReplicationLagRisk `json:"replication_lag_risk,omitempty"`
-	PartitionSharding  *PartitionSharding  `json:"partition_sharding,omitempty"`
+	Index               int                  `json:"index"`
+	Kind                string               `json:"kind"`
+	Table               string               `json:"table,omitempty"`
+	Normalized          string               `json:"normalized_sql"`
+	Risk                string               `json:"risk"`
+	Rules               []RuleFinding        `json:"rules"`
+	Obligations         []string             `json:"obligations,omitempty"`
+	EngineFacts         EngineFactSlice      `json:"engine_facts"`
+	Lock                LockSimulation       `json:"lock_simulation"`
+	OnlineSchemaChange  *OnlineSchemaChange  `json:"online_schema_change,omitempty"`
+	ReplicationLagRisk  *ReplicationLagRisk  `json:"replication_lag_risk,omitempty"`
+	PartitionSharding   *PartitionSharding   `json:"partition_sharding,omitempty"`
+	RollbackFeasibility *RollbackFeasibility `json:"rollback_feasibility,omitempty"`
 }
 
 type RuleFinding struct {
@@ -98,20 +99,26 @@ type EngineFact struct {
 type EngineFactSlice []EngineFact
 
 type Summary struct {
-	Statements                 int      `json:"statements"`
-	HighRisk                   int      `json:"high_risk"`
-	MediumRisk                 int      `json:"medium_risk"`
-	LowRisk                    int      `json:"low_risk"`
-	VersionSpecificRules       int      `json:"version_specific_rules"`
-	ProofObligations           int      `json:"proof_obligations"`
-	LockSimulations            int      `json:"lock_simulations"`
-	ReaderBlockingLocks        int      `json:"reader_blocking_locks"`
-	WriterBlockingLocks        int      `json:"writer_blocking_locks"`
-	DDLBlockingLocks           int      `json:"ddl_blocking_locks"`
-	OnlineSchemaChangeAdapters int      `json:"online_schema_change_adapters,omitempty"`
-	ReplicationLagRisks        int      `json:"replication_lag_risks,omitempty"`
-	PartitionShardingFindings  int      `json:"partition_sharding_findings,omitempty"`
-	Tables                     []string `json:"tables"`
+	Statements                    int      `json:"statements"`
+	HighRisk                      int      `json:"high_risk"`
+	MediumRisk                    int      `json:"medium_risk"`
+	LowRisk                       int      `json:"low_risk"`
+	VersionSpecificRules          int      `json:"version_specific_rules"`
+	ProofObligations              int      `json:"proof_obligations"`
+	LockSimulations               int      `json:"lock_simulations"`
+	ReaderBlockingLocks           int      `json:"reader_blocking_locks"`
+	WriterBlockingLocks           int      `json:"writer_blocking_locks"`
+	DDLBlockingLocks              int      `json:"ddl_blocking_locks"`
+	OnlineSchemaChangeAdapters    int      `json:"online_schema_change_adapters,omitempty"`
+	ReplicationLagRisks           int      `json:"replication_lag_risks,omitempty"`
+	PartitionShardingFindings     int      `json:"partition_sharding_findings,omitempty"`
+	RollbackFeasibilityChecks     int      `json:"rollback_feasibility_checks,omitempty"`
+	TransactionalRollbacks        int      `json:"transactional_rollbacks,omitempty"`
+	ImplicitCommitRollbacks       int      `json:"implicit_commit_rollbacks,omitempty"`
+	IrreversibleMetadataRollbacks int      `json:"irreversible_metadata_rollbacks,omitempty"`
+	ConditionalRollbacks          int      `json:"conditional_rollbacks,omitempty"`
+	RefutedRollbacks              int      `json:"refuted_rollbacks,omitempty"`
+	Tables                        []string `json:"tables"`
 }
 
 type LockSimulation struct {
@@ -188,6 +195,23 @@ type PartitionSharding struct {
 	Mitigations               []string   `json:"mitigations,omitempty"`
 }
 
+type RollbackFeasibility struct {
+	Engine                Engine     `json:"engine"`
+	Class                 string     `json:"class"`
+	Status                string     `json:"status"`
+	Feasible              bool       `json:"feasible"`
+	TransactionalRollback bool       `json:"transactional_rollback"`
+	ImplicitCommit        bool       `json:"implicit_commit"`
+	IrreversibleMetadata  bool       `json:"irreversible_metadata"`
+	RequiresBeforeImage   bool       `json:"requires_before_image"`
+	RequiresSnapshot      bool       `json:"requires_snapshot"`
+	TimeTravelEligible    bool       `json:"time_travel_eligible"`
+	RecoveryMechanism     string     `json:"recovery_mechanism"`
+	Evidence              []Evidence `json:"evidence"`
+	Obligations           []string   `json:"obligations"`
+	FailureModes          []string   `json:"failure_modes,omitempty"`
+}
+
 func SupportedEngines() []Engine {
 	engines := []Engine{
 		EnginePostgres,
@@ -254,6 +278,24 @@ func Evaluate(engine Engine, version, source string, content []byte) (Report, er
 		}
 		if statement.PartitionSharding != nil {
 			report.Summary.PartitionShardingFindings++
+		}
+		if rollback := statement.RollbackFeasibility; rollback != nil {
+			report.Summary.RollbackFeasibilityChecks++
+			if rollback.TransactionalRollback {
+				report.Summary.TransactionalRollbacks++
+			}
+			if rollback.ImplicitCommit {
+				report.Summary.ImplicitCommitRollbacks++
+			}
+			if rollback.IrreversibleMetadata {
+				report.Summary.IrreversibleMetadataRollbacks++
+			}
+			switch rollback.Status {
+			case "conditional":
+				report.Summary.ConditionalRollbacks++
+			case "refuted":
+				report.Summary.RefutedRollbacks++
+			}
 		}
 		report.Summary.VersionSpecificRules += len(statement.Rules)
 		report.Summary.ProofObligations += len(statement.Obligations)
@@ -439,6 +481,7 @@ func evaluateStatement(index int, sql string, profile Profile) StatementSemantic
 	}
 	applyReplicationLagRisk(&statement, sql, tokens, profile)
 	applyPartitionSharding(&statement, sql, tokens, profile)
+	applyRollbackFeasibility(&statement, tokens, profile)
 	sort.Slice(statement.Rules, func(i, j int) bool { return statement.Rules[i].ID < statement.Rules[j].ID })
 	sort.Strings(statement.Obligations)
 	return statement
@@ -772,6 +815,288 @@ func applyPartitionSharding(statement *StatementSemantics, sql string, tokens []
 	if semantics.PartitionKey != "" {
 		statement.EngineFacts = append(statement.EngineFacts, EngineFact{"partition_key", semantics.PartitionKey})
 	}
+}
+
+func applyRollbackFeasibility(statement *StatementSemantics, tokens []string, profile Profile) {
+	feasibility := detectRollbackFeasibility(*statement, tokens, profile)
+	if feasibility == nil {
+		return
+	}
+	statement.RollbackFeasibility = feasibility
+	statement.Rules = append(statement.Rules, RuleFinding{
+		ID:       "rollback." + feasibility.Class,
+		Severity: rollbackSeverity(*feasibility),
+		Verdict:  feasibility.Status,
+		Evidence: rollbackRuleEvidence(*feasibility),
+	})
+	statement.Obligations = append(statement.Obligations, feasibility.Obligations...)
+	statement.EngineFacts = append(statement.EngineFacts,
+		EngineFact{"rollback_class", feasibility.Class},
+		EngineFact{"rollback_status", feasibility.Status},
+		EngineFact{"rollback_recovery", feasibility.RecoveryMechanism},
+		EngineFact{"rollback_transactional", strconv.FormatBool(feasibility.TransactionalRollback)},
+		EngineFact{"rollback_implicit_commit", strconv.FormatBool(feasibility.ImplicitCommit)},
+		EngineFact{"rollback_irreversible_metadata", strconv.FormatBool(feasibility.IrreversibleMetadata)},
+	)
+}
+
+func detectRollbackFeasibility(statement StatementSemantics, tokens []string, profile Profile) *RollbackFeasibility {
+	if !(isDDL(statement.Kind) || isDataMutationKind(statement.Kind)) {
+		return nil
+	}
+	if isPostgresConcurrentIndex(statement, tokens, profile) {
+		rollback := rollbackBase(statement, profile, "non_transactional_ddl_cleanup", "conditional", "drop_invalid_index_or_retry_concurrent_build")
+		rollback.Feasible = false
+		rollback.RequiresSnapshot = false
+		rollback.FailureModes = append(rollback.FailureModes,
+			"concurrent index builds cannot be rolled back by enclosing the migration in a transaction",
+			"failed builds can leave invalid indexes that require explicit cleanup before retry",
+		)
+		rollback.Obligations = append(rollback.Obligations,
+			"record invalid-index detection and DROP INDEX cleanup for failed concurrent builds",
+			"prove the migration runner disables wrapping transactions before running concurrent index DDL",
+		)
+		finalizeRollbackFeasibility(rollback)
+		return rollback
+	}
+	if isIrreversibleMetadataChange(statement, tokens, profile) {
+		rollback := rollbackBase(statement, profile, "irreversible_metadata", "refuted", "backup_or_shadow_copy_restore")
+		rollback.TransactionalRollback = profile.TransactionalDDL
+		rollback.ImplicitCommit = profile.ImplicitDDLCommit
+		rollback.IrreversibleMetadata = true
+		rollback.RequiresSnapshot = true
+		rollback.TimeTravelEligible = profile.TimeTravelRollback
+		if profile.TimeTravelRollback {
+			rollback.Status = "conditional"
+			rollback.Feasible = true
+			rollback.RecoveryMechanism = "time_travel_restore_with_dependency_review"
+		} else if profile.TransactionalDDL {
+			rollback.Status = "conditional"
+			rollback.Feasible = true
+			rollback.RecoveryMechanism = "rollback_before_commit_else_snapshot_restore"
+		}
+		rollback.FailureModes = append(rollback.FailureModes,
+			"metadata identity, grants, constraints, partitions, or stored values may be lost after commit",
+			"reverting application code does not reconstruct dropped table or column state",
+		)
+		rollback.Obligations = append(rollback.Obligations,
+			"bind rollback to a pre-change schema/data snapshot, table clone, or time-travel retention proof",
+			"record grant, dependency, partition, and row-count restoration checks before marking rollback feasible",
+		)
+		finalizeRollbackFeasibility(rollback)
+		return rollback
+	}
+	if profile.Engine == EngineClickHouse && statement.Kind == "alter" && (contains(tokens, "delete") || contains(tokens, "update")) {
+		rollback := rollbackBase(statement, profile, "async_mutation_recovery", "conditional", "mutation_queue_monitoring_plus_snapshot_restore")
+		rollback.Feasible = false
+		rollback.RequiresSnapshot = true
+		rollback.FailureModes = append(rollback.FailureModes,
+			"asynchronous mutations can be partially applied across parts or replicas",
+			"caller rollback cannot cancel already-applied background mutation work",
+		)
+		rollback.Obligations = append(rollback.Obligations,
+			"monitor system.mutations until every replica reaches a terminal state before evaluating rollback",
+			"record part-level backup or compensating mutation evidence for any affected partition",
+		)
+		finalizeRollbackFeasibility(rollback)
+		return rollback
+	}
+	if isDataMutationKind(statement.Kind) {
+		if statement.Kind == "insert" || contains(tokens, "where") && likelyPointLookup(tokens) {
+			rollback := rollbackBase(statement, profile, "compensating_dml", "conditional", "before_image_compensating_statement")
+			rollback.Feasible = true
+			rollback.RequiresBeforeImage = true
+			rollback.FailureModes = append(rollback.FailureModes,
+				"without a captured before image, compensating DML can overwrite legitimate concurrent changes",
+			)
+			rollback.Obligations = append(rollback.Obligations,
+				"capture row before-images or inserted-row identifiers before running the mutation",
+				"prove the compensation predicate is at least as narrow as the original mutation predicate",
+			)
+			finalizeRollbackFeasibility(rollback)
+			return rollback
+		}
+		rollback := rollbackBase(statement, profile, "snapshot_required", "conditional", "bounded_snapshot_or_point_in_time_restore")
+		rollback.Feasible = false
+		rollback.RequiresSnapshot = true
+		rollback.FailureModes = append(rollback.FailureModes,
+			"bulk DML can touch rows not reconstructable from the SQL text alone",
+			"row-level compensation without a snapshot risks expanding the blast radius",
+		)
+		rollback.Obligations = append(rollback.Obligations,
+			"bound affected rows and preserve a snapshot, export, or write-ahead evidence before execution",
+			"derive compensation from recorded before-images rather than re-evaluating a changed predicate later",
+		)
+		finalizeRollbackFeasibility(rollback)
+		return rollback
+	}
+	if profile.ImplicitDDLCommit {
+		rollback := rollbackBase(statement, profile, "implicit_commit_compensation", "conditional", "compensating_migration_or_restore_snapshot")
+		rollback.Feasible = false
+		rollback.ImplicitCommit = true
+		rollback.RequiresSnapshot = true
+		rollback.FailureModes = append(rollback.FailureModes,
+			"engine commits DDL outside the caller-controlled transaction boundary",
+			"ordinary transaction rollback cannot undo the metadata change after the statement starts",
+		)
+		rollback.Obligations = append(rollback.Obligations,
+			"attach a tested compensating migration or restore snapshot before running implicit-commit DDL",
+			"record exact engine version and DDL algorithm so implicit commit behavior is reproducible",
+		)
+		finalizeRollbackFeasibility(rollback)
+		return rollback
+	}
+	if profile.TransactionalDDL {
+		rollback := rollbackBase(statement, profile, "transactional_ddl", "checked", "caller_transaction_rollback_before_commit")
+		rollback.Feasible = true
+		rollback.TransactionalRollback = true
+		rollback.FailureModes = append(rollback.FailureModes,
+			"transactional rollback is only available before commit and before external side effects depend on the new schema",
+		)
+		rollback.Obligations = append(rollback.Obligations,
+			"prove the migration runner keeps this DDL inside the intended transaction boundary",
+			"record post-commit restore evidence separately for production rollback drills",
+		)
+		finalizeRollbackFeasibility(rollback)
+		return rollback
+	}
+	rollback := rollbackBase(statement, profile, "non_transactional_ddl", "conditional", "manual_compensation_or_restore_snapshot")
+	rollback.Feasible = false
+	rollback.RequiresSnapshot = true
+	rollback.FailureModes = append(rollback.FailureModes,
+		"engine does not expose ordinary caller-controlled transactional DDL rollback for this statement",
+	)
+	rollback.Obligations = append(rollback.Obligations,
+		"prove a compensating DDL statement, table clone, or restore snapshot exists before rollout",
+	)
+	finalizeRollbackFeasibility(rollback)
+	return rollback
+}
+
+func rollbackBase(statement StatementSemantics, profile Profile, class, status, recovery string) *RollbackFeasibility {
+	rollback := &RollbackFeasibility{
+		Engine:            profile.Engine,
+		Class:             class,
+		Status:            status,
+		RecoveryMechanism: recovery,
+		Evidence:          rollbackEvidence(profile.Engine),
+		Obligations: []string{
+			"classify rollback feasibility with the resolved " + string(profile.Engine) + " " + profile.ResolvedVersion + " engine profile",
+		},
+	}
+	if statement.Table != "" {
+		rollback.Obligations = append(rollback.Obligations, "bind rollback evidence to table "+statement.Table+" with schema hash, row count, or before-image witness")
+	}
+	return rollback
+}
+
+func rollbackSeverity(rollback RollbackFeasibility) string {
+	switch rollback.Class {
+	case "irreversible_metadata", "snapshot_required":
+		return "high"
+	case "transactional_ddl":
+		return "low"
+	default:
+		return "medium"
+	}
+}
+
+func rollbackRuleEvidence(rollback RollbackFeasibility) string {
+	if rollback.IrreversibleMetadata {
+		return "metadata/data identity can be lost after commit; rollback requires explicit restore evidence"
+	}
+	if rollback.ImplicitCommit {
+		return "engine commits DDL outside the caller-controlled rollback boundary"
+	}
+	if rollback.TransactionalRollback {
+		return "engine supports rolling back ordinary DDL inside the active transaction before commit"
+	}
+	if rollback.RequiresBeforeImage {
+		return "compensation is feasible only with captured before-images or inserted-row identifiers"
+	}
+	return "rollback path is conditional on out-of-band compensation or snapshot evidence"
+}
+
+func rollbackEvidence(engine Engine) []Evidence {
+	switch engine {
+	case EnginePostgres:
+		return []Evidence{
+			{"postgres.ddl_transactions", "ordinary DDL participates in user transactions until commit"},
+			{"postgres.create_index_concurrently", "concurrent index builds cannot run inside a transaction block and can leave invalid indexes"},
+		}
+	case EngineMySQL:
+		return []Evidence{
+			{"mysql.implicit_commit", "DDL causes implicit commits around the statement"},
+			{"mysql.8.atomic_ddl", "atomic DDL improves metadata crash safety but does not restore caller-controlled rollback"},
+		}
+	case EngineSQLite:
+		return []Evidence{
+			{"sqlite.transactional_schema", "schema changes are transactional with journaled database-file metadata"},
+			{"sqlite.3.35.drop_column", "DROP COLUMN removes persisted values and still needs post-commit restore evidence"},
+		}
+	case EngineSQLServer:
+		return []Evidence{
+			{"sqlserver.transactional_ddl", "many schema changes can participate in explicit transactions"},
+			{"sqlserver.schema_modification_locks", "DDL rollback feasibility must be balanced against schema modification locks"},
+		}
+	case EngineOracle:
+		return []Evidence{
+			{"oracle.ddl_implicit_commit", "DDL commits before and after execution"},
+			{"oracle.flashback", "flashback recovery is separate recovery evidence, not ordinary transaction rollback"},
+		}
+	case EngineBigQuery:
+		return []Evidence{
+			{"bigquery.table_metadata_jobs", "DDL/DML executes as jobs over table resources"},
+			{"bigquery.create_or_replace", "CREATE OR REPLACE TABLE replaces the table resource"},
+		}
+	case EngineSnowflake:
+		return []Evidence{
+			{"snowflake.ddl_autocommit", "DDL statements commit active transactions"},
+			{"snowflake.time_travel", "Time Travel can recover objects within retention but is not caller transaction rollback"},
+		}
+	case EngineClickHouse:
+		return []Evidence{
+			{"clickhouse.mutations_async", "ALTER UPDATE/DELETE mutations run asynchronously"},
+			{"clickhouse.atomic_database", "atomic metadata does not make row mutations transactional"},
+		}
+	default:
+		return nil
+	}
+}
+
+func finalizeRollbackFeasibility(rollback *RollbackFeasibility) {
+	sort.Slice(rollback.Evidence, func(i, j int) bool { return rollback.Evidence[i].Ref < rollback.Evidence[j].Ref })
+	sort.Strings(rollback.Obligations)
+	sort.Strings(rollback.FailureModes)
+}
+
+func isDataMutationKind(kind string) bool {
+	switch kind {
+	case "insert", "update", "delete", "merge", "replace":
+		return true
+	default:
+		return false
+	}
+}
+
+func isPostgresConcurrentIndex(statement StatementSemantics, tokens []string, profile Profile) bool {
+	return profile.Engine == EnginePostgres && profile.ConcurrentIndex && statement.Kind == "create" && contains(tokens, "index") && contains(tokens, "concurrently")
+}
+
+func isIrreversibleMetadataChange(statement StatementSemantics, tokens []string, profile Profile) bool {
+	if statement.Kind == "drop" || statement.Kind == "truncate" {
+		return true
+	}
+	if isCreateOrReplaceTable(tokens) && profile.CreateOrReplaceDrops {
+		return true
+	}
+	if statement.Kind == "alter" && contains(tokens, "drop") && (contains(tokens, "column") || contains(tokens, "partition")) {
+		return true
+	}
+	if statement.PartitionSharding != nil && strings.Contains(statement.PartitionSharding.Operation, "replace") {
+		return true
+	}
+	return false
 }
 
 func detectPartitionSharding(statement StatementSemantics, sql string, tokens []string, profile Profile) *PartitionSharding {

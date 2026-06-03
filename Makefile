@@ -1386,6 +1386,10 @@ replication-lag-risk-gate:
 partition-sharding-semantics-gate:
 	bash scripts/partition-sharding-semantics-gate.sh
 
+.PHONY: db-rollback-feasibility-gate
+db-rollback-feasibility-gate:
+	bash scripts/db-rollback-feasibility-gate.sh
+
 federated-benchmark-split-gate:
 	bash scripts/federated-benchmark-split-gate.sh
 

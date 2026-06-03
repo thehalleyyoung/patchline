@@ -1,6 +1,6 @@
 # Database version semantics
 
-Patchline's `db-semantics` command evaluates migration SQL against an explicit database engine and version instead of treating SQL as portable text. The current catalog covers PostgreSQL, MySQL, SQLite, SQL Server, Oracle, BigQuery, Snowflake, and ClickHouse with documented evidence for transactional DDL, implicit commits, atomic DDL, concurrent/online index behavior, online-schema-change adapters, replication-lag risk, instant or metadata-only column additions, create-or-replace replacement semantics, Time Travel recovery, partition-aware DDL, and asynchronous mutations.
+Patchline's `db-semantics` command evaluates migration SQL against an explicit database engine and version instead of treating SQL as portable text. The current catalog covers PostgreSQL, MySQL, SQLite, SQL Server, Oracle, BigQuery, Snowflake, and ClickHouse with documented evidence for transactional DDL, implicit commits, atomic DDL, concurrent/online index behavior, online-schema-change adapters, replication-lag risk, instant or metadata-only column additions, create-or-replace replacement semantics, Time Travel recovery, partition-aware DDL, asynchronous mutations, and rollback feasibility for irreversible metadata changes.
 
 The command emits deterministic JSON with the resolved profile, statement-level rules, proof obligations, risk counts, and a content hash:
 
@@ -21,9 +21,11 @@ The gate demonstrates version-specific behavior with real code:
 - BigQuery and Snowflake distinguish `CREATE OR REPLACE TABLE` replacement hazards.
 - ClickHouse marks `ALTER ... DELETE` as an asynchronous mutation requiring completion evidence.
 - SQLite, SQL Server, and Oracle contribute connection-level FK, schema-lock, validation, and implicit-commit obligations.
+- Rollback feasibility records whether the path is native transactional rollback, implicit-commit compensation, irreversible metadata restore, async mutation cleanup, DML before-image compensation, or snapshot-required bulk recovery.
 
 Reproduce the evidence with:
 
 ```bash
 make db-version-semantics-gate
+make db-rollback-feasibility-gate
 ```

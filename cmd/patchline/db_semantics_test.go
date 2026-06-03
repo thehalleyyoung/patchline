@@ -55,6 +55,28 @@ func TestDBSemanticsCommandWritesPartitionShardingReport(t *testing.T) {
 	}
 }
 
+func TestDBSemanticsCommandWritesRollbackFeasibilityReport(t *testing.T) {
+	root := t.TempDir()
+	sqlPath := filepath.Join(root, "replace.sql")
+	writeMainTestFile(t, root, "replace.sql", "CREATE OR REPLACE TABLE analytics.daily AS SELECT * FROM analytics.stage;")
+	outPath := filepath.Join(root, "rollback-report.json")
+	if err := run([]string{"db-semantics", "--engine", "bigquery", "--version", "2024.2", "--sql", sqlPath, "--out", outPath, "--json"}); err != nil {
+		t.Fatalf("db-semantics command failed: %v", err)
+	}
+	var report dbsemantics.Report
+	readMainTestJSON(t, outPath, &report)
+	if report.Summary.RollbackFeasibilityChecks != 1 || report.Summary.IrreversibleMetadataRollbacks != 1 || report.Summary.RefutedRollbacks != 1 {
+		t.Fatalf("expected irreversible rollback feasibility summary, got %#v", report.Summary)
+	}
+	rollback := report.Statements[0].RollbackFeasibility
+	if rollback == nil || rollback.Class != "irreversible_metadata" || rollback.Feasible || !rollback.IrreversibleMetadata {
+		t.Fatalf("unexpected rollback feasibility report: %#v", rollback)
+	}
+	if !mainDBSemanticsHasRule(report, "rollback.irreversible_metadata") {
+		t.Fatalf("expected rollback feasibility rule, got %#v", report.Statements[0].Rules)
+	}
+}
+
 func TestDBSemanticsCommandRejectsUnknownEngine(t *testing.T) {
 	err := run([]string{"db-semantics", "--engine", "toydb", "--version", "1", "--sql", "select 1;", "--json"})
 	if err == nil {

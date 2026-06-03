@@ -147,13 +147,15 @@ Run `artifact-benchmark federated-split`, `federated-run`, and `federated-verify
 
 Run `golden-fixture generate --github owner/repo --ref <sha> --subpath <path> --out <dir>` to turn a real-repo slice into a tiny deterministic Go test without vendoring the full repository; see [docs/golden-fixtures.md](docs/golden-fixtures.md).
 
-Run `db-semantics --engine <engine> --sql <sql-or-path>` to get versioned DDL semantics plus lock-mode simulator conflicts; reproduce all engines with `make lock-mode-simulator-gate`.
+Run `db-semantics --engine <engine> --sql <sql-or-path>` to get versioned DDL semantics, lock conflicts, and rollback feasibility for transactional DDL, implicit commits, and irreversible metadata; reproduce with `make lock-mode-simulator-gate` and `make db-rollback-feasibility-gate`.
 
 Run `make online-schema-change-adapters-gate` to prove `db-semantics` recognizes online-schema-change adapters: pt-online-schema-change (pt-osc), gh-ost, native concurrent indexes, and Rails/Django helpers with cutover obligations.
 
 Run `make replication-lag-risk-gate` to prove `db-semantics` links table rewrites, copy alters, online schema changes, replacements, and async mutations to conditional read replica, CDC, and event-stream lag obligations.
 
 Run `make partition-sharding-semantics-gate` to prove `db-semantics` models partitioning and sharding semantics for tenant routing, partition swap, and rebalancing operations without flagging ordinary tenant-scoped DML.
+
+Run `make db-rollback-feasibility-gate` to prove `db-semantics` distinguishes native transactional rollback, implicit-commit compensation, time-travel recovery, async mutation cleanup, before-image DML compensation, and snapshot-required bulk changes.
 
 <details>
 <summary><strong>Full verification catalog</strong> — 600+ reproducible <code>make &lt;name&gt;-gate</code> checks, each with a positive proof and a negative control on real public-repo data (click to expand)</summary>

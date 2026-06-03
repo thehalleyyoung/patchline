@@ -1,0 +1,160 @@
+{
+  "version": "patchline.db-rollback-feasibility-gate/v1",
+  "claim": "Patchline checks rollback feasibility using engine semantics rather than SQL keywords alone. The gate drives the real db-semantics CLI across transactional DDL, implicit-commit DDL, irreversible metadata replacement, Snowflake time-travel recovery, ClickHouse asynchronous mutation recovery, point DML compensation, and bulk DML snapshot requirements; a read-only query remains unflagged.",
+  "minimum_findings": 7,
+  "cases": [
+    {
+      "id": "postgres-transactional-ddl",
+      "engine": "postgres",
+      "version": "16",
+      "sql": "ALTER TABLE accounts ADD COLUMN status text;",
+      "expect": {
+        "finding": true,
+        "class": "transactional_ddl",
+        "status": "checked",
+        "feasible": true,
+        "transactional": true,
+        "implicit_commit": false,
+        "irreversible_metadata": false,
+        "requires_before_image": false,
+        "requires_snapshot": false,
+        "time_travel": false
+      }
+    },
+    {
+      "id": "postgres-concurrent-index-cleanup",
+      "engine": "postgres",
+      "version": "16",
+      "sql": "CREATE INDEX CONCURRENTLY idx_accounts_status ON accounts(status);",
+      "expect": {
+        "finding": true,
+        "class": "non_transactional_ddl_cleanup",
+        "status": "conditional",
+        "feasible": false,
+        "transactional": false,
+        "implicit_commit": false,
+        "irreversible_metadata": false,
+        "requires_before_image": false,
+        "requires_snapshot": false,
+        "time_travel": false
+      }
+    },
+    {
+      "id": "mysql-implicit-commit",
+      "engine": "mysql",
+      "version": "8.0.34",
+      "sql": "ALTER TABLE accounts ADD COLUMN status varchar(20) DEFAULT 'active';",
+      "expect": {
+        "finding": true,
+        "class": "implicit_commit_compensation",
+        "status": "conditional",
+        "feasible": false,
+        "transactional": false,
+        "implicit_commit": true,
+        "irreversible_metadata": false,
+        "requires_before_image": false,
+        "requires_snapshot": true,
+        "time_travel": false
+      }
+    },
+    {
+      "id": "bigquery-irrevocable-replace",
+      "engine": "bigquery",
+      "version": "2024.2",
+      "sql": "CREATE OR REPLACE TABLE analytics.daily AS SELECT * FROM analytics.stage;",
+      "expect": {
+        "finding": true,
+        "class": "irreversible_metadata",
+        "status": "refuted",
+        "feasible": false,
+        "transactional": false,
+        "implicit_commit": false,
+        "irreversible_metadata": true,
+        "requires_before_image": false,
+        "requires_snapshot": true,
+        "time_travel": false
+      }
+    },
+    {
+      "id": "snowflake-time-travel-replace",
+      "engine": "snowflake",
+      "version": "8.20",
+      "sql": "CREATE OR REPLACE TABLE analytics.daily AS SELECT * FROM analytics.stage;",
+      "expect": {
+        "finding": true,
+        "class": "irreversible_metadata",
+        "status": "conditional",
+        "feasible": true,
+        "transactional": false,
+        "implicit_commit": true,
+        "irreversible_metadata": true,
+        "requires_before_image": false,
+        "requires_snapshot": true,
+        "time_travel": true
+      }
+    },
+    {
+      "id": "clickhouse-async-mutation",
+      "engine": "clickhouse",
+      "version": "24.1",
+      "sql": "ALTER TABLE events DELETE WHERE created_at < now() - interval 30 day;",
+      "expect": {
+        "finding": true,
+        "class": "async_mutation_recovery",
+        "status": "conditional",
+        "feasible": false,
+        "transactional": false,
+        "implicit_commit": false,
+        "irreversible_metadata": false,
+        "requires_before_image": false,
+        "requires_snapshot": true,
+        "time_travel": false
+      }
+    },
+    {
+      "id": "postgres-point-dml",
+      "engine": "postgres",
+      "version": "16",
+      "sql": "UPDATE accounts SET status = 'closed' WHERE id = 42;",
+      "expect": {
+        "finding": true,
+        "class": "compensating_dml",
+        "status": "conditional",
+        "feasible": true,
+        "transactional": false,
+        "implicit_commit": false,
+        "irreversible_metadata": false,
+        "requires_before_image": true,
+        "requires_snapshot": false,
+        "time_travel": false
+      }
+    },
+    {
+      "id": "postgres-bulk-dml",
+      "engine": "postgres",
+      "version": "16",
+      "sql": "UPDATE accounts SET status = 'closed';",
+      "expect": {
+        "finding": true,
+        "class": "snapshot_required",
+        "status": "conditional",
+        "feasible": false,
+        "transactional": false,
+        "implicit_commit": false,
+        "irreversible_metadata": false,
+        "requires_before_image": false,
+        "requires_snapshot": true,
+        "time_travel": false
+      }
+    },
+    {
+      "id": "select-control",
+      "engine": "postgres",
+      "version": "16",
+      "sql": "SELECT * FROM accounts WHERE id = 42;",
+      "expect": {
+        "finding": false
+      }
+    }
+  ]
+}

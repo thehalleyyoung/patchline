@@ -57,6 +57,17 @@ func dbSemanticsCommand(args []string) error {
 			statement.Lock.BlocksWriters,
 			statement.Lock.BlocksDDL,
 		)
+		if rollback := statement.RollbackFeasibility; rollback != nil {
+			fmt.Printf("      rollback class=%s status=%s feasible=%t transactional=%t implicit_commit=%t irreversible_metadata=%t recovery=%s\n",
+				rollback.Class,
+				rollback.Status,
+				rollback.Feasible,
+				rollback.TransactionalRollback,
+				rollback.ImplicitCommit,
+				rollback.IrreversibleMetadata,
+				rollback.RecoveryMechanism,
+			)
+		}
 		for _, rule := range statement.Rules {
 			fmt.Printf("      - %s %s: %s\n", rule.Severity, rule.ID, rule.Evidence)
 		}
