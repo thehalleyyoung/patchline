@@ -1,0 +1,88 @@
+{
+  "version": "patchline.multi-service-rollback-plan/v1",
+  "name": "billing external id multi-service rollback",
+  "dependency_bound": {
+    "max_depth": 4,
+    "max_fanout": 2,
+    "max_waves": 4
+  },
+  "data_loss_bound": {
+    "max_rows": 0,
+    "max_critical_rows": 0,
+    "max_affected_services": 0
+  },
+  "services": [
+    {
+      "id": "api",
+      "name": "public API",
+      "owners": ["@org/api"],
+      "criticality": "high",
+      "upstream_services": ["ledger"],
+      "downstream_services": ["billing"]
+    },
+    {
+      "id": "billing",
+      "name": "billing writer",
+      "owners": ["@org/billing"],
+      "criticality": "critical",
+      "upstream_services": ["api"],
+      "downstream_services": ["ledger"]
+    },
+    {
+      "id": "ledger",
+      "name": "ledger projector",
+      "owners": ["@org/ledger"],
+      "criticality": "high",
+      "upstream_services": ["billing"],
+      "downstream_services": ["api"]
+    }
+  ],
+  "migrations": [
+    {
+      "id": "billing-expand",
+      "service_id": "billing",
+      "stage": "expand",
+      "kind": "schema",
+      "operation": "add nullable invoices.external_id",
+      "data_classes": ["invoice"],
+      "rollback_action": "drop invoices.external_id while nullable before writers depend on it",
+      "rollback_verified": true
+    },
+    {
+      "id": "ledger-dual-write",
+      "service_id": "ledger",
+      "stage": "dual-write",
+      "kind": "application",
+      "operation": "write ledger external_id shadow column from billing events",
+      "data_classes": ["invoice", "ledger"],
+      "estimated_rows": 2500,
+      "depends_on": ["billing-expand"],
+      "rollback_action": "disable ledger dual-write flag and replay from the billing snapshot",
+      "rollback_verified": true
+    },
+    {
+      "id": "api-read-shift",
+      "service_id": "api",
+      "stage": "read-shift",
+      "kind": "application",
+      "operation": "read external_id from the ledger projection",
+      "data_classes": ["invoice"],
+      "estimated_rows": 2500,
+      "depends_on": ["ledger-dual-write"],
+      "rollback_action": "restore the API read flag to legacy_external_id",
+      "rollback_verified": true
+    },
+    {
+      "id": "billing-contract",
+      "service_id": "billing",
+      "stage": "contract",
+      "kind": "schema",
+      "operation": "set invoices.external_id NOT NULL and remove legacy_external_id",
+      "data_classes": ["invoice"],
+      "estimated_rows": 2500,
+      "depends_on": ["api-read-shift"],
+      "rollback_action": "restore legacy_external_id from the verified backfill snapshot before re-enabling legacy reads",
+      "rollback_verified": true
+    }
+  ]
+}

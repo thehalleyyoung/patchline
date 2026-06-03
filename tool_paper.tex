@@ -53,7 +53,9 @@ turns baseline hazard classes into owner-routed remediation playbooks with rollb
 canary-data protocol compares pre/post migration invariants on sampled, redacted, production-like
 snapshots and emits only hash-based counterexamples, and a repair-risk escrow holds proposed fixes
 until distinct manual-review and certificate thresholds clear, while an incident-postmortem importer
-turns public remediation lessons into detector regression tests with positive and negative controls.
+turns public remediation lessons into detector regression tests with positive and negative controls, and
+a verified multi-service rollback planner reverses migration dependency DAGs while enforcing explicit
+dependency-depth, fanout, wave, and data-loss bounds.
 Critically,
 every capability in \tool{} is backed by a reproducible \emph{gate}: a script that proves the
 capability against real, pinned public code and fails loudly on drift. \tool{} currently ships more
@@ -208,6 +210,9 @@ certificates until release thresholds clear; reject revoked certificates and man
 \code{incident-postmortem-import} & Import public postmortem source observations and emit detector
 regression fixtures plus a generated Go test package. & \code{incident-postmortem-import.json},
 \code{generated-tests/} \\
+\code{multi-service-rollback-plan} & Reverse a service-migration dependency DAG into rollback waves;
+check cross-service handoff metadata and prove dependency-depth, fanout, wave, and data-loss bounds. &
+\code{multi-service-rollback-plan.json}, \code{.md} \\
 \code{propose} & Generate bounded interventions (guards, tests) within an explicit budget; quarantine
 them as untrusted artifacts. & \code{proposal.patch}, \code{patchline-proposals/} \\
 \code{compare} & Deterministically re-analyze proposed changes; accept or reject by evidence delta. &
@@ -487,6 +492,17 @@ source-grounded lesson classification, destructive protected-table mutations, mi
 and split-brain conflicting writes; it then runs the generated Go test package against the checked-out
 analyzer.
 
+\paragraph{Verified multi-service rollback planning.} The \code{multi-service-rollback-plan} command
+handles the case where a migration has already escaped a single repository or database boundary. A
+versioned spec declares services, owners, migration stages, migration-level \code{depends\_on} edges,
+verified rollback actions, irreversible steps, row estimates, critical-row estimates, and explicit
+dependency/data-loss bounds. \tool{} uses only the migration edges for ordering, emits the rollback plan
+as reverse topological waves, and treats service upstream/downstream metadata only as an auditable
+handoff witness. The \gate{verified-rollback-planner-gate} checks a four-stage billing/ledger/API
+rollout with depth~4, fanout~1, zero data-loss rows, and deterministic rollback order, then runs an
+unsafe control whose unverified API rollback and irreversible billing drop exceed row, critical-row, and
+affected-service bounds while still producing inspectable \code{ok=false} artifacts.
+
 \paragraph{The accept/reject decision.} Table~\ref{tab:compare} makes the compare contract precise.
 Each proposed artifact is scored on the same fact-derived axes as the baseline, and the decision is a
 pure function of the evidence delta---never of a model's self-reported confidence. An artifact that
@@ -729,6 +745,7 @@ Bounded, quarantined interventions & no & no & yes \\
 Owner-routed rollback playbooks & no & no & yes \\
 Pre/post canary invariant validation & no & no & yes \\
 Manual-review/certificate escrow & no & no & yes \\
+Multi-service rollback bounds & no & no & yes \\
 Deterministic, byte-stable artifacts & no & partial & yes \\
 Real-repo proof gates & no & no & yes \\
 \bottomrule
@@ -752,6 +769,7 @@ owner-routed rollback playbooks for broad writes & \gate{remediation-playbook-ga
 6 checked canary invariants; bad post-snapshot refuted & \gate{canary-validation-gate} \\
 1 released, 2 held, 2 rejected repair proposals under escrow & \gate{repair-risk-escrow-gate} \\
 27 detector regressions imported from public postmortems & \gate{incident-postmortem-importer-gate} \\
+4 rollback waves with 0 data-loss rows; unsafe 125-row rollback refuted & \gate{verified-rollback-planner-gate} \\
 9 Cassandra changes incl.\ destructive drops & \code{laaksomavrick/twitter-go} \\
 17 $\rightarrow$ 1 line, 1-minimal reproduction & delta-debugging oracle \\
 3 pipeline frameworks in one repo & \code{harrydevforlife/building-lakehouse} \\
@@ -1410,7 +1428,8 @@ Migration breadth & \code{multi-ecosystem-migration-gate}, \code{nosql-change-ga
 Intervention safety & \code{generated-code-quarantine-gate}, \code{rejected-generated-gate},
 \code{intervention-regression-archive-gate}, \code{expand-contract-templates-gate},
 \code{staged-backfill-planner-gate}, \code{canary-validation-gate}, \code{repair-risk-escrow-gate},
-\code{incident-postmortem-importer-gate}, \code{reviewability-examples-gate} \\
+\code{incident-postmortem-importer-gate}, \code{verified-rollback-planner-gate},
+\code{reviewability-examples-gate} \\
 Runtime evidence & \code{otel-trace-gen-gate}, \code{datadog-timeline-gate}, \code{prom-grafana-gate},
 \code{runtime-confidence-gate} \\
 Evaluation rigor & \code{fp-adjudication-gate}, \code{fn-discovery-gate}, \code{ablation-study-gate},

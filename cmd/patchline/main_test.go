@@ -24,6 +24,7 @@ import (
 	"github.com/thehalleyyoung/patchline/internal/intake"
 	"github.com/thehalleyyoung/patchline/internal/project"
 	"github.com/thehalleyyoung/patchline/internal/repairescrow"
+	"github.com/thehalleyyoung/patchline/internal/rollbackplanner"
 )
 
 func TestExitCodeDefaultsToUsageOrGenericFailure(t *testing.T) {
@@ -295,6 +296,42 @@ func TestIncidentPostmortemImportCommandWritesReports(t *testing.T) {
 		if stat, err := os.Stat(filepath.Join(out, filepath.FromSlash(rel))); err != nil || stat.Size() == 0 {
 			t.Fatalf("expected %s to be written, stat=%#v err=%v", rel, stat, err)
 		}
+	}
+}
+
+func TestMultiServiceRollbackPlanCommandWritesReports(t *testing.T) {
+	root := t.TempDir()
+	specPath := filepath.Join(root, "multi-service-rollback-plan.json")
+	writeMainTestFile(t, root, "multi-service-rollback-plan.json", `{
+  "version": "patchline.multi-service-rollback-plan/v1",
+  "name": "main test multi-service rollback",
+  "dependency_bound": {"max_depth": 3, "max_fanout": 2, "max_waves": 3},
+  "data_loss_bound": {"max_rows": 0, "max_critical_rows": 0, "max_affected_services": 0},
+  "services": [
+    {"id":"billing","owners":["@org/billing"],"downstream_services":["ledger"]},
+    {"id":"ledger","owners":["@org/ledger"],"upstream_services":["billing"],"downstream_services":["api"]},
+    {"id":"api","owners":["@org/api"],"upstream_services":["ledger"]}
+  ],
+  "migrations": [
+    {"id":"billing-expand","service_id":"billing","stage":"expand","kind":"schema","operation":"add nullable external_id","rollback_action":"drop external_id before contract","rollback_verified":true},
+    {"id":"ledger-shadow","service_id":"ledger","stage":"dual-write","kind":"application","operation":"write ledger shadow id","depends_on":["billing-expand"],"estimated_rows":7,"rollback_action":"disable dual-write flag and replay from billing snapshot","rollback_verified":true},
+    {"id":"api-read-shift","service_id":"api","stage":"read-shift","kind":"application","operation":"read ledger shadow id","depends_on":["ledger-shadow"],"estimated_rows":7,"rollback_action":"restore API legacy read flag","rollback_verified":true}
+  ]
+}`)
+	out := filepath.Join(t.TempDir(), "multi-service-rollback")
+	if err := run([]string{"multi-service-rollback-plan", "--spec", specPath, "--out", out, "--json"}); err != nil {
+		t.Fatalf("multi-service-rollback-plan failed: %v", err)
+	}
+	var report rollbackplanner.Report
+	readMainTestJSON(t, filepath.Join(out, "multi-service-rollback-plan.json"), &report)
+	if !report.OK || report.Summary.RollbackWaves != 3 || report.DependencyProof.MaxDepth != 3 || report.Summary.DataLossRows != 0 {
+		t.Fatalf("unexpected multi-service rollback report: %#v", report)
+	}
+	if got, want := strings.Join(report.DependencyProof.RollbackOrder, ","), "api-read-shift,ledger-shadow,billing-expand"; got != want {
+		t.Fatalf("unexpected rollback order: got %s want %s", got, want)
+	}
+	if stat, err := os.Stat(filepath.Join(out, "multi-service-rollback-plan.md")); err != nil || stat.Size() == 0 {
+		t.Fatalf("expected multi-service-rollback-plan.md to be written, stat=%#v err=%v", stat, err)
 	}
 }
 

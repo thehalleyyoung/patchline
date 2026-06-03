@@ -1,0 +1,73 @@
+{
+  "version": "patchline.multi-service-rollback-plan/v1",
+  "name": "unsafe billing external id rollback",
+  "dependency_bound": {
+    "max_depth": 3,
+    "max_fanout": 1,
+    "max_waves": 3
+  },
+  "data_loss_bound": {
+    "max_rows": 10,
+    "max_critical_rows": 1,
+    "max_affected_services": 0
+  },
+  "services": [
+    {
+      "id": "api",
+      "name": "public API",
+      "owners": ["@org/api"],
+      "criticality": "high",
+      "upstream_services": ["ledger"]
+    },
+    {
+      "id": "billing",
+      "name": "billing writer",
+      "owners": ["@org/billing"],
+      "criticality": "critical",
+      "downstream_services": ["ledger"]
+    },
+    {
+      "id": "ledger",
+      "name": "ledger projector",
+      "owners": ["@org/ledger"],
+      "criticality": "high",
+      "upstream_services": ["billing"],
+      "downstream_services": ["api"]
+    }
+  ],
+  "migrations": [
+    {
+      "id": "billing-drop-legacy-id",
+      "service_id": "billing",
+      "stage": "contract",
+      "kind": "schema",
+      "operation": "drop legacy_external_id before the final snapshot is checked",
+      "data_classes": ["invoice", "customer_identifier"],
+      "estimated_rows": 120,
+      "critical_rows": 12,
+      "rollback_action": "accept bounded loss because the legacy column was dropped before snapshot verification",
+      "irreversible": true
+    },
+    {
+      "id": "ledger-reindex",
+      "service_id": "ledger",
+      "stage": "reindex",
+      "kind": "derived-state",
+      "operation": "rebuild the ledger projection from billing events",
+      "depends_on": ["billing-drop-legacy-id"],
+      "rollback_action": "rebuild ledger projection from the last verified billing snapshot",
+      "rollback_verified": true
+    },
+    {
+      "id": "api-read-shift",
+      "service_id": "api",
+      "stage": "read-shift",
+      "kind": "application",
+      "operation": "read external_id from the new ledger projection",
+      "data_classes": ["invoice"],
+      "estimated_rows": 5,
+      "depends_on": ["ledger-reindex"],
+      "rollback_verified": false
+    }
+  ]
+}

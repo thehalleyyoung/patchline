@@ -129,6 +129,8 @@ Run `repair-escrow --spec <spec>` to hold proposed fixes until distinct manual-r
 
 Run `incident-postmortem-import --spec <spec>` to convert public remediation lessons into detector regression tests with positive and negative controls; reproduce it with `make incident-postmortem-importer-gate`.
 
+Run `multi-service-rollback-plan --spec <spec>` to reverse a service-migration dependency DAG while proving rollback depth, fanout, waves, and data-loss rows against explicit bounds; reproduce it with `make verified-rollback-planner-gate`.
+
 Run `golden-fixture generate --github owner/repo --ref <sha> --subpath <path> --out <dir>` to turn a real-repo slice into a tiny deterministic Go test without vendoring the full repository; see [docs/golden-fixtures.md](docs/golden-fixtures.md).
 
 <details>

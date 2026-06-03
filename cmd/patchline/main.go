@@ -57,6 +57,7 @@ import (
 	"github.com/thehalleyyoung/patchline/internal/repairescrow"
 	"github.com/thehalleyyoung/patchline/internal/replay"
 	"github.com/thehalleyyoung/patchline/internal/reproduce"
+	"github.com/thehalleyyoung/patchline/internal/rollbackplanner"
 	"github.com/thehalleyyoung/patchline/internal/semantics"
 	"github.com/thehalleyyoung/patchline/internal/solver"
 	"github.com/thehalleyyoung/patchline/internal/symbolic"
@@ -423,6 +424,8 @@ func run(args []string) error {
 		return repairEscrowCommand(args[1:], hasFlag(args[1:], "--json"))
 	case "incident-postmortem-import":
 		return incidentPostmortemImportCommand(args[1:], hasFlag(args[1:], "--json"))
+	case "multi-service-rollback-plan":
+		return multiServiceRollbackPlanCommand(args[1:], hasFlag(args[1:], "--json"))
 	case "feedback":
 		return feedbackCommand(args[1:])
 	case "security":
@@ -563,6 +566,7 @@ Usage:
   patchline canary-validate --spec canary-validation.json --before before.json --after after.json --out dir [--json]
   patchline repair-escrow --spec repair-escrow.json --out dir [--json]
   patchline incident-postmortem-import --spec incident-postmortem-import.json --out dir [--json]
+  patchline multi-service-rollback-plan --spec multi-service-rollback-plan.json --out dir [--json]
   patchline feedback counterfactual-log --feedback live-feedback.json --history policy-history.json --out dir [--json]
   patchline feedback online-eval --feedback live-feedback.json --spec online-evaluation.json --out dir [--json]
   patchline feedback active-learning-queue --spec active-learning.json --out dir [--json]
@@ -14760,6 +14764,35 @@ func incidentPostmortemImportCommand(args []string, jsonOut bool) error {
 		return writeJSON(os.Stdout, report)
 	}
 	fmt.Printf("wrote incident-postmortem importer report cases=%d regressions=%d detectors=%d to %s\n", report.Summary.Cases, report.Summary.Regressions, report.Summary.Detectors, outPath)
+	return nil
+}
+
+func multiServiceRollbackPlanCommand(args []string, jsonOut bool) error {
+	usage := "patchline multi-service-rollback-plan --spec multi-service-rollback-plan.json --out <dir> [--json]"
+	specPath, outPath, err := feedbackSpecOut(args, usage)
+	if err != nil {
+		return err
+	}
+	file, err := os.Open(specPath)
+	if err != nil {
+		return err
+	}
+	defer file.Close()
+	spec, err := rollbackplanner.ReadSpec(file)
+	if err != nil {
+		return err
+	}
+	report, err := rollbackplanner.BuildReport(spec)
+	if err != nil {
+		return err
+	}
+	if err := rollbackplanner.WriteArtifacts(outPath, report); err != nil {
+		return err
+	}
+	if jsonOut {
+		return writeJSON(os.Stdout, report)
+	}
+	fmt.Printf("wrote multi-service rollback plan ok=%t waves=%d data_loss_rows=%d counterexamples=%d to %s\n", report.OK, report.Summary.RollbackWaves, report.Summary.DataLossRows, report.Summary.Counterexamples, outPath)
 	return nil
 }
 
