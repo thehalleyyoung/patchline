@@ -23,6 +23,7 @@ import (
 	"github.com/thehalleyyoung/patchline/internal/evidencemarketplace"
 	"github.com/thehalleyyoung/patchline/internal/expandcontract"
 	"github.com/thehalleyyoung/patchline/internal/feedback"
+	"github.com/thehalleyyoung/patchline/internal/governancerisk"
 	"github.com/thehalleyyoung/patchline/internal/incidentdrill"
 	"github.com/thehalleyyoung/patchline/internal/incidentpostmortem"
 	"github.com/thehalleyyoung/patchline/internal/intake"
@@ -1253,6 +1254,60 @@ func TestFeedbackCounterfactualLogWritesPreviousReleaseRecommendations(t *testin
 		if strings.Contains(string(data), forbidden) {
 			t.Fatalf("counterfactual CLI output leaked %q:\n%s", forbidden, data)
 		}
+	}
+}
+
+func TestGovernanceRiskRegisterCommandWritesReports(t *testing.T) {
+	root := t.TempDir()
+	for rel, contents := range map[string]string{
+		"evidence/governance.md":     "governance charters, maintainer rotation, and escalation logs\n",
+		"evidence/funding.md":        "funding commitments, reserve controls, and sponsor concentration caps\n",
+		"evidence/infrastructure.md": "release CI, docs mirrors, registry ownership, and recovery drills\n",
+		"evidence/benchmark.md":      "benchmark curation, challenge scoring, and release freeze governance\n",
+	} {
+		writeMainTestFile(t, root, rel, contents)
+	}
+	specPath := filepath.Join(root, "governance-risk-register.json")
+	writeMainTestFile(t, root, "governance-risk-register.json", `{
+  "version": "patchline.governance-risk-register/v1",
+  "name": "main test governance-risk register",
+  "as_of_date": "2026-03-01T00:00:00Z",
+  "criteria": {
+    "required_domains": ["maintainership", "funding", "infrastructure", "benchmark_control"],
+    "max_owner_share": 0.6,
+    "max_organization_share": 0.65,
+    "min_independent_owners_per_domain": 2,
+    "min_independent_orgs_per_domain": 2,
+    "min_mitigations_per_high_risk_domain": 2,
+    "require_evidence_paths": true,
+    "require_rotation_plan": true,
+    "review_cadence_days": 120
+  },
+  "entries": [
+    {"asset_id":"maint-release","domain":"maintainership","asset_name":"Release approvals","owner":"release council","organization":"Patchline Maintainers","control_type":"merge authority","weight":55,"last_reviewed":"2026-02-01T00:00:00Z","rotation_plan":"quarterly release captain rotation","mitigations":["named backup","public review log"],"evidence_paths":["evidence/governance.md"]},
+    {"asset_id":"maint-security","domain":"maintainership","asset_name":"Security triage","owner":"security reviewers","organization":"Independent Security WG","control_type":"security escalation","weight":45,"last_reviewed":"2026-02-01T00:00:00Z","rotation_plan":"backup reviewer each drill","mitigations":["named backup","public review log"],"evidence_paths":["evidence/governance.md"]},
+    {"asset_id":"fund-grant","domain":"funding","asset_name":"Public-good grant","owner":"grant committee","organization":"Research Commons Fund","control_type":"grant control","weight":55,"last_reviewed":"2026-02-01T00:00:00Z","rotation_plan":"annual independent renewal","mitigations":["sponsor cap","reserve signer split"],"evidence_paths":["evidence/funding.md"]},
+    {"asset_id":"fund-reserve","domain":"funding","asset_name":"Reserve budget","owner":"treasury signers","organization":"Patchline Foundation","control_type":"reserve control","weight":45,"last_reviewed":"2026-02-01T00:00:00Z","rotation_plan":"two backup signers per withdrawal","mitigations":["sponsor cap","reserve signer split"],"evidence_paths":["evidence/funding.md"]},
+    {"asset_id":"infra-ci","domain":"infrastructure","asset_name":"Release CI","owner":"ci rotation","organization":"GitHub Actions Maintainers","control_type":"runner administration","weight":55,"last_reviewed":"2026-02-01T00:00:00Z","rotation_plan":"mirror release jobs before cutover","mitigations":["runner backup","artifact mirror"],"evidence_paths":["evidence/infrastructure.md"]},
+    {"asset_id":"infra-mirror","domain":"infrastructure","asset_name":"Docs mirror","owner":"mirror stewards","organization":"University Mirror Network","control_type":"mirror administration","weight":45,"last_reviewed":"2026-02-01T00:00:00Z","rotation_plan":"quarterly mirror succession test","mitigations":["runner backup","artifact mirror"],"evidence_paths":["evidence/infrastructure.md"]},
+    {"asset_id":"bench-corpus","domain":"benchmark_control","asset_name":"Corpus curation","owner":"corpus board","organization":"Benchmark Working Group","control_type":"case admission","weight":55,"last_reviewed":"2026-02-01T00:00:00Z","rotation_plan":"quorum excludes submitters","mitigations":["external dispute path","release freeze"],"evidence_paths":["evidence/benchmark.md"]},
+    {"asset_id":"bench-scoring","domain":"benchmark_control","asset_name":"Scoring rules","owner":"scorecard maintainers","organization":"External Replication Lab","control_type":"scorecard control","weight":45,"last_reviewed":"2026-02-01T00:00:00Z","rotation_plan":"scoring changes require release-candidate freeze","mitigations":["external dispute path","release freeze"],"evidence_paths":["evidence/benchmark.md"]}
+  ]
+}`)
+	out := filepath.Join(t.TempDir(), "governance-risk-register")
+	if err := run([]string{"governance-risk-register", "--spec", specPath, "--root", root, "--out", out, "--json"}); err != nil {
+		t.Fatalf("governance-risk-register failed: %v", err)
+	}
+	var report governancerisk.Report
+	readMainTestJSON(t, filepath.Join(out, "governance-risk-register.json"), &report)
+	if !report.OK || report.Summary.Domains != 4 || report.Summary.HighRiskDomains != 0 || report.Summary.MaxOwnerShare > 0.6 {
+		t.Fatalf("unexpected governance-risk report: %#v", report)
+	}
+	if len(report.Domains) != 4 || len(report.Domains[0].Evidence) == 0 || report.Domains[0].Evidence[0].SHA256 == "" {
+		t.Fatalf("expected domain evidence hashes, got %#v", report.Domains)
+	}
+	if stat, err := os.Stat(filepath.Join(out, "governance-risk-register.md")); err != nil || stat.Size() == 0 {
+		t.Fatalf("expected governance-risk-register.md to be written, stat=%#v err=%v", stat, err)
 	}
 }
 

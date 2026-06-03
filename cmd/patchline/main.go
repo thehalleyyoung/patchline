@@ -43,6 +43,7 @@ import (
 	"github.com/thehalleyyoung/patchline/internal/feedback"
 	"github.com/thehalleyyoung/patchline/internal/gate"
 	"github.com/thehalleyyoung/patchline/internal/goldenfixture"
+	"github.com/thehalleyyoung/patchline/internal/governancerisk"
 	"github.com/thehalleyyoung/patchline/internal/historical"
 	"github.com/thehalleyyoung/patchline/internal/incidentdrill"
 	"github.com/thehalleyyoung/patchline/internal/incidentpostmortem"
@@ -450,6 +451,8 @@ func run(args []string) error {
 		return reviewerFairnessAuditCommand(args[1:], hasFlag(args[1:], "--json"))
 	case "change-management-verify":
 		return changeManagementVerifyCommand(args[1:], hasFlag(args[1:], "--json"))
+	case "governance-risk-register":
+		return governanceRiskRegisterCommand(args[1:], hasFlag(args[1:], "--json"))
 	case "feedback":
 		return feedbackCommand(args[1:])
 	case "security":
@@ -605,6 +608,7 @@ Usage:
   patchline maintainer-acceptance-study --spec maintainer-acceptance-study.json --root repo-root --out dir [--json]
   patchline reviewer-fairness-audit --spec reviewer-fairness-audit.json --root repo-root --out dir [--json]
   patchline change-management-verify --spec change-management.json --root repo-root --out dir [--json]
+  patchline governance-risk-register --spec governance-risk-register.json --root repo-root --out dir [--json]
   patchline feedback counterfactual-log --feedback live-feedback.json --history policy-history.json --out dir [--json]
   patchline feedback online-eval --feedback live-feedback.json --spec online-evaluation.json --out dir [--json]
   patchline feedback active-learning-queue --spec active-learning.json --out dir [--json]
@@ -15150,6 +15154,39 @@ func changeManagementVerifyCommand(args []string, jsonOut bool) error {
 		return writeJSON(os.Stdout, report)
 	}
 	fmt.Printf("wrote change-management verification ok=%t workflows=%d blocking_gates=%d approved_steps=%d counterexamples=%d to %s\n", report.OK, report.Summary.Workflows, report.Summary.BlockingGates, report.Summary.ApprovedSteps, report.Summary.Counterexamples, outPath)
+	return nil
+}
+
+func governanceRiskRegisterCommand(args []string, jsonOut bool) error {
+	usage := "patchline governance-risk-register --spec governance-risk-register.json --root repo-root --out <dir> [--json]"
+	specPath, outPath, err := feedbackSpecOut(args, usage)
+	if err != nil {
+		return err
+	}
+	rootPath := "."
+	if value, ok := flagValue(args, "--root"); ok && value != "" {
+		rootPath = value
+	}
+	file, err := os.Open(specPath)
+	if err != nil {
+		return err
+	}
+	defer file.Close()
+	spec, err := governancerisk.ReadSpec(file)
+	if err != nil {
+		return err
+	}
+	report, err := governancerisk.BuildReport(spec, rootPath)
+	if err != nil {
+		return err
+	}
+	if err := governancerisk.WriteArtifacts(outPath, report); err != nil {
+		return err
+	}
+	if jsonOut {
+		return writeJSON(os.Stdout, report)
+	}
+	fmt.Printf("wrote governance-risk register ok=%t domains=%d assets=%d high_risk_domains=%d counterexamples=%d to %s\n", report.OK, report.Summary.Domains, report.Summary.Entries, report.Summary.HighRiskDomains, report.Summary.Counterexamples, outPath)
 	return nil
 }
 

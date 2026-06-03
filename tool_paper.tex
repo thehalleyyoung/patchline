@@ -72,7 +72,9 @@ disputed findings with preserved evidence, independent reviewer rationales, and 
 and a reviewer-fairness audit gates reviewer burden, false positives, and escalation rates across teams
 and ecosystems using hashed review evidence, while a change-management verifier proves organizational
 approvals cite passed blocking Patchline gates, hash-pinned reports, rollback plans, and bounded
-emergency expiry rather than bypassing the safety layer, and an incident-response drill rehearses
+emergency expiry rather than bypassing the safety layer, a governance-risk register quantifies
+maintainership, funding, infrastructure, and benchmark-control concentration with hash-backed evidence,
+rotation, review-cadence, and mitigation gates, and an incident-response drill rehearses
 hypothetical Patchline false negatives as public incidents with disclosure/remediation deadlines,
 evidence hashes, regression-gate closure, and leak-safe summaries;
 the same marketplace now hosts a public adversarial-migration challenge whose certificate-bound,
@@ -154,7 +156,7 @@ ranks the risks, and prints the next commands that can run immediately.
   \item A \textbf{gate-backed reproducibility and evaluation methodology}---over 613 gates, blinded
   false-positive adjudication, seeded false-negative recall, ablations, standardized effect sizes,
   severity calibration, a duplicate-safe certificate-backed public evidence marketplace, deterministic
-  governance-board lifecycle decisions, hash-bound appeal resolution, reviewer-fairness burden/false-positive/escalation audits, change-management approval binding, adversarial-challenge scoring, signed federated benchmark
+  governance-board lifecycle decisions, hash-bound appeal resolution, reviewer-fairness burden/false-positive/escalation audits, change-management approval binding, governance-risk concentration audits, adversarial-challenge scoring, signed federated benchmark
   aggregates for private adopters, and accountable-use mappings from autonomous or blocking capabilities
   to required human oversight---designed for artifact
   evaluation and best-paper-grade rigor
@@ -259,6 +261,9 @@ or unequal outcomes. & \code{reviewer-fairness-audit.json}, \code{.md} \\
 \code{change-management-verify} & Verify that organizational approvals cite passed blocking Patchline
 gates, hash-pinned reports, rollback plans, distinct approvers, and deterministic emergency expiry rather
 than bypassing safety policy. & \code{change-management.json}, \code{.md} \\
+\code{governance-risk-register} & Quantify concentration across maintainership, funding,
+infrastructure, and benchmark control; hash every evidence file and reject over-concentrated ownership,
+stale reviews, missing rotation plans, and missing mitigations. & \code{governance-risk-register.json}, \code{.md} \\
 \code{incident-response-drill} & Rehearse a hypothetical Patchline false negative as a public incident;
 check disclosure/remediation timelines, role separation, evidence hashes, regression-gate closure, and
 leak-safe public summaries. & \code{incident-response-drill.json}, \code{.md} \\
@@ -904,6 +909,14 @@ than open-ended waivers. The \gate{change-management-integration-gate} runs two 
 including one emergency path, then proves both a missing-gate approval bypass and a hash-mismatched gate
 report are rejected while the report hash remains stable across reruns.
 
+The \code{governance-risk-register} command applies the same falsifiable treatment to Patchline's own
+stewardship surface. A fixed \code{as\_of\_date} keeps review-cadence checks deterministic while the
+report computes top owner and organization shares across maintainership, funding, infrastructure, and
+benchmark control, rehashes every cited governance artifact, and rejects stale reviews, escaping
+evidence paths, missing rotation plans, or concentrated control. The
+\gate{governance-risk-register-gate} proves a twelve-asset register and then mutates it into
+single-maintainer and stale-evidence negative controls.
+
 Finally, \code{incident-response-drill} treats Patchline's own false negatives as rehearsable public
 incidents. The \gate{incident-response-drill-gate} validates a seven-event disclosure/remediation
 timeline, four distinct response roles, ten-plus hashed evidence artifacts, and a regression-gate report,
@@ -1034,6 +1047,7 @@ owner-routed rollback playbooks for broad writes & \gate{remediation-playbook-ga
 1 accepted, 1 deprecated, and 1 quarantined shared-evidence record; 4 archive artifacts preserved with tombstones; weak quorum/conflict/missing-tombstone controls rejected & \gate{evidence-governance-board-gate} \\
 3 disputed findings resolved with 6 preserved artifacts, 9 reviewer rationales, and controls for missing preservation, original approver reuse, and private markers & \gate{evidence-appeal-workflow-gate} \\
 2 change-management workflows with 4 distinct approvals bound to 2 passed blocking gates; missing-gate bypass and gate-report hash drift refuted & \gate{change-management-integration-gate} \\
+4 governance-risk domains / 12 controlled assets with owner/org concentration bounds, hash-backed evidence, deterministic review cadence, and stale/escaped-evidence controls & \gate{governance-risk-register-gate} \\
 7-event public false-negative drill with disclosure/remediation deadlines, 4 distinct roles, regression-gate hash binding, and private-marker controls & \gate{incident-response-drill-gate} \\
 2 public-safe adversarial migrations scored from verified artifacts and analyzer-backed high-risk proofs; embargoed publication refuted & \gate{adversarial-challenge-gate} \\
 3 private benchmark cases published as signed aggregate-only metrics; tampering/leakage rejected & \gate{federated-benchmark-split-gate} \\
@@ -1528,8 +1542,8 @@ production-grade remediation loops for rollback, repair escrow, and patch-series
 federated, checksum-mirrored, withdrawal-aware, challenge-ready public evidence marketplace with
 externally adopted governance and appeal audit trails; deeper rollback, query-plan, data-volume, and engine-negative-control semantics
 on top of the new versioned production-database profiles;
-socio-technical accountability beyond accountable-use, reviewer-fairness, and change-management binding,
-including ethics and detector deprecation; education and
+socio-technical accountability beyond accountable-use, reviewer-fairness, change-management binding, and
+governance-risk registration, including ethics and detector deprecation; education and
 certification materials that make migration safety teachable; resilient offline, edge, confidential,
 and disaster-recovery deployments; and an award-to-standard transition that externalizes benchmarks,
 errata, conformance labels, and long-term stewardship. These items are intentionally recorded as future
@@ -1744,7 +1758,8 @@ Generalization & \code{framework-holdout-gate}, \code{perturbation-robustness-ga
 Trust stack & \code{signed-provenance-chain-gate}, \code{reproducible-build-attestation-gate},
 \code{merkle-audit-log-gate}, \code{sbom-pinned-deps-gate}, \code{red-team-adversarial-gate},
 \code{evidence-governance-board-gate}, \code{evidence-appeal-workflow-gate},
-\code{change-management-integration-gate}, \code{incident-response-drill-gate} \\
+\code{change-management-integration-gate}, \code{governance-risk-register-gate},
+\code{incident-response-drill-gate} \\
 Reviewer \& community & \code{quickstart-sixty-seconds-gate}, \code{inline-review-surface-gate},
 \code{ci-pr-bot-gate}, \code{governance-policy-gate}, \code{citation-doi-gate} \\
 Research frontier & \code{learned-risk-model-gate}, \code{neuro-symbolic-verdict-gate},

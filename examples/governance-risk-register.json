@@ -1,0 +1,249 @@
+{
+  "version": "patchline.governance-risk-register/v1",
+  "name": "Patchline governance-risk register over project-control concentration",
+  "as_of_date": "2026-03-01T00:00:00Z",
+  "criteria": {
+    "required_domains": [
+      "maintainership",
+      "funding",
+      "infrastructure",
+      "benchmark_control"
+    ],
+    "max_owner_share": 0.6,
+    "max_organization_share": 0.65,
+    "min_independent_owners_per_domain": 2,
+    "min_independent_orgs_per_domain": 2,
+    "min_mitigations_per_high_risk_domain": 2,
+    "require_evidence_paths": true,
+    "require_rotation_plan": true,
+    "review_cadence_days": 120
+  },
+  "entries": [
+    {
+      "asset_id": "maint-core-release",
+      "domain": "maintainership",
+      "asset_name": "Core release approvals",
+      "owner": "release council",
+      "organization": "Patchline Maintainers",
+      "control_type": "merge authority",
+      "weight": 40,
+      "last_reviewed": "2026-02-01T00:00:00Z",
+      "rotation_plan": "Rotate release captains quarterly and require a backup signer for every release.",
+      "mitigations": [
+        "named backup",
+        "public review log"
+      ],
+      "evidence_paths": [
+        "docs/governance.md",
+        "docs/maintainer-council.md"
+      ]
+    },
+    {
+      "asset_id": "maint-security-triage",
+      "domain": "maintainership",
+      "asset_name": "Security triage ownership",
+      "owner": "security reviewers",
+      "organization": "Independent Security WG",
+      "control_type": "security escalation",
+      "weight": 35,
+      "last_reviewed": "2026-02-01T00:00:00Z",
+      "rotation_plan": "Primary and backup security reviewers rotate after each drill.",
+      "mitigations": [
+        "incident drill backup",
+        "conflict-of-interest recusal"
+      ],
+      "evidence_paths": [
+        "docs/governance.md",
+        "docs/evidence-governance-board.md"
+      ]
+    },
+    {
+      "asset_id": "maint-db-semantics",
+      "domain": "maintainership",
+      "asset_name": "Database semantics approval panel",
+      "owner": "database semantics panel",
+      "organization": "Academic Adopters Consortium",
+      "control_type": "detector semantics approval",
+      "weight": 25,
+      "last_reviewed": "2026-02-01T00:00:00Z",
+      "rotation_plan": "Panel membership and backups are reviewed before each benchmark release.",
+      "mitigations": [
+        "external replication review",
+        "public rationale log"
+      ],
+      "evidence_paths": [
+        "docs/certificate-standard.md",
+        "docs/evidence-governance-board.md"
+      ]
+    },
+    {
+      "asset_id": "fund-public-good-grant",
+      "domain": "funding",
+      "asset_name": "Public-good grant",
+      "owner": "grant stewardship committee",
+      "organization": "Research Commons Fund",
+      "control_type": "grant control",
+      "weight": 40,
+      "last_reviewed": "2026-02-01T00:00:00Z",
+      "rotation_plan": "Grant renewals require independent review and published budget deltas.",
+      "mitigations": [
+        "independent grant review",
+        "public budget delta"
+      ],
+      "evidence_paths": [
+        "docs/sustainability-plan.md",
+        "docs/public-roadmap-burndown.md"
+      ]
+    },
+    {
+      "asset_id": "fund-adopter-pool",
+      "domain": "funding",
+      "asset_name": "Adopter sponsorship pool",
+      "owner": "sponsor review board",
+      "organization": "Adopter Consortium",
+      "control_type": "sponsor intake",
+      "weight": 30,
+      "last_reviewed": "2026-02-01T00:00:00Z",
+      "rotation_plan": "Sponsor intake ownership rotates and caps single-sponsor influence.",
+      "mitigations": [
+        "single sponsor cap",
+        "separate benchmark committee"
+      ],
+      "evidence_paths": [
+        "docs/sustainability-plan.md"
+      ]
+    },
+    {
+      "asset_id": "fund-reserve-budget",
+      "domain": "funding",
+      "asset_name": "Reserve budget",
+      "owner": "treasury backup signers",
+      "organization": "Patchline Foundation",
+      "control_type": "reserve control",
+      "weight": 30,
+      "last_reviewed": "2026-02-01T00:00:00Z",
+      "rotation_plan": "Two backup signers are maintained for every withdrawal path.",
+      "mitigations": [
+        "multi-signer reserve",
+        "annual succession drill"
+      ],
+      "evidence_paths": [
+        "docs/sustainability-plan.md",
+        "docs/maintainer-council.md"
+      ]
+    },
+    {
+      "asset_id": "infra-release-ci",
+      "domain": "infrastructure",
+      "asset_name": "Release CI",
+      "owner": "ci rotation",
+      "organization": "GitHub Actions Maintainers",
+      "control_type": "runner administration",
+      "weight": 34,
+      "last_reviewed": "2026-02-01T00:00:00Z",
+      "rotation_plan": "Release jobs are mirrored before cutover and owned by a rotating CI steward.",
+      "mitigations": [
+        "mirrored release jobs",
+        "runner fallback"
+      ],
+      "evidence_paths": [
+        "docs/artifact-mirror.md",
+        "docs/public-roadmap-burndown.md"
+      ]
+    },
+    {
+      "asset_id": "infra-docs-mirror",
+      "domain": "infrastructure",
+      "asset_name": "Documentation mirror",
+      "owner": "docs mirror stewards",
+      "organization": "University Mirror Network",
+      "control_type": "mirror administration",
+      "weight": 33,
+      "last_reviewed": "2026-02-01T00:00:00Z",
+      "rotation_plan": "Mirror succession is tested quarterly with a separate owner for each mirror.",
+      "mitigations": [
+        "mirror succession test",
+        "offline artifact bundle"
+      ],
+      "evidence_paths": [
+        "docs/artifact-mirror.md"
+      ]
+    },
+    {
+      "asset_id": "infra-artifact-registry",
+      "domain": "infrastructure",
+      "asset_name": "Artifact registry",
+      "owner": "artifact registry admins",
+      "organization": "Public Artifact Co-op",
+      "control_type": "artifact administration",
+      "weight": 33,
+      "last_reviewed": "2026-02-01T00:00:00Z",
+      "rotation_plan": "Registry backup keys are split across admins and tested during release rehearsal.",
+      "mitigations": [
+        "split backup keys",
+        "release rehearsal"
+      ],
+      "evidence_paths": [
+        "docs/artifact-mirror.md",
+        "docs/certificate-standard.md"
+      ]
+    },
+    {
+      "asset_id": "bench-corpus-curation",
+      "domain": "benchmark_control",
+      "asset_name": "Corpus curation",
+      "owner": "corpus curation board",
+      "organization": "Benchmark Working Group",
+      "control_type": "case admission",
+      "weight": 34,
+      "last_reviewed": "2026-02-01T00:00:00Z",
+      "rotation_plan": "Curation quorum excludes submitters and records public admission rationale.",
+      "mitigations": [
+        "submitter recusal",
+        "public admission rationale"
+      ],
+      "evidence_paths": [
+        "docs/benchmark-release.md",
+        "docs/evidence-governance-board.md"
+      ]
+    },
+    {
+      "asset_id": "bench-challenge-track",
+      "domain": "benchmark_control",
+      "asset_name": "Adversarial challenge track",
+      "owner": "challenge track reviewers",
+      "organization": "External Replication Lab",
+      "control_type": "challenge scoring",
+      "weight": 33,
+      "last_reviewed": "2026-02-01T00:00:00Z",
+      "rotation_plan": "Challenge disputes route to external reviewers before scoreboard updates.",
+      "mitigations": [
+        "external dispute path",
+        "responsible disclosure hold"
+      ],
+      "evidence_paths": [
+        "docs/leaderboard.md",
+        "docs/benchmark-release.md"
+      ]
+    },
+    {
+      "asset_id": "bench-scoring-rules",
+      "domain": "benchmark_control",
+      "asset_name": "Scoring rules",
+      "owner": "scorecard maintainers",
+      "organization": "Patchline Maintainers",
+      "control_type": "scorecard control",
+      "weight": 33,
+      "last_reviewed": "2026-02-01T00:00:00Z",
+      "rotation_plan": "Scoring-rule changes require release-candidate freeze and external replication signoff.",
+      "mitigations": [
+        "release-candidate freeze",
+        "external replication signoff"
+      ],
+      "evidence_paths": [
+        "docs/leaderboard.md",
+        "docs/benchmark-release.md"
+      ]
+    }
+  ]
+}
