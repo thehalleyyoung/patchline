@@ -22,6 +22,7 @@ import (
 	"github.com/thehalleyyoung/patchline/internal/feedback"
 	"github.com/thehalleyyoung/patchline/internal/intake"
 	"github.com/thehalleyyoung/patchline/internal/project"
+	"github.com/thehalleyyoung/patchline/internal/repairescrow"
 )
 
 func TestExitCodeDefaultsToUsageOrGenericFailure(t *testing.T) {
@@ -224,6 +225,50 @@ func TestCanaryValidateCommandWritesReports(t *testing.T) {
 		if stat, err := os.Stat(filepath.Join(out, rel)); err != nil || stat.Size() == 0 {
 			t.Fatalf("expected %s to be written, stat=%#v err=%v", rel, stat, err)
 		}
+	}
+}
+
+func TestRepairEscrowCommandWritesReports(t *testing.T) {
+	root := t.TempDir()
+	specPath := filepath.Join(root, "repair-escrow.json")
+	writeMainTestFile(t, root, "repair-escrow.json", `{
+  "version": "patchline.repair-escrow/v1",
+  "name": "main test repair escrow",
+  "thresholds": {"manual_reviews": 2, "certificates": 1, "evidence": 1},
+  "repairs": [
+    {"id":"release-fix","title":"release safe fix","artifact_hash":"sha256:release","risk_class":"constraint-tightening"},
+    {"id":"hold-fix","title":"hold until review","artifact_hash":"sha256:hold","risk_class":"broad-write"}
+  ],
+  "reviews": [
+    {"id":"review-release-a","repair_id":"release-fix","artifact_hash":"sha256:release","reviewer":"alice","decision":"approved"},
+    {"id":"review-release-b","repair_id":"release-fix","artifact_hash":"sha256:release","reviewer":"bob","decision":"approved"},
+    {"id":"review-hold-a","repair_id":"hold-fix","artifact_hash":"sha256:hold","reviewer":"alice","decision":"approved"}
+  ],
+  "certificates": [
+    {"id":"cert-release","repair_id":"release-fix","artifact_hash":"sha256:release","issuer":"plci","status":"valid"},
+    {"id":"cert-hold","repair_id":"hold-fix","artifact_hash":"sha256:hold","issuer":"plci","status":"valid"}
+  ],
+  "evidence": [
+    {"id":"evidence-release","repair_id":"release-fix","artifact_hash":"sha256:release","kind":"canary-validation","verdict":"pass"},
+    {"id":"evidence-hold","repair_id":"hold-fix","artifact_hash":"sha256:hold","kind":"canary-validation","verdict":"pass"}
+  ]
+}`)
+	out := filepath.Join(t.TempDir(), "repair-escrow")
+	if err := run([]string{"repair-escrow", "--spec", specPath, "--out", out, "--json"}); err != nil {
+		t.Fatalf("repair-escrow failed: %v", err)
+	}
+	var report repairescrow.Report
+	readMainTestJSON(t, filepath.Join(out, "repair-escrow.json"), &report)
+	byID := map[string]repairescrow.RepairReport{}
+	for _, repair := range report.Repairs {
+		byID[repair.ID] = repair
+	}
+	hold := byID["hold-fix"]
+	if report.OK || report.Summary.Released != 1 || report.Summary.Held != 1 || len(hold.Obligations) != 1 || hold.Obligations[0].ID != "manual_review.threshold" {
+		t.Fatalf("unexpected repair escrow report: %#v", report)
+	}
+	if stat, err := os.Stat(filepath.Join(out, "repair-escrow.md")); err != nil || stat.Size() == 0 {
+		t.Fatalf("expected repair-escrow.md to be written, stat=%#v err=%v", stat, err)
 	}
 }
 

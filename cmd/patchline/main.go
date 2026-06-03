@@ -53,6 +53,7 @@ import (
 	"github.com/thehalleyyoung/patchline/internal/provenance"
 	"github.com/thehalleyyoung/patchline/internal/refinement"
 	"github.com/thehalleyyoung/patchline/internal/repair"
+	"github.com/thehalleyyoung/patchline/internal/repairescrow"
 	"github.com/thehalleyyoung/patchline/internal/replay"
 	"github.com/thehalleyyoung/patchline/internal/reproduce"
 	"github.com/thehalleyyoung/patchline/internal/semantics"
@@ -417,6 +418,8 @@ func run(args []string) error {
 		return backfillPlanCommand(args[1:], hasFlag(args[1:], "--json"))
 	case "canary-validate":
 		return canaryValidateCommand(args[1:], hasFlag(args[1:], "--json"))
+	case "repair-escrow":
+		return repairEscrowCommand(args[1:], hasFlag(args[1:], "--json"))
 	case "feedback":
 		return feedbackCommand(args[1:])
 	case "security":
@@ -555,6 +558,7 @@ Usage:
   patchline expand-contract-template --spec expand-contract.json --out dir [--json]
   patchline backfill-plan --spec backfill-plan.json --store store.json --out dir [--json]
   patchline canary-validate --spec canary-validation.json --before before.json --after after.json --out dir [--json]
+  patchline repair-escrow --spec repair-escrow.json --out dir [--json]
   patchline feedback counterfactual-log --feedback live-feedback.json --history policy-history.json --out dir [--json]
   patchline feedback online-eval --feedback live-feedback.json --spec online-evaluation.json --out dir [--json]
   patchline feedback active-learning-queue --spec active-learning.json --out dir [--json]
@@ -14688,6 +14692,41 @@ func canaryValidateCommand(args []string, jsonOut bool) error {
 		return writeJSON(os.Stdout, report)
 	}
 	fmt.Printf("wrote canary validation report ok=%t invariants=%d refuted=%d matched_rows=%d to %s\n", report.OK, report.Summary.Invariants, report.Summary.Refuted, report.Summary.MatchedRows, outPath)
+	return nil
+}
+
+func repairEscrowCommand(args []string, jsonOut bool) error {
+	usage := "patchline repair-escrow --spec repair-escrow.json --out <dir> [--json]"
+	specPath, outPath, err := feedbackSpecOut(args, usage)
+	if err != nil {
+		return err
+	}
+	file, err := os.Open(specPath)
+	if err != nil {
+		return err
+	}
+	defer file.Close()
+	spec, err := repairescrow.ReadSpec(file)
+	if err != nil {
+		return err
+	}
+	report, err := repairescrow.BuildReport(spec)
+	if err != nil {
+		return err
+	}
+	if err := os.MkdirAll(outPath, 0o755); err != nil {
+		return err
+	}
+	if err := writeJSONArtifact(filepath.Join(outPath, "repair-escrow.json"), report); err != nil {
+		return err
+	}
+	if err := os.WriteFile(filepath.Join(outPath, "repair-escrow.md"), []byte(repairescrow.RenderMarkdown(report)), 0o644); err != nil {
+		return err
+	}
+	if jsonOut {
+		return writeJSON(os.Stdout, report)
+	}
+	fmt.Printf("wrote repair-risk escrow report released=%d held=%d rejected=%d to %s\n", report.Summary.Released, report.Summary.Held, report.Summary.Rejected, outPath)
 	return nil
 }
 

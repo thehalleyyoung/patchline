@@ -51,7 +51,8 @@ surface now also derives invariant-backed expand/contract templates, uses a stag
 gate constraint-tightening and compatibility-code deletion on an exhaustive replay-store proof, and
 turns baseline hazard classes into owner-routed remediation playbooks with rollback points, while a
 canary-data protocol compares pre/post migration invariants on sampled, redacted, production-like
-snapshots and emits only hash-based counterexamples. Critically,
+snapshots and emits only hash-based counterexamples, and a repair-risk escrow holds proposed fixes
+until distinct manual-review and certificate thresholds clear. Critically,
 every capability in \tool{} is backed by a reproducible \emph{gate}: a script that proves the
 capability against real, pinned public code and fails loudly on drift. \tool{} currently ships more
 than 600 such gates over 560 documented capabilities, spanning relational migrations across nine
@@ -199,6 +200,9 @@ trace-to-code evidence. & \code{baseline.json}, \code{baseline.sarif} \\
 and owner handoffs. & \code{playbook.json}, \code{playbook.md} \\
 \code{canary-validate} & Compare pre/post migration invariants on sampled, redacted, production-like
 snapshots with hash-only counterexamples. & \code{canary-validation.json}, \code{.md}, \code{.sql} \\
+\code{repair-escrow} & Accumulate repair-bound evidence, distinct manual approvals, and valid
+certificates until release thresholds clear; reject revoked certificates and manual blocks. &
+\code{repair-escrow.json}, \code{repair-escrow.md} \\
 \code{propose} & Generate bounded interventions (guards, tests) within an explicit budget; quarantine
 them as untrusted artifacts. & \code{proposal.patch}, \code{patchline-proposals/} \\
 \code{compare} & Deterministically re-analyze proposed changes; accept or reject by evidence delta. &
@@ -457,6 +461,17 @@ The \gate{canary-validation-gate} checks a passing invoice migration with six in
 a negative post snapshot that duplicates a unique value, leaves one target empty, and mutates a stable
 business field; the bad snapshot must be refuted by exact hash-only counterexamples.
 
+\paragraph{Repair-risk escrow.} The \code{repair-escrow} command adds a release state machine for
+proposed fixes after compare, playbook, backfill, and canary evidence exist. A versioned spec lists
+candidate repair artifacts, manual review events, certificates, and evidence items, each bound to both
+the repair ID and artifact hash. Release requires configured thresholds for distinct reviewers,
+distinct valid certificates, and accepted evidence. Duplicate approvals do not count; manual
+rejections, failed evidence, artifact mismatches, expired certificates, and revoked certificates win
+over positive evidence and force \code{rejected}. Otherwise the repair remains \code{held} with
+quantified obligations such as one more certificate or one more independent reviewer. The
+\gate{repair-risk-escrow-gate} proves all three outcomes on a billing remediation fixture: one released
+repair, two held repairs with different missing threshold dimensions, and two rejected repairs.
+
 \paragraph{The accept/reject decision.} Table~\ref{tab:compare} makes the compare contract precise.
 Each proposed artifact is scored on the same fact-derived axes as the baseline, and the decision is a
 pure function of the evidence delta---never of a model's self-reported confidence. An artifact that
@@ -698,6 +713,7 @@ Runtime-trace corroboration & no & no & yes \\
 Bounded, quarantined interventions & no & no & yes \\
 Owner-routed rollback playbooks & no & no & yes \\
 Pre/post canary invariant validation & no & no & yes \\
+Manual-review/certificate escrow & no & no & yes \\
 Deterministic, byte-stable artifacts & no & partial & yes \\
 Real-repo proof gates & no & no & yes \\
 \bottomrule
@@ -719,6 +735,7 @@ hermetic local fixture with the same analyzer pipeline.
 8 review artifacts, 0 failed deterministic checks & same run, bounded budget \\
 owner-routed rollback playbooks for broad writes & \gate{remediation-playbook-gate} \\
 6 checked canary invariants; bad post-snapshot refuted & \gate{canary-validation-gate} \\
+1 released, 2 held, 2 rejected repair proposals under escrow & \gate{repair-risk-escrow-gate} \\
 9 Cassandra changes incl.\ destructive drops & \code{laaksomavrick/twitter-go} \\
 17 $\rightarrow$ 1 line, 1-minimal reproduction & delta-debugging oracle \\
 3 pipeline frameworks in one repo & \code{harrydevforlife/building-lakehouse} \\
@@ -1376,7 +1393,8 @@ Migration breadth & \code{multi-ecosystem-migration-gate}, \code{nosql-change-ga
 \code{data-pipeline-gate}, \code{schema-compat-gate}, \code{infra-ordering-gate} \\
 Intervention safety & \code{generated-code-quarantine-gate}, \code{rejected-generated-gate},
 \code{intervention-regression-archive-gate}, \code{expand-contract-templates-gate},
-\code{staged-backfill-planner-gate}, \code{canary-validation-gate}, \code{reviewability-examples-gate} \\
+\code{staged-backfill-planner-gate}, \code{canary-validation-gate}, \code{repair-risk-escrow-gate},
+\code{reviewability-examples-gate} \\
 Runtime evidence & \code{otel-trace-gen-gate}, \code{datadog-timeline-gate}, \code{prom-grafana-gate},
 \code{runtime-confidence-gate} \\
 Evaluation rigor & \code{fp-adjudication-gate}, \code{fn-discovery-gate}, \code{ablation-study-gate},

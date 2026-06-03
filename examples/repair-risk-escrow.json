@@ -1,0 +1,76 @@
+{
+  "version": "patchline.repair-escrow/v1",
+  "name": "billing external-id remediation escrow",
+  "thresholds": {
+    "manual_reviews": 2,
+    "certificates": 2,
+    "evidence": 2
+  },
+  "repairs": [
+    {
+      "id": "release-external-id",
+      "title": "Release external_id backfill after checked proof",
+      "artifact_hash": "sha256:release-external-id",
+      "risk_class": "constraint-tightening"
+    },
+    {
+      "id": "hold-missing-certificate",
+      "title": "Hold compatibility deletion until second certificate",
+      "artifact_hash": "sha256:hold-certificate",
+      "risk_class": "compatibility-delete"
+    },
+    {
+      "id": "hold-missing-review",
+      "title": "Hold broad-write fix until second reviewer",
+      "artifact_hash": "sha256:hold-review",
+      "risk_class": "broad-write"
+    },
+    {
+      "id": "reject-manual-review",
+      "title": "Reject a patch blocked by reviewer",
+      "artifact_hash": "sha256:reject-review",
+      "risk_class": "broad-write"
+    },
+    {
+      "id": "reject-revoked-certificate",
+      "title": "Reject a patch with a revoked certificate",
+      "artifact_hash": "sha256:reject-certificate",
+      "risk_class": "constraint-tightening"
+    }
+  ],
+  "reviews": [
+    {"id":"review-release-alice","repair_id":"release-external-id","artifact_hash":"sha256:release-external-id","reviewer":"alice","decision":"approved"},
+    {"id":"review-release-bob","repair_id":"release-external-id","artifact_hash":"sha256:release-external-id","reviewer":"bob","decision":"approved"},
+    {"id":"review-hold-cert-alice","repair_id":"hold-missing-certificate","artifact_hash":"sha256:hold-certificate","reviewer":"alice","decision":"approved"},
+    {"id":"review-hold-cert-bob","repair_id":"hold-missing-certificate","artifact_hash":"sha256:hold-certificate","reviewer":"bob","decision":"approved"},
+    {"id":"review-hold-review-alice","repair_id":"hold-missing-review","artifact_hash":"sha256:hold-review","reviewer":"alice","decision":"approved"},
+    {"id":"review-hold-review-alice-duplicate","repair_id":"hold-missing-review","artifact_hash":"sha256:hold-review","reviewer":"alice","decision":"approved"},
+    {"id":"review-reject-alice","repair_id":"reject-manual-review","artifact_hash":"sha256:reject-review","reviewer":"alice","decision":"approved"},
+    {"id":"review-reject-bob","repair_id":"reject-manual-review","artifact_hash":"sha256:reject-review","reviewer":"bob","decision":"rejected"},
+    {"id":"review-reject-cert-alice","repair_id":"reject-revoked-certificate","artifact_hash":"sha256:reject-certificate","reviewer":"alice","decision":"approved"},
+    {"id":"review-reject-cert-bob","repair_id":"reject-revoked-certificate","artifact_hash":"sha256:reject-certificate","reviewer":"bob","decision":"approved"}
+  ],
+  "certificates": [
+    {"id":"cert-release-plci","repair_id":"release-external-id","artifact_hash":"sha256:release-external-id","issuer":"plci-core","status":"valid"},
+    {"id":"cert-release-canary","repair_id":"release-external-id","artifact_hash":"sha256:release-external-id","issuer":"canary-validator","status":"valid"},
+    {"id":"cert-hold-one","repair_id":"hold-missing-certificate","artifact_hash":"sha256:hold-certificate","issuer":"plci-core","status":"valid"},
+    {"id":"cert-hold-review-plci","repair_id":"hold-missing-review","artifact_hash":"sha256:hold-review","issuer":"plci-core","status":"valid"},
+    {"id":"cert-hold-review-canary","repair_id":"hold-missing-review","artifact_hash":"sha256:hold-review","issuer":"canary-validator","status":"valid"},
+    {"id":"cert-reject-review-plci","repair_id":"reject-manual-review","artifact_hash":"sha256:reject-review","issuer":"plci-core","status":"valid"},
+    {"id":"cert-reject-review-canary","repair_id":"reject-manual-review","artifact_hash":"sha256:reject-review","issuer":"canary-validator","status":"valid"},
+    {"id":"cert-reject-revoked","repair_id":"reject-revoked-certificate","artifact_hash":"sha256:reject-certificate","issuer":"plci-core","status":"revoked"},
+    {"id":"cert-reject-valid","repair_id":"reject-revoked-certificate","artifact_hash":"sha256:reject-certificate","issuer":"canary-validator","status":"valid"}
+  ],
+  "evidence": [
+    {"id":"evidence-release-canary","repair_id":"release-external-id","artifact_hash":"sha256:release-external-id","kind":"canary-validation","source":"results/generated/canary-validation-gate/good","verdict":"pass"},
+    {"id":"evidence-release-backfill","repair_id":"release-external-id","artifact_hash":"sha256:release-external-id","kind":"backfill-plan","source":"results/generated/staged-backfill-planner-gate/complete","verdict":"pass"},
+    {"id":"evidence-hold-cert-canary","repair_id":"hold-missing-certificate","artifact_hash":"sha256:hold-certificate","kind":"canary-validation","source":"results/generated/canary-validation-gate/good","verdict":"pass"},
+    {"id":"evidence-hold-cert-backfill","repair_id":"hold-missing-certificate","artifact_hash":"sha256:hold-certificate","kind":"backfill-plan","source":"results/generated/staged-backfill-planner-gate/complete","verdict":"pass"},
+    {"id":"evidence-hold-review-canary","repair_id":"hold-missing-review","artifact_hash":"sha256:hold-review","kind":"canary-validation","source":"results/generated/canary-validation-gate/good","verdict":"pass"},
+    {"id":"evidence-hold-review-backfill","repair_id":"hold-missing-review","artifact_hash":"sha256:hold-review","kind":"backfill-plan","source":"results/generated/staged-backfill-planner-gate/complete","verdict":"pass"},
+    {"id":"evidence-reject-review-canary","repair_id":"reject-manual-review","artifact_hash":"sha256:reject-review","kind":"canary-validation","source":"results/generated/canary-validation-gate/good","verdict":"pass"},
+    {"id":"evidence-reject-review-backfill","repair_id":"reject-manual-review","artifact_hash":"sha256:reject-review","kind":"backfill-plan","source":"results/generated/staged-backfill-planner-gate/complete","verdict":"pass"},
+    {"id":"evidence-reject-cert-canary","repair_id":"reject-revoked-certificate","artifact_hash":"sha256:reject-certificate","kind":"canary-validation","source":"results/generated/canary-validation-gate/good","verdict":"pass"},
+    {"id":"evidence-reject-cert-backfill","repair_id":"reject-revoked-certificate","artifact_hash":"sha256:reject-certificate","kind":"backfill-plan","source":"results/generated/staged-backfill-planner-gate/complete","verdict":"pass"}
+  ]
+}
