@@ -60,6 +60,7 @@ import (
 	"github.com/thehalleyyoung/patchline/internal/repairescrow"
 	"github.com/thehalleyyoung/patchline/internal/replay"
 	"github.com/thehalleyyoung/patchline/internal/reproduce"
+	"github.com/thehalleyyoung/patchline/internal/reviewerfairness"
 	"github.com/thehalleyyoung/patchline/internal/rollbackplanner"
 	"github.com/thehalleyyoung/patchline/internal/semantics"
 	"github.com/thehalleyyoung/patchline/internal/solver"
@@ -441,6 +442,8 @@ func run(args []string) error {
 		return patchSeriesVerifyCommand(args[1:], hasFlag(args[1:], "--json"))
 	case "maintainer-acceptance-study":
 		return maintainerAcceptanceStudyCommand(args[1:], hasFlag(args[1:], "--json"))
+	case "reviewer-fairness-audit":
+		return reviewerFairnessAuditCommand(args[1:], hasFlag(args[1:], "--json"))
 	case "feedback":
 		return feedbackCommand(args[1:])
 	case "security":
@@ -593,6 +596,7 @@ Usage:
   patchline remediation-cost --spec remediation-cost-optimizer.json --out dir [--json]
   patchline patch-series-verify --spec patch-series.json --out dir [--json]
   patchline maintainer-acceptance-study --spec maintainer-acceptance-study.json --root repo-root --out dir [--json]
+  patchline reviewer-fairness-audit --spec reviewer-fairness-audit.json --root repo-root --out dir [--json]
   patchline feedback counterfactual-log --feedback live-feedback.json --history policy-history.json --out dir [--json]
   patchline feedback online-eval --feedback live-feedback.json --spec online-evaluation.json --out dir [--json]
   patchline feedback active-learning-queue --spec active-learning.json --out dir [--json]
@@ -15039,6 +15043,39 @@ func maintainerAcceptanceStudyCommand(args []string, jsonOut bool) error {
 		return writeJSON(os.Stdout, report)
 	}
 	fmt.Printf("wrote maintainer acceptance study ok=%t pairs=%d time_reduction=%.2f%% generated_uncertainty_recall=%.2f counterexamples=%d to %s\n", report.OK, report.Summary.Pairs, report.Summary.ReviewTimeReductionPercent, report.Summary.GeneratedUncertaintyRecall, report.Summary.Counterexamples, outPath)
+	return nil
+}
+
+func reviewerFairnessAuditCommand(args []string, jsonOut bool) error {
+	usage := "patchline reviewer-fairness-audit --spec reviewer-fairness-audit.json --root repo-root --out <dir> [--json]"
+	specPath, outPath, err := feedbackSpecOut(args, usage)
+	if err != nil {
+		return err
+	}
+	rootPath := "."
+	if value, ok := flagValue(args, "--root"); ok && value != "" {
+		rootPath = value
+	}
+	file, err := os.Open(specPath)
+	if err != nil {
+		return err
+	}
+	defer file.Close()
+	spec, err := reviewerfairness.ReadSpec(file)
+	if err != nil {
+		return err
+	}
+	report, err := reviewerfairness.BuildReport(spec, rootPath)
+	if err != nil {
+		return err
+	}
+	if err := reviewerfairness.WriteArtifacts(outPath, report); err != nil {
+		return err
+	}
+	if jsonOut {
+		return writeJSON(os.Stdout, report)
+	}
+	fmt.Printf("wrote reviewer fairness audit ok=%t reviews=%d teams=%d ecosystems=%d counterexamples=%d to %s\n", report.OK, report.Summary.Reviews, report.Summary.Teams, report.Summary.Ecosystems, report.Summary.Counterexamples, outPath)
 	return nil
 }
 

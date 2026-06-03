@@ -28,6 +28,7 @@ import (
 	"github.com/thehalleyyoung/patchline/internal/project"
 	"github.com/thehalleyyoung/patchline/internal/remediationcost"
 	"github.com/thehalleyyoung/patchline/internal/repairescrow"
+	"github.com/thehalleyyoung/patchline/internal/reviewerfairness"
 	"github.com/thehalleyyoung/patchline/internal/rollbackplanner"
 )
 
@@ -791,6 +792,46 @@ func TestMaintainerAcceptanceStudyCommandWritesReports(t *testing.T) {
 	}
 	if stat, err := os.Stat(filepath.Join(out, "maintainer-acceptance-study.md")); err != nil || stat.Size() == 0 {
 		t.Fatalf("expected maintainer-acceptance-study.md to be written, stat=%#v err=%v", stat, err)
+	}
+}
+
+func TestReviewerFairnessAuditCommandWritesReports(t *testing.T) {
+	root := t.TempDir()
+	writeMainTestFile(t, root, "docs/acceptance-study.md", "paired reviews with adjudicated false positives\n")
+	writeMainTestFile(t, root, "docs/escalation-log.md", "owner-routed escalation handoffs\n")
+	specPath := filepath.Join(root, "reviewer-fairness-audit.json")
+	writeMainTestFile(t, root, "reviewer-fairness-audit.json", `{
+  "version": "patchline.reviewer-fairness-audit/v1",
+  "name": "main test reviewer fairness audit",
+  "criteria": {
+    "min_teams": 2,
+    "min_ecosystems": 2,
+    "min_reviews_per_group": 2,
+    "max_burden_ratio": 1.2,
+    "max_false_positive_rate_gap": 0.3,
+    "max_escalation_rate_gap": 0.2
+  },
+  "observations": [
+    {"review_id":"payments-rails","reviewer_id":"r-pay-1","team":"payments","ecosystem":"rails","review_minutes":30,"findings_reported":4,"false_positives":1,"escalated":true,"evidence_paths":["docs/acceptance-study.md","docs/escalation-log.md"]},
+    {"review_id":"payments-django","reviewer_id":"r-pay-2","team":"payments","ecosystem":"django","review_minutes":28,"findings_reported":3,"false_positives":0,"escalated":false,"evidence_paths":["docs/acceptance-study.md"]},
+    {"review_id":"platform-rails","reviewer_id":"r-plat-1","team":"platform","ecosystem":"rails","review_minutes":31,"findings_reported":4,"false_positives":1,"escalated":false,"evidence_paths":["docs/acceptance-study.md","docs/escalation-log.md"]},
+    {"review_id":"platform-django","reviewer_id":"r-plat-2","team":"platform","ecosystem":"django","review_minutes":29,"findings_reported":3,"false_positives":0,"escalated":true,"evidence_paths":["docs/escalation-log.md"]}
+  ]
+}`)
+	out := filepath.Join(t.TempDir(), "reviewer-fairness-audit")
+	if err := run([]string{"reviewer-fairness-audit", "--spec", specPath, "--root", root, "--out", out, "--json"}); err != nil {
+		t.Fatalf("reviewer-fairness-audit failed: %v", err)
+	}
+	var report reviewerfairness.Report
+	readMainTestJSON(t, filepath.Join(out, "reviewer-fairness-audit.json"), &report)
+	if !report.OK || report.Summary.Reviews != 4 || report.Summary.TeamEscalationRateGap != 0 {
+		t.Fatalf("unexpected reviewer fairness report: %#v", report)
+	}
+	if len(report.Teams) != 2 || len(report.Teams[0].Evidence) == 0 || report.Teams[0].Evidence[0].SHA256 == "" {
+		t.Fatalf("expected grouped evidence hashes, got %#v", report.Teams)
+	}
+	if stat, err := os.Stat(filepath.Join(out, "reviewer-fairness-audit.md")); err != nil || stat.Size() == 0 {
+		t.Fatalf("expected reviewer-fairness-audit.md to be written, stat=%#v err=%v", stat, err)
 	}
 }
 

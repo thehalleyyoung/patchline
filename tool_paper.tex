@@ -67,8 +67,10 @@ prevalence accounting, mirrors every accepted artifact by checksum with license 
 and imports only prevalence representatives into runnable benchmarks while recording submitter labels as
 untrusted and deriving cases from independent redacted evidence cues;
 a shared-evidence governance board then accepts, deprecates, or quarantines published records only after
-quorum, conflict checks, hash binding, and archive-preserving tombstones, and an appeal workflow resolves
-disputed findings with preserved evidence, independent reviewer rationales, and resolution audit trails;
+quorum, conflict checks, hash binding, and archive-preserving tombstones, an appeal workflow resolves
+disputed findings with preserved evidence, independent reviewer rationales, and resolution audit trails,
+and a reviewer-fairness audit gates reviewer burden, false positives, and escalation rates across teams
+and ecosystems using hashed review evidence;
 the same marketplace now hosts a public adversarial-migration challenge whose certificate-bound,
 public-safe submissions are scored from verified artifacts, analyzer behavior, minimization, novelty,
 and responsible disclosure; private adopters can then run federated benchmark splits locally and publish only signed,
@@ -145,10 +147,10 @@ ranks the risks, and prints the next commands that can run immediately.
   \item A \textbf{runtime and observability evidence} layer that scores findings on independent
   static-risk and observed-runtime axes using OpenTelemetry, Datadog-style, and Prometheus/Grafana
   exports (Section~\ref{sec:runtime}).
-  \item A \textbf{gate-backed reproducibility and evaluation methodology}---over 611 gates, blinded
+  \item A \textbf{gate-backed reproducibility and evaluation methodology}---over 612 gates, blinded
   false-positive adjudication, seeded false-negative recall, ablations, standardized effect sizes,
   severity calibration, a duplicate-safe certificate-backed public evidence marketplace, deterministic
-  governance-board lifecycle decisions, hash-bound appeal resolution, adversarial-challenge scoring, signed federated benchmark
+  governance-board lifecycle decisions, hash-bound appeal resolution, reviewer-fairness burden/false-positive/escalation audits, adversarial-challenge scoring, signed federated benchmark
   aggregates for private adopters, and accountable-use mappings from autonomous or blocking capabilities
   to required human oversight---designed for artifact
   evaluation and best-paper-grade rigor
@@ -247,6 +249,9 @@ invariants at the initial state and every intermediate state. & \code{patch-seri
 \code{maintainer-acceptance-study} & Compare paired maintainer reviews of baseline remediation material
 against generated plans while hashing the real artifacts reviewed and failing hidden uncertainty. &
 \code{maintainer-acceptance-study.json}, \code{.md} \\
+\code{reviewer-fairness-audit} & Audit review-minute burden, false-positive rate, and escalation-rate
+disparities across teams and ecosystems, hashing every reviewed evidence file and rejecting under-sampled
+or unequal outcomes. & \code{reviewer-fairness-audit.json}, \code{.md} \\
 \code{evidence-marketplace} / \code{artifact-benchmark import-marketplace} & Publish redacted public
 hazard examples only after automated license/consent release admission, symlink-safe artifact-hash,
 certificate-obligation, public-data reproduction, deterministic reputation, and exact/near-duplicate

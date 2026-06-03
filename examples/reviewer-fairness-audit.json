@@ -1,0 +1,68 @@
+{
+  "version": "patchline.reviewer-fairness-audit/v1",
+  "name": "Patchline reviewer fairness audit over burden, false positives, and escalation",
+  "criteria": {
+    "min_teams": 2,
+    "min_ecosystems": 2,
+    "min_reviews_per_group": 2,
+    "max_burden_ratio": 1.2,
+    "max_false_positive_rate_gap": 0.3,
+    "max_escalation_rate_gap": 0.2
+  },
+  "observations": [
+    {
+      "review_id": "payments-rails",
+      "reviewer_id": "reviewer-payments-rails",
+      "team": "payments",
+      "ecosystem": "rails",
+      "review_minutes": 30,
+      "findings_reported": 4,
+      "false_positives": 1,
+      "escalated": true,
+      "evidence_paths": [
+        "docs/maintainer-acceptance-study.md",
+        "docs/fp-adjudication.md"
+      ]
+    },
+    {
+      "review_id": "payments-django",
+      "reviewer_id": "reviewer-payments-django",
+      "team": "payments",
+      "ecosystem": "django",
+      "review_minutes": 28,
+      "findings_reported": 3,
+      "false_positives": 0,
+      "escalated": false,
+      "evidence_paths": [
+        "docs/maintainer-acceptance-study.md"
+      ]
+    },
+    {
+      "review_id": "platform-rails",
+      "reviewer_id": "reviewer-platform-rails",
+      "team": "platform",
+      "ecosystem": "rails",
+      "review_minutes": 31,
+      "findings_reported": 4,
+      "false_positives": 1,
+      "escalated": false,
+      "evidence_paths": [
+        "docs/maintainer-acceptance-study.md",
+        "docs/fp-adjudication.md"
+      ]
+    },
+    {
+      "review_id": "platform-django",
+      "reviewer_id": "reviewer-platform-django",
+      "team": "platform",
+      "ecosystem": "django",
+      "review_minutes": 29,
+      "findings_reported": 3,
+      "false_positives": 0,
+      "escalated": true,
+      "evidence_paths": [
+        "docs/fp-adjudication.md"
+      ]
+    }
+  ]
+}
