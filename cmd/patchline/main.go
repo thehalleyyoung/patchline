@@ -53,6 +53,7 @@ import (
 	"github.com/thehalleyyoung/patchline/internal/proof"
 	"github.com/thehalleyyoung/patchline/internal/provenance"
 	"github.com/thehalleyyoung/patchline/internal/refinement"
+	"github.com/thehalleyyoung/patchline/internal/remediationcost"
 	"github.com/thehalleyyoung/patchline/internal/repair"
 	"github.com/thehalleyyoung/patchline/internal/repairescrow"
 	"github.com/thehalleyyoung/patchline/internal/replay"
@@ -426,6 +427,8 @@ func run(args []string) error {
 		return incidentPostmortemImportCommand(args[1:], hasFlag(args[1:], "--json"))
 	case "multi-service-rollback-plan":
 		return multiServiceRollbackPlanCommand(args[1:], hasFlag(args[1:], "--json"))
+	case "remediation-cost":
+		return remediationCostCommand(args[1:], hasFlag(args[1:], "--json"))
 	case "feedback":
 		return feedbackCommand(args[1:])
 	case "security":
@@ -567,6 +570,7 @@ Usage:
   patchline repair-escrow --spec repair-escrow.json --out dir [--json]
   patchline incident-postmortem-import --spec incident-postmortem-import.json --out dir [--json]
   patchline multi-service-rollback-plan --spec multi-service-rollback-plan.json --out dir [--json]
+  patchline remediation-cost --spec remediation-cost-optimizer.json --out dir [--json]
   patchline feedback counterfactual-log --feedback live-feedback.json --history policy-history.json --out dir [--json]
   patchline feedback online-eval --feedback live-feedback.json --spec online-evaluation.json --out dir [--json]
   patchline feedback active-learning-queue --spec active-learning.json --out dir [--json]
@@ -14793,6 +14797,35 @@ func multiServiceRollbackPlanCommand(args []string, jsonOut bool) error {
 		return writeJSON(os.Stdout, report)
 	}
 	fmt.Printf("wrote multi-service rollback plan ok=%t waves=%d data_loss_rows=%d counterexamples=%d to %s\n", report.OK, report.Summary.RollbackWaves, report.Summary.DataLossRows, report.Summary.Counterexamples, outPath)
+	return nil
+}
+
+func remediationCostCommand(args []string, jsonOut bool) error {
+	usage := "patchline remediation-cost --spec remediation-cost-optimizer.json --out <dir> [--json]"
+	specPath, outPath, err := feedbackSpecOut(args, usage)
+	if err != nil {
+		return err
+	}
+	file, err := os.Open(specPath)
+	if err != nil {
+		return err
+	}
+	defer file.Close()
+	spec, err := remediationcost.ReadSpec(file)
+	if err != nil {
+		return err
+	}
+	report, err := remediationcost.BuildReport(spec)
+	if err != nil {
+		return err
+	}
+	if err := remediationcost.WriteArtifacts(outPath, report); err != nil {
+		return err
+	}
+	if jsonOut {
+		return writeJSON(os.Stdout, report)
+	}
+	fmt.Printf("wrote remediation-cost optimizer ok=%t guard=%d backfill=%d expand_contract=%d manual_review=%d counterexamples=%d to %s\n", report.OK, report.Summary.Guard, report.Summary.Backfill, report.Summary.ExpandContract, report.Summary.ManualReview, report.Summary.Counterexamples, outPath)
 	return nil
 }
 

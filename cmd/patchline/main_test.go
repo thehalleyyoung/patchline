@@ -23,6 +23,7 @@ import (
 	"github.com/thehalleyyoung/patchline/internal/incidentpostmortem"
 	"github.com/thehalleyyoung/patchline/internal/intake"
 	"github.com/thehalleyyoung/patchline/internal/project"
+	"github.com/thehalleyyoung/patchline/internal/remediationcost"
 	"github.com/thehalleyyoung/patchline/internal/repairescrow"
 	"github.com/thehalleyyoung/patchline/internal/rollbackplanner"
 )
@@ -332,6 +333,90 @@ func TestMultiServiceRollbackPlanCommandWritesReports(t *testing.T) {
 	}
 	if stat, err := os.Stat(filepath.Join(out, "multi-service-rollback-plan.md")); err != nil || stat.Size() == 0 {
 		t.Fatalf("expected multi-service-rollback-plan.md to be written, stat=%#v err=%v", stat, err)
+	}
+}
+
+func TestRemediationCostCommandWritesReports(t *testing.T) {
+	root := t.TempDir()
+	specPath := filepath.Join(root, "remediation-cost-optimizer.json")
+	writeMainTestFile(t, root, "remediation-cost-optimizer.json", `{
+  "version": "patchline.remediation-cost/v1",
+  "name": "main test remediation-cost optimizer",
+  "thresholds": {"max_residual_loss": 500, "max_uncertainty": 0.5},
+  "cases": [
+    {
+      "id": "runtime-guard",
+      "hazard_class": "broad-write",
+      "affected_rows": 100,
+      "probability": 0.2,
+      "impact_per_row": 100,
+      "uncertainty": 0.1,
+      "evidence": {"runtime_guard": true, "backfill_proof": true, "invariant_template": true, "orm_check": true, "canary_validation": true},
+      "options": [
+        {"id": "guard", "kind": "guard", "direct_cost": 100, "risk_reduction": 0.9, "requires": ["runtime_guard", "canary_validation"]},
+        {"id": "backfill", "kind": "backfill", "direct_cost": 600, "risk_reduction": 0.95, "requires": ["backfill_proof"]},
+        {"id": "expand-contract", "kind": "expand_contract", "direct_cost": 800, "risk_reduction": 0.97, "requires": ["invariant_template", "orm_check"]},
+        {"id": "manual", "kind": "manual_review", "direct_cost": 1200, "risk_reduction": 0.85}
+      ]
+    },
+    {
+      "id": "verified-backfill",
+      "hazard_class": "partial-backfill",
+      "affected_rows": 100,
+      "probability": 0.4,
+      "impact_per_row": 100,
+      "uncertainty": 0.05,
+      "evidence": {"runtime_guard": true, "backfill_proof": true, "invariant_template": true, "orm_check": true, "canary_validation": true},
+      "options": [
+        {"id": "guard", "kind": "guard", "direct_cost": 300, "risk_reduction": 0.7, "requires": ["runtime_guard", "canary_validation"]},
+        {"id": "backfill", "kind": "backfill", "direct_cost": 200, "risk_reduction": 0.93, "requires": ["backfill_proof"]},
+        {"id": "expand-contract", "kind": "expand_contract", "direct_cost": 800, "risk_reduction": 0.97, "requires": ["invariant_template", "orm_check"]},
+        {"id": "manual", "kind": "manual_review", "direct_cost": 1000, "risk_reduction": 0.9}
+      ]
+    },
+    {
+      "id": "expand-contract",
+      "hazard_class": "constraint-tightening",
+      "affected_rows": 200,
+      "probability": 0.3,
+      "impact_per_row": 50,
+      "uncertainty": 0.05,
+      "evidence": {"runtime_guard": true, "backfill_proof": true, "invariant_template": true, "orm_check": true, "canary_validation": true},
+      "options": [
+        {"id": "guard", "kind": "guard", "direct_cost": 200, "risk_reduction": 0.8, "requires": ["runtime_guard", "canary_validation"]},
+        {"id": "backfill", "kind": "backfill", "direct_cost": 600, "risk_reduction": 0.85, "requires": ["backfill_proof"]},
+        {"id": "expand-contract", "kind": "expand_contract", "direct_cost": 400, "risk_reduction": 0.95, "requires": ["invariant_template", "orm_check"]},
+        {"id": "manual", "kind": "manual_review", "direct_cost": 1000, "risk_reduction": 0.9}
+      ]
+    },
+    {
+      "id": "uncertain-remedy",
+      "hazard_class": "ambiguous-cross-service-effect",
+      "affected_rows": 100,
+      "probability": 0.5,
+      "impact_per_row": 100,
+      "uncertainty": 0.75,
+      "evidence": {},
+      "options": [
+        {"id": "guard", "kind": "guard", "direct_cost": 100, "risk_reduction": 0.95, "requires": ["runtime_guard", "canary_validation"]},
+        {"id": "backfill", "kind": "backfill", "direct_cost": 100, "risk_reduction": 0.95, "requires": ["backfill_proof"]},
+        {"id": "expand-contract", "kind": "expand_contract", "direct_cost": 100, "risk_reduction": 0.95, "requires": ["invariant_template", "orm_check"]},
+        {"id": "manual", "kind": "manual_review", "direct_cost": 900, "risk_reduction": 0.95}
+      ]
+    }
+  ]
+}`)
+	out := filepath.Join(t.TempDir(), "remediation-cost")
+	if err := run([]string{"remediation-cost", "--spec", specPath, "--out", out, "--json"}); err != nil {
+		t.Fatalf("remediation-cost failed: %v", err)
+	}
+	var report remediationcost.Report
+	readMainTestJSON(t, filepath.Join(out, "remediation-cost.json"), &report)
+	if !report.OK || report.Summary.Guard != 1 || report.Summary.Backfill != 1 || report.Summary.ExpandContract != 1 || report.Summary.ManualReview != 1 {
+		t.Fatalf("unexpected remediation-cost report: %#v", report.Summary)
+	}
+	if stat, err := os.Stat(filepath.Join(out, "remediation-cost.md")); err != nil || stat.Size() == 0 {
+		t.Fatalf("expected remediation-cost.md to be written, stat=%#v err=%v", stat, err)
 	}
 }
 

@@ -1,0 +1,212 @@
+{
+  "version": "patchline.remediation-cost/v1",
+  "name": "invoice external id remediation optimizer",
+  "thresholds": {
+    "max_residual_loss": 500,
+    "max_uncertainty": 0.5
+  },
+  "cases": [
+    {
+      "id": "runtime-guard",
+      "hazard_class": "broad-write",
+      "affected_rows": 100,
+      "probability": 0.2,
+      "impact_per_row": 100,
+      "uncertainty": 0.1,
+      "evidence": {
+        "runtime_guard": true,
+        "backfill_proof": true,
+        "invariant_template": true,
+        "orm_check": true,
+        "canary_validation": true
+      },
+      "options": [
+        {
+          "id": "guard",
+          "kind": "guard",
+          "direct_cost": 100,
+          "risk_reduction": 0.9,
+          "requires": [
+            "runtime_guard",
+            "canary_validation"
+          ]
+        },
+        {
+          "id": "backfill",
+          "kind": "backfill",
+          "direct_cost": 600,
+          "risk_reduction": 0.95,
+          "requires": [
+            "backfill_proof"
+          ]
+        },
+        {
+          "id": "expand-contract",
+          "kind": "expand_contract",
+          "direct_cost": 800,
+          "risk_reduction": 0.97,
+          "requires": [
+            "invariant_template",
+            "orm_check"
+          ]
+        },
+        {
+          "id": "manual",
+          "kind": "manual_review",
+          "direct_cost": 1200,
+          "risk_reduction": 0.85
+        }
+      ]
+    },
+    {
+      "id": "verified-backfill",
+      "hazard_class": "partial-backfill",
+      "affected_rows": 100,
+      "probability": 0.4,
+      "impact_per_row": 100,
+      "uncertainty": 0.05,
+      "evidence": {
+        "runtime_guard": true,
+        "backfill_proof": true,
+        "invariant_template": true,
+        "orm_check": true,
+        "canary_validation": true
+      },
+      "options": [
+        {
+          "id": "guard",
+          "kind": "guard",
+          "direct_cost": 300,
+          "risk_reduction": 0.7,
+          "requires": [
+            "runtime_guard",
+            "canary_validation"
+          ]
+        },
+        {
+          "id": "backfill",
+          "kind": "backfill",
+          "direct_cost": 200,
+          "risk_reduction": 0.93,
+          "requires": [
+            "backfill_proof"
+          ]
+        },
+        {
+          "id": "expand-contract",
+          "kind": "expand_contract",
+          "direct_cost": 800,
+          "risk_reduction": 0.97,
+          "requires": [
+            "invariant_template",
+            "orm_check"
+          ]
+        },
+        {
+          "id": "manual",
+          "kind": "manual_review",
+          "direct_cost": 1000,
+          "risk_reduction": 0.9
+        }
+      ]
+    },
+    {
+      "id": "expand-contract",
+      "hazard_class": "constraint-tightening",
+      "affected_rows": 200,
+      "probability": 0.3,
+      "impact_per_row": 50,
+      "uncertainty": 0.05,
+      "evidence": {
+        "runtime_guard": true,
+        "backfill_proof": true,
+        "invariant_template": true,
+        "orm_check": true,
+        "canary_validation": true
+      },
+      "options": [
+        {
+          "id": "guard",
+          "kind": "guard",
+          "direct_cost": 200,
+          "risk_reduction": 0.8,
+          "requires": [
+            "runtime_guard",
+            "canary_validation"
+          ]
+        },
+        {
+          "id": "backfill",
+          "kind": "backfill",
+          "direct_cost": 600,
+          "risk_reduction": 0.85,
+          "requires": [
+            "backfill_proof"
+          ]
+        },
+        {
+          "id": "expand-contract",
+          "kind": "expand_contract",
+          "direct_cost": 400,
+          "risk_reduction": 0.95,
+          "requires": [
+            "invariant_template",
+            "orm_check"
+          ]
+        },
+        {
+          "id": "manual",
+          "kind": "manual_review",
+          "direct_cost": 1000,
+          "risk_reduction": 0.9
+        }
+      ]
+    },
+    {
+      "id": "uncertain-remedy",
+      "hazard_class": "ambiguous-cross-service-effect",
+      "affected_rows": 100,
+      "probability": 0.5,
+      "impact_per_row": 100,
+      "uncertainty": 0.75,
+      "evidence": {},
+      "options": [
+        {
+          "id": "guard",
+          "kind": "guard",
+          "direct_cost": 100,
+          "risk_reduction": 0.95,
+          "requires": [
+            "runtime_guard",
+            "canary_validation"
+          ]
+        },
+        {
+          "id": "backfill",
+          "kind": "backfill",
+          "direct_cost": 100,
+          "risk_reduction": 0.95,
+          "requires": [
+            "backfill_proof"
+          ]
+        },
+        {
+          "id": "expand-contract",
+          "kind": "expand_contract",
+          "direct_cost": 100,
+          "risk_reduction": 0.95,
+          "requires": [
+            "invariant_template",
+            "orm_check"
+          ]
+        },
+        {
+          "id": "manual",
+          "kind": "manual_review",
+          "direct_cost": 900,
+          "risk_reduction": 0.95
+        }
+      ]
+    }
+  ]
+}

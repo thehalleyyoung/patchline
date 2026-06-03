@@ -131,6 +131,8 @@ Run `incident-postmortem-import --spec <spec>` to convert public remediation les
 
 Run `multi-service-rollback-plan --spec <spec>` to reverse a service-migration dependency DAG while proving rollback depth, fanout, waves, and data-loss rows against explicit bounds; reproduce it with `make verified-rollback-planner-gate`.
 
+Run `remediation-cost --spec <spec>` to choose guard, backfill, expand/contract, or manual review via uncertainty-adjusted expected loss; reproduce it with `make remediation-cost-optimizer-gate`.
+
 Run `golden-fixture generate --github owner/repo --ref <sha> --subpath <path> --out <dir>` to turn a real-repo slice into a tiny deterministic Go test without vendoring the full repository; see [docs/golden-fixtures.md](docs/golden-fixtures.md).
 
 <details>
