@@ -1,0 +1,10 @@
+{
+  "public_outputs": [
+    "examples/confidential-computing/outputs/public/django-aggregate.json"
+  ],
+  "private_outputs": [
+    "examples/confidential-computing/outputs/private/django-findings.jsonl"
+  ],
+  "redacted": true,
+  "aggregate_only": true
+}

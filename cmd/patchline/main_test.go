@@ -20,6 +20,7 @@ import (
 	"github.com/thehalleyyoung/patchline/internal/canaryvalidate"
 	"github.com/thehalleyyoung/patchline/internal/certificationrenewal"
 	"github.com/thehalleyyoung/patchline/internal/changemanagement"
+	"github.com/thehalleyyoung/patchline/internal/confidentialcomputing"
 	"github.com/thehalleyyoung/patchline/internal/education"
 	"github.com/thehalleyyoung/patchline/internal/ethicsreview"
 	"github.com/thehalleyyoung/patchline/internal/evidence"
@@ -1946,6 +1947,130 @@ func TestHardwareSigningCommandWritesReports(t *testing.T) {
 	}
 }
 
+func TestConfidentialComputingCommandWritesReports(t *testing.T) {
+	root := t.TempDir()
+	sgxMeasurement := mainStringHash("main sgx measurement")
+	sevMeasurement := mainStringHash("main sev measurement")
+	files := map[string]string{
+		"evidence/run.md":              "confidential-computing private corpus evaluation evidence\n",
+		"evidence/sgx.md":              "sgx attestation accepted for private migration corpus\n",
+		"evidence/sev.md":              "sev-snp attestation accepted for private incident corpus\n",
+		"evidence/sgx-policy.md":       "sgx key release policy reviewer quorum evidence\n",
+		"evidence/sev-policy.md":       "sev key release policy reviewer quorum evidence\n",
+		"evidence/rails-workload.md":   "rails workload replayed inside attested sgx enclave\n",
+		"evidence/django-workload.md":  "django workload replayed inside attested sev-snp enclave\n",
+		"attestations/sgx.json":        `{"tee":"sgx","measurement":"` + sgxMeasurement + `"}` + "\n",
+		"attestations/sev.json":        `{"tee":"sev-snp","measurement":"` + sevMeasurement + `"}` + "\n",
+		"verifier-reports/sgx.json":    `{"ok":true,"measurement":"` + sgxMeasurement + `"}` + "\n",
+		"verifier-reports/sev.json":    `{"ok":true,"measurement":"` + sevMeasurement + `"}` + "\n",
+		"policies/sgx.json":            `{"policy":"sgx","fresh_nonce":true}` + "\n",
+		"policies/sev.json":            `{"policy":"sev","fresh_nonce":true}` + "\n",
+		"manifests/rails-input.json":   `{"corpus":"private-rails","encrypted_inputs":["inputs/rails.age"]}` + "\n",
+		"manifests/rails-output.json":  `{"redacted":true,"aggregate_only":true}` + "\n",
+		"manifests/django-input.json":  `{"corpus":"private-django","encrypted_inputs":["inputs/django.age"]}` + "\n",
+		"manifests/django-output.json": `{"redacted":true,"aggregate_only":true}` + "\n",
+		"inputs/rails.age":             "encrypted rails private corpus\n",
+		"inputs/django.age":            "encrypted django private corpus\n",
+		"outputs/public/rails.json":    `{"aggregate":true,"examples":"redacted"}` + "\n",
+		"outputs/public/django.json":   `{"aggregate":true,"examples":"redacted"}` + "\n",
+		"outputs/private/rails.jsonl":  `{"private":"rails finding"}` + "\n",
+		"outputs/private/django.jsonl": `{"private":"django finding"}` + "\n",
+		"replay/rails.json":            `{"deterministic":true}` + "\n",
+		"replay/django.json":           `{"deterministic":true}` + "\n",
+	}
+	for path, contents := range files {
+		writeMainTestFile(t, root, path, contents)
+	}
+	spec := confidentialcomputing.Spec{
+		Version: confidentialcomputing.SpecVersion,
+		Name:    "main test confidential computing",
+		Claim:   "Patchline verifies private corpus analysis workloads by binding encrypted inputs and private outputs to attested confidential-computing enclaves, key-release policies, redacted aggregate disclosures, no-network execution, and deterministic replay.",
+		Criteria: confidentialcomputing.Criteria{
+			RequiredTEEKinds:            []string{"sgx", "sev-snp"},
+			MinEnclaves:                 2,
+			MinKeyReleasePolicies:       2,
+			MinWorkloads:                2,
+			RequireAttestation:          true,
+			RequireMeasurementAllowlist: true,
+			RequireKeyReleasePolicy:     true,
+			RequireEncryptedInputs:      true,
+			RequirePrivateOutputs:       true,
+			RequireNoPlaintextExport:    true,
+			RequireNoNetworkEgress:      true,
+			RequireVerifierEvidence:     true,
+			RequireReplayEvidence:       true,
+			RequireEvidenceHashes:       true,
+		},
+		Enclaves: []confidentialcomputing.Enclave{
+			{
+				ID:                   "sgx-private-runner",
+				TEEKind:              "sgx",
+				Runtime:              "gramine",
+				ImageDigest:          mainStringHash("main sgx image"),
+				Measurement:          sgxMeasurement,
+				SignerID:             "confidential-release-root",
+				AttestationQuotePath: "attestations/sgx.json",
+				VerifierReportPath:   "verifier-reports/sgx.json",
+				EvidencePaths:        []string{"evidence/sgx.md"},
+			},
+			{
+				ID:                   "sev-private-runner",
+				TEEKind:              "sev-snp",
+				Runtime:              "kata-confidential-containers",
+				ImageDigest:          mainStringHash("main sev image"),
+				Measurement:          sevMeasurement,
+				SignerID:             "confidential-release-root",
+				AttestationQuotePath: "attestations/sev.json",
+				VerifierReportPath:   "verifier-reports/sev.json",
+				EvidencePaths:        []string{"evidence/sev.md"},
+			},
+		},
+		KeyReleasePolicies: []confidentialcomputing.KeyReleasePolicy{
+			{
+				ID:                     "sgx-policy",
+				EnclaveIDs:             []string{"sgx-private-runner"},
+				AllowedMeasurements:    []string{sgxMeasurement},
+				MaxAgeHours:            2,
+				RequiresFreshNonce:     true,
+				RequiresReviewerQuorum: true,
+				PlaintextExportAllowed: false,
+				PolicyPath:             "policies/sgx.json",
+				EvidencePaths:          []string{"evidence/sgx-policy.md"},
+			},
+			{
+				ID:                     "sev-policy",
+				EnclaveIDs:             []string{"sev-private-runner"},
+				AllowedMeasurements:    []string{sevMeasurement},
+				MaxAgeHours:            2,
+				RequiresFreshNonce:     true,
+				RequiresReviewerQuorum: true,
+				PlaintextExportAllowed: false,
+				PolicyPath:             "policies/sev.json",
+				EvidencePaths:          []string{"evidence/sev-policy.md"},
+			},
+		},
+		Workloads: []confidentialcomputing.Workload{
+			mainConfidentialWorkload(t, root, "rails-private-migrations", "migration-risk-analysis", "private-rails", "sgx-private-runner", "sgx-policy", "manifests/rails-input.json", "inputs/rails.age", "manifests/rails-output.json", "outputs/public/rails.json", "outputs/private/rails.jsonl", "replay/rails.json", "evidence/rails-workload.md"),
+			mainConfidentialWorkload(t, root, "django-private-incidents", "incident-link-analysis", "private-django", "sev-private-runner", "sev-policy", "manifests/django-input.json", "inputs/django.age", "manifests/django-output.json", "outputs/public/django.json", "outputs/private/django.jsonl", "replay/django.json", "evidence/django-workload.md"),
+		},
+		EvidencePaths: []string{"evidence/run.md"},
+	}
+	specPath := filepath.Join(root, "confidential-computing.json")
+	writeMainTestJSONFile(t, specPath, spec)
+	out := filepath.Join(t.TempDir(), "confidential-computing")
+	if err := run([]string{"confidential-computing", "--spec", specPath, "--root", root, "--out", out, "--json"}); err != nil {
+		t.Fatalf("confidential-computing failed: %v", err)
+	}
+	var report confidentialcomputing.Report
+	readMainTestJSON(t, filepath.Join(out, "confidential-computing.json"), &report)
+	if !report.OK || report.Summary.Enclaves != 2 || report.Summary.AttestedEnclaves != 2 || report.Summary.Workloads != 2 || report.Summary.EncryptedInputs != 2 || report.Summary.PrivateOutputs != 2 || report.Summary.ReplayProofs != 2 {
+		t.Fatalf("unexpected confidential-computing report: %#v", report)
+	}
+	if stat, err := os.Stat(filepath.Join(out, "confidential-computing.md")); err != nil || stat.Size() == 0 {
+		t.Fatalf("expected confidential-computing.md to be written, stat=%#v err=%v", stat, err)
+	}
+}
+
 func TestSupplyChainCompromiseSimulationCommandWritesReports(t *testing.T) {
 	root := t.TempDir()
 	files := map[string]string{
@@ -2190,6 +2315,34 @@ func mainSigningDrill(id, kind, artifactID, oldSignerID, newSignerID, evidencePa
 		EvidencePaths: []string{evidencePath},
 		ResultPaths:   []string{resultPath},
 	}
+}
+
+func mainConfidentialWorkload(t *testing.T, root, id, kind, corpus, enclave, policy, inputManifest, encryptedInput, outputManifest, publicOutput, privateOutput, replay, evidence string) confidentialcomputing.Workload {
+	t.Helper()
+	return confidentialcomputing.Workload{
+		ID:                   id,
+		Kind:                 kind,
+		CorpusID:             corpus,
+		EnclaveID:            enclave,
+		KeyPolicyID:          policy,
+		InputManifestPath:    inputManifest,
+		InputManifestSHA256:  mainTestFileHash(t, filepath.Join(root, filepath.FromSlash(inputManifest))),
+		EncryptedInputPaths:  []string{encryptedInput},
+		OutputManifestPath:   outputManifest,
+		OutputManifestSHA256: mainTestFileHash(t, filepath.Join(root, filepath.FromSlash(outputManifest))),
+		PublicOutputPaths:    []string{publicOutput},
+		PrivateOutputPaths:   []string{privateOutput},
+		OutputsRedacted:      true,
+		AggregateOnly:        true,
+		ReplayEvidencePaths:  []string{replay},
+		NetworkEgressAllowed: false,
+		EvidencePaths:        []string{evidence},
+	}
+}
+
+func mainStringHash(value string) string {
+	sum := sha256.Sum256([]byte(value))
+	return "sha256:" + hex.EncodeToString(sum[:])
 }
 
 func mainTextbookChapter(id, title, audience, notebookPath, command, docPath, specPath, jsonOut, mdOut string) education.TextbookChapter {

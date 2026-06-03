@@ -1,0 +1,151 @@
+{
+  "version": "patchline.confidential-computing/v1",
+  "name": "Patchline confidential-computing private corpus evaluation",
+  "claim": "Patchline proves that private corpus analysis can be evaluated without pretending private data is public: each workload is bound to a verifiable confidential-computing enclave attestation, measured runtime image digest, measurement allowlist, key-release policy, encrypted inputs, no-network execution, redacted aggregate public outputs, retained private outputs, verifier reports, and deterministic replay evidence. The gate mutates the spec into missing quotes, missing verifier reports, wrong measurements, plaintext export, missing encrypted inputs, forged output manifests, network egress, unredacted outputs, policy/enclave mismatches, and missing replay evidence, then requires deterministic counterexamples instead of trusting a self-declared private analysis result.",
+  "criteria": {
+    "required_tee_kinds": [
+      "sgx",
+      "sev-snp"
+    ],
+    "min_enclaves": 2,
+    "min_key_release_policies": 2,
+    "min_workloads": 2,
+    "require_attestation": true,
+    "require_measurement_allowlist": true,
+    "require_key_release_policy": true,
+    "require_encrypted_inputs": true,
+    "require_private_outputs": true,
+    "require_no_plaintext_export": true,
+    "require_no_network_egress": true,
+    "require_verifier_evidence": true,
+    "require_replay_evidence": true,
+    "require_evidence_hashes": true
+  },
+  "enclaves": [
+    {
+      "id": "sgx-private-runner",
+      "tee_kind": "sgx",
+      "runtime": "gramine",
+      "image_digest": "sha256:3333333333333333333333333333333333333333333333333333333333333333",
+      "measurement": "sha256:1111111111111111111111111111111111111111111111111111111111111111",
+      "signer_id": "confidential-release-root",
+      "attestation_quote_path": "examples/confidential-computing/attestations/sgx-private-runner.quote.json",
+      "verifier_report_path": "examples/confidential-computing/verifier-reports/sgx-private-runner.json",
+      "evidence_paths": [
+        "examples/confidential-computing/evidence/sgx-enclave.md"
+      ]
+    },
+    {
+      "id": "sev-private-runner",
+      "tee_kind": "sev-snp",
+      "runtime": "kata-confidential-containers",
+      "image_digest": "sha256:4444444444444444444444444444444444444444444444444444444444444444",
+      "measurement": "sha256:2222222222222222222222222222222222222222222222222222222222222222",
+      "signer_id": "confidential-release-root",
+      "attestation_quote_path": "examples/confidential-computing/attestations/sev-private-runner.quote.json",
+      "verifier_report_path": "examples/confidential-computing/verifier-reports/sev-private-runner.json",
+      "evidence_paths": [
+        "examples/confidential-computing/evidence/sev-enclave.md"
+      ]
+    }
+  ],
+  "key_release_policies": [
+    {
+      "id": "sgx-policy",
+      "enclave_ids": [
+        "sgx-private-runner"
+      ],
+      "allowed_measurements": [
+        "sha256:1111111111111111111111111111111111111111111111111111111111111111"
+      ],
+      "max_age_hours": 2,
+      "requires_fresh_nonce": true,
+      "requires_reviewer_quorum": true,
+      "plaintext_export_allowed": false,
+      "policy_path": "examples/confidential-computing/policies/sgx-key-release.json",
+      "evidence_paths": [
+        "examples/confidential-computing/evidence/sgx-policy.md"
+      ]
+    },
+    {
+      "id": "sev-policy",
+      "enclave_ids": [
+        "sev-private-runner"
+      ],
+      "allowed_measurements": [
+        "sha256:2222222222222222222222222222222222222222222222222222222222222222"
+      ],
+      "max_age_hours": 2,
+      "requires_fresh_nonce": true,
+      "requires_reviewer_quorum": true,
+      "plaintext_export_allowed": false,
+      "policy_path": "examples/confidential-computing/policies/sev-key-release.json",
+      "evidence_paths": [
+        "examples/confidential-computing/evidence/sev-policy.md"
+      ]
+    }
+  ],
+  "workloads": [
+    {
+      "id": "rails-private-migrations",
+      "kind": "migration-risk-analysis",
+      "corpus_id": "private-rails-migrations",
+      "enclave_id": "sgx-private-runner",
+      "key_policy_id": "sgx-policy",
+      "input_manifest_path": "examples/confidential-computing/manifests/rails-private-input.json",
+      "input_manifest_sha256": "sha256:dc477bf39eab75b51ce4eb584797ee8ab71238436c37f24c7ad4c0d972f2a2c4",
+      "encrypted_input_paths": [
+        "examples/confidential-computing/inputs/rails-private-corpus.age"
+      ],
+      "output_manifest_path": "examples/confidential-computing/manifests/rails-private-output.json",
+      "output_manifest_sha256": "sha256:b5889adce393650be08ccf783b4a2430a6ea3413337996b9a8f66899e1dcd13c",
+      "public_output_paths": [
+        "examples/confidential-computing/outputs/public/rails-aggregate.json"
+      ],
+      "private_output_paths": [
+        "examples/confidential-computing/outputs/private/rails-findings.jsonl"
+      ],
+      "outputs_redacted": true,
+      "aggregate_only": true,
+      "replay_evidence_paths": [
+        "examples/confidential-computing/replay/rails-replay.json"
+      ],
+      "network_egress_allowed": false,
+      "evidence_paths": [
+        "examples/confidential-computing/evidence/rails-workload.md"
+      ]
+    },
+    {
+      "id": "django-private-incidents",
+      "kind": "incident-link-analysis",
+      "corpus_id": "private-django-incidents",
+      "enclave_id": "sev-private-runner",
+      "key_policy_id": "sev-policy",
+      "input_manifest_path": "examples/confidential-computing/manifests/django-private-input.json",
+      "input_manifest_sha256": "sha256:72d4b9710725dbe768071c2982a54872337487e4e75c184e106c34051fa1783a",
+      "encrypted_input_paths": [
+        "examples/confidential-computing/inputs/django-private-corpus.age"
+      ],
+      "output_manifest_path": "examples/confidential-computing/manifests/django-private-output.json",
+      "output_manifest_sha256": "sha256:b8498c4605879e13dddc9a00b7d970139f7da7568db449e570935f4f96bf5276",
+      "public_output_paths": [
+        "examples/confidential-computing/outputs/public/django-aggregate.json"
+      ],
+      "private_output_paths": [
+        "examples/confidential-computing/outputs/private/django-findings.jsonl"
+      ],
+      "outputs_redacted": true,
+      "aggregate_only": true,
+      "replay_evidence_paths": [
+        "examples/confidential-computing/replay/django-replay.json"
+      ],
+      "network_egress_allowed": false,
+      "evidence_paths": [
+        "examples/confidential-computing/evidence/django-workload.md"
+      ]
+    }
+  ],
+  "evidence_paths": [
+    "examples/confidential-computing/evidence/overview.md"
+  ]
+}

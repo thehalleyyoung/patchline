@@ -1,0 +1,7 @@
+{
+  "tee": "sgx",
+  "runtime": "gramine",
+  "measurement": "sha256:1111111111111111111111111111111111111111111111111111111111111111",
+  "nonce": "fresh-rails-2026-06-03",
+  "signer": "confidential-release-root"
+}

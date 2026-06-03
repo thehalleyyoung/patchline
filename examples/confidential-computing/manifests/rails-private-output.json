@@ -1,0 +1,10 @@
+{
+  "public_outputs": [
+    "examples/confidential-computing/outputs/public/rails-aggregate.json"
+  ],
+  "private_outputs": [
+    "examples/confidential-computing/outputs/private/rails-findings.jsonl"
+  ],
+  "redacted": true,
+  "aggregate_only": true
+}

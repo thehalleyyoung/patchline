@@ -35,6 +35,7 @@ import (
 	"github.com/thehalleyyoung/patchline/internal/certplugfest"
 	"github.com/thehalleyyoung/patchline/internal/certrevocation"
 	"github.com/thehalleyyoung/patchline/internal/changemanagement"
+	"github.com/thehalleyyoung/patchline/internal/confidentialcomputing"
 	"github.com/thehalleyyoung/patchline/internal/dbdryrun"
 	"github.com/thehalleyyoung/patchline/internal/demo"
 	"github.com/thehalleyyoung/patchline/internal/diagnostics"
@@ -488,6 +489,8 @@ func run(args []string) error {
 		return resilientAnalysisCommand(args[1:], hasFlag(args[1:], "--json"))
 	case "hardware-signing":
 		return hardwareSigningCommand(args[1:], hasFlag(args[1:], "--json"))
+	case "confidential-computing":
+		return confidentialComputingCommand(args[1:], hasFlag(args[1:], "--json"))
 	case "reviewer-fairness-audit":
 		return reviewerFairnessAuditCommand(args[1:], hasFlag(args[1:], "--json"))
 	case "change-management-verify":
@@ -666,6 +669,7 @@ Usage:
   patchline offline-deploy --spec offline-deploy.json --root repo-root --out dir [--json]
   patchline resilient-analysis --spec resilient-analysis.json --root repo-root --out dir [--json]
   patchline hardware-signing --spec hardware-signing.json --root repo-root --out dir [--json]
+  patchline confidential-computing --spec confidential-computing.json --root repo-root --out dir [--json]
   patchline reviewer-fairness-audit --spec reviewer-fairness-audit.json --root repo-root --out dir [--json]
   patchline change-management-verify --spec change-management.json --root repo-root --out dir [--json]
   patchline governance-risk-register --spec governance-risk-register.json --root repo-root --out dir [--json]
@@ -15603,6 +15607,45 @@ func hardwareSigningCommand(args []string, jsonOut bool) error {
 	}
 	if !report.OK {
 		return codedError{code: 2, err: errors.New("hardware signing validation failed")}
+	}
+	return nil
+}
+
+func confidentialComputingCommand(args []string, jsonOut bool) error {
+	usage := "patchline confidential-computing --spec confidential-computing.json --root repo-root --out <dir> [--json]"
+	specPath, outPath, err := feedbackSpecOut(args, usage)
+	if err != nil {
+		return err
+	}
+	rootPath := "."
+	if value, ok := flagValue(args, "--root"); ok && value != "" {
+		rootPath = value
+	}
+	file, err := os.Open(specPath)
+	if err != nil {
+		return err
+	}
+	defer file.Close()
+	spec, err := confidentialcomputing.ReadSpec(file)
+	if err != nil {
+		return err
+	}
+	report, err := confidentialcomputing.BuildReport(spec, rootPath)
+	if err != nil {
+		return err
+	}
+	if err := confidentialcomputing.WriteArtifacts(outPath, report); err != nil {
+		return err
+	}
+	if jsonOut {
+		if err := writeJSON(os.Stdout, report); err != nil {
+			return err
+		}
+	} else {
+		fmt.Printf("wrote confidential computing ok=%t enclaves=%d attested=%d workloads=%d encrypted_inputs=%d private_outputs=%d replay_proofs=%d counterexamples=%d to %s\n", report.OK, report.Summary.Enclaves, report.Summary.AttestedEnclaves, report.Summary.Workloads, report.Summary.EncryptedInputs, report.Summary.PrivateOutputs, report.Summary.ReplayProofs, report.Summary.Counterexamples, outPath)
+	}
+	if !report.OK {
+		return codedError{code: 2, err: errors.New("confidential computing validation failed")}
 	}
 	return nil
 }

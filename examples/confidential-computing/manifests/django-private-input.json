@@ -1,0 +1,7 @@
+{
+  "corpus": "private-django-incidents",
+  "encrypted_inputs": [
+    "examples/confidential-computing/inputs/django-private-corpus.age"
+  ],
+  "plaintext_export_allowed": false
+}

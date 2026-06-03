@@ -1,0 +1,5 @@
+{
+  "deterministic": true,
+  "workload": "django-private-incidents",
+  "replay_hash": "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+}

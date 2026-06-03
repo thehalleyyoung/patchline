@@ -1,0 +1,6 @@
+{
+  "corpus": "private-rails-migrations",
+  "hazard_classes": 4,
+  "redacted_examples": true,
+  "aggregate_only": true
+}

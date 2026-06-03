@@ -1,0 +1,6 @@
+{
+  "corpus": "private-django-incidents",
+  "hazard_classes": 3,
+  "redacted_examples": true,
+  "aggregate_only": true
+}

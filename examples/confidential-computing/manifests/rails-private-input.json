@@ -1,0 +1,7 @@
+{
+  "corpus": "private-rails-migrations",
+  "encrypted_inputs": [
+    "examples/confidential-computing/inputs/rails-private-corpus.age"
+  ],
+  "plaintext_export_allowed": false
+}

@@ -1,0 +1,7 @@
+{
+  "tee": "sev-snp",
+  "runtime": "kata-confidential-containers",
+  "measurement": "sha256:2222222222222222222222222222222222222222222222222222222222222222",
+  "nonce": "fresh-django-2026-06-03",
+  "signer": "confidential-release-root"
+}

@@ -1,0 +1,7 @@
+{
+  "policy": "sev-policy",
+  "enclave": "sev-private-runner",
+  "fresh_nonce": true,
+  "reviewer_quorum": 2,
+  "plaintext_export_allowed": false
+}
