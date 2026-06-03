@@ -13,6 +13,7 @@
 .PHONY: localized-teaching-examples-gate
 .PHONY: workforce-impact-study-gate
 .PHONY: open-textbook-companion-gate
+.PHONY: offline-deploy-gate
 
 build:
 	go build -o bin/patchline ./cmd/patchline
@@ -1211,6 +1212,9 @@ classroom-lab-kits-gate:
 
 open-textbook-companion-gate:
 	bash scripts/open-textbook-companion-gate.sh
+
+offline-deploy-gate:
+	bash scripts/offline-deploy-gate.sh
 
 industry-working-group-gate:
 	bash scripts/industry-working-group-gate.sh

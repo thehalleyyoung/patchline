@@ -56,6 +56,7 @@ import (
 	"github.com/thehalleyyoung/patchline/internal/ledger"
 	"github.com/thehalleyyoung/patchline/internal/migration"
 	"github.com/thehalleyyoung/patchline/internal/misuseresistance"
+	"github.com/thehalleyyoung/patchline/internal/offlinedeploy"
 	"github.com/thehalleyyoung/patchline/internal/patchseries"
 	"github.com/thehalleyyoung/patchline/internal/plugins"
 	"github.com/thehalleyyoung/patchline/internal/policy"
@@ -471,6 +472,8 @@ func run(args []string) error {
 		return localizedTeachingExamplesCommand(args[1:], hasFlag(args[1:], "--json"))
 	case "open-textbook-companion":
 		return openTextbookCompanionCommand(args[1:], hasFlag(args[1:], "--json"))
+	case "offline-deploy":
+		return offlineDeployCommand(args[1:], hasFlag(args[1:], "--json"))
 	case "reviewer-fairness-audit":
 		return reviewerFairnessAuditCommand(args[1:], hasFlag(args[1:], "--json"))
 	case "change-management-verify":
@@ -644,6 +647,7 @@ Usage:
   patchline contributor-apprenticeship --spec contributor-apprenticeship.json --root repo-root --out dir [--json]
   patchline skills-taxonomy --spec skills-taxonomy.json --root repo-root --out dir [--json]
   patchline localized-teaching-examples --spec localized-teaching-examples.json --root repo-root --out dir [--json]
+  patchline offline-deploy --spec offline-deploy.json --root repo-root --out dir [--json]
   patchline reviewer-fairness-audit --spec reviewer-fairness-audit.json --root repo-root --out dir [--json]
   patchline change-management-verify --spec change-management.json --root repo-root --out dir [--json]
   patchline governance-risk-register --spec governance-risk-register.json --root repo-root --out dir [--json]
@@ -15426,6 +15430,45 @@ func openTextbookCompanionCommand(args []string, jsonOut bool) error {
 		return writeJSON(os.Stdout, report)
 	}
 	fmt.Printf("wrote open textbook companion ok=%t chapters=%d notebooks=%d executable=%d examples=%d generated=%d counterexamples=%d to %s\n", report.OK, report.Summary.Chapters, report.Summary.Notebooks, report.Summary.ExecutableNotebooks, report.Summary.TeachingExamples, report.Summary.GeneratedArtifacts, report.Summary.Counterexamples, outPath)
+	return nil
+}
+
+func offlineDeployCommand(args []string, jsonOut bool) error {
+	usage := "patchline offline-deploy --spec offline-deploy.json --root repo-root --out <dir> [--json]"
+	specPath, outPath, err := feedbackSpecOut(args, usage)
+	if err != nil {
+		return err
+	}
+	rootPath := "."
+	if value, ok := flagValue(args, "--root"); ok && value != "" {
+		rootPath = value
+	}
+	file, err := os.Open(specPath)
+	if err != nil {
+		return err
+	}
+	defer file.Close()
+	spec, err := offlinedeploy.ReadSpec(file)
+	if err != nil {
+		return err
+	}
+	report, err := offlinedeploy.BuildReport(spec, rootPath)
+	if err != nil {
+		return err
+	}
+	if err := offlinedeploy.WriteArtifacts(outPath, report); err != nil {
+		return err
+	}
+	if jsonOut {
+		if err := writeJSON(os.Stdout, report); err != nil {
+			return err
+		}
+	} else {
+		fmt.Printf("wrote offline deployment ok=%t profiles=%d no_network=%d telemetry_disabled=%d pinned_bundles=%d offline_updates=%d counterexamples=%d to %s\n", report.OK, report.Summary.Profiles, report.Summary.NoNetworkProfiles, report.Summary.TelemetryDisabledProfiles, report.Summary.PinnedBundles, report.Summary.OfflineUpdateBundles, report.Summary.Counterexamples, outPath)
+	}
+	if !report.OK {
+		return codedError{code: 2, err: errors.New("offline deployment validation failed")}
+	}
 	return nil
 }
 

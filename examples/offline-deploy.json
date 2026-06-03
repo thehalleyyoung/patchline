@@ -1,0 +1,183 @@
+{
+  "version": "patchline.offline-deploy/v1",
+  "name": "Patchline regulated edge/offline deployment",
+  "claim": "Patchline proves regulated edge/offline deployments are reproducible before they enter sites that permit no network and no telemetry. The spec covers distinct regulated environments, local-only install and verification commands, pinned install bundles, signatures, SBOMs, offline update bundles, update manifests, and rollback plans bound to previous bundle hashes. The gate runs a positive deployment proof, mutates the spec into a phone-home and telemetry-enabled negative control, checks hash mismatch and missing rollback counterexamples, and reruns the positive path to prove a deterministic report hash.",
+  "criteria": {
+    "required_environments": [
+      "clinic-edge",
+      "finance-review-room"
+    ],
+    "min_profiles": 2,
+    "min_bundles_per_profile": 2,
+    "min_update_bundles_per_profile": 1,
+    "min_regulatory_controls_per_profile": 2,
+    "require_no_network": true,
+    "require_telemetry_disabled": true,
+    "require_pinned_bundles": true,
+    "require_pinned_update_bundles": true,
+    "require_offline_updates": true,
+    "require_reproducible_commands": true,
+    "require_rollback_plan": true,
+    "require_evidence_hashes": true,
+    "require_bundle_signatures": true,
+    "require_software_bill_of_materials": true
+  },
+  "profiles": [
+    {
+      "id": "clinic-edge-arm64",
+      "environment": "clinic-edge",
+      "site": "regional-clinic-a",
+      "install_target": "linux-arm64-edge-appliance",
+      "regulatory_controls": [
+        "hipaa",
+        "no-telemetry",
+        "offline-change-window"
+      ],
+      "network_policy": {
+        "mode": "none",
+        "egress_allowed": false
+      },
+      "telemetry_policy": {
+        "mode": "disabled",
+        "enabled": false
+      },
+      "install_commands": [
+        "patchline install --bundle examples/offline-deploy/bundles/clinic/patchline-1.0.0.bundle --telemetry=off",
+        "patchline rules import --bundle examples/offline-deploy/bundles/clinic/rules-2026-06.bundle --offline"
+      ],
+      "verify_commands": [
+        "shasum -a 256 -c examples/offline-deploy/updates/clinic/MANIFEST.checks"
+      ],
+      "evidence_paths": [
+        "docs/offline-deploy.md",
+        "examples/offline-deploy/evidence/clinic-window.md"
+      ],
+      "bundles": [
+        {
+          "id": "patchline-cli",
+          "kind": "cli",
+          "version": "1.0.0",
+          "path": "examples/offline-deploy/bundles/clinic/patchline-1.0.0.bundle",
+          "sha256": "sha256:8d842547ce58bb4a5103927f31bf9d60290ae0eced25c9e4ce89388b82683a6e",
+          "signature_path": "examples/offline-deploy/bundles/clinic/patchline-1.0.0.bundle.sig",
+          "sbom_path": "examples/offline-deploy/bundles/clinic/patchline-1.0.0.sbom.json",
+          "update_channel": "stable"
+        },
+        {
+          "id": "rules-pack",
+          "kind": "rules",
+          "version": "2026.06",
+          "path": "examples/offline-deploy/bundles/clinic/rules-2026-06.bundle",
+          "sha256": "sha256:07db6e856a130f129fc66a927a260c2fc06469703b888179c5658a59f73955b2",
+          "signature_path": "examples/offline-deploy/bundles/clinic/rules-2026-06.bundle.sig",
+          "sbom_path": "examples/offline-deploy/bundles/clinic/rules-2026-06.sbom.json",
+          "update_channel": "stable"
+        }
+      ],
+      "update_bundles": [
+        {
+          "id": "clinic-rules-2026-07",
+          "from_version": "2026.06",
+          "to_version": "2026.07",
+          "path": "examples/offline-deploy/updates/clinic/rules-2026-07.update",
+          "sha256": "sha256:fc05323fdbcf5730ac80f80d266e2e28bf15f870c6f89054a5f99723e7102d8d",
+          "manifest_path": "examples/offline-deploy/updates/clinic/MANIFEST.checks",
+          "signature_path": "examples/offline-deploy/updates/clinic/rules-2026-07.update.sig",
+          "offline": true,
+          "applies_to": [
+            "rules-pack"
+          ]
+        }
+      ],
+      "rollback_plan": {
+        "id": "clinic-rollback",
+        "max_minutes": 15,
+        "previous_bundle_sha256": "sha256:07db6e856a130f129fc66a927a260c2fc06469703b888179c5658a59f73955b2",
+        "commands": [
+          "patchline rules import --bundle examples/offline-deploy/bundles/clinic/rules-2026-06.bundle --offline"
+        ],
+        "evidence_paths": [
+          "examples/offline-deploy/evidence/clinic-rollback.md"
+        ]
+      }
+    },
+    {
+      "id": "finance-review-amd64",
+      "environment": "finance-review-room",
+      "site": "regulated-review-vault",
+      "install_target": "linux-amd64-review-workstation",
+      "regulatory_controls": [
+        "sox",
+        "pci-dss",
+        "no-telemetry"
+      ],
+      "network_policy": {
+        "mode": "air-gapped",
+        "egress_allowed": false
+      },
+      "telemetry_policy": {
+        "mode": "off",
+        "enabled": false
+      },
+      "install_commands": [
+        "patchline install --bundle examples/offline-deploy/bundles/finance/patchline-1.0.0.bundle --telemetry=off",
+        "patchline docs import --bundle examples/offline-deploy/bundles/finance/docs-2026-06.bundle --offline"
+      ],
+      "verify_commands": [
+        "shasum -a 256 -c examples/offline-deploy/updates/finance/MANIFEST.checks"
+      ],
+      "evidence_paths": [
+        "docs/offline-deploy.md",
+        "examples/offline-deploy/evidence/finance-review.md"
+      ],
+      "bundles": [
+        {
+          "id": "patchline-cli",
+          "kind": "cli",
+          "version": "1.0.0",
+          "path": "examples/offline-deploy/bundles/finance/patchline-1.0.0.bundle",
+          "sha256": "sha256:1da2dbb19424ab7f904053f2004fce981a784fed56e18355a0c405854c48560b",
+          "signature_path": "examples/offline-deploy/bundles/finance/patchline-1.0.0.bundle.sig",
+          "sbom_path": "examples/offline-deploy/bundles/finance/patchline-1.0.0.sbom.json",
+          "update_channel": "stable"
+        },
+        {
+          "id": "docs-pack",
+          "kind": "docs",
+          "version": "2026.06",
+          "path": "examples/offline-deploy/bundles/finance/docs-2026-06.bundle",
+          "sha256": "sha256:493e18cbd54161528f66ddc0fab308a2d9d4d8175386450515320f7b79bb62a6",
+          "signature_path": "examples/offline-deploy/bundles/finance/docs-2026-06.bundle.sig",
+          "sbom_path": "examples/offline-deploy/bundles/finance/docs-2026-06.sbom.json",
+          "update_channel": "stable"
+        }
+      ],
+      "update_bundles": [
+        {
+          "id": "finance-docs-2026-07",
+          "from_version": "2026.06",
+          "to_version": "2026.07",
+          "path": "examples/offline-deploy/updates/finance/docs-2026-07.update",
+          "sha256": "sha256:3af3976db1885c54e78a1a606612a059a5d7c9dd020dc07619e054334a782334",
+          "manifest_path": "examples/offline-deploy/updates/finance/MANIFEST.checks",
+          "signature_path": "examples/offline-deploy/updates/finance/docs-2026-07.update.sig",
+          "offline": true,
+          "applies_to": [
+            "docs-pack"
+          ]
+        }
+      ],
+      "rollback_plan": {
+        "id": "finance-rollback",
+        "max_minutes": 20,
+        "previous_bundle_sha256": "sha256:493e18cbd54161528f66ddc0fab308a2d9d4d8175386450515320f7b79bb62a6",
+        "commands": [
+          "patchline docs import --bundle examples/offline-deploy/bundles/finance/docs-2026-06.bundle --offline"
+        ],
+        "evidence_paths": [
+          "examples/offline-deploy/evidence/finance-rollback.md"
+        ]
+      }
+    }
+  ]
+}

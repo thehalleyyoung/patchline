@@ -368,13 +368,14 @@ A cross-cutting \emph{gate layer} sits beside the pipeline. Each gate is a self-
 (a) validates a versioned example specification, (b) checks that the relevant documentation and the
 README still describe the capability, (c) runs the capability against real pinned code, (d) asserts
 machine-checkable invariants on the output, and (e) writes a \code{gate-summary.json}. The repository
-currently ships \textbf{more than 610 gates}, \textbf{more than 560 capability documents}, and \textbf{more than 600 example
+currently ships \textbf{more than 620 gates}, \textbf{more than 565 capability documents}, and \textbf{more than 600 example
 specifications}, with a single analyzer core of roughly 2{,}900 lines of Go.
 
 \paragraph{Resumability and offline operation.} \code{repo analyze --resume} reuses existing fetch,
 inventory, intake, baseline, proposal, and compare artifacts while changing later settings, and
-\code{repo offline} validates cached inputs and generated reports without any network access---a
-prerequisite for restricted artifact-evaluation environments.
+\code{repo offline} validates cached inputs and generated reports without any network access, while
+\code{offline-deploy} checks regulated edge profiles whose install/update bundles are SHA-256 pinned,
+telemetry-disabled, egress-free, and rollback-backed before entering air-gapped sites.
 
 \subsection{Artifact contract}
 Every stage writes a stable set of files so that downstream stages, gates, and reviewers can rely on
@@ -1654,8 +1655,8 @@ externally adopted governance and appeal audit trails; deeper rollback, query-pl
 on top of the new versioned production-database profiles;
 socio-technical accountability beyond accountable-use, reviewer-fairness, workforce-impact measurement,
 change-management binding, governance-risk registration, ethics review, explainability audit, misuse resistance, and detector
-deprecation; broader external textbook adoption and certification materials that make migration safety teachable; resilient offline, edge, confidential,
-and disaster-recovery deployments; and an award-to-standard transition that externalizes benchmarks,
+deprecation; broader external textbook adoption and certification materials that make migration safety teachable; confidential and
+disaster-recovery deployments; and an award-to-standard transition that externalizes benchmarks,
 errata, conformance labels, and long-term stewardship. These items are intentionally recorded as future
 work, not as claims in the deployed gate catalog: the standard for adding them remains the same as the
 current system's standard---a positive proof on real code, a negative control, stable artifacts, and

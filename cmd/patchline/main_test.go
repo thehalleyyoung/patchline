@@ -32,6 +32,7 @@ import (
 	"github.com/thehalleyyoung/patchline/internal/incidentpostmortem"
 	"github.com/thehalleyyoung/patchline/internal/intake"
 	"github.com/thehalleyyoung/patchline/internal/misuseresistance"
+	"github.com/thehalleyyoung/patchline/internal/offlinedeploy"
 	"github.com/thehalleyyoung/patchline/internal/patchseries"
 	"github.com/thehalleyyoung/patchline/internal/practitionercertification"
 	"github.com/thehalleyyoung/patchline/internal/project"
@@ -1680,6 +1681,137 @@ func TestOpenTextbookCompanionCommandWritesReports(t *testing.T) {
 	}
 	if stat, err := os.Stat(filepath.Join(out, "open-textbook-companion.md")); err != nil || stat.Size() == 0 {
 		t.Fatalf("expected open-textbook-companion.md to be written, stat=%#v err=%v", stat, err)
+	}
+}
+
+func TestOfflineDeployCommandWritesReports(t *testing.T) {
+	root := t.TempDir()
+	writeMainTestFile(t, root, "docs/offline-deploy.md", "Offline deploy evidence.\n")
+	files := map[string]string{
+		"bundles/edge/patchline.bundle":       "patchline edge bundle\n",
+		"bundles/edge/patchline.bundle.sig":   "signature\n",
+		"bundles/edge/patchline.sbom.json":    `{"name":"patchline-edge"}` + "\n",
+		"bundles/edge/rules.bundle":           "rules bundle\n",
+		"bundles/edge/rules.bundle.sig":       "signature\n",
+		"bundles/edge/rules.sbom.json":        `{"name":"rules"}` + "\n",
+		"updates/edge/rules.update":           "rules update\n",
+		"updates/edge/rules.update.sig":       "signature\n",
+		"updates/edge/MANIFEST.checks":        "sha256 update checks\n",
+		"evidence/edge.md":                    "edge install evidence\n",
+		"evidence/edge-rollback.md":           "edge rollback evidence\n",
+		"bundles/review/patchline.bundle":     "patchline review bundle\n",
+		"bundles/review/patchline.bundle.sig": "signature\n",
+		"bundles/review/patchline.sbom.json":  `{"name":"patchline-review"}` + "\n",
+		"bundles/review/docs.bundle":          "docs bundle\n",
+		"bundles/review/docs.bundle.sig":      "signature\n",
+		"bundles/review/docs.sbom.json":       `{"name":"docs"}` + "\n",
+		"updates/review/docs.update":          "docs update\n",
+		"updates/review/docs.update.sig":      "signature\n",
+		"updates/review/MANIFEST.checks":      "sha256 update checks\n",
+		"evidence/review.md":                  "review install evidence\n",
+		"evidence/review-rollback.md":         "review rollback evidence\n",
+	}
+	for path, contents := range files {
+		writeMainTestFile(t, root, path, contents)
+	}
+	spec := offlinedeploy.Spec{
+		Version: offlinedeploy.SpecVersion,
+		Name:    "main test offline deployment",
+		Claim:   "Patchline verifies regulated edge and review-room deployments with no network, no telemetry, pinned bundles, offline update bundles, local commands, and rollback evidence.",
+		Criteria: offlinedeploy.Criteria{
+			RequiredEnvironments:            []string{"edge-clinic", "review-room"},
+			MinProfiles:                     2,
+			MinBundlesPerProfile:            2,
+			MinUpdateBundlesPerProfile:      1,
+			MinRegulatoryControlsPerProfile: 2,
+			RequireNoNetwork:                true,
+			RequireTelemetryDisabled:        true,
+			RequirePinnedBundles:            true,
+			RequirePinnedUpdateBundles:      true,
+			RequireOfflineUpdates:           true,
+			RequireReproducibleCommands:     true,
+			RequireRollbackPlan:             true,
+			RequireEvidenceHashes:           true,
+			RequireBundleSignatures:         true,
+			RequireSoftwareBillOfMaterials:  true,
+		},
+		Profiles: []offlinedeploy.Profile{
+			mainOfflineProfile(t, root, "edge", "edge-clinic", "arm64 appliance", "bundles/edge/patchline.bundle", "bundles/edge/rules.bundle", "updates/edge/rules.update", "updates/edge/MANIFEST.checks", "updates/edge/rules.update.sig", "evidence/edge.md", "evidence/edge-rollback.md"),
+			mainOfflineProfile(t, root, "review", "review-room", "amd64 workstation", "bundles/review/patchline.bundle", "bundles/review/docs.bundle", "updates/review/docs.update", "updates/review/MANIFEST.checks", "updates/review/docs.update.sig", "evidence/review.md", "evidence/review-rollback.md"),
+		},
+	}
+	specPath := filepath.Join(root, "offline-deploy.json")
+	writeMainTestJSONFile(t, specPath, spec)
+	out := filepath.Join(t.TempDir(), "offline-deploy")
+	if err := run([]string{"offline-deploy", "--spec", specPath, "--root", root, "--out", out, "--json"}); err != nil {
+		t.Fatalf("offline-deploy failed: %v", err)
+	}
+	var report offlinedeploy.Report
+	readMainTestJSON(t, filepath.Join(out, "offline-deploy.json"), &report)
+	if !report.OK || report.Summary.Profiles != 2 || report.Summary.NoNetworkProfiles != 2 || report.Summary.TelemetryDisabledProfiles != 2 || report.Summary.PinnedBundles != 4 || report.Summary.OfflineUpdateBundles != 2 {
+		t.Fatalf("unexpected offline deployment report: %#v", report)
+	}
+	if len(report.Profiles[0].Bundles[0].Artifact.SHA256) != 71 {
+		t.Fatalf("expected sha256-prefixed artifact hash, got %#v", report.Profiles[0].Bundles[0].Artifact)
+	}
+	if stat, err := os.Stat(filepath.Join(out, "offline-deploy.md")); err != nil || stat.Size() == 0 {
+		t.Fatalf("expected offline-deploy.md to be written, stat=%#v err=%v", stat, err)
+	}
+}
+
+func mainOfflineProfile(t *testing.T, root, id, environment, target, cliPath, dataPath, updatePath, manifestPath, updateSignaturePath, evidencePath, rollbackEvidencePath string) offlinedeploy.Profile {
+	t.Helper()
+	return offlinedeploy.Profile{
+		ID:                 id,
+		Environment:        environment,
+		Site:               id + "-site",
+		InstallTarget:      target,
+		RegulatoryControls: []string{"no-telemetry", "offline-change-window"},
+		NetworkPolicy:      offlinedeploy.NetworkPolicy{Mode: "none", EgressAllowed: false},
+		TelemetryPolicy:    offlinedeploy.TelemetryPolicy{Mode: "disabled", Enabled: false},
+		InstallCommands: []string{
+			"patchline install --bundle " + cliPath + " --telemetry=off",
+			"patchline bundle import --bundle " + dataPath + " --offline",
+		},
+		VerifyCommands: []string{"shasum -a 256 -c " + manifestPath},
+		EvidencePaths:  []string{"docs/offline-deploy.md", evidencePath},
+		Bundles: []offlinedeploy.Bundle{{
+			ID:            "patchline-cli",
+			Kind:          "cli",
+			Version:       "1.0.0",
+			Path:          cliPath,
+			SHA256:        mainTestFileHash(t, filepath.Join(root, filepath.FromSlash(cliPath))),
+			SignaturePath: strings.TrimSuffix(cliPath, ".bundle") + ".bundle.sig",
+			SBOMPath:      strings.TrimSuffix(cliPath, ".bundle") + ".sbom.json",
+			UpdateChannel: "stable",
+		}, {
+			ID:            "content-pack",
+			Kind:          "content",
+			Version:       "2026.06",
+			Path:          dataPath,
+			SHA256:        mainTestFileHash(t, filepath.Join(root, filepath.FromSlash(dataPath))),
+			SignaturePath: strings.TrimSuffix(dataPath, ".bundle") + ".bundle.sig",
+			SBOMPath:      strings.TrimSuffix(dataPath, ".bundle") + ".sbom.json",
+			UpdateChannel: "stable",
+		}},
+		UpdateBundles: []offlinedeploy.UpdateBundle{{
+			ID:            id + "-update",
+			FromVersion:   "2026.06",
+			ToVersion:     "2026.07",
+			Path:          updatePath,
+			SHA256:        mainTestFileHash(t, filepath.Join(root, filepath.FromSlash(updatePath))),
+			ManifestPath:  manifestPath,
+			SignaturePath: updateSignaturePath,
+			Offline:       true,
+			AppliesTo:     []string{"content-pack"},
+		}},
+		RollbackPlan: offlinedeploy.RollbackPlan{
+			ID:                   id + "-rollback",
+			MaxMinutes:           15,
+			PreviousBundleSHA256: mainTestFileHash(t, filepath.Join(root, filepath.FromSlash(dataPath))),
+			Commands:             []string{"patchline bundle import --bundle " + dataPath + " --offline"},
+			EvidencePaths:        []string{rollbackEvidencePath},
+		},
 	}
 }
 
