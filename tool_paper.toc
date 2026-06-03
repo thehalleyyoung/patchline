@@ -51,7 +51,7 @@
 \contentsline {paragraph}{Anatomy of a gate.}{19}{section.9}%
 \contentsline {paragraph}{Robustness.}{19}{section.9}%
 \contentsline {paragraph}{Minimal reproductions.}{19}{section.9}%
-\contentsline {paragraph}{Drift protection.}{20}{table.caption.4}%
+\contentsline {paragraph}{Drift protection.}{19}{table.caption.4}%
 \contentsline {paragraph}{Shared evidence without trust erosion.}{20}{table.caption.4}%
 \contentsline {paragraph}{Federated private benchmark aggregates.}{21}{table.caption.4}%
 \contentsline {paragraph}{Paying for minimized missing evidence.}{22}{table.caption.4}%
@@ -89,14 +89,14 @@
 \contentsline {paragraph}{\texttt {lobsters/lobsters} (Rails, \texttt {db/migrate}).}{28}{section.15}%
 \contentsline {paragraph}{\texttt {apache/avro} (schema compatibility).}{28}{section.15}%
 \contentsline {paragraph}{\texttt {helm/charts} (infra/data ordering).}{28}{section.15}%
-\contentsline {paragraph}{\texttt {harrydevforlife/building-lakehouse} (pipelines).}{29}{section.15}%
+\contentsline {paragraph}{\texttt {harrydevforlife/building-lakehouse} (pipelines).}{28}{section.15}%
 \contentsline {paragraph}{\texttt {laaksomavrick/twitter-go} (NoSQL + minimization).}{29}{section.15}%
 \contentsline {section}{\numberline {16}Related Work}{29}{section.16}%
 \contentsline {section}{\numberline {17}Threats to Validity}{29}{section.17}%
 \contentsline {paragraph}{Construct validity.}{29}{section.17}%
 \contentsline {paragraph}{Internal validity.}{29}{section.17}%
 \contentsline {paragraph}{External validity.}{29}{section.17}%
-\contentsline {paragraph}{Known blind spots.}{30}{section.17}%
+\contentsline {paragraph}{Known blind spots.}{29}{section.17}%
 \contentsline {section}{\numberline {18}Limitations}{30}{section.18}%
 \contentsline {section}{\numberline {19}Discussion}{30}{section.19}%
 \contentsline {paragraph}{Why a fact layer instead of a model.}{30}{section.19}%

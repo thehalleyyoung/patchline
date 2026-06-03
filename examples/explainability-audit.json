@@ -1,0 +1,71 @@
+{
+  "version": "patchline.explainability-audit/v1",
+  "name": "Patchline explainability audit over paper and artifact verdicts",
+  "criteria": {
+    "min_reviewers": 2,
+    "min_verdicts": 2,
+    "min_reviews_per_verdict": 2,
+    "min_agreement_rate": 1,
+    "min_supported_rate": 1,
+    "max_unsupported_rate": 0,
+    "require_independent_reviewers": true
+  },
+  "reviews": [
+    {
+      "review_id": "claims-evidence-review-a",
+      "verdict_id": "verdict-claims-evidence",
+      "reviewer_id": "independent-artifact-reviewer",
+      "reviewer_role": "artifact reviewer",
+      "independent": true,
+      "stated_verdict": "README and paper claims are linked to reproducible evidence artifacts",
+      "judgment": "supported",
+      "evidence_paths": [
+        "docs/claims-evidence.md",
+        "docs/camera-ready-checklist.md"
+      ],
+      "rationale": "The claims ledger and camera-ready checklist bind public claims to generated tables, figures, and proof gates."
+    },
+    {
+      "review_id": "claims-evidence-review-b",
+      "verdict_id": "verdict-claims-evidence",
+      "reviewer_id": "independent-maintainer-reviewer",
+      "reviewer_role": "maintainer reviewer",
+      "independent": true,
+      "stated_verdict": "README and paper claims are linked to reproducible evidence artifacts",
+      "judgment": "supported",
+      "evidence_paths": [
+        "docs/claims-evidence.md",
+        "docs/artifact-badge-audit.md"
+      ],
+      "rationale": "The evidence trail names the artifacts and gate-backed badge audit rather than asking maintainers to trust prose claims."
+    },
+    {
+      "review_id": "walkthrough-review-a",
+      "verdict_id": "verdict-reviewer-walkthrough",
+      "reviewer_id": "independent-artifact-reviewer",
+      "reviewer_role": "artifact reviewer",
+      "independent": true,
+      "stated_verdict": "Fresh reviewers can reproduce Patchline artifact outputs from the documented walkthrough",
+      "judgment": "supported",
+      "evidence_paths": [
+        "docs/reviewer-walkthrough.md",
+        "docs/artifact-evaluation-kit.md"
+      ],
+      "rationale": "The walkthrough and evaluation kit describe the command path, expected outputs, and pass/fail checks for a fresh review."
+    },
+    {
+      "review_id": "walkthrough-review-b",
+      "verdict_id": "verdict-reviewer-walkthrough",
+      "reviewer_id": "independent-maintainer-reviewer",
+      "reviewer_role": "maintainer reviewer",
+      "independent": true,
+      "stated_verdict": "Fresh reviewers can reproduce Patchline artifact outputs from the documented walkthrough",
+      "judgment": "supported",
+      "evidence_paths": [
+        "docs/reviewer-walkthrough.md",
+        "docs/independent-replication.md"
+      ],
+      "rationale": "The reproduction path includes independent replication instructions and reviewer-facing expected artifacts."
+    }
+  ]
+}

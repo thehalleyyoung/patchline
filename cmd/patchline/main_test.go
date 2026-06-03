@@ -23,6 +23,7 @@ import (
 	"github.com/thehalleyyoung/patchline/internal/evidence"
 	"github.com/thehalleyyoung/patchline/internal/evidencemarketplace"
 	"github.com/thehalleyyoung/patchline/internal/expandcontract"
+	"github.com/thehalleyyoung/patchline/internal/explainabilityaudit"
 	"github.com/thehalleyyoung/patchline/internal/feedback"
 	"github.com/thehalleyyoung/patchline/internal/governancerisk"
 	"github.com/thehalleyyoung/patchline/internal/incidentdrill"
@@ -938,6 +939,47 @@ func TestReviewerFairnessAuditCommandWritesReports(t *testing.T) {
 	}
 	if stat, err := os.Stat(filepath.Join(out, "reviewer-fairness-audit.md")); err != nil || stat.Size() == 0 {
 		t.Fatalf("expected reviewer-fairness-audit.md to be written, stat=%#v err=%v", stat, err)
+	}
+}
+
+func TestExplainabilityAuditCommandWritesReports(t *testing.T) {
+	root := t.TempDir()
+	writeMainTestFile(t, root, "docs/claims-evidence.md", "claims ledger maps README and paper statements to generated artifacts\n")
+	writeMainTestFile(t, root, "docs/reviewer-walkthrough.md", "reviewer walkthrough regenerates reports, tables, and artifact bundles\n")
+	specPath := filepath.Join(root, "explainability-audit.json")
+	writeMainTestFile(t, root, "explainability-audit.json", `{
+  "version": "patchline.explainability-audit/v1",
+  "name": "main test explainability audit",
+  "criteria": {
+    "min_reviewers": 2,
+    "min_verdicts": 2,
+    "min_reviews_per_verdict": 2,
+    "min_agreement_rate": 1,
+    "min_supported_rate": 1,
+    "max_unsupported_rate": 0,
+    "require_independent_reviewers": true
+  },
+  "reviews": [
+    {"review_id":"claims-a","verdict_id":"claims-evidence","reviewer_id":"reviewer-a","reviewer_role":"artifact reviewer","independent":true,"stated_verdict":"claims map to evidence","judgment":"supported","evidence_paths":["docs/claims-evidence.md"],"rationale":"the claim ledger names the concrete artifacts"},
+    {"review_id":"claims-b","verdict_id":"claims-evidence","reviewer_id":"reviewer-b","reviewer_role":"maintainer reviewer","independent":true,"stated_verdict":"claims map to evidence","judgment":"supported","evidence_paths":["docs/claims-evidence.md"],"rationale":"the evidence trail is explicit and reproducible"},
+    {"review_id":"walkthrough-a","verdict_id":"reviewer-walkthrough","reviewer_id":"reviewer-a","reviewer_role":"artifact reviewer","independent":true,"stated_verdict":"walkthrough is reproducible","judgment":"supported","evidence_paths":["docs/reviewer-walkthrough.md"],"rationale":"the walkthrough gives commands and expected outputs"},
+    {"review_id":"walkthrough-b","verdict_id":"reviewer-walkthrough","reviewer_id":"reviewer-b","reviewer_role":"maintainer reviewer","independent":true,"stated_verdict":"walkthrough is reproducible","judgment":"supported","evidence_paths":["docs/reviewer-walkthrough.md"],"rationale":"the reviewer path cites generated reports"}
+  ]
+}`)
+	out := filepath.Join(t.TempDir(), "explainability-audit")
+	if err := run([]string{"explainability-audit", "--spec", specPath, "--root", root, "--out", out, "--json"}); err != nil {
+		t.Fatalf("explainability-audit failed: %v", err)
+	}
+	var report explainabilityaudit.Report
+	readMainTestJSON(t, filepath.Join(out, "explainability-audit.json"), &report)
+	if !report.OK || report.Summary.Reviews != 4 || report.Summary.Verdicts != 2 || report.Summary.SupportedRate != 1 {
+		t.Fatalf("unexpected explainability audit report: %#v", report)
+	}
+	if len(report.Verdicts) != 2 || len(report.Verdicts[0].Evidence) == 0 || report.Verdicts[0].Evidence[0].SHA256 == "" {
+		t.Fatalf("expected per-verdict evidence hashes, got %#v", report.Verdicts)
+	}
+	if stat, err := os.Stat(filepath.Join(out, "explainability-audit.md")); err != nil || stat.Size() == 0 {
+		t.Fatalf("expected explainability-audit.md to be written, stat=%#v err=%v", stat, err)
 	}
 }
 

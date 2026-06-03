@@ -41,6 +41,7 @@ import (
 	"github.com/thehalleyyoung/patchline/internal/ethicsreview"
 	"github.com/thehalleyyoung/patchline/internal/evidence"
 	"github.com/thehalleyyoung/patchline/internal/expandcontract"
+	"github.com/thehalleyyoung/patchline/internal/explainabilityaudit"
 	"github.com/thehalleyyoung/patchline/internal/feedback"
 	"github.com/thehalleyyoung/patchline/internal/gate"
 	"github.com/thehalleyyoung/patchline/internal/goldenfixture"
@@ -456,6 +457,8 @@ func run(args []string) error {
 		return governanceRiskRegisterCommand(args[1:], hasFlag(args[1:], "--json"))
 	case "ethics-review-template":
 		return ethicsReviewTemplateCommand(args[1:], hasFlag(args[1:], "--json"))
+	case "explainability-audit":
+		return explainabilityAuditCommand(args[1:], hasFlag(args[1:], "--json"))
 	case "feedback":
 		return feedbackCommand(args[1:])
 	case "security":
@@ -613,6 +616,7 @@ Usage:
   patchline change-management-verify --spec change-management.json --root repo-root --out dir [--json]
   patchline governance-risk-register --spec governance-risk-register.json --root repo-root --out dir [--json]
   patchline ethics-review-template --spec ethics-review-template.json --root repo-root --out dir [--json]
+  patchline explainability-audit --spec explainability-audit.json --root repo-root --out dir [--json]
   patchline feedback counterfactual-log --feedback live-feedback.json --history policy-history.json --out dir [--json]
   patchline feedback online-eval --feedback live-feedback.json --spec online-evaluation.json --out dir [--json]
   patchline feedback active-learning-queue --spec active-learning.json --out dir [--json]
@@ -15224,6 +15228,39 @@ func ethicsReviewTemplateCommand(args []string, jsonOut bool) error {
 		return writeJSON(os.Stdout, report)
 	}
 	fmt.Printf("wrote ethics review template ok=%t areas=%d reviews=%d high_risk_reviews=%d counterexamples=%d to %s\n", report.OK, report.Summary.Areas, report.Summary.Entries, report.Summary.HighRiskEntries, report.Summary.Counterexamples, outPath)
+	return nil
+}
+
+func explainabilityAuditCommand(args []string, jsonOut bool) error {
+	usage := "patchline explainability-audit --spec explainability-audit.json --root repo-root --out <dir> [--json]"
+	specPath, outPath, err := feedbackSpecOut(args, usage)
+	if err != nil {
+		return err
+	}
+	rootPath := "."
+	if value, ok := flagValue(args, "--root"); ok && value != "" {
+		rootPath = value
+	}
+	file, err := os.Open(specPath)
+	if err != nil {
+		return err
+	}
+	defer file.Close()
+	spec, err := explainabilityaudit.ReadSpec(file)
+	if err != nil {
+		return err
+	}
+	report, err := explainabilityaudit.BuildReport(spec, rootPath)
+	if err != nil {
+		return err
+	}
+	if err := explainabilityaudit.WriteArtifacts(outPath, report); err != nil {
+		return err
+	}
+	if jsonOut {
+		return writeJSON(os.Stdout, report)
+	}
+	fmt.Printf("wrote explainability audit ok=%t reviews=%d reviewers=%d verdicts=%d supported_rate=%.2f counterexamples=%d to %s\n", report.OK, report.Summary.Reviews, report.Summary.Reviewers, report.Summary.Verdicts, report.Summary.SupportedRate, report.Summary.Counterexamples, outPath)
 	return nil
 }
 
