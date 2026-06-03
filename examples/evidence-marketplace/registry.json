@@ -60,6 +60,16 @@
         "go run ./cmd/patchline evidence-marketplace publish --registry examples/evidence-marketplace/registry.json --out results/generated/evidence-marketplace --json",
         "jq -e '.ok == true and .summary.published >= 2' results/generated/evidence-marketplace/marketplace.json"
       ],
+      "gate_reputation": {
+        "reproducible_runs": 14,
+        "first_verified_at": "2025-01-01T00:00:00Z",
+        "last_verified_at": "2025-09-01T00:00:00Z",
+        "independent_confirmations": [
+          "Database Reliability Guild",
+          "Independent Artifact Review Lab",
+          "Migration Safety Working Group"
+        ]
+      },
       "limitations": [
         "The artifact preserves hazard shape and provenance but intentionally omits raw table names, owners, literals, and row values."
       ]
@@ -117,6 +127,15 @@
         "go run ./cmd/patchline evidence-marketplace publish --registry examples/evidence-marketplace/registry.json --out results/generated/evidence-marketplace --json",
         "jq -e '.by_ecosystem | length >= 2' results/generated/evidence-marketplace/marketplace.json"
       ],
+      "gate_reputation": {
+        "reproducible_runs": 7,
+        "first_verified_at": "2025-02-01T00:00:00Z",
+        "last_verified_at": "2025-05-15T00:00:00Z",
+        "independent_confirmations": [
+          "Independent Artifact Review Lab",
+          "Migration Safety Working Group"
+        ]
+      },
       "limitations": [
         "The redacted artifact demonstrates certificate-backed publication, not a claim about the upstream project's current safety posture."
       ]

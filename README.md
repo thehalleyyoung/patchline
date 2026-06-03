@@ -137,7 +137,7 @@ Run `patch-series-verify --spec <spec>` to prove every modeled migration-PR inte
 
 Run `maintainer-acceptance-study --spec <spec>` to measure paired maintainer review-time reduction for generated remediation plans while failing hidden uncertainty or overconfidence; reproduce it with `make maintainer-acceptance-study-gate`.
 
-Run `evidence-marketplace publish --registry <registry>` and `artifact-benchmark import-marketplace --registry <registry>` to publish redacted, certificate-backed hazard examples and import them into runnable benchmarks without trusting submitter labels; reproduce it with `make evidence-marketplace-gate`.
+Run `evidence-marketplace publish --registry <registry>` and `artifact-benchmark import-marketplace --registry <registry>` to publish redacted, certificate-backed hazard examples with automated license/consent release checks and reproducibility/longevity/independent-confirmation reputation, then import them into runnable benchmarks without trusting submitter labels; reproduce it with `make evidence-marketplace-gate`.
 
 Run `golden-fixture generate --github owner/repo --ref <sha> --subpath <path> --out <dir>` to turn a real-repo slice into a tiny deterministic Go test without vendoring the full repository; see [docs/golden-fixtures.md](docs/golden-fixtures.md).
 
@@ -835,7 +835,7 @@ Run `make mechanistic-decision-circuits-gate` for a mechanistic study extracting
 Run `make calibrated-risk-frontier-gate` for a **calibrated risk frontier** separating aleatoric and epistemic uncertainty with coverage gates, rejecting an unsupported item; see [docs/calibrated-risk-frontier.md](docs/calibrated-risk-frontier.md).
 Run `make certified-distributional-robustness-gate` for a certified distributional-robustness bound on verdicts under shifted input distributions, rejecting an unsupported item; see [docs/certified-distributional-robustness.md](docs/certified-distributional-robustness.md).
 Run `make reproducible-rl-repair-policy-gate` for a reproducible RL repair policy with a deterministic post-hoc verification layer, rejecting an unsupported item; see [docs/reproducible-rl-repair-policy.md](docs/reproducible-rl-repair-policy.md).
-Run `make open-problem-bounty-board-gate` for an open-problem **bounty board** with gate-checkable success criteria and reproducible submissions, rejecting an unsupported item; see [docs/open-problem-bounty-board.md](docs/open-problem-bounty-board.md).
+Run `make open-problem-bounty-board-gate` for an open-problem **bounty board** that pays approved minimized reproductions of false negatives and ecosystem gaps, rejecting unsupported submissions; see [docs/open-problem-bounty-board.md](docs/open-problem-bounty-board.md).
 Run `make one-command-full-repro-2-gate` for a **one-command full reproduction** rebuilding every study, figure, and number in a clean container, rejecting an unsupported item; see [docs/one-command-full-repro-2.md](docs/one-command-full-repro-2.md).
 Run `make provenance-linked-every-number-gate` for an **every-number provenance** linkage so each value in the paper traces to a gate output in CI, rejecting an unsupported item; see [docs/provenance-linked-every-number.md](docs/provenance-linked-every-number.md).
 Run `make machine-checked-appendix-2-gate` for a **machine-checked appendix** re-verified on every commit with a public proof-status badge, rejecting an unsupported item; see [docs/machine-checked-appendix-2.md](docs/machine-checked-appendix-2.md).

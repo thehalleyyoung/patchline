@@ -21,11 +21,14 @@ jq -e '
     (.certificate.obligations | index("redaction-reviewed")) and
     (.certificate.obligations | index("license-cleared")) and
     (.certificate.obligations | index("artifact-hashes-verified")) and
-    (.certificate.obligations | index("reproducible-without-private-data"))
+    (.certificate.obligations | index("reproducible-without-private-data")) and
+    (.gate_reputation | keys == ["first_verified_at","independent_confirmations","last_verified_at","reproducible_runs"]) and
+    .gate_reputation.reproducible_runs >= 0 and
+    (.gate_reputation.independent_confirmations | length) >= 2
   )
 ' "$REGISTRY" > /dev/null
 
-for phrase in "evidence marketplace" "redacted, certificate-backed" "make evidence-marketplace-gate"; do
+for phrase in "evidence marketplace" "redacted, certificate-backed" "reproducibility, longevity, and independent confirmation" "make evidence-marketplace-gate"; do
   grep -F "$phrase" docs/evidence-marketplace.md README.md > /dev/null
 done
 
@@ -50,14 +53,29 @@ jq -e '
   .summary.certificate_backed == .summary.published and
   .summary.redaction_reviewed == .summary.published and
   .summary.clear_licensed == .summary.published and
+  .summary.public_release_eligible == .summary.published and
   .summary.artifacts_verified >= 4 and
+  .summary.gate_reputation_submitted == .summary.published and
+  .summary.gate_reputation_reviewable == .summary.published and
+  .summary.gate_reputation_established >= 1 and
   (.examples | all(
     (.certificate_subject_hash | startswith("sha256:")) and
     (.evidence_hash | startswith("sha256:")) and
+    (.release_admission.public_release_eligible == true) and
+    (.release_admission.license_accepted == true) and
+    (.release_admission.consent_names_submitter == true) and
+    (.release_admission.consent_grants_publication == true) and
+    (.release_admission.consent_names_license == true) and
+    (.gate_reputation.score >= 50) and
+    ((.gate_reputation.tier == "reviewable") or (.gate_reputation.tier == "established")) and
+    (.gate_reputation.reproducibility_points >= 28) and
+    (.gate_reputation.longevity_points >= 15) and
+    (.gate_reputation.confirmation_points >= 20) and
     (.artifacts | all(.redacted == true and (.sha256 | startswith("sha256:"))))
   )) and
   (.by_hazard | length) >= 2 and
-  (.by_ecosystem | length) >= 2
+  (.by_ecosystem | length) >= 2 and
+  (.by_reputation_tier | length) >= 2
 ' "$OUT/published/marketplace.json" > /dev/null
 
 if grep -Eiq 'password=|Authorization:|AWS_SECRET_ACCESS_KEY|source_code|BEGIN PRIVATE|token=' \
@@ -126,9 +144,12 @@ jq -n \
   version: "patchline.evidence-marketplace-gate-results/v1",
   published: $r[0].summary.published,
   artifacts_verified: $r[0].summary.artifacts_verified,
+  public_release_eligible: $r[0].summary.public_release_eligible,
+  gate_reputation_reviewable: $r[0].summary.gate_reputation_reviewable,
+  gate_reputation_established: $r[0].summary.gate_reputation_established,
   imported_benchmark_cases: $i[0].summary.imported,
   negative_control_rejected: true,
   verified: true
 }' > "$OUT/gate-summary.json"
 
-echo "evidence-marketplace gate passed: $(jq -r .summary.published "$OUT/published/marketplace.json") redacted certificate-backed examples published; $(jq -r .summary.imported "$OUT/imported-benchmark/marketplace-import.json") imported into runnable benchmarks; corrupted certificate rejected"
+echo "evidence-marketplace gate passed: $(jq -r .summary.published "$OUT/published/marketplace.json") redacted certificate-backed examples published; $(jq -r .summary.gate_reputation_reviewable "$OUT/published/marketplace.json") reviewable gate reputations scored; $(jq -r .summary.imported "$OUT/imported-benchmark/marketplace-import.json") imported into runnable benchmarks; corrupted certificate rejected"

@@ -12,6 +12,7 @@ import (
 	"path/filepath"
 	"sort"
 	"strings"
+	"time"
 
 	"github.com/thehalleyyoung/patchline/internal/canonical"
 )
@@ -62,19 +63,20 @@ type Metadata struct {
 }
 
 type Example struct {
-	ID           string      `json:"id"`
-	Title        string      `json:"title"`
-	Organization string      `json:"organization"`
-	Ecosystem    string      `json:"ecosystem"`
-	HazardClass  string      `json:"hazard_class"`
-	Source       Source      `json:"source"`
-	LicenseSPDX  string      `json:"license_spdx"`
-	Consent      string      `json:"consent"`
-	Redaction    Redaction   `json:"redaction"`
-	Artifacts    []Artifact  `json:"artifacts"`
-	Certificate  Certificate `json:"certificate"`
-	Reproduction []string    `json:"reproduction"`
-	Limitations  []string    `json:"limitations,omitempty"`
+	ID             string               `json:"id"`
+	Title          string               `json:"title"`
+	Organization   string               `json:"organization"`
+	Ecosystem      string               `json:"ecosystem"`
+	HazardClass    string               `json:"hazard_class"`
+	Source         Source               `json:"source"`
+	LicenseSPDX    string               `json:"license_spdx"`
+	Consent        string               `json:"consent"`
+	Redaction      Redaction            `json:"redaction"`
+	Artifacts      []Artifact           `json:"artifacts"`
+	Certificate    Certificate          `json:"certificate"`
+	Reproduction   []string             `json:"reproduction"`
+	GateReputation *GateReputationInput `json:"gate_reputation,omitempty"`
+	Limitations    []string             `json:"limitations,omitempty"`
 }
 
 type Source struct {
@@ -109,47 +111,85 @@ type Certificate struct {
 	Obligations []string `json:"obligations"`
 }
 
+type GateReputationInput struct {
+	ReproducibleRuns         int      `json:"reproducible_runs"`
+	FirstVerifiedAt          string   `json:"first_verified_at"`
+	LastVerifiedAt           string   `json:"last_verified_at"`
+	IndependentConfirmations []string `json:"independent_confirmations"`
+}
+
+type GateReputationReport struct {
+	Submitted                bool     `json:"submitted"`
+	ReproducibleRuns         int      `json:"reproducible_runs"`
+	FirstVerifiedAt          string   `json:"first_verified_at,omitempty"`
+	LastVerifiedAt           string   `json:"last_verified_at,omitempty"`
+	VerifiedDays             int      `json:"verified_days"`
+	IndependentConfirmations []string `json:"independent_confirmations"`
+	ReproducibilityPoints    int      `json:"reproducibility_points"`
+	LongevityPoints          int      `json:"longevity_points"`
+	ConfirmationPoints       int      `json:"confirmation_points"`
+	Score                    int      `json:"score"`
+	Tier                     string   `json:"tier"`
+}
+
+type ReleaseAdmissionReport struct {
+	LicenseSPDX              string `json:"license_spdx"`
+	LicenseAccepted          bool   `json:"license_accepted"`
+	ConsentPresent           bool   `json:"consent_present"`
+	ConsentNamesSubmitter    bool   `json:"consent_names_submitter"`
+	ConsentGrantsPublication bool   `json:"consent_grants_publication"`
+	ConsentNamesLicense      bool   `json:"consent_names_license"`
+	PublicReleaseEligible    bool   `json:"public_release_eligible"`
+}
+
 type Report struct {
-	Version      string             `json:"version"`
-	OK           bool               `json:"ok"`
-	RegistryHash string             `json:"registry_hash"`
-	Hash         string             `json:"hash"`
-	Summary      Summary            `json:"summary"`
-	Marketplace  Metadata           `json:"marketplace"`
-	Examples     []PublishedExample `json:"examples"`
-	Rejected     []RejectedExample  `json:"rejected,omitempty"`
-	ByHazard     []Count            `json:"by_hazard"`
-	ByEcosystem  []Count            `json:"by_ecosystem"`
-	ByLicense    []Count            `json:"by_license"`
-	Markdown     string             `json:"markdown,omitempty"`
+	Version          string             `json:"version"`
+	OK               bool               `json:"ok"`
+	RegistryHash     string             `json:"registry_hash"`
+	Hash             string             `json:"hash"`
+	Summary          Summary            `json:"summary"`
+	Marketplace      Metadata           `json:"marketplace"`
+	Examples         []PublishedExample `json:"examples"`
+	Rejected         []RejectedExample  `json:"rejected,omitempty"`
+	ByHazard         []Count            `json:"by_hazard"`
+	ByEcosystem      []Count            `json:"by_ecosystem"`
+	ByLicense        []Count            `json:"by_license"`
+	ByReputationTier []Count            `json:"by_reputation_tier"`
+	Markdown         string             `json:"markdown,omitempty"`
 }
 
 type Summary struct {
-	Submitted                int `json:"submitted"`
-	Published                int `json:"published"`
-	Rejected                 int `json:"rejected"`
-	CertificateBacked        int `json:"certificate_backed"`
-	RedactionReviewed        int `json:"redaction_reviewed"`
-	ClearLicensed            int `json:"clear_licensed"`
-	ArtifactsVerified        int `json:"artifacts_verified"`
-	ReproductionCommandCount int `json:"reproduction_command_count"`
+	Submitted                 int `json:"submitted"`
+	Published                 int `json:"published"`
+	Rejected                  int `json:"rejected"`
+	CertificateBacked         int `json:"certificate_backed"`
+	RedactionReviewed         int `json:"redaction_reviewed"`
+	ClearLicensed             int `json:"clear_licensed"`
+	PublicReleaseEligible     int `json:"public_release_eligible"`
+	ArtifactsVerified         int `json:"artifacts_verified"`
+	ReproductionCommandCount  int `json:"reproduction_command_count"`
+	GateReputationSubmitted   int `json:"gate_reputation_submitted"`
+	GateReputationReviewable  int `json:"gate_reputation_reviewable"`
+	GateReputationEstablished int `json:"gate_reputation_established"`
 }
 
 type PublishedExample struct {
-	ID                     string            `json:"id"`
-	Title                  string            `json:"title"`
-	Organization           string            `json:"organization"`
-	Ecosystem              string            `json:"ecosystem"`
-	HazardClass            string            `json:"hazard_class"`
-	Source                 Source            `json:"source"`
-	LicenseSPDX            string            `json:"license_spdx"`
-	CertificateID          string            `json:"certificate_id"`
-	CertificateIssuer      string            `json:"certificate_issuer"`
-	CertificateSubjectHash string            `json:"certificate_subject_hash"`
-	EvidenceHash           string            `json:"evidence_hash"`
-	Artifacts              []ArtifactSummary `json:"artifacts"`
-	Reproduction           []string          `json:"reproduction"`
-	Limitations            []string          `json:"limitations,omitempty"`
+	ID                     string                 `json:"id"`
+	Title                  string                 `json:"title"`
+	Organization           string                 `json:"organization"`
+	Ecosystem              string                 `json:"ecosystem"`
+	HazardClass            string                 `json:"hazard_class"`
+	Source                 Source                 `json:"source"`
+	LicenseSPDX            string                 `json:"license_spdx"`
+	ReleaseAdmission       ReleaseAdmissionReport `json:"release_admission"`
+	CertificateID          string                 `json:"certificate_id"`
+	CertificateIssuer      string                 `json:"certificate_issuer"`
+	CertificateSubjectHash string                 `json:"certificate_subject_hash"`
+	EvidenceHash           string                 `json:"evidence_hash"`
+	Artifacts              []ArtifactSummary      `json:"artifacts"`
+	Reproduction           []string               `json:"reproduction"`
+	GateReputation         GateReputationReport   `json:"gate_reputation"`
+	Limitations            []string               `json:"limitations,omitempty"`
 }
 
 type ArtifactSummary struct {
@@ -254,8 +294,20 @@ func PublishRegistry(registry Registry, root string) (Report, error) {
 		report.Summary.CertificateBacked++
 		report.Summary.RedactionReviewed++
 		report.Summary.ClearLicensed++
+		if published.ReleaseAdmission.PublicReleaseEligible {
+			report.Summary.PublicReleaseEligible++
+		}
 		report.Summary.ArtifactsVerified += len(published.Artifacts)
 		report.Summary.ReproductionCommandCount += len(published.Reproduction)
+		if published.GateReputation.Submitted {
+			report.Summary.GateReputationSubmitted++
+		}
+		if published.GateReputation.Score >= 50 {
+			report.Summary.GateReputationReviewable++
+		}
+		if published.GateReputation.Tier == "established" {
+			report.Summary.GateReputationEstablished++
+		}
 	}
 	sort.Slice(report.Examples, func(i, j int) bool {
 		return report.Examples[i].ID < report.Examples[j].ID
@@ -264,6 +316,7 @@ func PublishRegistry(registry Registry, root string) (Report, error) {
 	report.ByHazard = counts(report.Examples, func(example PublishedExample) string { return example.HazardClass })
 	report.ByEcosystem = counts(report.Examples, func(example PublishedExample) string { return example.Ecosystem })
 	report.ByLicense = counts(report.Examples, func(example PublishedExample) string { return example.LicenseSPDX })
+	report.ByReputationTier = counts(report.Examples, func(example PublishedExample) string { return example.GateReputation.Tier })
 	report.OK = report.Summary.Published > 0 && report.Summary.Rejected == 0
 	report.Hash = reportHash(report)
 	report.Markdown = RenderMarkdown(report)
@@ -330,12 +383,8 @@ func validateExample(example Example, root string, seen map[string]bool) (Publis
 		}
 	}
 	reasons = append(reasons, validateSource(example.Source)...)
-	if !acceptedLicenses[strings.TrimSpace(example.LicenseSPDX)] {
-		reasons = append(reasons, "license_spdx must be a clear accepted public license")
-	}
-	if len(strings.TrimSpace(example.Consent)) < 40 {
-		reasons = append(reasons, "consent must describe publication permission")
-	}
+	releaseAdmission, releaseReasons := evaluateReleaseAdmission(example)
+	reasons = append(reasons, releaseReasons...)
 	if !example.Redaction.Reviewed {
 		reasons = append(reasons, "redaction.redaction_reviewed must be true")
 	}
@@ -355,6 +404,8 @@ func validateExample(example Example, root string, seen map[string]bool) (Publis
 	reasons = append(reasons, artifactReasons...)
 	reasons = append(reasons, validateCertificate(example)...)
 	reasons = append(reasons, validateReproduction(example.Reproduction)...)
+	gateReputation, reputationReasons := evaluateGateReputation(example)
+	reasons = append(reasons, reputationReasons...)
 	reasons = append(reasons, scanPublicStrings("metadata", metadataStrings(example))...)
 	if len(reasons) > 0 {
 		sort.Strings(reasons)
@@ -368,14 +419,61 @@ func validateExample(example Example, root string, seen map[string]bool) (Publis
 		HazardClass:            strings.TrimSpace(example.HazardClass),
 		Source:                 normalizeSource(example.Source),
 		LicenseSPDX:            strings.TrimSpace(example.LicenseSPDX),
+		ReleaseAdmission:       releaseAdmission,
 		CertificateID:          strings.TrimSpace(example.Certificate.ID),
 		CertificateIssuer:      strings.TrimSpace(example.Certificate.Issuer),
 		CertificateSubjectHash: ExpectedSubjectHash(example),
 		EvidenceHash:           EvidenceHash(example),
 		Artifacts:              artifactSummaries,
 		Reproduction:           normalizeStringList(example.Reproduction, false),
+		GateReputation:         gateReputation,
 		Limitations:            normalizeStringList(example.Limitations, false),
 	}, nil
+}
+
+func evaluateReleaseAdmission(example Example) (ReleaseAdmissionReport, []string) {
+	license := strings.TrimSpace(example.LicenseSPDX)
+	consent := strings.TrimSpace(example.Consent)
+	report := ReleaseAdmissionReport{
+		LicenseSPDX:              license,
+		LicenseAccepted:          acceptedLicenses[license],
+		ConsentPresent:           len(consent) >= 40,
+		ConsentNamesSubmitter:    containsFold(consent, strings.TrimSpace(example.Organization)),
+		ConsentGrantsPublication: containsFold(consent, "publish") || containsFold(consent, "publication"),
+		ConsentNamesLicense:      containsFold(consent, license) || containsFold(consent, "declared public license") || containsFold(consent, "public license"),
+	}
+	report.PublicReleaseEligible = report.LicenseAccepted &&
+		report.ConsentPresent &&
+		report.ConsentNamesSubmitter &&
+		report.ConsentGrantsPublication &&
+		report.ConsentNamesLicense
+
+	var reasons []string
+	if !report.LicenseAccepted {
+		reasons = append(reasons, "license_spdx must be a clear accepted public license")
+	}
+	if !report.ConsentPresent {
+		reasons = append(reasons, "consent must describe publication permission")
+	}
+	if !report.ConsentNamesSubmitter {
+		reasons = append(reasons, "consent must name the submitting organization")
+	}
+	if !report.ConsentGrantsPublication {
+		reasons = append(reasons, "consent must explicitly grant publication")
+	}
+	if !report.ConsentNamesLicense {
+		reasons = append(reasons, "consent must reference the declared public license")
+	}
+	return report, reasons
+}
+
+func containsFold(value, needle string) bool {
+	value = strings.TrimSpace(value)
+	needle = strings.TrimSpace(needle)
+	if value == "" || needle == "" {
+		return false
+	}
+	return strings.Contains(strings.ToLower(value), strings.ToLower(needle))
 }
 
 func validateSource(source Source) []string {
@@ -493,6 +591,116 @@ func validateReproduction(commands []string) []string {
 	return reasons
 }
 
+func evaluateGateReputation(example Example) (GateReputationReport, []string) {
+	report := GateReputationReport{Tier: "emerging"}
+	if example.GateReputation == nil {
+		return report, nil
+	}
+	report.Submitted = true
+	reputation := *example.GateReputation
+	var reasons []string
+	if reputation.ReproducibleRuns < 0 {
+		reasons = append(reasons, "gate_reputation.reproducible_runs must be non-negative")
+	}
+	report.ReproducibleRuns = reputation.ReproducibleRuns
+
+	first, firstReasons := parseGateReputationTime("gate_reputation.first_verified_at", reputation.FirstVerifiedAt)
+	last, lastReasons := parseGateReputationTime("gate_reputation.last_verified_at", reputation.LastVerifiedAt)
+	reasons = append(reasons, firstReasons...)
+	reasons = append(reasons, lastReasons...)
+	if len(firstReasons) == 0 {
+		report.FirstVerifiedAt = first.Format(time.RFC3339)
+	}
+	if len(lastReasons) == 0 {
+		report.LastVerifiedAt = last.Format(time.RFC3339)
+	}
+	if len(firstReasons) == 0 && len(lastReasons) == 0 {
+		if last.Before(first) {
+			reasons = append(reasons, "gate_reputation.last_verified_at must not be before first_verified_at")
+		} else {
+			report.VerifiedDays = int(last.Sub(first).Hours() / 24)
+		}
+	}
+
+	confirmations, confirmationReasons := normalizeIndependentConfirmations(reputation.IndependentConfirmations, example.Organization)
+	reasons = append(reasons, confirmationReasons...)
+	report.IndependentConfirmations = confirmations
+	if len(reasons) > 0 {
+		return report, reasons
+	}
+
+	report.ReproducibilityPoints = minInt(40, reputation.ReproducibleRuns*4)
+	report.LongevityPoints = minInt(30, (report.VerifiedDays/30)*5)
+	report.ConfirmationPoints = minInt(30, len(confirmations)*10)
+	report.Score = report.ReproducibilityPoints + report.LongevityPoints + report.ConfirmationPoints
+	report.Tier = gateReputationTier(report.Score)
+	return report, nil
+}
+
+func parseGateReputationTime(field, value string) (time.Time, []string) {
+	value = strings.TrimSpace(value)
+	if value == "" {
+		return time.Time{}, []string{field + " is required"}
+	}
+	parsed, err := time.Parse(time.RFC3339, value)
+	if err != nil {
+		return time.Time{}, []string{field + " must be RFC3339"}
+	}
+	return parsed, nil
+}
+
+func normalizeIndependentConfirmations(values []string, organization string) ([]string, []string) {
+	var reasons []string
+	organizationKey := reputationIdentityKey(organization)
+	seen := map[string]string{}
+	var out []string
+	for i, raw := range values {
+		value := strings.TrimSpace(raw)
+		if value == "" {
+			reasons = append(reasons, fmt.Sprintf("gate_reputation.independent_confirmations[%d] is empty", i))
+			continue
+		}
+		key := reputationIdentityKey(value)
+		if key == organizationKey && organizationKey != "" {
+			reasons = append(reasons, "gate_reputation.independent_confirmations must not include the submitting organization")
+			continue
+		}
+		if prior, ok := seen[key]; ok {
+			reasons = append(reasons, "duplicate gate_reputation.independent_confirmations entry "+prior)
+			continue
+		}
+		seen[key] = value
+		out = append(out, value)
+	}
+	if len(out) == 0 {
+		reasons = append(reasons, "gate_reputation.independent_confirmations must include at least one independent confirmation")
+	}
+	sort.Strings(out)
+	return out, reasons
+}
+
+func reputationIdentityKey(value string) string {
+	return strings.ToLower(strings.Join(strings.Fields(strings.TrimSpace(value)), " "))
+}
+
+func gateReputationTier(score int) string {
+	switch {
+	case score >= 75:
+		return "established"
+	case score >= 50:
+		return "reviewable"
+	default:
+		return "emerging"
+	}
+}
+
+func minInt(a, b int) int {
+	if a < b {
+		return a
+	}
+	return b
+}
+
 func scanPublicStrings(scope string, values []string) []string {
 	var reasons []string
 	for _, value := range values {
@@ -530,6 +738,13 @@ func metadataStrings(example Example) []string {
 	values = append(values, example.Redaction.Fields...)
 	values = append(values, example.Certificate.Obligations...)
 	values = append(values, example.Reproduction...)
+	if example.GateReputation != nil {
+		values = append(values,
+			example.GateReputation.FirstVerifiedAt,
+			example.GateReputation.LastVerifiedAt,
+		)
+		values = append(values, example.GateReputation.IndependentConfirmations...)
+	}
 	values = append(values, example.Limitations...)
 	return values
 }
@@ -699,18 +914,25 @@ func RenderMarkdown(report Report) string {
 	fmt.Fprintf(&b, "| Published examples | %d |\n", report.Summary.Published)
 	fmt.Fprintf(&b, "| Rejected examples | %d |\n", report.Summary.Rejected)
 	fmt.Fprintf(&b, "| Verified artifacts | %d |\n", report.Summary.ArtifactsVerified)
+	fmt.Fprintf(&b, "| Public-release eligible | %d |\n", report.Summary.PublicReleaseEligible)
+	fmt.Fprintf(&b, "| Gate reputations submitted | %d |\n", report.Summary.GateReputationSubmitted)
+	fmt.Fprintf(&b, "| Reviewable gate reputations | %d |\n", report.Summary.GateReputationReviewable)
+	fmt.Fprintf(&b, "| Established gate reputations | %d |\n", report.Summary.GateReputationEstablished)
 	fmt.Fprintf(&b, "\n## Published examples\n\n")
 	if len(report.Examples) == 0 {
 		fmt.Fprintf(&b, "No examples cleared publication checks.\n\n")
 	} else {
-		fmt.Fprintf(&b, "| ID | Hazard | Ecosystem | License | Certificate | Evidence |\n")
-		fmt.Fprintf(&b, "| --- | --- | --- | --- | --- | --- |\n")
+		fmt.Fprintf(&b, "| ID | Hazard | Ecosystem | License | Release | Gate reputation | Certificate | Evidence |\n")
+		fmt.Fprintf(&b, "| --- | --- | --- | --- | --- | ---: | --- | --- |\n")
 		for _, example := range report.Examples {
-			fmt.Fprintf(&b, "| `%s` | %s | %s | `%s` | `%s` | `%s` |\n",
+			fmt.Fprintf(&b, "| `%s` | %s | %s | `%s` | %t | %s (%d) | `%s` | `%s` |\n",
 				escapePipe(example.ID),
 				escapePipe(example.HazardClass),
 				escapePipe(example.Ecosystem),
 				escapePipe(example.LicenseSPDX),
+				example.ReleaseAdmission.PublicReleaseEligible,
+				escapePipe(example.GateReputation.Tier),
+				example.GateReputation.Score,
 				escapePipe(example.CertificateSubjectHash),
 				escapePipe(example.EvidenceHash),
 			)
@@ -734,9 +956,9 @@ func RenderHTML(report Report) (string, error) {
 <h1>Patchline public evidence marketplace</h1>
 <p>Published {{.Summary.Published}} redacted, certificate-backed hazard examples; rejected {{.Summary.Rejected}}.</p>
 <table>
-<thead><tr><th>ID</th><th>Title</th><th>Hazard</th><th>Ecosystem</th><th>License</th><th>Certificate</th></tr></thead>
+<thead><tr><th>ID</th><th>Title</th><th>Hazard</th><th>Ecosystem</th><th>License</th><th>Release</th><th>Gate reputation</th><th>Certificate</th></tr></thead>
 <tbody>
-{{range .Examples}}<tr><td><code>{{.ID}}</code></td><td>{{.Title}}</td><td>{{.HazardClass}}</td><td>{{.Ecosystem}}</td><td><code>{{.LicenseSPDX}}</code></td><td><code>{{.CertificateSubjectHash}}</code></td></tr>
+{{range .Examples}}<tr><td><code>{{.ID}}</code></td><td>{{.Title}}</td><td>{{.HazardClass}}</td><td>{{.Ecosystem}}</td><td><code>{{.LicenseSPDX}}</code></td><td>{{.ReleaseAdmission.PublicReleaseEligible}}</td><td>{{.GateReputation.Tier}} ({{.GateReputation.Score}})</td><td><code>{{.CertificateSubjectHash}}</code></td></tr>
 {{end}}</tbody>
 </table>
 `

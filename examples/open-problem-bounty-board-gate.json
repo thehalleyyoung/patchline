@@ -1,11 +1,43 @@
 {
   "version": "patchline.open-problem-bounty-board-gate/v1",
-  "claim": "Patchline ships an open-problem bounty board with gate-checkable success criteria and reproducible submissions. The worker loads a frozen, content-addressed spec and checks every item is scored and references concrete backing evidence; the gate re-runs the worker, confirms every item is scored and evidenced, and rejects an unsupported item with empty evidence, so the bounty board claim is reproducible on real Patchline self-data via `make open-problem-bounty-board-gate`.",
+  "claim": "Patchline ships an open-problem bounty board with gate-checkable success criteria, reproducible submissions, and payout-approved minimized reproductions for false negatives and high-impact ecosystem gaps. The worker loads a frozen, content-addressed spec and checks every bounty has an approved payout, a minimized reproduction, and concrete backing evidence; the gate re-runs the worker, confirms both false-negative and ecosystem-gap bounties are eligible, and rejects an unsupported item with empty evidence and no payout, so the bounty workflow is reproducible on real Patchline self-data via `make open-problem-bounty-board-gate`.",
   "real_repo": "patchline (self): open-problem-bounty-board",
   "items": [
-    { "criterion": "soundness", "scored": true, "evidence": "grand-unified-one-command-index-gate" },
-    { "criterion": "reproducibility", "scored": true, "evidence": "artifact-consistency-gate" },
-    { "criterion": "evidence-trace", "scored": true, "evidence": "reviewer-mode-gate" }
+    {
+      "id": "fn-rails-backfill-min-repro",
+      "category": "false_negative",
+      "ecosystem": "rails",
+      "minimized_reproduction": "benchmarks/ground_truth/negative/insufficient-public-incident-evidence.json",
+      "evidence": "fn-discovery-gate",
+      "payout_usd": 750,
+      "payment_status": "approved"
+    },
+    {
+      "id": "gap-diesel-migration-min-repro",
+      "category": "ecosystem_gap",
+      "ecosystem": "diesel",
+      "minimized_reproduction": "examples/multi-ecosystem-migration-gate.json",
+      "evidence": "multi-ecosystem-migration-gate",
+      "payout_usd": 500,
+      "payment_status": "approved"
+    },
+    {
+      "id": "fn-telemetry-causality-min-repro",
+      "category": "false_negative",
+      "ecosystem": "opentelemetry",
+      "minimized_reproduction": "examples/negative-controls-gate.json",
+      "evidence": "negative-controls-gate",
+      "payout_usd": 600,
+      "payment_status": "approved"
+    }
   ],
-  "bad": { "criterion": "unsupported", "scored": true, "evidence": "" }
+  "bad": {
+    "id": "unsupported-unminimized-gap",
+    "category": "ecosystem_gap",
+    "ecosystem": "unknown",
+    "minimized_reproduction": "",
+    "evidence": "",
+    "payout_usd": 0,
+    "payment_status": "pending"
+  }
 }

@@ -24,7 +24,65 @@ func TestPublishRegistryPublishesCertificateBackedExamples(t *testing.T) {
 	if report.Examples[0].EvidenceHash == "" || report.Hash == "" || report.RegistryHash == "" {
 		t.Fatalf("expected stable hashes in report: %#v", report)
 	}
+	if report.Summary.PublicReleaseEligible != 1 || !report.Examples[0].ReleaseAdmission.PublicReleaseEligible {
+		t.Fatalf("expected automated release admission to pass: %#v", report.Examples[0].ReleaseAdmission)
+	}
+	if report.Examples[0].GateReputation.Submitted || report.Examples[0].GateReputation.Score != 0 || report.Examples[0].GateReputation.Tier != "emerging" {
+		t.Fatalf("omitted gate reputation should publish as zero-score emerging metadata: %#v", report.Examples[0].GateReputation)
+	}
 	assertStableReportHash(t, registry, root, report.Hash)
+}
+
+func TestPublishRegistryComputesGateReputationOnlyFromAllowedSignals(t *testing.T) {
+	registry, root := validRegistry(t)
+	registry.Examples[0].GateReputation = &GateReputationInput{
+		ReproducibleRuns: 12,
+		FirstVerifiedAt:  "2025-01-01T00:00:00Z",
+		LastVerifiedAt:   "2025-07-01T00:00:00Z",
+		IndependentConfirmations: []string{
+			"Migration Safety Working Group",
+			"Independent Artifact Review Lab",
+			"Database Reliability Guild",
+		},
+	}
+
+	report, err := PublishRegistry(registry, root)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !report.OK || report.Summary.GateReputationSubmitted != 1 || report.Summary.GateReputationEstablished != 1 {
+		t.Fatalf("unexpected reputation summary: %#v", report.Summary)
+	}
+	reputation := report.Examples[0].GateReputation
+	if !reputation.Submitted || reputation.Score != 100 || reputation.Tier != "established" {
+		t.Fatalf("unexpected reputation score: %#v", reputation)
+	}
+	if reputation.ReproducibilityPoints != 40 || reputation.LongevityPoints != 30 || reputation.ConfirmationPoints != 30 {
+		t.Fatalf("unexpected reputation dimensions: %#v", reputation)
+	}
+	if reputation.VerifiedDays != 181 {
+		t.Fatalf("longevity should be derived from supplied timestamps, got %d days", reputation.VerifiedDays)
+	}
+	if got := strings.Join(reputation.IndependentConfirmations, ","); got != "Database Reliability Guild,Independent Artifact Review Lab,Migration Safety Working Group" {
+		t.Fatalf("confirmations should be normalized and sorted, got %q", got)
+	}
+	if report.Examples[0].CertificateSubjectHash != registry.Examples[0].Certificate.SubjectHash {
+		t.Fatalf("mutable reputation must not change certificate subject hash: %#v", report.Examples[0])
+	}
+	assertStableReportHash(t, registry, root, report.Hash)
+
+	changed := registry
+	changed.Examples[0].Title = "Same gate reputation with a different title"
+	changed.Examples[0].Organization = "Different Submitter"
+	changed.Examples[0].Consent = "Different Submitter approved publication of this redacted hazard example under the declared public license."
+	changed.Examples[0].Certificate.SubjectHash = ExpectedSubjectHash(changed.Examples[0])
+	changedReport, err := PublishRegistry(changed, root)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if changedReport.Examples[0].GateReputation.Score != reputation.Score {
+		t.Fatalf("non-reputation metadata changed reputation score: got %d want %d", changedReport.Examples[0].GateReputation.Score, reputation.Score)
+	}
 }
 
 func TestCertificateHashNormalizesSetLikeFields(t *testing.T) {
@@ -94,6 +152,30 @@ func TestPublishRegistryRejectsInvalidExamples(t *testing.T) {
 			want: "consent",
 		},
 		{
+			name: "consent missing submitter",
+			edit: func(registry *Registry, root string) {
+				registry.Examples[0].Consent = "A different group approved publication of this redacted hazard example under the declared public license."
+				registry.Examples[0].Certificate.SubjectHash = ExpectedSubjectHash(registry.Examples[0])
+			},
+			want: "consent must name the submitting organization",
+		},
+		{
+			name: "consent missing publication grant",
+			edit: func(registry *Registry, root string) {
+				registry.Examples[0].Consent = "Example Maintainers reviewed this redacted hazard example under the declared public license."
+				registry.Examples[0].Certificate.SubjectHash = ExpectedSubjectHash(registry.Examples[0])
+			},
+			want: "consent must explicitly grant publication",
+		},
+		{
+			name: "consent missing license",
+			edit: func(registry *Registry, root string) {
+				registry.Examples[0].Consent = "Example Maintainers approved publication of this redacted hazard example for public release."
+				registry.Examples[0].Certificate.SubjectHash = ExpectedSubjectHash(registry.Examples[0])
+			},
+			want: "consent must reference the declared public license",
+		},
+		{
 			name: "unreviewed redaction",
 			edit: func(registry *Registry, root string) {
 				registry.Examples[0].Redaction.Reviewed = false
@@ -157,6 +239,81 @@ func TestPublishRegistryRejectsInvalidExamples(t *testing.T) {
 				registry.Examples[0].Certificate.SubjectHash = ExpectedSubjectHash(registry.Examples[0])
 			},
 			want: "escapes registry root",
+		},
+		{
+			name: "bad reputation timestamp",
+			edit: func(registry *Registry, root string) {
+				registry.Examples[0].GateReputation = &GateReputationInput{
+					ReproducibleRuns:         3,
+					FirstVerifiedAt:          "not-a-time",
+					LastVerifiedAt:           "2025-07-01T00:00:00Z",
+					IndependentConfirmations: []string{"Independent Artifact Review Lab"},
+				}
+			},
+			want: "gate_reputation.first_verified_at must be RFC3339",
+		},
+		{
+			name: "reputation last before first",
+			edit: func(registry *Registry, root string) {
+				registry.Examples[0].GateReputation = &GateReputationInput{
+					ReproducibleRuns:         3,
+					FirstVerifiedAt:          "2025-07-01T00:00:00Z",
+					LastVerifiedAt:           "2025-01-01T00:00:00Z",
+					IndependentConfirmations: []string{"Independent Artifact Review Lab"},
+				}
+			},
+			want: "gate_reputation.last_verified_at must not be before first_verified_at",
+		},
+		{
+			name: "negative reputation runs",
+			edit: func(registry *Registry, root string) {
+				registry.Examples[0].GateReputation = &GateReputationInput{
+					ReproducibleRuns:         -1,
+					FirstVerifiedAt:          "2025-01-01T00:00:00Z",
+					LastVerifiedAt:           "2025-07-01T00:00:00Z",
+					IndependentConfirmations: []string{"Independent Artifact Review Lab"},
+				}
+			},
+			want: "gate_reputation.reproducible_runs must be non-negative",
+		},
+		{
+			name: "self confirmation",
+			edit: func(registry *Registry, root string) {
+				registry.Examples[0].GateReputation = &GateReputationInput{
+					ReproducibleRuns:         3,
+					FirstVerifiedAt:          "2025-01-01T00:00:00Z",
+					LastVerifiedAt:           "2025-07-01T00:00:00Z",
+					IndependentConfirmations: []string{" example maintainers "},
+				}
+			},
+			want: "gate_reputation.independent_confirmations must not include the submitting organization",
+		},
+		{
+			name: "duplicate confirmation",
+			edit: func(registry *Registry, root string) {
+				registry.Examples[0].GateReputation = &GateReputationInput{
+					ReproducibleRuns: 3,
+					FirstVerifiedAt:  "2025-01-01T00:00:00Z",
+					LastVerifiedAt:   "2025-07-01T00:00:00Z",
+					IndependentConfirmations: []string{
+						"Independent Artifact Review Lab",
+						" independent artifact review lab ",
+					},
+				}
+			},
+			want: "duplicate gate_reputation.independent_confirmations entry",
+		},
+		{
+			name: "private marker in confirmation",
+			edit: func(registry *Registry, root string) {
+				registry.Examples[0].GateReputation = &GateReputationInput{
+					ReproducibleRuns:         3,
+					FirstVerifiedAt:          "2025-01-01T00:00:00Z",
+					LastVerifiedAt:           "2025-07-01T00:00:00Z",
+					IndependentConfirmations: []string{"token=not-public"},
+				}
+			},
+			want: "metadata contains private marker token=",
 		},
 	}
 
