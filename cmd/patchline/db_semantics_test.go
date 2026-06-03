@@ -23,6 +23,9 @@ func TestDBSemanticsCommandWritesVersionedReport(t *testing.T) {
 	if report.Summary.HighRisk != 1 || len(report.Statements) != 1 {
 		t.Fatalf("unexpected summary: %#v", report.Summary)
 	}
+	if report.Summary.LockSimulations != 1 || report.Statements[0].Lock.Mode == "" {
+		t.Fatalf("expected lock simulation in report: summary=%#v statement=%#v", report.Summary, report.Statements[0])
+	}
 	if !mainDBSemanticsHasRule(report, "postgres.pre11_table_rewrite_default") {
 		t.Fatalf("expected postgres pre-11 rewrite rule, got %#v", report.Statements)
 	}

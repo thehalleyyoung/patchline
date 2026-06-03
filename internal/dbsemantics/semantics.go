@@ -45,6 +45,7 @@ type Profile struct {
 	AsyncMutations         bool       `json:"async_mutations"`
 	TimeTravelRollback     bool       `json:"time_travel_rollback"`
 	PartitionAwareDDL      bool       `json:"partition_aware_ddl"`
+	SupportedLockModes     []string   `json:"supported_lock_modes"`
 	RepresentativeVersions []string   `json:"representative_versions"`
 	Evidence               []Evidence `json:"evidence"`
 }
@@ -74,6 +75,7 @@ type StatementSemantics struct {
 	Rules       []RuleFinding   `json:"rules"`
 	Obligations []string        `json:"obligations,omitempty"`
 	EngineFacts EngineFactSlice `json:"engine_facts"`
+	Lock        LockSimulation  `json:"lock_simulation"`
 }
 
 type RuleFinding struct {
@@ -97,7 +99,40 @@ type Summary struct {
 	LowRisk              int      `json:"low_risk"`
 	VersionSpecificRules int      `json:"version_specific_rules"`
 	ProofObligations     int      `json:"proof_obligations"`
+	LockSimulations      int      `json:"lock_simulations"`
+	ReaderBlockingLocks  int      `json:"reader_blocking_locks"`
+	WriterBlockingLocks  int      `json:"writer_blocking_locks"`
+	DDLBlockingLocks     int      `json:"ddl_blocking_locks"`
 	Tables               []string `json:"tables"`
+}
+
+type LockSimulation struct {
+	Engine             Engine             `json:"engine"`
+	Mode               string             `json:"mode"`
+	Scope              string             `json:"scope"`
+	DurationClass      string             `json:"duration_class"`
+	BlocksReaders      bool               `json:"blocks_readers"`
+	BlocksWriters      bool               `json:"blocks_writers"`
+	BlocksDDL          bool               `json:"blocks_ddl"`
+	Online             bool               `json:"online"`
+	PhaseNotes         []string           `json:"phase_notes"`
+	Conflicts          []LockConflict     `json:"conflicts"`
+	DocumentedBehavior []Evidence         `json:"documented_behavior"`
+	ContainerSmoke     ContainerSmokeTest `json:"container_smoke_test"`
+}
+
+type LockConflict struct {
+	Workload string `json:"workload"`
+	Blocked  bool   `json:"blocked"`
+	Reason   string `json:"reason"`
+}
+
+type ContainerSmokeTest struct {
+	ID          string `json:"id"`
+	Image       string `json:"image"`
+	Command     string `json:"command"`
+	Observation string `json:"observation"`
+	Status      string `json:"status"`
 }
 
 func SupportedEngines() []Engine {
@@ -146,6 +181,18 @@ func Evaluate(engine Engine, version, source string, content []byte) (Report, er
 		default:
 			report.Summary.LowRisk++
 		}
+		if statement.Lock.Mode != "" {
+			report.Summary.LockSimulations++
+			if statement.Lock.BlocksReaders {
+				report.Summary.ReaderBlockingLocks++
+			}
+			if statement.Lock.BlocksWriters {
+				report.Summary.WriterBlockingLocks++
+			}
+			if statement.Lock.BlocksDDL {
+				report.Summary.DDLBlockingLocks++
+			}
+		}
 		report.Summary.VersionSpecificRules += len(statement.Rules)
 		report.Summary.ProofObligations += len(statement.Obligations)
 	}
@@ -188,6 +235,7 @@ func ResolveProfile(engine Engine, version string) (Profile, error) {
 		profile.PartitionAwareDDL = major >= 10
 		profile.Evidence = []Evidence{
 			{"postgres.ddl_transactions", "ordinary DDL participates in user transactions"},
+			{"postgres.explicit_locking", "table-level lock modes include ACCESS EXCLUSIVE, SHARE, and SHARE UPDATE EXCLUSIVE with documented conflict matrices"},
 			{"postgres.11.fast_defaults", "constant DEFAULT values are metadata-only from PostgreSQL 11"},
 			{"postgres.create_index_concurrently", "concurrent index builds avoid blocking writes but cannot run inside a transaction block"},
 		}
@@ -199,6 +247,7 @@ func ResolveProfile(engine Engine, version string) (Profile, error) {
 		profile.PartitionAwareDDL = true
 		profile.Evidence = []Evidence{
 			{"mysql.implicit_commit", "DDL causes implicit commits around the statement"},
+			{"mysql.metadata_locks", "DDL obtains metadata locks; online and instant algorithms shorten but do not erase metadata-lock barriers"},
 			{"mysql.8.atomic_ddl", "MySQL 8.0 records atomic DDL metadata while still implicitly committing"},
 			{"mysql.8.0.12.instant_add", "instant ADD COLUMN is available for eligible InnoDB operations from 8.0.12"},
 		}
@@ -208,6 +257,7 @@ func ResolveProfile(engine Engine, version string) (Profile, error) {
 		profile.InstantAddColumn = true
 		profile.Evidence = []Evidence{
 			{"sqlite.transactional_schema", "schema changes are transactional with the database file journal"},
+			{"sqlite.locking", "schema and write operations use database-level locks whose behavior depends on journal mode and transaction state"},
 			{"sqlite.3.35.drop_column", "DROP COLUMN exists only in SQLite 3.35 and later"},
 			{"sqlite.foreign_keys_pragma", "foreign key enforcement is connection-scoped and can be disabled"},
 		}
@@ -219,6 +269,7 @@ func ResolveProfile(engine Engine, version string) (Profile, error) {
 		profile.PartitionAwareDDL = true
 		profile.Evidence = []Evidence{
 			{"sqlserver.schema_modification_locks", "DDL can take schema modification locks even inside transactions"},
+			{"sqlserver.lock_compatibility", "schema stability and schema modification locks have documented incompatibilities with concurrent DDL and queries"},
 			{"sqlserver.online_index", "ONLINE=ON changes the lock profile for supported editions and operations"},
 			{"sqlserver.partition_switch", "partition switch operations have metadata semantics with strict constraints"},
 		}
@@ -229,6 +280,7 @@ func ResolveProfile(engine Engine, version string) (Profile, error) {
 		profile.PartitionAwareDDL = true
 		profile.Evidence = []Evidence{
 			{"oracle.ddl_implicit_commit", "DDL commits before and after execution"},
+			{"oracle.ddl_locks", "DDL obtains dictionary/table locks and enqueues that serialize incompatible object changes"},
 			{"oracle.online_redefinition", "DBMS_REDEFINITION and online clauses can reduce blocking for eligible objects"},
 			{"oracle.flashback", "flashback features are separate recovery evidence, not ordinary transactional rollback"},
 		}
@@ -238,6 +290,7 @@ func ResolveProfile(engine Engine, version string) (Profile, error) {
 		profile.PartitionAwareDDL = true
 		profile.Evidence = []Evidence{
 			{"bigquery.jobs", "DDL/DML executes as jobs over table resources"},
+			{"bigquery.table_metadata_jobs", "table DDL is modeled as a table metadata job rather than an exposed row-lock mode"},
 			{"bigquery.create_or_replace", "CREATE OR REPLACE TABLE replaces the table resource"},
 			{"bigquery.partition_pruning", "partition predicates determine scan and mutation scope"},
 		}
@@ -249,6 +302,7 @@ func ResolveProfile(engine Engine, version string) (Profile, error) {
 		profile.PartitionAwareDDL = true
 		profile.Evidence = []Evidence{
 			{"snowflake.ddl_autocommit", "DDL statements commit active transactions"},
+			{"snowflake.concurrent_transactions", "DDL uses transactional metadata changes with object-level concurrency semantics rather than exposed row-lock modes"},
 			{"snowflake.create_or_replace", "CREATE OR REPLACE swaps object identity and requires grant/dependency review"},
 			{"snowflake.time_travel", "Time Travel can recover objects within retention but is not a user-transaction rollback"},
 		}
@@ -258,10 +312,12 @@ func ResolveProfile(engine Engine, version string) (Profile, error) {
 		profile.PartitionAwareDDL = true
 		profile.Evidence = []Evidence{
 			{"clickhouse.mutations_async", "ALTER UPDATE/DELETE mutations are asynchronous background work"},
+			{"clickhouse.locks", "DDL takes metadata locks while mutations continue asynchronously through mutation queues"},
 			{"clickhouse.atomic_database", "Atomic database engine makes metadata operations safer but not row mutations transactional"},
 			{"clickhouse.partition_operations", "partition drops, replaces, and moves are metadata-heavy destructive operations"},
 		}
 	}
+	profile.SupportedLockModes = supportedLockModes(engine)
 	return profile, nil
 }
 
@@ -283,6 +339,7 @@ func evaluateStatement(index int, sql string, profile Profile) StatementSemantic
 			{"atomic_ddl", strconv.FormatBool(profile.AtomicDDL)},
 		},
 	}
+	statement.Lock = simulateLock(statement, tokens, profile)
 	if isDDL(kind) {
 		if profile.ImplicitDDLCommit {
 			statement.addRule("engine.implicit_ddl_commit", "medium", "checked", "engine version commits DDL outside caller-controlled rollback")
@@ -417,6 +474,307 @@ func applyClickHouse(statement *StatementSemantics, tokens []string, _ Profile) 
 	if contains(tokens, "drop") && contains(tokens, "partition") {
 		statement.addRule("clickhouse.drop_partition_destructive", "high", "checked", "DROP PARTITION removes a data part from the table")
 	}
+}
+
+func supportedLockModes(engine Engine) []string {
+	switch engine {
+	case EnginePostgres:
+		return []string{"ACCESS EXCLUSIVE", "SHARE", "SHARE UPDATE EXCLUSIVE"}
+	case EngineMySQL:
+		return []string{"metadata lock shared", "metadata lock exclusive", "instant metadata barrier"}
+	case EngineSQLite:
+		return []string{"schema write lock", "database reserved lock", "database exclusive lock"}
+	case EngineSQLServer:
+		return []string{"Sch-S", "Sch-M", "online index phase barrier"}
+	case EngineOracle:
+		return []string{"DDL dictionary lock", "TM enqueue", "online redefinition lock"}
+	case EngineBigQuery:
+		return []string{"table metadata job", "partition metadata job"}
+	case EngineSnowflake:
+		return []string{"transactional metadata lock", "object replacement lock"}
+	case EngineClickHouse:
+		return []string{"metadata lock", "mutation queue"}
+	default:
+		return nil
+	}
+}
+
+func simulateLock(statement StatementSemantics, tokens []string, profile Profile) LockSimulation {
+	lock := LockSimulation{
+		Engine:        profile.Engine,
+		Mode:          defaultLockMode(profile.Engine, statement.Kind),
+		Scope:         lockScope(statement),
+		DurationClass: "brief",
+		BlocksDDL:     isDDL(statement.Kind),
+		PhaseNotes:    []string{"conservative lock simulation derived from normalized SQL and engine/version profile"},
+		Conflicts: []LockConflict{
+			{Workload: "readers", Blocked: false, Reason: "ordinary reads are not assumed blocked unless documented for this mode"},
+			{Workload: "writers", Blocked: false, Reason: "ordinary writes are not assumed blocked unless documented for this mode"},
+			{Workload: "ddl", Blocked: isDDL(statement.Kind), Reason: "DDL generally conflicts with concurrent object metadata changes"},
+		},
+		DocumentedBehavior: lockEvidence(profile.Engine),
+		ContainerSmoke:     containerSmoke(profile.Engine),
+	}
+
+	switch profile.Engine {
+	case EnginePostgres:
+		applyPostgresLock(&lock, statement, tokens, profile)
+	case EngineMySQL:
+		applyMySQLLock(&lock, statement, tokens, profile)
+	case EngineSQLite:
+		applySQLiteLock(&lock, statement, tokens)
+	case EngineSQLServer:
+		applySQLServerLock(&lock, statement, tokens, profile)
+	case EngineOracle:
+		applyOracleLock(&lock, statement, tokens)
+	case EngineBigQuery:
+		applyBigQueryLock(&lock, statement, tokens)
+	case EngineSnowflake:
+		applySnowflakeLock(&lock, statement, tokens)
+	case EngineClickHouse:
+		applyClickHouseLock(&lock, statement, tokens)
+	}
+	lock.Conflicts = []LockConflict{
+		{Workload: "readers", Blocked: lock.BlocksReaders, Reason: conflictReason("readers", lock)},
+		{Workload: "writers", Blocked: lock.BlocksWriters, Reason: conflictReason("writers", lock)},
+		{Workload: "ddl", Blocked: lock.BlocksDDL, Reason: conflictReason("ddl", lock)},
+	}
+	sort.Slice(lock.DocumentedBehavior, func(i, j int) bool { return lock.DocumentedBehavior[i].Ref < lock.DocumentedBehavior[j].Ref })
+	return lock
+}
+
+func applyPostgresLock(lock *LockSimulation, statement StatementSemantics, tokens []string, profile Profile) {
+	if statement.Kind == "create" && contains(tokens, "index") {
+		if contains(tokens, "concurrently") {
+			lock.Mode = "SHARE UPDATE EXCLUSIVE"
+			lock.DurationClass = "brief-phase-barrier"
+			lock.BlocksReaders = false
+			lock.BlocksWriters = false
+			lock.BlocksDDL = true
+			lock.Online = true
+			lock.PhaseNotes = []string{
+				"CREATE INDEX CONCURRENTLY avoids the long writer-blocking SHARE lock used by plain CREATE INDEX",
+				"it still waits at documented phases and cannot run inside an explicit transaction block",
+			}
+			return
+		}
+		lock.Mode = "SHARE"
+		lock.DurationClass = "build-duration"
+		lock.BlocksReaders = false
+		lock.BlocksWriters = true
+		lock.BlocksDDL = true
+		lock.PhaseNotes = []string{"plain CREATE INDEX permits reads but blocks writes for the build"}
+		return
+	}
+	if isDDL(statement.Kind) {
+		lock.Mode = "ACCESS EXCLUSIVE"
+		lock.DurationClass = "brief"
+		lock.BlocksReaders = true
+		lock.BlocksWriters = true
+		lock.BlocksDDL = true
+		if isAddColumnWithDefault(tokens) && profile.MetadataOnlyDefaults {
+			lock.PhaseNotes = []string{"PostgreSQL 11+ keeps constant defaults metadata-only, but ALTER TABLE still takes a brief ACCESS EXCLUSIVE lock"}
+		} else {
+			lock.DurationClass = "statement-duration"
+			lock.PhaseNotes = []string{"ALTER/DROP/TRUNCATE style DDL uses ACCESS EXCLUSIVE compatibility unless a narrower documented mode applies"}
+		}
+	}
+}
+
+func applyMySQLLock(lock *LockSimulation, statement StatementSemantics, tokens []string, profile Profile) {
+	if isDDL(statement.Kind) {
+		lock.Mode = "metadata lock exclusive"
+		lock.BlocksReaders = false
+		lock.BlocksWriters = true
+		lock.BlocksDDL = true
+		lock.DurationClass = "statement-duration"
+		lock.PhaseNotes = []string{"DDL acquires metadata locks and implicitly commits around the statement"}
+	}
+	if isAddColumn(tokens) {
+		if contains(tokens, "copy") || !profile.InstantAddColumn {
+			lock.Mode = "metadata lock exclusive + table copy"
+			lock.BlocksWriters = true
+			lock.DurationClass = "copy-duration"
+			lock.PhaseNotes = []string{"COPY or pre-instant ALTER TABLE can hold metadata locks while rebuilding table storage"}
+			return
+		}
+		lock.Mode = "instant metadata barrier"
+		lock.BlocksWriters = false
+		lock.DurationClass = "brief-phase-barrier"
+		lock.Online = true
+		lock.PhaseNotes = []string{"eligible MySQL 8.0.12+ instant ADD COLUMN uses a brief metadata-lock barrier rather than a copy-duration writer block"}
+	}
+}
+
+func applySQLiteLock(lock *LockSimulation, statement StatementSemantics, tokens []string) {
+	if isDDL(statement.Kind) || contains(tokens, "pragma") {
+		lock.Mode = "schema write lock"
+		lock.BlocksReaders = true
+		lock.BlocksWriters = true
+		lock.BlocksDDL = true
+		lock.DurationClass = "transaction-duration"
+		lock.PhaseNotes = []string{"schema-changing statements serialize through SQLite database/schema locks; WAL mode can change reader behavior but not schema serialization"}
+	}
+}
+
+func applySQLServerLock(lock *LockSimulation, statement StatementSemantics, tokens []string, profile Profile) {
+	if statement.Kind == "create" && contains(tokens, "index") && contains(tokens, "online") && contains(tokens, "on") && profile.OnlineDDL {
+		lock.Mode = "online index phase barrier"
+		lock.BlocksReaders = false
+		lock.BlocksWriters = false
+		lock.BlocksDDL = true
+		lock.DurationClass = "brief-phase-barrier"
+		lock.Online = true
+		lock.PhaseNotes = []string{"ONLINE=ON reduces blocking during the main build but still needs schema-modification barriers at phase boundaries"}
+		return
+	}
+	if isDDL(statement.Kind) {
+		lock.Mode = "Sch-M"
+		lock.BlocksReaders = true
+		lock.BlocksWriters = true
+		lock.BlocksDDL = true
+		lock.DurationClass = "statement-duration"
+		lock.PhaseNotes = []string{"offline DDL and index operations take schema-modification locks incompatible with queries and writes"}
+	}
+}
+
+func applyOracleLock(lock *LockSimulation, statement StatementSemantics, tokens []string) {
+	if isDDL(statement.Kind) {
+		lock.Mode = "DDL dictionary lock"
+		lock.BlocksReaders = false
+		lock.BlocksWriters = true
+		lock.BlocksDDL = true
+		lock.DurationClass = "statement-duration"
+		lock.PhaseNotes = []string{"Oracle DDL auto-commits and serializes incompatible object changes through dictionary/table locks"}
+	}
+	if contains(tokens, "online") {
+		lock.Mode = "online redefinition lock"
+		lock.BlocksWriters = false
+		lock.DurationClass = "brief-phase-barrier"
+		lock.Online = true
+		lock.PhaseNotes = []string{"online clauses reduce writer blocking for eligible operations but still require metadata synchronization"}
+	}
+}
+
+func applyBigQueryLock(lock *LockSimulation, statement StatementSemantics, tokens []string) {
+	if isDDL(statement.Kind) || isCreateOrReplaceTable(tokens) {
+		lock.Mode = "table metadata job"
+		lock.BlocksReaders = false
+		lock.BlocksWriters = false
+		lock.BlocksDDL = true
+		lock.DurationClass = "job-duration"
+		lock.PhaseNotes = []string{"BigQuery exposes table DDL as metadata jobs; readers use snapshot semantics while incompatible table metadata changes serialize"}
+	}
+}
+
+func applySnowflakeLock(lock *LockSimulation, statement StatementSemantics, tokens []string) {
+	if isDDL(statement.Kind) || isCreateOrReplaceTable(tokens) {
+		lock.Mode = "transactional metadata lock"
+		lock.BlocksReaders = false
+		lock.BlocksWriters = isCreateOrReplaceTable(tokens)
+		lock.BlocksDDL = true
+		lock.DurationClass = "statement-duration"
+		lock.PhaseNotes = []string{"Snowflake DDL changes transactional metadata; readers see consistent versions while object replacement requires dependency and grant review"}
+		if isCreateOrReplaceTable(tokens) {
+			lock.Mode = "object replacement lock"
+		}
+	}
+}
+
+func applyClickHouseLock(lock *LockSimulation, statement StatementSemantics, tokens []string) {
+	if isDDL(statement.Kind) {
+		lock.Mode = "metadata lock"
+		lock.BlocksReaders = false
+		lock.BlocksWriters = false
+		lock.BlocksDDL = true
+		lock.DurationClass = "brief"
+		lock.PhaseNotes = []string{"ClickHouse DDL takes metadata locks; row mutations may continue asynchronously after the metadata phase"}
+	}
+	if statement.Kind == "alter" && (contains(tokens, "delete") || contains(tokens, "update")) {
+		lock.Mode = "metadata lock + mutation queue"
+		lock.DurationClass = "async-mutation"
+		lock.PhaseNotes = []string{"ALTER UPDATE/DELETE enqueues asynchronous mutations after a metadata lock, so completion must be monitored in system.mutations"}
+	}
+}
+
+func defaultLockMode(engine Engine, kind string) string {
+	if !isDDL(kind) {
+		return "statement-level data locks"
+	}
+	modes := supportedLockModes(engine)
+	if len(modes) == 0 {
+		return "unknown"
+	}
+	return modes[0]
+}
+
+func lockScope(statement StatementSemantics) string {
+	if statement.Table == "" {
+		return "statement"
+	}
+	return "table:" + statement.Table
+}
+
+func lockEvidence(engine Engine) []Evidence {
+	switch engine {
+	case EnginePostgres:
+		return []Evidence{
+			{"postgres.explicit_locking", "lock conflict matrix for ACCESS EXCLUSIVE, SHARE, and SHARE UPDATE EXCLUSIVE"},
+			{"postgres.create_index_concurrently", "concurrent index builds use narrower lock phases than plain CREATE INDEX"},
+		}
+	case EngineMySQL:
+		return []Evidence{
+			{"mysql.metadata_locks", "metadata locks protect table definitions during DDL"},
+			{"mysql.8.0.12.instant_add", "instant ADD COLUMN changes lock duration and copy behavior for eligible operations"},
+		}
+	case EngineSQLite:
+		return []Evidence{{"sqlite.locking", "schema and write transactions serialize through database locks"}}
+	case EngineSQLServer:
+		return []Evidence{
+			{"sqlserver.lock_compatibility", "schema stability and schema modification compatibility rules"},
+			{"sqlserver.online_index", "online index operations reduce but do not eliminate blocking phases"},
+		}
+	case EngineOracle:
+		return []Evidence{
+			{"oracle.ddl_locks", "dictionary locks and DDL enqueues serialize incompatible object changes"},
+			{"oracle.online_redefinition", "online redefinition reduces blocking for eligible changes"},
+		}
+	case EngineBigQuery:
+		return []Evidence{{"bigquery.table_metadata_jobs", "table DDL runs as metadata jobs with snapshot readers"}}
+	case EngineSnowflake:
+		return []Evidence{{"snowflake.concurrent_transactions", "transactional metadata provides object-level concurrency semantics"}}
+	case EngineClickHouse:
+		return []Evidence{
+			{"clickhouse.locks", "metadata locks guard DDL"},
+			{"clickhouse.mutations_async", "row mutations run asynchronously after metadata changes"},
+		}
+	default:
+		return nil
+	}
+}
+
+func containerSmoke(engine Engine) ContainerSmokeTest {
+	id := "lock-mode-smoke-" + string(engine)
+	return ContainerSmokeTest{
+		ID:          id,
+		Image:       "golang:1.22",
+		Command:     "go test ./internal/dbsemantics -run TestLockModeSimulator",
+		Observation: "containerized Patchline smoke reruns the engine fixture and asserts documented lock conflicts",
+		Status:      "planned-or-passed-by-gate",
+	}
+}
+
+func conflictReason(workload string, lock LockSimulation) string {
+	if workload == "ddl" && lock.BlocksDDL {
+		return lock.Mode + " serializes incompatible metadata changes"
+	}
+	if workload == "writers" && lock.BlocksWriters {
+		return lock.Mode + " conflicts with writes for " + lock.DurationClass
+	}
+	if workload == "readers" && lock.BlocksReaders {
+		return lock.Mode + " conflicts with readers for " + lock.DurationClass
+	}
+	return lock.Mode + " does not block " + workload + " in the modeled phase"
 }
 
 func (s *StatementSemantics) addRule(id, severity, verdict, evidence string) {

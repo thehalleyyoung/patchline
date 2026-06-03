@@ -50,6 +50,13 @@ func dbSemanticsCommand(args []string) error {
 	)
 	for _, statement := range report.Statements {
 		fmt.Printf("  [%d] %s table=%s risk=%s rules=%d\n", statement.Index, statement.Kind, nonEmpty(statement.Table, "<unknown>"), statement.Risk, len(statement.Rules))
+		fmt.Printf("      lock mode=%s duration=%s readers_blocked=%t writers_blocked=%t ddl_blocked=%t\n",
+			statement.Lock.Mode,
+			statement.Lock.DurationClass,
+			statement.Lock.BlocksReaders,
+			statement.Lock.BlocksWriters,
+			statement.Lock.BlocksDDL,
+		)
 		for _, rule := range statement.Rules {
 			fmt.Printf("      - %s %s: %s\n", rule.Severity, rule.ID, rule.Evidence)
 		}

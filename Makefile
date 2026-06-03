@@ -1597,6 +1597,10 @@ git-history-streaming-gate:
 multi-engine-matrix-gate:
 	bash scripts/multi-engine-matrix-gate.sh
 
+.PHONY: lock-mode-simulator-gate
+lock-mode-simulator-gate:
+	bash scripts/lock-mode-simulator-gate.sh
+
 polyglot-orm-frontend-gate:
 	bash scripts/polyglot-orm-frontend-gate.sh
 

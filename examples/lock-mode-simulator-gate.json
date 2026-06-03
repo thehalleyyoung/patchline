@@ -1,0 +1,65 @@
+{
+  "version": "patchline.lock-mode-simulator-gate/v1",
+  "claim": "Patchline simulates documented lock modes for every supported database engine, attaches evidence references to each modeled conflict, and ships a containerized smoke-test command that reruns the engine fixture checks in a clean Go container. The default gate exercises the real CLI for Postgres, MySQL, SQLite, SQL Server, Oracle, BigQuery, Snowflake, and ClickHouse; when PATCHLINE_RUN_CONTAINERS=1 and Docker or Podman is available, it repeats the focused Go lock-mode tests inside golang:1.22.",
+  "minimum_engines": 8,
+  "container_image": "golang:1.22",
+  "container_command": "go test ./internal/dbsemantics -run TestLockModeSimulator -count=1",
+  "cases": [
+    {
+      "id": "postgres-concurrent-index",
+      "engine": "postgres",
+      "version": "16",
+      "sql": "CREATE INDEX CONCURRENTLY idx_accounts_status ON accounts(status);",
+      "expect": {"mode": "SHARE UPDATE EXCLUSIVE", "duration_class": "brief-phase-barrier", "blocks_readers": false, "blocks_writers": false, "blocks_ddl": true, "online": true}
+    },
+    {
+      "id": "mysql-instant-add-column",
+      "engine": "mysql",
+      "version": "8.0.34",
+      "sql": "ALTER TABLE accounts ADD COLUMN status varchar(20) DEFAULT 'active';",
+      "expect": {"mode": "instant metadata barrier", "duration_class": "brief-phase-barrier", "blocks_readers": false, "blocks_writers": false, "blocks_ddl": true, "online": true}
+    },
+    {
+      "id": "sqlite-schema-write",
+      "engine": "sqlite",
+      "version": "3.45.1",
+      "sql": "ALTER TABLE accounts ADD COLUMN status text;",
+      "expect": {"mode": "schema write lock", "duration_class": "transaction-duration", "blocks_readers": true, "blocks_writers": true, "blocks_ddl": true, "online": false}
+    },
+    {
+      "id": "sqlserver-online-index",
+      "engine": "sqlserver",
+      "version": "2022",
+      "sql": "CREATE INDEX idx_accounts_status ON accounts(status) WITH (ONLINE=ON);",
+      "expect": {"mode": "online index phase barrier", "duration_class": "brief-phase-barrier", "blocks_readers": false, "blocks_writers": false, "blocks_ddl": true, "online": true}
+    },
+    {
+      "id": "oracle-online-move",
+      "engine": "oracle",
+      "version": "23",
+      "sql": "ALTER TABLE accounts MOVE ONLINE;",
+      "expect": {"mode": "online redefinition lock", "duration_class": "brief-phase-barrier", "blocks_readers": false, "blocks_writers": false, "blocks_ddl": true, "online": true}
+    },
+    {
+      "id": "bigquery-table-metadata-job",
+      "engine": "bigquery",
+      "version": "2024.2",
+      "sql": "CREATE OR REPLACE TABLE analytics.daily AS SELECT * FROM analytics.stage;",
+      "expect": {"mode": "table metadata job", "duration_class": "job-duration", "blocks_readers": false, "blocks_writers": false, "blocks_ddl": true, "online": false}
+    },
+    {
+      "id": "snowflake-object-replacement",
+      "engine": "snowflake",
+      "version": "8.20",
+      "sql": "CREATE OR REPLACE TABLE analytics.daily AS SELECT * FROM analytics.stage;",
+      "expect": {"mode": "object replacement lock", "duration_class": "statement-duration", "blocks_readers": false, "blocks_writers": true, "blocks_ddl": true, "online": false}
+    },
+    {
+      "id": "clickhouse-async-mutation",
+      "engine": "clickhouse",
+      "version": "24.1",
+      "sql": "ALTER TABLE events DELETE WHERE created_at < now() - interval 30 day;",
+      "expect": {"mode": "metadata lock + mutation queue", "duration_class": "async-mutation", "blocks_readers": false, "blocks_writers": false, "blocks_ddl": true, "online": false}
+    }
+  ]
+}

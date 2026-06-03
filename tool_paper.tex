@@ -76,7 +76,7 @@ Critically,
 every capability in \tool{} is backed by a reproducible \emph{gate}: a script that proves the
 capability against real, pinned public code and fails loudly on drift. \tool{} currently ships more
 than 600 such gates over 560 documented capabilities, spanning relational migrations across nine
-ecosystems, versioned database semantics across eight production engines, five NoSQL engines,
+ecosystems, versioned database semantics and lock-mode simulations across eight production engines, five NoSQL engines,
 four data-pipeline frameworks, protobuf/Avro schema compatibility,
 infrastructure/data ordering, a research-grade evaluation methodology that includes blinded
 false-positive adjudication, seeded false-negative recall, ablations, standardized effect sizes, and
@@ -131,7 +131,7 @@ ranks the risks, and prints the next commands that can run immediately.
   \item A \textbf{deterministic, provenance-carrying fact layer} for data-change risk that is derived
   from real repositories without pre-authored schemas (Section~\ref{sec:facts}).
   \item A \textbf{breadth of analysis} that unifies relational migrations (nine ecosystems),
-  versioned database semantics (eight engines), NoSQL changes (five engines), data pipelines
+  versioned database semantics and lock-mode conflict simulations (eight engines), NoSQL changes (five engines), data pipelines
   (four frameworks), protobuf/Avro schema compatibility, and
   infrastructure/data ordering under one fact model (Section~\ref{sec:breadth}).
   \item A \textbf{bounded-intervention-with-deterministic-rejection} model that quarantines generated
@@ -265,7 +265,7 @@ aggregate bound to the manifest and salted split commitments. & local \code{spli
 them as untrusted artifacts. & \code{proposal.patch}, \code{patchline-proposals/} \\
 \code{compare} & Deterministically re-analyze proposed changes; accept or reject by evidence delta. &
 \code{compare.json} \\
-\code{deep} & Optional deeper semantic passes (dataflow, lock duration, tenant boundaries). & deep
+\code{deep} & Optional deeper semantic passes (dataflow, lock duration, lock modes, tenant boundaries). & deep
 analysis reports \\
 \bottomrule
 \end{longtable}
@@ -380,7 +380,13 @@ concurrent or online index behavior, instant or metadata-only column addition, \
 replacement, Snowflake Time Travel recovery, partition-aware DDL, and ClickHouse asynchronous
 mutations. This matters because the same migration can be metadata-only on PostgreSQL~15 but a table
 rewrite on PostgreSQL~10, instant on MySQL~8.0.34 but copy-style on MySQL~5.7, or synchronous-looking
-SQL on ClickHouse while actually launching background mutations. The new
+SQL on ClickHouse while actually launching background mutations. The same surface now emits a
+statement-level lock-mode simulation: the report names the modeled mode, scope, duration class,
+reader/writer/DDL conflicts, phase notes, documented-behavior evidence, and a containerized smoke-test
+command. The \code{lock-mode-simulator-gate} exercises the real CLI across all eight engines, proving
+that PostgreSQL concurrent indexes, MySQL instant column adds, SQLite schema writes, SQL Server online
+index barriers, Oracle online DDL, BigQuery metadata jobs, Snowflake object replacement, and ClickHouse
+mutation queues do not collapse into one misleading ``database lock'' story. The new
 \code{db-version-semantics-gate} exercises one checked SQL fixture across all eight engines plus an
 unsupported-engine negative control.
 
@@ -450,7 +456,7 @@ the real repository each is proven against.
 \textbf{Surface} & \textbf{Fact kinds} & \textbf{Real-repo proof} \\
 \midrule
 Relational migrations & \code{schema\_evolution}, \code{migration\_root} & \code{laravel/laravel}, \code{lobsters/lobsters} \\
-Database engine semantics & \code{db\_semantics}, \code{engine\_profile} & 8-engine versioned fixture + unsupported-engine negative control \\
+Database engine semantics & \code{db\_semantics}, \code{engine\_profile}, \code{lock\_simulation} & 8-engine versioned fixture + lock-mode simulator + unsupported-engine negative control \\
 NoSQL changes & \code{nosql\_change} & \code{laaksomavrick/twitter-go} \\
 Data pipelines & \code{data\_pipeline\_change} & \code{harrydevforlife/building-lakehouse} \\
 Schema compatibility & \code{schema\_compatibility} & \code{apache/avro} \\
@@ -913,6 +919,7 @@ Manual-review/certificate escrow & no & no & yes \\
 Multi-service rollback bounds & no & no & yes \\
 Expected-loss remediation choice & no & no & yes \\
 Patch-series intermediate invariant proof & no & no & yes \\
+Versioned lock-mode conflicts & no & partial & yes \\
 Deterministic, byte-stable artifacts & no & partial & yes \\
 Real-repo proof gates & no & no & yes \\
 \bottomrule
@@ -951,6 +958,7 @@ owner-routed rollback playbooks for broad writes & \gate{remediation-playbook-ga
 10 sequenced / 3 unordered data jobs & \code{helm/charts} \\
 dozens of schema-evolution hazards & \code{apache/avro} \\
 6/6 ecosystems fuzz-clean (0 crashes) & parser dashboard corpus \\
+8 engine-specific lock-mode simulations with documented evidence and container-smoke fixtures & \gate{lock-mode-simulator-gate} \\
 600+ gates / 560+ docs / 540+ examples & repository inventory \\
 \bottomrule
 \end{tabular}
@@ -1601,7 +1609,8 @@ theme to convey the breadth of what is proven against real, pinned public code. 
 \endhead
 Source breadth & \code{mercurial-fossil-source-gate}, \code{monorepo-boundary-gate} \\
 Migration breadth & \code{multi-ecosystem-migration-gate}, \code{nosql-change-gate},
-\code{data-pipeline-gate}, \code{schema-compat-gate}, \code{infra-ordering-gate} \\
+\code{data-pipeline-gate}, \code{schema-compat-gate}, \code{infra-ordering-gate},
+\code{lock-mode-simulator-gate} \\
 Intervention safety & \code{generated-code-quarantine-gate}, \code{rejected-generated-gate},
 \code{intervention-regression-archive-gate}, \code{expand-contract-templates-gate},
 \code{staged-backfill-planner-gate}, \code{canary-validation-gate}, \code{repair-risk-escrow-gate},

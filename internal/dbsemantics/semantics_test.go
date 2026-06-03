@@ -91,6 +91,112 @@ func TestCloudAndAnalyticalEnginesHaveDistinctSemantics(t *testing.T) {
 	}
 }
 
+func TestLockModeSimulatorCoversEverySupportedEngine(t *testing.T) {
+	cases := map[Engine]string{
+		EnginePostgres:   "CREATE INDEX idx_accounts_status ON accounts(status);",
+		EngineMySQL:      "ALTER TABLE accounts ADD COLUMN status varchar(20) DEFAULT 'active';",
+		EngineSQLite:     "ALTER TABLE accounts ADD COLUMN status text;",
+		EngineSQLServer:  "CREATE INDEX idx_accounts_status ON accounts(status);",
+		EngineOracle:     "ALTER TABLE accounts MODIFY status NOT NULL;",
+		EngineBigQuery:   "CREATE OR REPLACE TABLE analytics.daily AS SELECT * FROM analytics.stage;",
+		EngineSnowflake:  "CREATE OR REPLACE TABLE analytics.daily AS SELECT * FROM analytics.stage;",
+		EngineClickHouse: "ALTER TABLE events DELETE WHERE created_at < now() - interval 30 day;",
+	}
+	for _, engine := range SupportedEngines() {
+		report, err := Evaluate(engine, "", string(engine)+".sql", []byte(cases[engine]))
+		if err != nil {
+			t.Fatalf("%s evaluate failed: %v", engine, err)
+		}
+		if len(report.Profile.SupportedLockModes) == 0 {
+			t.Fatalf("%s missing profile lock modes", engine)
+		}
+		if report.Summary.LockSimulations != 1 || report.Summary.DDLBlockingLocks != 1 {
+			t.Fatalf("%s missing summary lock simulation: %#v", engine, report.Summary)
+		}
+		lock := report.Statements[0].Lock
+		if lock.Mode == "" || lock.Scope == "" || lock.DurationClass == "" {
+			t.Fatalf("%s missing lock simulation fields: %#v", engine, lock)
+		}
+		if len(lock.DocumentedBehavior) == 0 {
+			t.Fatalf("%s missing documented behavior evidence: %#v", engine, lock)
+		}
+		if lock.ContainerSmoke.ID == "" || lock.ContainerSmoke.Image == "" || lock.ContainerSmoke.Command == "" {
+			t.Fatalf("%s missing container smoke fixture: %#v", engine, lock.ContainerSmoke)
+		}
+		if len(lock.Conflicts) != 3 {
+			t.Fatalf("%s should report reader/writer/ddl conflicts: %#v", engine, lock.Conflicts)
+		}
+	}
+}
+
+func TestLockModeSimulatorDistinguishesPostgresConcurrentIndex(t *testing.T) {
+	plain, err := Evaluate(EnginePostgres, "16", "plain.sql", []byte("CREATE INDEX idx_accounts_status ON accounts(status);"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	concurrent, err := Evaluate(EnginePostgres, "16", "concurrent.sql", []byte("CREATE INDEX CONCURRENTLY idx_accounts_status ON accounts(status);"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	plainLock := plain.Statements[0].Lock
+	concurrentLock := concurrent.Statements[0].Lock
+	if plainLock.Mode != "SHARE" || !plainLock.BlocksWriters || plainLock.Online {
+		t.Fatalf("plain index lock should block writers in SHARE mode: %#v", plainLock)
+	}
+	if concurrentLock.Mode != "SHARE UPDATE EXCLUSIVE" || concurrentLock.BlocksWriters || !concurrentLock.Online {
+		t.Fatalf("concurrent index lock should avoid writer blocking with narrower mode: %#v", concurrentLock)
+	}
+	if plainLock.DurationClass == concurrentLock.DurationClass {
+		t.Fatalf("plain and concurrent lock duration classes should differ: %#v %#v", plainLock, concurrentLock)
+	}
+}
+
+func TestLockModeSimulatorTracksMySQLInstantVersusCopy(t *testing.T) {
+	sql := []byte("ALTER TABLE accounts ADD COLUMN status varchar(20) DEFAULT 'active';")
+	oldReport, err := Evaluate(EngineMySQL, "5.7", "mysql57.sql", sql)
+	if err != nil {
+		t.Fatal(err)
+	}
+	newReport, err := Evaluate(EngineMySQL, "8.0.34", "mysql80.sql", sql)
+	if err != nil {
+		t.Fatal(err)
+	}
+	oldLock := oldReport.Statements[0].Lock
+	newLock := newReport.Statements[0].Lock
+	if oldLock.DurationClass != "copy-duration" || !oldLock.BlocksWriters {
+		t.Fatalf("pre-instant MySQL alter should model writer-blocking copy: %#v", oldLock)
+	}
+	if newLock.DurationClass != "brief-phase-barrier" || newLock.BlocksWriters || !newLock.Online {
+		t.Fatalf("instant MySQL alter should model a brief online metadata barrier: %#v", newLock)
+	}
+}
+
+func TestLockModeSimulatorSQLServerOnlineIndexAndClickHouseMutation(t *testing.T) {
+	offline, err := Evaluate(EngineSQLServer, "2022", "offline.sql", []byte("CREATE INDEX idx_accounts_status ON accounts(status);"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	online, err := Evaluate(EngineSQLServer, "2022", "online.sql", []byte("CREATE INDEX idx_accounts_status ON accounts(status) WITH (ONLINE=ON);"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if offline.Statements[0].Lock.Mode != "Sch-M" || !offline.Statements[0].Lock.BlocksReaders || !offline.Statements[0].Lock.BlocksWriters {
+		t.Fatalf("offline SQL Server index should use blocking Sch-M: %#v", offline.Statements[0].Lock)
+	}
+	if online.Statements[0].Lock.Mode != "online index phase barrier" || online.Statements[0].Lock.BlocksReaders || online.Statements[0].Lock.BlocksWriters || !online.Statements[0].Lock.Online {
+		t.Fatalf("online SQL Server index should reduce reader/writer blocking: %#v", online.Statements[0].Lock)
+	}
+
+	clickhouse, err := Evaluate(EngineClickHouse, "24.1", "mutation.sql", []byte("ALTER TABLE events DELETE WHERE created_at < now() - interval 30 day;"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	lock := clickhouse.Statements[0].Lock
+	if lock.Mode != "metadata lock + mutation queue" || lock.DurationClass != "async-mutation" || !lock.BlocksDDL {
+		t.Fatalf("ClickHouse mutation should model metadata lock plus async queue: %#v", lock)
+	}
+}
+
 func TestRejectsUnsupportedEngineAndBadVersion(t *testing.T) {
 	if _, err := ResolveProfile(Engine("db2"), "11"); err == nil {
 		t.Fatal("expected unsupported engine error")

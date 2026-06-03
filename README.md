@@ -147,6 +147,8 @@ Run `artifact-benchmark federated-split`, `federated-run`, and `federated-verify
 
 Run `golden-fixture generate --github owner/repo --ref <sha> --subpath <path> --out <dir>` to turn a real-repo slice into a tiny deterministic Go test without vendoring the full repository; see [docs/golden-fixtures.md](docs/golden-fixtures.md).
 
+Run `db-semantics --engine <engine> --sql <sql-or-path>` to get versioned DDL semantics plus lock-mode simulator conflicts; reproduce all engines with `make lock-mode-simulator-gate`.
+
 <details>
 <summary><strong>Full verification catalog</strong> — 600+ reproducible <code>make &lt;name&gt;-gate</code> checks, each with a positive proof and a negative control on real public-repo data (click to expand)</summary>
 
