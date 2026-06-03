@@ -7,8 +7,10 @@ import (
 	"bytes"
 	"compress/gzip"
 	"context"
+	"encoding/hex"
 	"encoding/json"
 	"io"
+	"math/rand"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -625,6 +627,149 @@ func TestFetchArchiveURLUsesContentAddressedCache(t *testing.T) {
 	}
 	if _, err := os.Stat(filepath.Join(filepath.FromSlash(second.Source.ScannedRoot), "db/migrate/001.sql")); err != nil {
 		t.Fatalf("expected cached archive extraction: %v", err)
+	}
+}
+
+func TestFetchArchiveURLChaosRecoversFromRandomCacheDeletion(t *testing.T) {
+	archive := tarGzForTest(t, map[string]string{"repo-main/db/migrate/001.sql": "create table accounts(id int);"})
+	var requests int32
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		atomic.AddInt32(&requests, 1)
+		w.Header().Set("Content-Type", "application/gzip")
+		_, _ = w.Write(archive)
+	}))
+	defer server.Close()
+
+	cacheDir := filepath.Join(t.TempDir(), "cache")
+	first, err := Fetch(context.Background(), FetchOptions{Input: server.URL + "/repo.tar.gz", OutDir: filepath.Join(t.TempDir(), "warm"), DownloadDir: cacheDir})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if first.Source.CacheHit {
+		t.Fatalf("initial fetch must be a cache miss: %#v", first.Source)
+	}
+	if got := atomic.LoadInt32(&requests); got != 1 {
+		t.Fatalf("initial warm should issue one request, got %d", got)
+	}
+	cacheEntryPath := downloadCacheEntryPath(cacheDir, first.Source.CacheKey)
+	archivePath := filepath.FromSlash(first.Source.CachePath)
+	if first.Source.ArchiveHash == "" || archivePath == "" {
+		t.Fatalf("expected cache metadata to be recorded: %#v", first.Source)
+	}
+
+	type chaosOp struct {
+		name          string
+		mutate        func(t *testing.T)
+		wantDownloads int32
+		wantCacheHit  bool
+	}
+	ops := []chaosOp{
+		{name: "leave-cache-intact", wantCacheHit: true},
+		{name: "remove-cache-metadata", wantDownloads: 1, mutate: func(t *testing.T) {
+			t.Helper()
+			if err := os.Remove(cacheEntryPath); err != nil {
+				t.Fatal(err)
+			}
+		}},
+		{name: "remove-archive-bytes", wantDownloads: 1, mutate: func(t *testing.T) {
+			t.Helper()
+			if err := os.Remove(archivePath); err != nil {
+				t.Fatal(err)
+			}
+		}},
+		{name: "remove-metadata-and-archive", wantDownloads: 1, mutate: func(t *testing.T) {
+			t.Helper()
+			if err := os.Remove(cacheEntryPath); err != nil {
+				t.Fatal(err)
+			}
+			if err := os.Remove(archivePath); err != nil {
+				t.Fatal(err)
+			}
+		}},
+		{name: "leave-cache-intact-after-rebuild", wantCacheHit: true},
+	}
+	rng := rand.New(rand.NewSource(780))
+	middle := append([]chaosOp(nil), ops[1:4]...)
+	rng.Shuffle(len(middle), func(i, j int) { middle[i], middle[j] = middle[j], middle[i] })
+	ops = append([]chaosOp{ops[0]}, append(middle, ops[4])...)
+
+	for i, op := range ops {
+		t.Run(op.name, func(t *testing.T) {
+			if op.mutate != nil {
+				op.mutate(t)
+			}
+			before := atomic.LoadInt32(&requests)
+			result, err := Fetch(context.Background(), FetchOptions{
+				Input:       server.URL + "/repo.tar.gz",
+				OutDir:      filepath.Join(t.TempDir(), "fetch"),
+				DownloadDir: cacheDir,
+			})
+			if err != nil {
+				t.Fatalf("fetch after %s failed: %v", op.name, err)
+			}
+			if got := atomic.LoadInt32(&requests) - before; got != op.wantDownloads {
+				t.Fatalf("fetch after %s issued %d downloads, want %d", op.name, got, op.wantDownloads)
+			}
+			if result.Source.CacheHit != op.wantCacheHit {
+				t.Fatalf("cache hit after %s = %t, want %t: %#v", op.name, result.Source.CacheHit, op.wantCacheHit, result.Source)
+			}
+			if result.Source.ArchiveHash != first.Source.ArchiveHash {
+				t.Fatalf("archive hash drift after %s: got %s want %s", op.name, result.Source.ArchiveHash, first.Source.ArchiveHash)
+			}
+			if _, err := os.Stat(filepath.Join(filepath.FromSlash(result.Source.ScannedRoot), "db/migrate/001.sql")); err != nil {
+				t.Fatalf("expected extracted repo after %s: %v", op.name, err)
+			}
+			if _, err := os.Stat(cacheEntryPath); err != nil {
+				t.Fatalf("cache metadata was not restored after %s iteration %d: %v", op.name, i, err)
+			}
+			if _, err := os.Stat(archivePath); err != nil {
+				t.Fatalf("archive bytes were not restored after %s iteration %d: %v", op.name, i, err)
+			}
+		})
+	}
+}
+
+func TestFetchLocalVCSChaosSurvivesMissingOptionalTools(t *testing.T) {
+	t.Setenv("PATH", t.TempDir())
+
+	hgRoot := t.TempDir()
+	writeFile(t, hgRoot, "db/migrate/001.sql", "create table accounts(id int);")
+	node := make([]byte, 40)
+	for i := range node {
+		node[i] = byte(i + 1)
+	}
+	writeFile(t, hgRoot, ".hg/dirstate", string(node))
+	hgResult, err := Fetch(context.Background(), FetchOptions{Input: hgRoot, OutDir: filepath.Join(t.TempDir(), "hg"), DownloadDir: filepath.Join(t.TempDir(), "cache")})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if hgResult.Source.VCS != "mercurial" || hgResult.Source.ResolvedCommit != hex.EncodeToString(node[:20]) {
+		t.Fatalf("Mercurial fallback did not survive missing hg binary: %#v", hgResult.Source)
+	}
+
+	fossilRoot := t.TempDir()
+	writeFile(t, fossilRoot, "migrations/002.sql", "alter table users add column archived_at timestamp;")
+	writeFile(t, fossilRoot, "_FOSSIL_", "fossil checkout database stub bytes for missing-tool chaos")
+	fossilResult, err := Fetch(context.Background(), FetchOptions{Input: fossilRoot, OutDir: filepath.Join(t.TempDir(), "fossil"), DownloadDir: filepath.Join(t.TempDir(), "cache")})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if fossilResult.Source.VCS != "fossil" || len(fossilResult.Source.ResolvedCommit) != 40 {
+		t.Fatalf("Fossil fallback did not survive missing fossil binary: %#v", fossilResult.Source)
+	}
+
+	gitRoot := t.TempDir()
+	writeFile(t, gitRoot, "db/migrate/003.sql", "alter table accounts add column tier text;")
+	writeFile(t, gitRoot, ".git/config", "[core]\n\trepositoryformatversion = 0\n")
+	gitResult, err := Fetch(context.Background(), FetchOptions{Input: gitRoot, OutDir: filepath.Join(t.TempDir(), "git"), DownloadDir: filepath.Join(t.TempDir(), "cache")})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if gitResult.Source.VCS != "git" || gitResult.Source.ResolvedCommit != "" || gitResult.Source.ArchiveHash == "" {
+		t.Fatalf("Git optional-tool degradation should preserve fetch and tree hash without inventing a revision: %#v", gitResult.Source)
+	}
+	if _, err := os.Stat(filepath.Join(filepath.FromSlash(gitResult.Source.ScannedRoot), "db/migrate/003.sql")); err != nil {
+		t.Fatalf("expected local git tree to remain analyzable without git binary: %v", err)
 	}
 }
 

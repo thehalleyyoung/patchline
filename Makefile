@@ -21,6 +21,7 @@
 .PHONY: disaster-recovery-exercise-gate
 .PHONY: supply-chain-compromise-sim-gate
 .PHONY: release-channel-isolation-gate
+.PHONY: reproducibility-chaos-gate
 
 build:
 	go build -o bin/patchline ./cmd/patchline
@@ -1240,6 +1241,9 @@ resource-profiles-gate:
 
 release-channel-isolation-gate:
 	bash scripts/release-channel-isolation-gate.sh
+
+reproducibility-chaos-gate:
+	bash scripts/reproducibility-chaos-gate.sh
 
 disaster-recovery-exercise-gate:
 	bash scripts/disaster-recovery-exercise-gate.sh

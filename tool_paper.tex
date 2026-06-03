@@ -3,7 +3,7 @@
 \usepackage[utf8]{inputenc}
 \usepackage[T1]{fontenc}
 \usepackage{lmodern}
-\usepackage[margin=0.75in]{geometry}
+\usepackage[margin=0.70in]{geometry}
 \usepackage{booktabs}
 \usepackage{longtable}
 \usepackage{array}
@@ -99,8 +99,8 @@ k-thresholded aggregate metrics.
 Critically,
 every capability in \tool{} is backed by a reproducible \emph{gate}: a script that proves the
 capability against real, pinned public code and fails loudly on drift. \tool{} currently ships more
-than 625 such gates over 570 documented capabilities, now including release-channel isolation proofs for
-stable certificates, resource-adaptive profiles for laptops, CI, air-gapped servers, and public-good hosted tiers, supply-chain compromise simulations
+than 626 such gates over 571 documented capabilities, now including release-channel isolation proofs for
+stable certificates, reproducibility chaos tests for deleted caches, mirrors, and optional tool access, resource-adaptive profiles for laptops, CI, air-gapped servers, and public-good hosted tiers, supply-chain compromise simulations
 for dependency poisoning, malicious archives, and forged release metadata, plus resilient distributed-analysis,
 hardware-signing, confidential-computing, and accelerator-free learned-component verifiers for worker loss, cache corruption, partitions, threshold signatures,
 recovery, rotation, revocation, and verifiable enclave attestation before accepting a corpus run or trusted artifact; the broader gate catalog spans relational migrations across nine
@@ -358,7 +358,7 @@ deterministic reviewer artifact that pins engine versions, local runtime or emul
 where available, embedded/managed-service profiles where not, and observed profile, rule, lock,
 rollback, query-plan, runtime, replication, and partition evidence rows. &
 \code{reproducibility-report.json}, \code{.md} \\
-\code{resilient-analysis}, \code{hardware-signing}, \code{confidential-computing}, \code{accelerator-fallbacks}, \code{resource-profiles}, \code{release-channel-isolation}, \code{supply-chain simulate} & Replay distributed analysis evidence under worker
+\code{resilient-analysis}, \code{hardware-signing}, \code{confidential-computing}, \code{accelerator-fallbacks}, \code{resource-profiles}, \code{release-channel-isolation}, \code{reproducibility-chaos}, \code{supply-chain simulate} & Replay distributed analysis evidence under worker
 loss, cache corruption, deterministic leases, and recovered partitions; verify release, gate, and
 certificate artifacts against hardware attestations, thresholds, recovery shares, logs, reports, and
 key-rotation/revocation drills; bind private corpus workloads to enclave quotes, verifier reports,
@@ -366,6 +366,7 @@ key-release policy, encrypted inputs, redacted aggregates, private retained outp
 prove every learned fixture has CPU-only pinned replay and parity; verify deterministic resource budgets,
 cache policy, native-test policy, and graceful degradation for laptop, CI, offline, and hosted tiers;
 prove experimental detector output changes a naive certificate hash but not stable certificate results;
+randomly remove content-addressed cache metadata/bytes, archive mirror files, and optional VCS tools while requiring regeneration or fail-safe drift rejection;
 reject dependency poisoning, malicious archive, and forged metadata simulations. & \code{resilient-analysis.json}, \code{hardware-signing.json}, \code{confidential-computing.json}, \code{accelerator-fallbacks.json}, \code{resource-profiles.json}, \code{release-channel-isolation.json}, \code{supply-chain-sim.json}, \code{.md} \\
 \code{propose} & Generate bounded interventions (guards, tests) within an explicit budget; quarantine
 them as untrusted artifacts. & \code{proposal.patch}, \code{patchline-proposals/} \\
@@ -381,7 +382,7 @@ A cross-cutting \emph{gate layer} sits beside the pipeline. Each gate is a self-
 (a) validates a versioned example specification, (b) checks that the relevant documentation and the
 README still describe the capability, (c) runs the capability against real pinned code, (d) asserts
 machine-checkable invariants on the output, and (e) writes a \code{gate-summary.json}. The repository
-currently ships \textbf{more than 624 gates}, \textbf{more than 569 capability documents}, and \textbf{more than 600 example
+currently ships \textbf{more than 625 gates}, \textbf{more than 570 capability documents}, and \textbf{more than 600 example
 specifications}, with a single analyzer core of roughly 2{,}900 lines of Go.
 
 \paragraph{Resumability, offline operation, resilience, and release trust.} \code{repo analyze --resume} reuses existing fetch,
@@ -403,7 +404,11 @@ private retained outputs, and replay proofs must agree before a confidential run
 \code{accelerator-fallbacks} discovers every learned fixture and requires CPU-only implementation bytes,
 pinned inputs/outputs, a stable seed, two matching replays, and parity bounds before learned results
 count as broadly reproducible. The
-\code{disaster-recovery-exercise} gate closes the loop by rebuilding the public corpus, hosted docs,
+\code{reproducibility-chaos} gate complements this by using a fixed seed to delete archive-cache
+metadata, cache bytes, marketplace mirror files, and optional VCS tool access; \tool{} must reuse
+intact caches without network requests, redownload missing bytes, regenerate mirrors from trusted
+source artifacts, fall back to Mercurial/Fossil metadata when binaries are absent, and fail safe on
+source-artifact hash drift. The \code{disaster-recovery-exercise} gate closes the loop by rebuilding the public corpus, hosted docs,
 release manifest, and certificate logs, publishing each to checksum-covered mirrors, corrupting three
 primary mirrors, restoring from the first valid mirror, replaying the restored certificate log, and
 rejecting an all-mirrors-lost negative control.

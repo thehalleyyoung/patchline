@@ -5,6 +5,7 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
+	"math/rand"
 	"os"
 	"path/filepath"
 	"strings"
@@ -507,6 +508,44 @@ func TestWriteReportBuildsArchiveMirror(t *testing.T) {
 	}
 }
 
+func TestWriteReportChaosRegeneratesDeletedMirrorFiles(t *testing.T) {
+	registry, root := validRegistry(t)
+	report, err := PublishRegistry(registry, root)
+	if err != nil {
+		t.Fatal(err)
+	}
+	out := t.TempDir()
+	if err := WriteReport(out, report); err != nil {
+		t.Fatal(err)
+	}
+	assertMarketplaceMirrorRestored(t, out, report)
+
+	targets := []string{"archive-mirror.json", "marketplace.json", "marketplace.md", "index.html"}
+	for _, entry := range report.ArchiveMirror.Entries {
+		targets = append(targets, entry.MirrorPath)
+	}
+	rng := rand.New(rand.NewSource(780))
+	rng.Shuffle(len(targets), func(i, j int) { targets[i], targets[j] = targets[j], targets[i] })
+	for _, rel := range targets {
+		t.Run("delete-"+strings.ReplaceAll(rel, "/", "-"), func(t *testing.T) {
+			path := filepath.Join(out, filepath.FromSlash(rel))
+			if err := os.Remove(path); err != nil {
+				t.Fatal(err)
+			}
+			if err := WriteReport(out, report); err != nil {
+				t.Fatalf("mirror rewrite after deleting %s failed: %v", rel, err)
+			}
+			assertMarketplaceMirrorRestored(t, out, report)
+		})
+	}
+
+	writeFile(t, root, report.ArchiveMirror.Entries[0].ArtifactPath, `{"tampered":"source artifact drift"}`)
+	err = WriteReport(filepath.Join(t.TempDir(), "drift"), report)
+	if err == nil || !strings.Contains(err.Error(), "sha256 drift") {
+		t.Fatalf("expected source artifact drift to fail safe, got %v", err)
+	}
+}
+
 func TestWriteReportRejectsArchiveMirrorHashDrift(t *testing.T) {
 	registry, root := validRegistry(t)
 	report, err := PublishRegistry(registry, root)
@@ -757,6 +796,21 @@ func TestPublishRegistryRejectsInvalidExamples(t *testing.T) {
 				t.Fatalf("expected rejection containing %q, got %#v", tt.want, report.Rejected)
 			}
 		})
+	}
+}
+
+func assertMarketplaceMirrorRestored(t *testing.T, out string, report Report) {
+	t.Helper()
+	for _, rel := range []string{"marketplace.json", "marketplace.md", "index.html", "archive-mirror.json"} {
+		if stat, err := os.Stat(filepath.Join(out, rel)); err != nil || stat.Size() == 0 {
+			t.Fatalf("expected %s to be regenerated, stat=%#v err=%v", rel, stat, err)
+		}
+	}
+	for _, entry := range report.ArchiveMirror.Entries {
+		mirroredPath := filepath.Join(out, filepath.FromSlash(entry.MirrorPath))
+		if got := fileHash(t, mirroredPath); got != entry.Checksum {
+			t.Fatalf("regenerated mirror hash mismatch for %s: got %s want %s", entry.MirrorPath, got, entry.Checksum)
+		}
 	}
 }
 
