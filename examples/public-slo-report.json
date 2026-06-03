@@ -1,0 +1,223 @@
+{
+  "version": "patchline.public-slo/v1",
+  "name": "public uptime and reproducibility SLO report",
+  "claim": "Patchline publishes a public uptime and reproducibility SLO report spanning hosted documentation, release and paper artifacts, evidence-marketplace exports, and corpus APIs. Every surface has a public endpoint and status page, fresh uptime probes, rerunnable reproducibility probes, hash-backed evidence artifacts, latency and incident budgets, deterministic report hashing, and explicit negative controls for missing status pages, stale probes, broken hashes, breached uptime, missing reproducibility, missing evidence, and unreviewed incidents. This turns public-good infrastructure health into a reproducible, citable artifact rather than a marketing promise.",
+  "period": {
+    "start": "2026-06-01T00:00:00Z",
+    "end": "2026-06-03T12:00:00Z"
+  },
+  "criteria": {
+    "required_kinds": ["hosted-docs", "artifacts", "marketplace-evidence", "corpus-api"],
+    "min_surfaces": 4,
+    "min_probes_per_surface": 3,
+    "min_uptime_percent": 99,
+    "min_reproducibility_percent": 100,
+    "max_p95_latency_ms": 900,
+    "max_probe_age_hours": 96,
+    "max_incident_minutes": 30,
+    "require_public_status_url": true,
+    "require_reproducibility_probe": true,
+    "require_incident_review": true,
+    "require_evidence_hashes": true,
+    "require_reproducibility_command": true
+  },
+  "surfaces": [
+    {
+      "id": "hosted-docs",
+      "kind": "hosted-docs",
+      "display_name": "Hosted documentation",
+      "public_url": "https://docs.patchline.dev",
+      "status_url": "https://status.patchline.dev/docs",
+      "owner": "maintainers",
+      "slo": {
+        "uptime_target_percent": 99,
+        "reproducibility_target_percent": 100,
+        "max_p95_latency_ms": 900,
+        "max_incident_minutes": 30
+      },
+      "probes": [
+        {
+          "id": "hosted-docs-uptime-a",
+          "kind": "uptime",
+          "observed_at": "2026-06-03T10:00:00Z",
+          "status": "pass",
+          "latency_ms": 118,
+          "evidence_paths": ["examples/public-slo-report/evidence/docs.md"]
+        },
+        {
+          "id": "hosted-docs-uptime-b",
+          "kind": "uptime",
+          "observed_at": "2026-06-03T11:00:00Z",
+          "status": "pass",
+          "latency_ms": 167,
+          "evidence_paths": ["examples/public-slo-report/evidence/docs.md"]
+        },
+        {
+          "id": "hosted-docs-reproduce",
+          "kind": "reproducibility",
+          "observed_at": "2026-06-03T11:30:00Z",
+          "status": "pass",
+          "latency_ms": 430,
+          "command": ["make", "docs-site-gate"],
+          "artifact": {
+            "path": "examples/public-slo-report/outputs/docs-repro.json",
+            "sha256": "sha256:2e181fd78f9932a8547f9cfc415e013009badb74bed842331bb011fa488f2efa"
+          },
+          "evidence_paths": ["examples/public-slo-report/evidence/docs.md"]
+        }
+      ],
+      "evidence_paths": ["examples/public-slo-report/evidence/docs.md"]
+    },
+    {
+      "id": "release-artifacts",
+      "kind": "artifacts",
+      "display_name": "Release, paper, and certificate artifacts",
+      "public_url": "https://artifacts.patchline.dev",
+      "status_url": "https://status.patchline.dev/artifacts",
+      "owner": "release-engineering",
+      "slo": {
+        "uptime_target_percent": 99,
+        "reproducibility_target_percent": 100,
+        "max_p95_latency_ms": 900,
+        "max_incident_minutes": 30
+      },
+      "probes": [
+        {
+          "id": "release-artifacts-uptime-a",
+          "kind": "uptime",
+          "observed_at": "2026-06-03T10:00:00Z",
+          "status": "pass",
+          "latency_ms": 141,
+          "evidence_paths": ["examples/public-slo-report/evidence/artifacts.md"]
+        },
+        {
+          "id": "release-artifacts-uptime-b",
+          "kind": "uptime",
+          "observed_at": "2026-06-03T11:00:00Z",
+          "status": "pass",
+          "latency_ms": 219,
+          "evidence_paths": ["examples/public-slo-report/evidence/artifacts.md"]
+        },
+        {
+          "id": "release-artifacts-reproduce",
+          "kind": "reproducibility",
+          "observed_at": "2026-06-03T11:30:00Z",
+          "status": "pass",
+          "latency_ms": 520,
+          "command": ["make", "artifact-release-manifest-gate"],
+          "artifact": {
+            "path": "examples/public-slo-report/outputs/artifacts-repro.json",
+            "sha256": "sha256:8d4036fec7b9b8a10174753c30ee98228434e2fb57ce8ab01f56485694f6dd4a"
+          },
+          "evidence_paths": ["examples/public-slo-report/evidence/artifacts.md"]
+        }
+      ],
+      "evidence_paths": ["examples/public-slo-report/evidence/artifacts.md"]
+    },
+    {
+      "id": "marketplace-evidence",
+      "kind": "marketplace-evidence",
+      "display_name": "Evidence marketplace",
+      "public_url": "https://evidence.patchline.dev",
+      "status_url": "https://status.patchline.dev/evidence",
+      "owner": "evidence-governance-board",
+      "slo": {
+        "uptime_target_percent": 99,
+        "reproducibility_target_percent": 100,
+        "max_p95_latency_ms": 900,
+        "max_incident_minutes": 30
+      },
+      "probes": [
+        {
+          "id": "marketplace-evidence-uptime-a",
+          "kind": "uptime",
+          "observed_at": "2026-06-03T10:00:00Z",
+          "status": "pass",
+          "latency_ms": 191,
+          "evidence_paths": ["examples/public-slo-report/evidence/marketplace.md"]
+        },
+        {
+          "id": "marketplace-evidence-uptime-b",
+          "kind": "uptime",
+          "observed_at": "2026-06-03T11:00:00Z",
+          "status": "pass",
+          "latency_ms": 244,
+          "evidence_paths": ["examples/public-slo-report/evidence/marketplace.md"]
+        },
+        {
+          "id": "marketplace-evidence-reproduce",
+          "kind": "reproducibility",
+          "observed_at": "2026-06-03T11:30:00Z",
+          "status": "pass",
+          "latency_ms": 610,
+          "command": ["make", "evidence-marketplace-gate"],
+          "artifact": {
+            "path": "examples/public-slo-report/outputs/marketplace-repro.json",
+            "sha256": "sha256:017834debbc35718d2d8f66de79e950df3c3efaf2b9b59362db3a818ff2d32b7"
+          },
+          "evidence_paths": ["examples/public-slo-report/evidence/marketplace.md"]
+        }
+      ],
+      "incidents": [
+        {
+          "id": "marketplace-mirror-delay",
+          "started_at": "2026-06-02T10:00:00Z",
+          "resolved_at": "2026-06-02T10:12:00Z",
+          "severity": "minor",
+          "public_summary_url": "https://status.patchline.dev/incidents/marketplace-mirror-delay",
+          "review_path": "examples/public-slo-report/evidence/incident-review.md",
+          "corrective_action": "mirror freshness monitor now pages before artifact publication stalls",
+          "evidence_paths": ["examples/public-slo-report/evidence/incident-review.md"]
+        }
+      ],
+      "evidence_paths": ["examples/public-slo-report/evidence/marketplace.md"]
+    },
+    {
+      "id": "corpus-api",
+      "kind": "corpus-api",
+      "display_name": "Corpus statistics API",
+      "public_url": "https://corpus.patchline.dev/api",
+      "status_url": "https://status.patchline.dev/corpus",
+      "owner": "corpus-maintainers",
+      "slo": {
+        "uptime_target_percent": 99,
+        "reproducibility_target_percent": 100,
+        "max_p95_latency_ms": 900,
+        "max_incident_minutes": 30
+      },
+      "probes": [
+        {
+          "id": "corpus-api-uptime-a",
+          "kind": "uptime",
+          "observed_at": "2026-06-03T10:00:00Z",
+          "status": "pass",
+          "latency_ms": 203,
+          "evidence_paths": ["examples/public-slo-report/evidence/corpus-api.md"]
+        },
+        {
+          "id": "corpus-api-uptime-b",
+          "kind": "uptime",
+          "observed_at": "2026-06-03T11:00:00Z",
+          "status": "pass",
+          "latency_ms": 261,
+          "evidence_paths": ["examples/public-slo-report/evidence/corpus-api.md"]
+        },
+        {
+          "id": "corpus-api-reproduce",
+          "kind": "reproducibility",
+          "observed_at": "2026-06-03T11:30:00Z",
+          "status": "pass",
+          "latency_ms": 690,
+          "command": ["make", "corpus-stats-public-api-gate"],
+          "artifact": {
+            "path": "examples/public-slo-report/outputs/corpus-api-repro.json",
+            "sha256": "sha256:82991216b3cd735deb64d7e9b939df91287682304c534bab93cbe918de3d31ff"
+          },
+          "evidence_paths": ["examples/public-slo-report/evidence/corpus-api.md"]
+        }
+      ],
+      "evidence_paths": ["examples/public-slo-report/evidence/corpus-api.md"]
+    }
+  ],
+  "evidence_paths": ["examples/public-slo-report/evidence/overview.md"]
+}

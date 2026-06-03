@@ -99,8 +99,8 @@ k-thresholded aggregate metrics.
 Critically,
 every capability in \tool{} is backed by a reproducible \emph{gate}: a script that proves the
 capability against real, pinned public code and fails loudly on drift. \tool{} currently ships more
-than 626 such gates over 571 documented capabilities, now including release-channel isolation proofs for
-stable certificates, reproducibility chaos tests for deleted caches, mirrors, and optional tool access, resource-adaptive profiles for laptops, CI, air-gapped servers, and public-good hosted tiers, supply-chain compromise simulations
+than 627 such gates over 572 documented capabilities, now including release-channel isolation proofs for
+stable certificates, reproducibility chaos tests for deleted caches, mirrors, and optional tool access, resource-adaptive profiles plus public SLO reports for hosted docs, artifacts, marketplace evidence, and corpus APIs, supply-chain compromise simulations
 for dependency poisoning, malicious archives, and forged release metadata, plus resilient distributed-analysis,
 hardware-signing, confidential-computing, and accelerator-free learned-component verifiers for worker loss, cache corruption, partitions, threshold signatures,
 recovery, rotation, revocation, and verifiable enclave attestation before accepting a corpus run or trusted artifact; the broader gate catalog spans relational migrations across nine
@@ -832,12 +832,13 @@ content-addressed and cached, so repeated and resumed runs avoid redundant downl
 byte-stable for fixed inputs (P1), incremental and parallel corpus execution can safely cache and
 shard by repository without risking nondeterministic diffs. The build itself is kept honest by a
 performance-budget gate that fails if the hot analysis path regresses beyond a documented threshold.
-The \code{resource-profiles} verifier makes those engineering assumptions executable: a laptop profile
-caps CPU, memory, files, lines, tokens, and changes; a CI profile adds bounded safe native tests; an
-air-gapped profile forbids network access and requires cache-backed degradation; and a hosted public-good
-profile caps per-analysis cost. Its gate mutates profile coverage, LLM use, offline networking, cache
-policy, invalid budgets, evidence hashes, and hosted cost to prove constrained deployments degrade
-explicitly rather than silently pretending full-resource analysis ran.
+The \code{resource-profiles} and \code{public-slo-report} verifiers make those assumptions executable:
+profiles cap CPU, memory, files, lines, tokens, changes, network, cache, native-test, and hosted-cost
+budgets, while public SLOs bind hosted docs, artifacts, marketplace evidence, and corpus APIs to status
+URLs, fresh uptime/reproducibility probes, incident review, and artifact hashes. Their gates mutate
+coverage, LLM use, offline networking, cache policy, invalid budgets, stale probes, broken hashes, and
+missing incident review so constrained deployments and public infrastructure fail explicitly rather than
+silently pretending healthy, full-resource analysis ran.
 
 %======================================================================
 \section{Formal and Decision-Theoretic Guarantees}

@@ -169,6 +169,7 @@ Release-channel isolation (`make release-channel-isolation-gate`) proves experim
 Reproducibility chaos (`make reproducibility-chaos-gate`) deletes cache metadata/bytes, archive mirrors, and optional VCS tools under a fixed seed; Patchline regenerates trusted artifacts or fails safe on source drift.
 Run `make disaster-recovery-exercise-gate` to rebuild the public corpus, docs, release manifest, and certificate logs, restore them from checksum-verified mirrors, and reject unrecoverable mirror loss; see [docs/disaster-recovery-exercise.md](docs/disaster-recovery-exercise.md).
 Run `supply-chain simulate --spec examples/supply-chain-compromise-sim.json` for supply-chain compromise simulations covering dependency poisoning, malicious archives, and forged release metadata; reproduce it with `make supply-chain-compromise-sim-gate`.
+Run `public-slo-report --spec examples/public-slo-report.json` to verify public uptime and reproducibility SLOs for hosted docs, artifacts, marketplace evidence, and corpus APIs; reproduce it with `make public-slo-report-gate`.
 
 Run `explainability-audit --spec examples/explainability-audit.json` to verify independent reviewers agree evidence trails support stated verdicts, with hash-mismatch and disagreement negative controls; reproduce it with `make explainability-audit-gate`.
 

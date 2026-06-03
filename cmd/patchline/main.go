@@ -78,6 +78,7 @@ import (
 	"github.com/thehalleyyoung/patchline/internal/reviewerfairness"
 	"github.com/thehalleyyoung/patchline/internal/rollbackplanner"
 	"github.com/thehalleyyoung/patchline/internal/semantics"
+	"github.com/thehalleyyoung/patchline/internal/sloreport"
 	"github.com/thehalleyyoung/patchline/internal/solver"
 	"github.com/thehalleyyoung/patchline/internal/supplychainsim"
 	"github.com/thehalleyyoung/patchline/internal/symbolic"
@@ -497,6 +498,8 @@ func run(args []string) error {
 		return acceleratorFallbacksCommand(args[1:], hasFlag(args[1:], "--json"))
 	case "resource-profiles":
 		return resourceProfilesCommand(args[1:], hasFlag(args[1:], "--json"))
+	case "public-slo-report":
+		return publicSLOReportCommand(args[1:], hasFlag(args[1:], "--json"))
 	case "reviewer-fairness-audit":
 		return reviewerFairnessAuditCommand(args[1:], hasFlag(args[1:], "--json"))
 	case "change-management-verify":
@@ -678,6 +681,7 @@ Usage:
   patchline confidential-computing --spec confidential-computing.json --root repo-root --out dir [--json]
   patchline accelerator-fallbacks --spec accelerator-fallbacks.json --root repo-root --out dir [--json]
   patchline resource-profiles --spec resource-profiles.json --root repo-root --out dir [--json]
+  patchline public-slo-report --spec public-slo-report.json --root repo-root --out dir [--json]
   patchline reviewer-fairness-audit --spec reviewer-fairness-audit.json --root repo-root --out dir [--json]
   patchline change-management-verify --spec change-management.json --root repo-root --out dir [--json]
   patchline governance-risk-register --spec governance-risk-register.json --root repo-root --out dir [--json]
@@ -15732,6 +15736,45 @@ func resourceProfilesCommand(args []string, jsonOut bool) error {
 	}
 	if !report.OK {
 		return codedError{code: 2, err: errors.New("resource profile validation failed")}
+	}
+	return nil
+}
+
+func publicSLOReportCommand(args []string, jsonOut bool) error {
+	usage := "patchline public-slo-report --spec public-slo-report.json --root repo-root --out <dir> [--json]"
+	specPath, outPath, err := feedbackSpecOut(args, usage)
+	if err != nil {
+		return err
+	}
+	rootPath := "."
+	if value, ok := flagValue(args, "--root"); ok && value != "" {
+		rootPath = value
+	}
+	file, err := os.Open(specPath)
+	if err != nil {
+		return err
+	}
+	defer file.Close()
+	spec, err := sloreport.ReadSpec(file)
+	if err != nil {
+		return err
+	}
+	report, err := sloreport.BuildReport(spec, rootPath)
+	if err != nil {
+		return err
+	}
+	if err := sloreport.WriteArtifacts(outPath, report); err != nil {
+		return err
+	}
+	if jsonOut {
+		if err := writeJSON(os.Stdout, report); err != nil {
+			return err
+		}
+	} else {
+		fmt.Printf("wrote public SLO report ok=%t surfaces=%d kinds=%d probes=%d uptime_slo=%d reproducibility_slo=%d counterexamples=%d to %s\n", report.OK, report.Summary.Surfaces, report.Summary.Kinds, report.Summary.Probes, report.Summary.UptimeSLOMet, report.Summary.ReproducibilitySLOMet, report.Summary.Counterexamples, outPath)
+	}
+	if !report.OK {
+		return codedError{code: 2, err: errors.New("public SLO report validation failed")}
 	}
 	return nil
 }

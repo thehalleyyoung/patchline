@@ -45,6 +45,7 @@ import (
 	"github.com/thehalleyyoung/patchline/internal/resourceprofile"
 	"github.com/thehalleyyoung/patchline/internal/reviewerfairness"
 	"github.com/thehalleyyoung/patchline/internal/rollbackplanner"
+	"github.com/thehalleyyoung/patchline/internal/sloreport"
 	"github.com/thehalleyyoung/patchline/internal/supplychainsim"
 )
 
@@ -255,6 +256,109 @@ func TestEvidenceMarketplaceAppealCommandWritesAppealWorkflow(t *testing.T) {
 	readMainTestJSON(t, filepath.Join(badOut, "appeal-workflow.json"), &rejected)
 	if rejected.OK || len(rejected.Rejected) == 0 {
 		t.Fatalf("expected rejected appeal workflow, got %#v", rejected)
+	}
+}
+
+func TestPublicSLOReportCommandWritesReports(t *testing.T) {
+	root := t.TempDir()
+	writeMainTestFile(t, root, "evidence/overview.md", "public SLO evidence covers hosted docs, artifacts, marketplace evidence, and corpus APIs\n")
+	writeMainTestFile(t, root, "evidence/docs.md", "docs uptime and reproducibility evidence\n")
+	writeMainTestFile(t, root, "evidence/artifacts.md", "artifact uptime and reproducibility evidence\n")
+	writeMainTestFile(t, root, "evidence/marketplace.md", "marketplace uptime and reproducibility evidence\n")
+	writeMainTestFile(t, root, "evidence/corpus.md", "corpus API uptime and reproducibility evidence\n")
+	writeMainTestFile(t, root, "evidence/incident.md", "reviewed marketplace mirror delay\n")
+	writeMainTestFile(t, root, "outputs/docs.json", `{"ok":true,"surface":"docs"}`+"\n")
+	writeMainTestFile(t, root, "outputs/artifacts.json", `{"ok":true,"surface":"artifacts"}`+"\n")
+	writeMainTestFile(t, root, "outputs/marketplace.json", `{"ok":true,"surface":"marketplace"}`+"\n")
+	writeMainTestFile(t, root, "outputs/corpus.json", `{"ok":true,"surface":"corpus"}`+"\n")
+	spec := sloreport.Spec{
+		Version: sloreport.SpecVersion,
+		Name:    "main test public SLO report",
+		Period:  sloreport.Period{Start: "2026-06-01T00:00:00Z", End: "2026-06-03T12:00:00Z"},
+		Criteria: sloreport.Criteria{
+			RequiredKinds:                 []string{"hosted-docs", "artifacts", "marketplace-evidence", "corpus-api"},
+			MinSurfaces:                   4,
+			MinProbesPerSurface:           3,
+			MinUptimePercent:              99,
+			MinReproducibilityPercent:     100,
+			MaxP95LatencyMS:               900,
+			MaxProbeAgeHours:              96,
+			MaxIncidentMinutes:            30,
+			RequirePublicStatusURL:        true,
+			RequireReproducibilityProbe:   true,
+			RequireIncidentReview:         true,
+			RequireEvidenceHashes:         true,
+			RequireReproducibilityCommand: true,
+		},
+		Surfaces: []sloreport.Surface{
+			mainTestSLOSurface(t, root, "hosted-docs", "hosted-docs", "https://docs.patchline.dev", "https://status.patchline.dev/docs", "evidence/docs.md", "outputs/docs.json", nil),
+			mainTestSLOSurface(t, root, "release-artifacts", "artifacts", "https://artifacts.patchline.dev", "https://status.patchline.dev/artifacts", "evidence/artifacts.md", "outputs/artifacts.json", nil),
+			mainTestSLOSurface(t, root, "marketplace-evidence", "marketplace-evidence", "https://evidence.patchline.dev", "https://status.patchline.dev/evidence", "evidence/marketplace.md", "outputs/marketplace.json", []sloreport.Incident{{
+				ID:               "marketplace-delay",
+				StartedAt:        "2026-06-02T10:00:00Z",
+				ResolvedAt:       "2026-06-02T10:12:00Z",
+				Severity:         "minor",
+				PublicSummaryURL: "https://status.patchline.dev/incidents/marketplace-delay",
+				ReviewPath:       "evidence/incident.md",
+				CorrectiveAction: "added mirror freshness monitor",
+				EvidencePaths:    []string{"evidence/incident.md"},
+			}}),
+			mainTestSLOSurface(t, root, "corpus-api", "corpus-api", "https://corpus.patchline.dev/api", "https://status.patchline.dev/corpus", "evidence/corpus.md", "outputs/corpus.json", nil),
+		},
+		EvidencePaths: []string{"evidence/overview.md"},
+	}
+	specPath := filepath.Join(root, "public-slo-report.json")
+	writeMainTestJSONFile(t, specPath, spec)
+	out := filepath.Join(t.TempDir(), "slo")
+	if err := run([]string{"public-slo-report", "--spec", specPath, "--root", root, "--out", out, "--json"}); err != nil {
+		t.Fatalf("public-slo-report failed: %v", err)
+	}
+	var report sloreport.Report
+	readMainTestJSON(t, filepath.Join(out, "public-slo-report.json"), &report)
+	if !report.OK || report.Summary.Surfaces != 4 || report.Summary.UptimeSLOMet != 4 || report.Summary.ReproducibilitySLOMet != 4 {
+		t.Fatalf("unexpected SLO report: %#v", report.Summary)
+	}
+	if stat, err := os.Stat(filepath.Join(out, "public-slo-report.md")); err != nil || stat.Size() == 0 {
+		t.Fatalf("expected public-slo-report.md to be written, stat=%#v err=%v", stat, err)
+	}
+	bad := spec
+	bad.Surfaces = append([]sloreport.Surface(nil), spec.Surfaces...)
+	bad.Surfaces[0].StatusURL = ""
+	bad.Surfaces[0].Probes[0].Status = "fail"
+	badPath := filepath.Join(root, "public-slo-report.bad.json")
+	writeMainTestJSONFile(t, badPath, bad)
+	badOut := filepath.Join(t.TempDir(), "bad-slo")
+	if err := run([]string{"public-slo-report", "--spec", badPath, "--root", root, "--out", badOut, "--json"}); err == nil || exitCode(err) != 2 {
+		t.Fatalf("expected rejected public SLO report with exit code 2, got %v", err)
+	}
+	var rejected sloreport.Report
+	readMainTestJSON(t, filepath.Join(badOut, "public-slo-report.json"), &rejected)
+	if rejected.OK || len(rejected.Counterexamples) == 0 {
+		t.Fatalf("expected rejected public SLO report, got %#v", rejected)
+	}
+}
+
+func mainTestSLOSurface(t *testing.T, root, id, kind, publicURL, statusURL, evidencePath, outputPath string, incidents []sloreport.Incident) sloreport.Surface {
+	t.Helper()
+	return sloreport.Surface{
+		ID:        id,
+		Kind:      kind,
+		PublicURL: publicURL,
+		StatusURL: statusURL,
+		Owner:     "main-test-maintainers",
+		SLO: sloreport.SurfaceSLO{
+			UptimeTargetPercent:          99,
+			ReproducibilityTargetPercent: 100,
+			MaxP95LatencyMS:              900,
+			MaxIncidentMinutes:           30,
+		},
+		Probes: []sloreport.Probe{
+			{ID: id + "-uptime-a", Kind: "uptime", ObservedAt: "2026-06-03T10:00:00Z", Status: "pass", LatencyMS: 120, EvidencePaths: []string{evidencePath}},
+			{ID: id + "-uptime-b", Kind: "uptime", ObservedAt: "2026-06-03T11:00:00Z", Status: "pass", LatencyMS: 180, EvidencePaths: []string{evidencePath}},
+			{ID: id + "-reproduce", Kind: "reproducibility", ObservedAt: "2026-06-03T11:30:00Z", Status: "pass", LatencyMS: 420, Command: []string{"make", id + "-gate"}, Artifact: sloreport.ArtifactRef{Path: outputPath, SHA256: mainTestFileHash(t, filepath.Join(root, filepath.FromSlash(outputPath)))}, EvidencePaths: []string{evidencePath}},
+		},
+		Incidents:     incidents,
+		EvidencePaths: []string{evidencePath},
 	}
 }
 
