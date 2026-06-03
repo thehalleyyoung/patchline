@@ -21,6 +21,7 @@ import (
 const (
 	RegistryVersion = "patchline.evidence-marketplace/v1"
 	ReportVersion   = "patchline.evidence-marketplace-report/v1"
+	MirrorVersion   = "patchline.evidence-marketplace-mirror/v1"
 )
 
 var requiredObligations = []string{
@@ -227,31 +228,35 @@ type Report struct {
 	Examples           []PublishedExample `json:"examples"`
 	Rejected           []RejectedExample  `json:"rejected,omitempty"`
 	DuplicateGroups    []DuplicateGroup   `json:"duplicate_groups,omitempty"`
+	ArchiveMirror      ArchiveMirror      `json:"archive_mirror"`
 	ByHazard           []Count            `json:"by_hazard"`
 	ByHazardPrevalence []Count            `json:"by_hazard_prevalence"`
 	ByEcosystem        []Count            `json:"by_ecosystem"`
 	ByLicense          []Count            `json:"by_license"`
 	ByReputationTier   []Count            `json:"by_reputation_tier"`
 	Markdown           string             `json:"markdown,omitempty"`
+	registryRoot       string
 }
 
 type Summary struct {
-	Submitted                 int `json:"submitted"`
-	Published                 int `json:"published"`
-	Rejected                  int `json:"rejected"`
-	PrevalenceExamples        int `json:"prevalence_examples"`
-	DuplicateInflation        int `json:"duplicate_inflation"`
-	ExactDuplicateGroups      int `json:"exact_duplicate_groups"`
-	NearDuplicateGroups       int `json:"near_duplicate_groups"`
-	CertificateBacked         int `json:"certificate_backed"`
-	RedactionReviewed         int `json:"redaction_reviewed"`
-	ClearLicensed             int `json:"clear_licensed"`
-	PublicReleaseEligible     int `json:"public_release_eligible"`
-	ArtifactsVerified         int `json:"artifacts_verified"`
-	ReproductionCommandCount  int `json:"reproduction_command_count"`
-	GateReputationSubmitted   int `json:"gate_reputation_submitted"`
-	GateReputationReviewable  int `json:"gate_reputation_reviewable"`
-	GateReputationEstablished int `json:"gate_reputation_established"`
+	Submitted                 int   `json:"submitted"`
+	Published                 int   `json:"published"`
+	Rejected                  int   `json:"rejected"`
+	PrevalenceExamples        int   `json:"prevalence_examples"`
+	DuplicateInflation        int   `json:"duplicate_inflation"`
+	ExactDuplicateGroups      int   `json:"exact_duplicate_groups"`
+	NearDuplicateGroups       int   `json:"near_duplicate_groups"`
+	CertificateBacked         int   `json:"certificate_backed"`
+	RedactionReviewed         int   `json:"redaction_reviewed"`
+	ClearLicensed             int   `json:"clear_licensed"`
+	PublicReleaseEligible     int   `json:"public_release_eligible"`
+	ArtifactsVerified         int   `json:"artifacts_verified"`
+	ReproductionCommandCount  int   `json:"reproduction_command_count"`
+	GateReputationSubmitted   int   `json:"gate_reputation_submitted"`
+	GateReputationReviewable  int   `json:"gate_reputation_reviewable"`
+	GateReputationEstablished int   `json:"gate_reputation_established"`
+	MirroredArtifacts         int   `json:"mirrored_artifacts"`
+	MirrorBytes               int64 `json:"mirror_bytes"`
 }
 
 type PublishedExample struct {
@@ -291,6 +296,53 @@ type RejectedExample struct {
 type Count struct {
 	Key   string `json:"key"`
 	Count int    `json:"count"`
+}
+
+type ArchiveMirror struct {
+	Version      string               `json:"version"`
+	RegistryHash string               `json:"registry_hash"`
+	Marketplace  Metadata             `json:"marketplace"`
+	Summary      ArchiveMirrorSummary `json:"summary"`
+	Entries      []ArchiveMirrorEntry `json:"entries"`
+	ByLicense    []Count              `json:"by_license"`
+	Hash         string               `json:"hash"`
+}
+
+type ArchiveMirrorSummary struct {
+	Examples    int   `json:"examples"`
+	Artifacts   int   `json:"artifacts"`
+	UniqueFiles int   `json:"unique_files"`
+	Bytes       int64 `json:"bytes"`
+	UniqueBytes int64 `json:"unique_bytes"`
+	Active      int   `json:"active"`
+	Withdrawn   int   `json:"withdrawn"`
+}
+
+type ArchiveMirrorEntry struct {
+	ExampleID              string             `json:"example_id"`
+	ArtifactPath           string             `json:"artifact_path"`
+	ArtifactRole           string             `json:"artifact_role"`
+	MirrorPath             string             `json:"mirror_path"`
+	Checksum               string             `json:"checksum"`
+	Bytes                  int64              `json:"bytes"`
+	LicenseSPDX            string             `json:"license_spdx"`
+	Redacted               bool               `json:"redacted"`
+	Source                 Source             `json:"source"`
+	CertificateSubjectHash string             `json:"certificate_subject_hash"`
+	EvidenceHash           string             `json:"evidence_hash"`
+	Withdrawal             WithdrawalMetadata `json:"withdrawal"`
+}
+
+type WithdrawalMetadata struct {
+	Status                          string `json:"status"`
+	Requested                       bool   `json:"requested"`
+	WithdrawalID                    string `json:"withdrawal_id"`
+	PolicyURL                       string `json:"policy_url"`
+	Contact                         string `json:"contact"`
+	ReviewRequired                  bool   `json:"review_required"`
+	TombstoneRequired               bool   `json:"tombstone_required"`
+	PreserveChecksumAfterWithdrawal bool   `json:"preserve_checksum_after_withdrawal"`
+	ReplacementAllowed              bool   `json:"replacement_allowed"`
 }
 
 type certificateSubject struct {
@@ -404,6 +456,7 @@ func PublishRegistry(registry Registry, root string) (Report, error) {
 		Version:      ReportVersion,
 		RegistryHash: "sha256:" + canonical.Hash(registry),
 		Marketplace:  registry.Marketplace,
+		registryRoot: rootAbs,
 		Summary: Summary{
 			Submitted: len(registry.Examples),
 		},
@@ -451,6 +504,9 @@ func PublishRegistry(registry Registry, root string) (Report, error) {
 	report.ByEcosystem = counts(report.Examples, func(example PublishedExample) string { return example.Ecosystem })
 	report.ByLicense = counts(report.Examples, func(example PublishedExample) string { return example.LicenseSPDX })
 	report.ByReputationTier = counts(report.Examples, func(example PublishedExample) string { return example.GateReputation.Tier })
+	report.ArchiveMirror = buildArchiveMirror(report.Marketplace, report.RegistryHash, report.Examples)
+	report.Summary.MirroredArtifacts = report.ArchiveMirror.Summary.Artifacts
+	report.Summary.MirrorBytes = report.ArchiveMirror.Summary.Bytes
 	report.OK = report.Summary.Published > 0 && report.Summary.Rejected == 0
 	report.Hash = reportHash(report)
 	report.Markdown = RenderMarkdown(report)
@@ -458,20 +514,27 @@ func PublishRegistry(registry Registry, root string) (Report, error) {
 }
 
 func WriteReport(outDir string, report Report) error {
-	if err := os.MkdirAll(outDir, 0o755); err != nil {
+	outAbs, err := filepath.Abs(outDir)
+	if err != nil {
 		return err
 	}
-	if err := writeJSON(filepath.Join(outDir, "marketplace.json"), report); err != nil {
+	if err := os.MkdirAll(outAbs, 0o755); err != nil {
 		return err
 	}
-	if err := os.WriteFile(filepath.Join(outDir, "marketplace.md"), []byte(report.Markdown), 0o644); err != nil {
+	if err := writeArchiveMirror(outAbs, report.registryRoot, report.ArchiveMirror); err != nil {
+		return err
+	}
+	if err := writeJSON(filepath.Join(outAbs, "marketplace.json"), report); err != nil {
+		return err
+	}
+	if err := os.WriteFile(filepath.Join(outAbs, "marketplace.md"), []byte(report.Markdown), 0o644); err != nil {
 		return err
 	}
 	html, err := RenderHTML(report)
 	if err != nil {
 		return err
 	}
-	return os.WriteFile(filepath.Join(outDir, "index.html"), []byte(html), 0o644)
+	return os.WriteFile(filepath.Join(outAbs, "index.html"), []byte(html), 0o644)
 }
 
 func ExpectedSubjectHash(example Example) string {
@@ -1346,6 +1409,163 @@ func stableRejectedID(id string) string {
 	return id
 }
 
+func buildArchiveMirror(marketplace Metadata, registryHash string, examples []PublishedExample) ArchiveMirror {
+	mirror := ArchiveMirror{
+		Version:      MirrorVersion,
+		RegistryHash: strings.TrimSpace(registryHash),
+		Marketplace:  marketplace,
+		Entries:      []ArchiveMirrorEntry{},
+		ByLicense:    []Count{},
+	}
+	exampleIDs := map[string]bool{}
+	uniqueFiles := map[string]int64{}
+	for _, example := range examples {
+		exampleIDs[example.ID] = true
+		for _, artifact := range example.Artifacts {
+			entry := ArchiveMirrorEntry{
+				ExampleID:              example.ID,
+				ArtifactPath:           artifact.Path,
+				ArtifactRole:           artifact.Role,
+				MirrorPath:             archiveMirrorPath(artifact.SHA256),
+				Checksum:               artifact.SHA256,
+				Bytes:                  artifact.Bytes,
+				LicenseSPDX:            example.LicenseSPDX,
+				Redacted:               artifact.Redacted,
+				Source:                 example.Source,
+				CertificateSubjectHash: example.CertificateSubjectHash,
+				EvidenceHash:           example.EvidenceHash,
+				Withdrawal:             withdrawalMetadataFor(marketplace, example, artifact),
+			}
+			mirror.Entries = append(mirror.Entries, entry)
+			mirror.Summary.Artifacts++
+			mirror.Summary.Bytes += artifact.Bytes
+			mirror.Summary.Active++
+			if _, ok := uniqueFiles[artifact.SHA256]; !ok {
+				uniqueFiles[artifact.SHA256] = artifact.Bytes
+				mirror.Summary.UniqueBytes += artifact.Bytes
+			}
+		}
+	}
+	mirror.Summary.Examples = len(exampleIDs)
+	mirror.Summary.UniqueFiles = len(uniqueFiles)
+	sort.Slice(mirror.Entries, func(i, j int) bool {
+		if mirror.Entries[i].ExampleID != mirror.Entries[j].ExampleID {
+			return mirror.Entries[i].ExampleID < mirror.Entries[j].ExampleID
+		}
+		if mirror.Entries[i].ArtifactPath != mirror.Entries[j].ArtifactPath {
+			return mirror.Entries[i].ArtifactPath < mirror.Entries[j].ArtifactPath
+		}
+		return mirror.Entries[i].ArtifactRole < mirror.Entries[j].ArtifactRole
+	})
+	mirror.ByLicense = archiveMirrorCounts(mirror.Entries, func(entry ArchiveMirrorEntry) string { return entry.LicenseSPDX })
+	mirror.Hash = archiveMirrorHash(mirror)
+	return mirror
+}
+
+func withdrawalMetadataFor(marketplace Metadata, example PublishedExample, artifact ArtifactSummary) WithdrawalMetadata {
+	material := strings.Join([]string{example.ID, artifact.Path, artifact.SHA256}, "\n")
+	sum := sha256.Sum256([]byte(material))
+	return WithdrawalMetadata{
+		Status:                          "active",
+		Requested:                       false,
+		WithdrawalID:                    "sha256:" + hex.EncodeToString(sum[:]),
+		PolicyURL:                       strings.TrimSpace(marketplace.PolicyURL),
+		Contact:                         strings.TrimSpace(marketplace.Maintainer),
+		ReviewRequired:                  true,
+		TombstoneRequired:               true,
+		PreserveChecksumAfterWithdrawal: true,
+		ReplacementAllowed:              true,
+	}
+}
+
+func archiveMirrorPath(checksum string) string {
+	return "archive/sha256/" + strings.TrimPrefix(strings.TrimSpace(checksum), "sha256:")
+}
+
+func archiveMirrorCounts(entries []ArchiveMirrorEntry, key func(ArchiveMirrorEntry) string) []Count {
+	values := map[string]int{}
+	for _, entry := range entries {
+		values[key(entry)]++
+	}
+	out := make([]Count, 0, len(values))
+	for key, count := range values {
+		out = append(out, Count{Key: key, Count: count})
+	}
+	sort.Slice(out, func(i, j int) bool {
+		return out[i].Key < out[j].Key
+	})
+	return out
+}
+
+func archiveMirrorHash(mirror ArchiveMirror) string {
+	copy := mirror
+	copy.Hash = ""
+	return "sha256:" + canonical.Hash(copy)
+}
+
+func writeArchiveMirror(outDir, root string, mirror ArchiveMirror) error {
+	if mirror.Version == "" {
+		mirror = ArchiveMirror{Version: MirrorVersion, Entries: []ArchiveMirrorEntry{}, ByLicense: []Count{}}
+		mirror.Hash = archiveMirrorHash(mirror)
+	}
+	if err := os.MkdirAll(filepath.Join(outDir, "archive", "sha256"), 0o755); err != nil {
+		return err
+	}
+	if len(mirror.Entries) > 0 && strings.TrimSpace(root) == "" {
+		return fmt.Errorf("registry root unavailable for archive mirror")
+	}
+	for _, entry := range mirror.Entries {
+		if err := materializeArchiveMirrorEntry(outDir, root, entry); err != nil {
+			return err
+		}
+	}
+	return writeJSON(filepath.Join(outDir, "archive-mirror.json"), mirror)
+}
+
+func materializeArchiveMirrorEntry(outDir, root string, entry ArchiveMirrorEntry) error {
+	if !strings.HasPrefix(entry.MirrorPath, "archive/sha256/") {
+		return fmt.Errorf("archive mirror entry %s has invalid mirror path %q", entry.ArtifactPath, entry.MirrorPath)
+	}
+	sourcePath, err := resolveArtifact(root, entry.ArtifactPath)
+	if err != nil {
+		return fmt.Errorf("archive mirror artifact %s: %w", entry.ArtifactPath, err)
+	}
+	content, err := os.ReadFile(sourcePath)
+	if err != nil {
+		return fmt.Errorf("archive mirror artifact %s: %w", entry.ArtifactPath, err)
+	}
+	sum := sha256.Sum256(content)
+	actualChecksum := "sha256:" + hex.EncodeToString(sum[:])
+	if actualChecksum != entry.Checksum {
+		return fmt.Errorf("archive mirror artifact %s sha256 drift: expected %s got %s", entry.ArtifactPath, entry.Checksum, actualChecksum)
+	}
+	if int64(len(content)) != entry.Bytes {
+		return fmt.Errorf("archive mirror artifact %s byte count drift: expected %d got %d", entry.ArtifactPath, entry.Bytes, len(content))
+	}
+	destPath := filepath.Join(outDir, filepath.FromSlash(entry.MirrorPath))
+	relative, err := filepath.Rel(outDir, destPath)
+	if err != nil {
+		return err
+	}
+	if relative == ".." || strings.HasPrefix(relative, ".."+string(os.PathSeparator)) || filepath.IsAbs(relative) {
+		return fmt.Errorf("archive mirror path escapes output directory")
+	}
+	if err := os.MkdirAll(filepath.Dir(destPath), 0o755); err != nil {
+		return err
+	}
+	if existing, err := os.ReadFile(destPath); err == nil {
+		existingSum := sha256.Sum256(existing)
+		existingChecksum := "sha256:" + hex.EncodeToString(existingSum[:])
+		if existingChecksum != entry.Checksum {
+			return fmt.Errorf("archive mirror destination %s checksum mismatch: expected %s got %s", entry.MirrorPath, entry.Checksum, existingChecksum)
+		}
+		return nil
+	} else if !os.IsNotExist(err) {
+		return err
+	}
+	return os.WriteFile(destPath, content, 0o644)
+}
+
 func reportHash(report Report) string {
 	copy := report
 	copy.Hash = ""
@@ -1365,7 +1585,7 @@ func writeJSON(path string, value any) error {
 func RenderMarkdown(report Report) string {
 	var b strings.Builder
 	fmt.Fprintf(&b, "# Public evidence marketplace\n\n")
-	fmt.Fprintf(&b, "Patchline publishes only redacted, certificate-backed hazard examples with clear licenses and reproducible commands.\n\n")
+	fmt.Fprintf(&b, "Patchline publishes only redacted, certificate-backed hazard examples with clear licenses, reproducible commands, and a content-addressed archive mirror.\n\n")
 	fmt.Fprintf(&b, "| Metric | Count |\n| --- | ---: |\n")
 	fmt.Fprintf(&b, "| Submitted examples | %d |\n", report.Summary.Submitted)
 	fmt.Fprintf(&b, "| Published examples | %d |\n", report.Summary.Published)
@@ -1375,6 +1595,8 @@ func RenderMarkdown(report Report) string {
 	fmt.Fprintf(&b, "| Near-duplicate groups | %d |\n", report.Summary.NearDuplicateGroups)
 	fmt.Fprintf(&b, "| Rejected examples | %d |\n", report.Summary.Rejected)
 	fmt.Fprintf(&b, "| Verified artifacts | %d |\n", report.Summary.ArtifactsVerified)
+	fmt.Fprintf(&b, "| Mirrored archive artifacts | %d |\n", report.Summary.MirroredArtifacts)
+	fmt.Fprintf(&b, "| Archive mirror bytes | %d |\n", report.Summary.MirrorBytes)
 	fmt.Fprintf(&b, "| Public-release eligible | %d |\n", report.Summary.PublicReleaseEligible)
 	fmt.Fprintf(&b, "| Gate reputations submitted | %d |\n", report.Summary.GateReputationSubmitted)
 	fmt.Fprintf(&b, "| Reviewable gate reputations | %d |\n", report.Summary.GateReputationReviewable)
@@ -1431,7 +1653,7 @@ func RenderHTML(report Report) (string, error) {
 <meta charset="utf-8">
 <title>Patchline public evidence marketplace</title>
 <h1>Patchline public evidence marketplace</h1>
-<p>Published {{.Summary.Published}} redacted, certificate-backed hazard examples; {{.Summary.PrevalenceExamples}} duplicate-collapsed prevalence examples; rejected {{.Summary.Rejected}}.</p>
+<p>Published {{.Summary.Published}} redacted, certificate-backed hazard examples; {{.Summary.PrevalenceExamples}} duplicate-collapsed prevalence examples; mirrored {{.Summary.MirroredArtifacts}} archive artifacts; rejected {{.Summary.Rejected}}.</p>
 <table>
 <thead><tr><th>ID</th><th>Title</th><th>Hazard</th><th>Ecosystem</th><th>Prevalence</th><th>License</th><th>Release</th><th>Gate reputation</th><th>Certificate</th></tr></thead>
 <tbody>

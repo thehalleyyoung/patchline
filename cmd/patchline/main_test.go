@@ -79,12 +79,23 @@ func TestEvidenceMarketplacePublishCommandWritesReports(t *testing.T) {
 	}
 	var report evidencemarketplace.Report
 	readMainTestJSON(t, filepath.Join(out, "marketplace.json"), &report)
-	if !report.OK || report.Summary.Published != 1 || report.Summary.ArtifactsVerified != 2 {
+	if !report.OK || report.Summary.Published != 1 || report.Summary.ArtifactsVerified != 2 || report.Summary.MirroredArtifacts != 2 {
 		t.Fatalf("unexpected marketplace report: %#v", report)
 	}
-	for _, rel := range []string{"marketplace.json", "marketplace.md", "index.html"} {
+	for _, rel := range []string{"marketplace.json", "marketplace.md", "index.html", "archive-mirror.json"} {
 		if stat, err := os.Stat(filepath.Join(out, rel)); err != nil || stat.Size() == 0 {
 			t.Fatalf("expected %s to be written, stat=%#v err=%v", rel, stat, err)
+		}
+	}
+	if len(report.ArchiveMirror.Entries) != 2 {
+		t.Fatalf("expected two mirror entries, got %#v", report.ArchiveMirror)
+	}
+	for _, entry := range report.ArchiveMirror.Entries {
+		if got := mainTestFileHash(t, filepath.Join(out, filepath.FromSlash(entry.MirrorPath))); got != entry.Checksum {
+			t.Fatalf("mirrored artifact checksum mismatch for %s: got %s want %s", entry.MirrorPath, got, entry.Checksum)
+		}
+		if entry.LicenseSPDX == "" || entry.Withdrawal.Status != "active" || entry.Withdrawal.WithdrawalID == "" {
+			t.Fatalf("mirror entry missing license or withdrawal metadata: %#v", entry)
 		}
 	}
 
@@ -100,6 +111,11 @@ func TestEvidenceMarketplacePublishCommandWritesReports(t *testing.T) {
 	readMainTestJSON(t, filepath.Join(badOut, "marketplace.json"), &rejected)
 	if rejected.OK || len(rejected.Rejected) != 1 {
 		t.Fatalf("expected rejected report, got %#v", rejected)
+	}
+	var rejectedMirror evidencemarketplace.ArchiveMirror
+	readMainTestJSON(t, filepath.Join(badOut, "archive-mirror.json"), &rejectedMirror)
+	if rejectedMirror.Summary.Artifacts != 0 || len(rejectedMirror.Entries) != 0 {
+		t.Fatalf("expected rejected report to write an empty mirror manifest, got %#v", rejectedMirror)
 	}
 }
 

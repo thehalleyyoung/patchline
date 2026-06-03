@@ -3,6 +3,7 @@ package evidencemarketplace
 import (
 	"crypto/sha256"
 	"encoding/hex"
+	"encoding/json"
 	"os"
 	"path/filepath"
 	"strings"
@@ -23,6 +24,20 @@ func TestPublishRegistryPublishesCertificateBackedExamples(t *testing.T) {
 	}
 	if report.Examples[0].EvidenceHash == "" || report.Hash == "" || report.RegistryHash == "" {
 		t.Fatalf("expected stable hashes in report: %#v", report)
+	}
+	if report.Summary.MirroredArtifacts != 2 || report.Summary.MirrorBytes == 0 {
+		t.Fatalf("expected verified artifacts to be staged for long-term mirroring: %#v", report.Summary)
+	}
+	if report.ArchiveMirror.Version != MirrorVersion || report.ArchiveMirror.Summary.Artifacts != 2 || len(report.ArchiveMirror.Entries) != 2 {
+		t.Fatalf("unexpected archive mirror summary: %#v", report.ArchiveMirror)
+	}
+	for _, entry := range report.ArchiveMirror.Entries {
+		if entry.LicenseSPDX != registry.Examples[0].LicenseSPDX || !strings.HasPrefix(entry.Checksum, "sha256:") || !strings.HasPrefix(entry.MirrorPath, "archive/sha256/") {
+			t.Fatalf("mirror entry is missing checksum/license/path metadata: %#v", entry)
+		}
+		if entry.Withdrawal.Status != "active" || entry.Withdrawal.Requested || !entry.Withdrawal.TombstoneRequired || !entry.Withdrawal.PreserveChecksumAfterWithdrawal {
+			t.Fatalf("mirror entry is missing withdrawal metadata: %#v", entry.Withdrawal)
+		}
 	}
 	if report.Summary.PrevalenceExamples != 1 || report.Summary.DuplicateInflation != 0 {
 		t.Fatalf("single unique example should count once for prevalence: %#v", report.Summary)
@@ -254,6 +269,87 @@ func TestRenderHTMLEscapesPublisherControlledStrings(t *testing.T) {
 	}
 	if !strings.Contains(html, "&lt;script&gt;") {
 		t.Fatalf("expected escaped script marker in html:\n%s", html)
+	}
+}
+
+func TestWriteReportBuildsArchiveMirror(t *testing.T) {
+	registry, root := validRegistry(t)
+	report, err := PublishRegistry(registry, root)
+	if err != nil {
+		t.Fatal(err)
+	}
+	out := t.TempDir()
+	if err := WriteReport(out, report); err != nil {
+		t.Fatal(err)
+	}
+	for _, rel := range []string{"marketplace.json", "marketplace.md", "index.html", "archive-mirror.json"} {
+		if stat, err := os.Stat(filepath.Join(out, rel)); err != nil || stat.Size() == 0 {
+			t.Fatalf("expected %s to be written, stat=%#v err=%v", rel, stat, err)
+		}
+	}
+
+	var mirror ArchiveMirror
+	data, err := os.ReadFile(filepath.Join(out, "archive-mirror.json"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := json.Unmarshal(data, &mirror); err != nil {
+		t.Fatal(err)
+	}
+	if mirror.Version != MirrorVersion || mirror.Summary.Artifacts != 2 || mirror.Summary.UniqueFiles != 2 || mirror.Summary.Active != 2 || mirror.Summary.Withdrawn != 0 {
+		t.Fatalf("unexpected mirror manifest: %#v", mirror)
+	}
+	for _, entry := range mirror.Entries {
+		mirroredPath := filepath.Join(out, filepath.FromSlash(entry.MirrorPath))
+		if got := fileHash(t, mirroredPath); got != entry.Checksum {
+			t.Fatalf("mirrored artifact hash mismatch for %s: got %s want %s", entry.MirrorPath, got, entry.Checksum)
+		}
+		if entry.LicenseSPDX != registry.Examples[0].LicenseSPDX {
+			t.Fatalf("mirror entry lost license metadata: %#v", entry)
+		}
+		if entry.Withdrawal.WithdrawalID == "" || entry.Withdrawal.PolicyURL == "" || entry.Withdrawal.Contact == "" {
+			t.Fatalf("mirror entry lost withdrawal metadata: %#v", entry.Withdrawal)
+		}
+	}
+}
+
+func TestWriteReportRejectsArchiveMirrorHashDrift(t *testing.T) {
+	registry, root := validRegistry(t)
+	report, err := PublishRegistry(registry, root)
+	if err != nil {
+		t.Fatal(err)
+	}
+	writeFile(t, root, "artifacts/hazard.json", `{"version":"patchline.redacted-hazard-example/v1","finding":"changed after publication"}`)
+	err = WriteReport(t.TempDir(), report)
+	if err == nil || !strings.Contains(err.Error(), "sha256 drift") {
+		t.Fatalf("expected archive mirror drift rejection, got %v", err)
+	}
+}
+
+func TestWriteReportWritesEmptyArchiveMirrorForRejectedReports(t *testing.T) {
+	registry, root := validRegistry(t)
+	registry.Examples[0].Certificate.SubjectHash = "sha256:0000000000000000000000000000000000000000000000000000000000000000"
+	report, err := PublishRegistry(registry, root)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if report.OK || len(report.ArchiveMirror.Entries) != 0 {
+		t.Fatalf("expected rejected report without mirror entries: %#v", report)
+	}
+	out := t.TempDir()
+	if err := WriteReport(out, report); err != nil {
+		t.Fatal(err)
+	}
+	var mirror ArchiveMirror
+	data, err := os.ReadFile(filepath.Join(out, "archive-mirror.json"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := json.Unmarshal(data, &mirror); err != nil {
+		t.Fatal(err)
+	}
+	if mirror.Summary.Artifacts != 0 || len(mirror.Entries) != 0 {
+		t.Fatalf("expected empty mirror for rejected report: %#v", mirror)
 	}
 }
 

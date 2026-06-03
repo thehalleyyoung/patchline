@@ -12,6 +12,9 @@ Every accepted example also receives exact and near-duplicate fingerprints, so
 multiple submissions remain auditable without inflating prevalence studies.
 When an example supplies community-gate reputation, Patchline scores it only
 from reproducibility, longevity, and independent confirmation signals.
+Publication also writes a long-term **archive mirror**: each accepted artifact is
+copied to a content-addressed `archive/sha256/<hash>` path and listed with its
+checksum, license, source/certificate hashes, and withdrawal metadata.
 
 ## Publish
 
@@ -22,7 +25,8 @@ go run ./cmd/patchline evidence-marketplace publish \
   --json
 ```
 
-The command writes `marketplace.json`, `marketplace.md`, and `index.html`.
+The command writes `marketplace.json`, `marketplace.md`, `index.html`,
+`archive-mirror.json`, and content-addressed copies under `archive/sha256/`.
 Rejected examples stay in the report with reason codes; they are not silently
 dropped.
 
@@ -30,6 +34,21 @@ The reputation score is deterministic and additive. It does not affect the
 certificate subject hash because reputation is expected to evolve as gates are
 rerun and independently confirmed; the publication report hash still makes the
 current reputation snapshot tamper-evident.
+
+## Long-term archive mirror
+
+The archive mirror persists every accepted, already-redacted marketplace artifact
+even when duplicate analysis later assigns it zero prevalence weight. The mirror
+manifest records the artifact checksum, byte count, SPDX license, source commit,
+certificate subject hash, evidence hash, and a deterministic withdrawal record
+for each artifact. Withdrawal metadata starts in `active` state with a stable
+`withdrawal_id`, maintainer contact, policy URL, review requirement, tombstone
+requirement, and checksum-preservation requirement so future takedowns can hide
+bytes without erasing the historical proof that was reviewed.
+
+`WriteReport` re-reads and rehashes source artifacts before copying them into
+the mirror; if bytes drift after publication validation, report writing fails
+instead of publishing stale checksums.
 
 ## Duplicate-safe prevalence
 
@@ -102,6 +121,7 @@ Each public example must include:
 | Redaction review | `redaction_reviewed` must be true and `raw_data_shared` false. |
 | Artifact hashes | Every relative artifact path is resolved through symlink-safe bounds checks and SHA-256 verified. |
 | Certificate backing | Required obligations are `redaction-reviewed`, `license-cleared`, `artifact-hashes-verified`, and `reproducible-without-private-data`. |
+| Archive mirror | Accepted artifacts are copied to `archive/sha256/<hash>` and listed with checksum, license, source, certificate, evidence, and withdrawal metadata. |
 | Reproduction | Commands must be public-data-only and free of high-signal credential markers. |
 | Gate reputation | Optional `gate_reputation` may contain only `reproducible_runs`, `first_verified_at`, `last_verified_at`, and `independent_confirmations`; malformed timestamps, self-confirmations, duplicate confirmations, negative runs, and private markers are rejected. |
 | Duplicate analysis | Every accepted example receives exact and near fingerprints; prevalence counts and benchmark imports use only the representative example in each near-duplicate group. |

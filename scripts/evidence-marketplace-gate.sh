@@ -28,11 +28,11 @@ jq -e '
   )
 ' "$REGISTRY" > /dev/null
 
-for phrase in "evidence marketplace" "redacted, certificate-backed" "reproducibility, longevity, and independent confirmation" "make evidence-marketplace-gate"; do
+for phrase in "evidence marketplace" "redacted, certificate-backed" "archive mirror" "reproducibility, longevity, and independent confirmation" "make evidence-marketplace-gate"; do
   grep -F "$phrase" docs/evidence-marketplace.md README.md > /dev/null
 done
 
-go test ./internal/evidencemarketplace -run 'TestPublishRegistry|TestCertificateHash|TestRenderHTML'
+go test ./internal/evidencemarketplace -run 'TestPublishRegistry|TestCertificateHash|TestRenderHTML|TestWriteReport'
 go test ./internal/artifact -run TestImportMarketplaceBenchmark
 go test ./cmd/patchline -run 'TestEvidenceMarketplacePublishCommandWritesReports|TestArtifactBenchmarkImportMarketplaceCommandWritesRunnableBenchmark'
 
@@ -44,6 +44,7 @@ go run ./cmd/patchline evidence-marketplace publish \
 test -s "$OUT/published/marketplace.json"
 test -s "$OUT/published/marketplace.md"
 test -s "$OUT/published/index.html"
+test -s "$OUT/published/archive-mirror.json"
 
 jq -e '
   .version == "patchline.evidence-marketplace-report/v1" and
@@ -59,9 +60,30 @@ jq -e '
   .summary.exact_duplicate_groups == 0 and
   .summary.near_duplicate_groups == 0 and
   .summary.artifacts_verified >= 4 and
+  .summary.mirrored_artifacts == .summary.artifacts_verified and
+  .summary.mirror_bytes > 0 and
   .summary.gate_reputation_submitted == .summary.published and
   .summary.gate_reputation_reviewable == .summary.published and
   .summary.gate_reputation_established >= 1 and
+  .archive_mirror.version == "patchline.evidence-marketplace-mirror/v1" and
+  .archive_mirror.summary.artifacts == .summary.artifacts_verified and
+  .archive_mirror.summary.unique_files == .summary.artifacts_verified and
+  .archive_mirror.summary.active == .summary.artifacts_verified and
+  .archive_mirror.summary.withdrawn == 0 and
+  (.archive_mirror.entries | all(
+    (.mirror_path | startswith("archive/sha256/")) and
+    (.checksum | startswith("sha256:")) and
+    (.license_spdx | length) > 0 and
+    .redacted == true and
+    (.withdrawal.status == "active") and
+    (.withdrawal.requested == false) and
+    (.withdrawal.withdrawal_id | startswith("sha256:")) and
+    (.withdrawal.policy_url | length) > 0 and
+    (.withdrawal.contact | length) > 0 and
+    (.withdrawal.review_required == true) and
+    (.withdrawal.tombstone_required == true) and
+    (.withdrawal.preserve_checksum_after_withdrawal == true)
+  )) and
   (.examples | all(
     (.certificate_subject_hash | startswith("sha256:")) and
     (.evidence_hash | startswith("sha256:")) and
@@ -87,8 +109,31 @@ jq -e '
   (.by_reputation_tier | length) >= 2
 ' "$OUT/published/marketplace.json" > /dev/null
 
+jq -e '
+  .version == "patchline.evidence-marketplace-mirror/v1" and
+  .summary.artifacts >= 4 and
+  .summary.active == .summary.artifacts and
+  .summary.withdrawn == 0 and
+  (.entries | all(
+    (.checksum | startswith("sha256:")) and
+    (.license_spdx | length) > 0 and
+    (.certificate_subject_hash | startswith("sha256:")) and
+    (.evidence_hash | startswith("sha256:")) and
+    (.withdrawal.withdrawal_id | startswith("sha256:"))
+  ))
+' "$OUT/published/archive-mirror.json" > /dev/null
+
+while IFS=$'\t' read -r checksum mirror_path; do
+  test -f "$OUT/published/$mirror_path"
+  actual="sha256:$(shasum -a 256 "$OUT/published/$mirror_path" | cut -d' ' -f1)"
+  if [ "$actual" != "$checksum" ]; then
+    echo "FAIL: mirrored artifact $mirror_path checksum $actual did not match manifest $checksum" >&2
+    exit 1
+  fi
+done < <(jq -r '.entries[] | [.checksum, .mirror_path] | @tsv' "$OUT/published/archive-mirror.json")
+
 if grep -Eiq 'password=|Authorization:|AWS_SECRET_ACCESS_KEY|source_code|BEGIN PRIVATE|token=' \
-  "$OUT/published/marketplace.json" "$OUT/published/marketplace.md" "$OUT/published/index.html"; then
+  "$OUT/published/marketplace.json" "$OUT/published/marketplace.md" "$OUT/published/index.html" "$OUT/published/archive-mirror.json" "$OUT/published/archive/sha256/"*; then
   echo "FAIL: marketplace output contains a high-signal private marker" >&2
   exit 1
 fi
@@ -147,15 +192,19 @@ if [ "$status" -eq 0 ]; then
 fi
 jq -e '.ok == false and (.rejected | length) >= 1 and (.rejected[]?.reasons[]? | contains("certificate.subject_hash mismatch"))' \
   "$OUT/rejected/marketplace.json" > /dev/null
+jq -e '.version == "patchline.evidence-marketplace-mirror/v1" and .summary.artifacts == 2 and (.entries | length) == 2 and (.entries | all(.example_id == "redacted-django-nullability-backfill"))' \
+  "$OUT/rejected/archive-mirror.json" > /dev/null
 
 jq -n \
   --slurpfile r "$OUT/published/marketplace.json" \
+  --slurpfile m "$OUT/published/archive-mirror.json" \
   --slurpfile i "$OUT/imported-benchmark/marketplace-import.json" '{
   version: "patchline.evidence-marketplace-gate-results/v1",
   published: $r[0].summary.published,
   prevalence_examples: $r[0].summary.prevalence_examples,
   duplicate_inflation: $r[0].summary.duplicate_inflation,
   artifacts_verified: $r[0].summary.artifacts_verified,
+  mirrored_artifacts: $m[0].summary.artifacts,
   public_release_eligible: $r[0].summary.public_release_eligible,
   gate_reputation_reviewable: $r[0].summary.gate_reputation_reviewable,
   gate_reputation_established: $r[0].summary.gate_reputation_established,
@@ -164,4 +213,4 @@ jq -n \
   verified: true
 }' > "$OUT/gate-summary.json"
 
-echo "evidence-marketplace gate passed: $(jq -r .summary.published "$OUT/published/marketplace.json") redacted certificate-backed examples published; $(jq -r .summary.prevalence_examples "$OUT/published/marketplace.json") prevalence examples after duplicate collapse; $(jq -r .summary.gate_reputation_reviewable "$OUT/published/marketplace.json") reviewable gate reputations scored; $(jq -r .summary.imported "$OUT/imported-benchmark/marketplace-import.json") imported into runnable benchmarks; corrupted certificate rejected"
+echo "evidence-marketplace gate passed: $(jq -r .summary.published "$OUT/published/marketplace.json") redacted certificate-backed examples published; $(jq -r .summary.prevalence_examples "$OUT/published/marketplace.json") prevalence examples after duplicate collapse; $(jq -r .summary.artifacts "$OUT/published/archive-mirror.json") artifacts mirrored with checksum/license/withdrawal metadata; $(jq -r .summary.gate_reputation_reviewable "$OUT/published/marketplace.json") reviewable gate reputations scored; $(jq -r .summary.imported "$OUT/imported-benchmark/marketplace-import.json") imported into runnable benchmarks; corrupted certificate rejected"
