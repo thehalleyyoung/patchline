@@ -1,0 +1,8 @@
+{
+  "version": "patchline.apprenticeship-negative-control/v1",
+  "target_gate": "online-schema-change-adapters-gate",
+  "id": "plain-alter-without-adapter-marker",
+  "mutation": "remove the pt-online-schema-change, gh-ost, concurrent-index, Rails, or Django adapter marker",
+  "expected_counterexample": "db-semantics must not classify the statement as an online schema change adapter",
+  "sql": "ALTER TABLE accounts ADD COLUMN status varchar(20) DEFAULT 'active';"
+}

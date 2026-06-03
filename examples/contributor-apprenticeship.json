@@ -1,0 +1,189 @@
+{
+  "version": "patchline.contributor-apprenticeship/v1",
+  "name": "Patchline contributor apprenticeship",
+  "claim": "Patchline graduates new contributors only when an apprenticeship track proves a real detector, reproducing gate, concise documentation, minimized positive fixture, minimized negative-control fixture, mentor signoff, and independent reviewer evidence against the live repository. The path is a working gate, not a social checklist.",
+  "criteria": {
+    "min_tracks": 3,
+    "required_deliverables": [
+      "detector",
+      "gate",
+      "doc",
+      "fixture"
+    ],
+    "min_reviewers": 2,
+    "max_fixture_bytes": 8192,
+    "require_mentor_signoff": true,
+    "require_reproducible_gate": true,
+    "require_minimized_fixture": true,
+    "require_detector_symbol": true,
+    "require_negative_control": true,
+    "require_documentation_phrases": true
+  },
+  "tracks": [
+    {
+      "id": "query-plan-regression-apprentice",
+      "title": "Ship a query-plan regression detector",
+      "hazard_class": "query-plan-regression",
+      "contributor_id": "apprentice-query-plan",
+      "mentor_id": "mentor-db-semantics",
+      "repo": "thehalleyyoung/patchline",
+      "detector": {
+        "path": "internal/dbsemantics/semantics.go",
+        "symbol": "detectQueryPlanRegression",
+        "expected_signal": "QueryPlanRegression",
+        "evidence_paths": [
+          "internal/dbsemantics/semantics_test.go"
+        ]
+      },
+      "gate": {
+        "name": "query-plan-regression-gate",
+        "commands": [
+          "make query-plan-regression-gate"
+        ],
+        "expected_artifacts": [
+          "results/generated/query-plan-regression/query-plan-regression.json",
+          "results/generated/query-plan-regression/reports/mysql-drop-index.json"
+        ],
+        "negative_controls": [
+          {
+            "id": "plain-add-column-control",
+            "mutation": "replace an index or column-shape regression case with a plain ADD COLUMN control",
+            "expected_counterexample": "the query-plan detector remains quiet instead of fabricating a regression"
+          }
+        ]
+      },
+      "documentation": {
+        "path": "docs/query-plan-regression.md",
+        "required_phrases": [
+          "query-plan regression",
+          "make query-plan-regression-gate"
+        ]
+      },
+      "fixture": {
+        "path": "examples/query-plan-regression-gate.json",
+        "minimized": true,
+        "negative_control_path": "examples/query-plan-negative-control.json"
+      },
+      "review": {
+        "reviewers": [
+          "db-semantics-reviewer",
+          "artifact-gate-reviewer"
+        ],
+        "mentor_signoff": true,
+        "merged_prs": [
+          "local:query-plan-regression-gate"
+        ]
+      }
+    },
+    {
+      "id": "online-schema-change-apprentice",
+      "title": "Ship an online schema change adapter detector",
+      "hazard_class": "online-schema-change",
+      "contributor_id": "apprentice-online-schema-change",
+      "mentor_id": "mentor-db-semantics",
+      "repo": "thehalleyyoung/patchline",
+      "detector": {
+        "path": "internal/dbsemantics/semantics.go",
+        "symbol": "detectOnlineSchemaChange",
+        "expected_signal": "OnlineSchemaChange",
+        "evidence_paths": [
+          "internal/dbsemantics/semantics_test.go"
+        ]
+      },
+      "gate": {
+        "name": "online-schema-change-adapters-gate",
+        "commands": [
+          "make online-schema-change-adapters-gate"
+        ],
+        "expected_artifacts": [
+          "results/generated/online-schema-change-adapters/online-schema-change-adapters.json",
+          "results/generated/online-schema-change-adapters/reports/pt-online-schema-change.json"
+        ],
+        "negative_controls": [
+          {
+            "id": "plain-alter-control",
+            "mutation": "remove the adapter marker from an otherwise ordinary ALTER TABLE fixture",
+            "expected_counterexample": "the adapter detector does not classify the statement as online schema change"
+          }
+        ]
+      },
+      "documentation": {
+        "path": "docs/online-schema-change-adapters.md",
+        "required_phrases": [
+          "online-schema-change adapters",
+          "make online-schema-change-adapters-gate"
+        ]
+      },
+      "fixture": {
+        "path": "examples/online-schema-change-adapters-gate.json",
+        "minimized": true,
+        "negative_control_path": "examples/online-schema-negative-control.json"
+      },
+      "review": {
+        "reviewers": [
+          "db-semantics-reviewer",
+          "artifact-gate-reviewer"
+        ],
+        "mentor_signoff": true,
+        "merged_prs": [
+          "local:online-schema-change-adapters-gate"
+        ]
+      }
+    },
+    {
+      "id": "staged-backfill-apprentice",
+      "title": "Ship a staged backfill completeness detector",
+      "hazard_class": "partial-backfill",
+      "contributor_id": "apprentice-staged-backfill",
+      "mentor_id": "mentor-repair-planning",
+      "repo": "thehalleyyoung/patchline",
+      "detector": {
+        "path": "internal/backfillplanner/planner.go",
+        "symbol": "BuildPlan",
+        "expected_signal": "CompletenessProof",
+        "evidence_paths": [
+          "internal/backfillplanner/planner_test.go"
+        ]
+      },
+      "gate": {
+        "name": "staged-backfill-planner-gate",
+        "commands": [
+          "make staged-backfill-planner-gate"
+        ],
+        "expected_artifacts": [
+          "results/generated/staged-backfill-planner-gate/gate-summary.json",
+          "results/generated/staged-backfill-planner/staged-backfill-plan.md"
+        ],
+        "negative_controls": [
+          {
+            "id": "missing-row-proof",
+            "mutation": "use the incomplete replay store so one legacy invoice lacks an external_id",
+            "expected_counterexample": "contract and compatibility-code deletion remain blocked"
+          }
+        ]
+      },
+      "documentation": {
+        "path": "docs/staged-backfill-planner.md",
+        "required_phrases": [
+          "Staged data-backfill planner",
+          "make staged-backfill-planner-gate"
+        ]
+      },
+      "fixture": {
+        "path": "examples/staged-backfill-plan.json",
+        "minimized": true,
+        "negative_control_path": "examples/staged-backfill-store-incomplete.json"
+      },
+      "review": {
+        "reviewers": [
+          "repair-planning-reviewer",
+          "artifact-gate-reviewer"
+        ],
+        "mentor_signoff": true,
+        "merged_prs": [
+          "local:staged-backfill-planner-gate"
+        ]
+      }
+    }
+  ]
+}

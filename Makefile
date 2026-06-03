@@ -7,6 +7,7 @@
 .PHONY: practitioner-certification-exam-gate
 .PHONY: classroom-lab-kits-gate
 .PHONY: longitudinal-education-study-gate
+.PHONY: contributor-apprenticeship-gate
 
 build:
 	go build -o bin/patchline ./cmd/patchline
@@ -1398,6 +1399,9 @@ maintainer-acceptance-study-gate:
 
 longitudinal-education-study-gate:
 	bash scripts/longitudinal-education-study-gate.sh
+
+contributor-apprenticeship-gate:
+	bash scripts/contributor-apprenticeship-gate.sh
 
 evidence-marketplace-gate:
 	bash scripts/evidence-marketplace-gate.sh

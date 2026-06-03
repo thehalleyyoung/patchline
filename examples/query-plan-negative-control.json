@@ -1,0 +1,8 @@
+{
+  "version": "patchline.apprenticeship-negative-control/v1",
+  "target_gate": "query-plan-regression-gate",
+  "id": "plain-add-column-control",
+  "mutation": "replace the regression-producing index or column change with a plain ADD COLUMN",
+  "expected_counterexample": "db-semantics must not emit a query-plan regression finding for this control",
+  "sql": "ALTER TABLE accounts ADD COLUMN status text;"
+}

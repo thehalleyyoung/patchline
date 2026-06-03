@@ -145,6 +145,8 @@ Run `classroom-lab-kits --spec examples/classroom-lab-kits.json` to verify datab
 
 Run `longitudinal-education-study --spec examples/longitudinal-education-study.json` to measure whether Patchline-trained reviewers still catch real, gate-backed hazards months later versus a control cohort; reproduce it with `make longitudinal-education-study-gate`.
 
+Run `contributor-apprenticeship --spec examples/contributor-apprenticeship.json` to graduate contributors only after detector code, a Make-backed gate, docs, minimized positive/negative fixtures, mentor signoff, and reviewer evidence all verify; reproduce it with `make contributor-apprenticeship-gate`.
+
 Run `explainability-audit --spec examples/explainability-audit.json` to verify independent reviewers agree evidence trails support stated verdicts, with hash-mismatch and disagreement negative controls; reproduce it with `make explainability-audit-gate`.
 
 Run `change-management-verify --spec <spec>` to prove organizational approvals are bound to passed Patchline gates, hash-pinned reports, rollback evidence, and emergency expiry; reproduce it with `make change-management-integration-gate`.

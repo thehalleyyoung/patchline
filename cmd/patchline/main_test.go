@@ -1108,6 +1108,99 @@ func mainLongitudinalObservation(cohort, reviewer string, month int, hazard educ
 	return obs
 }
 
+func TestContributorApprenticeshipCommandWritesReports(t *testing.T) {
+	root := t.TempDir()
+	gates := []string{"query-plan-regression-gate", "online-schema-change-adapters-gate", "staged-backfill-planner-gate"}
+	var makefile strings.Builder
+	for _, gate := range gates {
+		fmt.Fprintf(&makefile, "%s:\n\tbash scripts/%s.sh\n\n", gate, gate)
+		writeMainTestFile(t, root, "scripts/"+gate+".sh", "#!/usr/bin/env bash\nset -euo pipefail\n")
+	}
+	writeMainTestFile(t, root, "Makefile", makefile.String())
+	writeMainTestFile(t, root, "internal/dbsemantics/semantics.go", "package dbsemantics\n\ntype QueryPlanRegression struct{}\ntype OnlineSchemaChange struct{}\nfunc detectQueryPlanRegression() *QueryPlanRegression { return nil }\nfunc detectOnlineSchemaChange() *OnlineSchemaChange { return nil }\n")
+	writeMainTestFile(t, root, "internal/dbsemantics/semantics_test.go", "package dbsemantics\n")
+	writeMainTestFile(t, root, "internal/backfillplanner/planner.go", "package backfillplanner\n\ntype CompletenessProof struct{}\nfunc BuildPlan() CompletenessProof { return CompletenessProof{} }\n")
+	writeMainTestFile(t, root, "internal/backfillplanner/planner_test.go", "package backfillplanner\n")
+	writeMainTestFile(t, root, "docs/query-plan-regression.md", "query-plan regression evidence; run make query-plan-regression-gate\n")
+	writeMainTestFile(t, root, "docs/online-schema-change-adapters.md", "online-schema-change adapters evidence; run make online-schema-change-adapters-gate\n")
+	writeMainTestFile(t, root, "docs/staged-backfill-planner.md", "Staged data-backfill plan evidence; run make staged-backfill-planner-gate\n")
+	writeMainTestFile(t, root, "examples/query-plan-regression-gate.json", `{"version":"patchline.query-plan-regression-gate/v1"}`)
+	writeMainTestFile(t, root, "examples/query-plan-negative-control.json", `{"version":"patchline.apprenticeship-negative-control/v1"}`)
+	writeMainTestFile(t, root, "examples/online-schema-change-adapters-gate.json", `{"version":"patchline.online-schema-change-adapters-gate/v1"}`)
+	writeMainTestFile(t, root, "examples/online-schema-negative-control.json", `{"version":"patchline.apprenticeship-negative-control/v1"}`)
+	writeMainTestFile(t, root, "examples/staged-backfill-plan.json", `{"version":"patchline.backfill-plan/v1"}`)
+	writeMainTestFile(t, root, "examples/staged-backfill-store-incomplete.json", `{"tables":{"invoices":{"3":{"external_id":""}}}}`)
+
+	specPath := filepath.Join(root, "contributor-apprenticeship.json")
+	writeMainTestJSONFile(t, specPath, education.ApprenticeshipSpec{
+		Version: education.ApprenticeshipSpecVersion,
+		Name:    "main test contributor apprenticeship",
+		Claim:   "Patchline contributor apprenticeship graduation requires detector code, a gate, documentation, minimized fixtures, negative controls, mentor signoff, and independent reviews.",
+		Criteria: education.ApprenticeshipCriteria{
+			MinTracks:                   3,
+			RequiredDeliverables:        []string{"detector", "gate", "doc", "fixture"},
+			MinReviewers:                2,
+			MaxFixtureBytes:             8192,
+			RequireMentorSignoff:        true,
+			RequireReproducibleGate:     true,
+			RequireMinimizedFixture:     true,
+			RequireDetectorSymbol:       true,
+			RequireNegativeControl:      true,
+			RequireDocumentationPhrases: true,
+		},
+		Tracks: []education.ApprenticeshipTrack{
+			mainApprenticeshipTrack("query", "query-plan-regression", "internal/dbsemantics/semantics.go", "detectQueryPlanRegression", "QueryPlanRegression", "query-plan-regression-gate", "docs/query-plan-regression.md", []string{"query-plan regression", "make query-plan-regression-gate"}, "examples/query-plan-regression-gate.json", "examples/query-plan-negative-control.json", "internal/dbsemantics/semantics_test.go"),
+			mainApprenticeshipTrack("online", "online-schema-change", "internal/dbsemantics/semantics.go", "detectOnlineSchemaChange", "OnlineSchemaChange", "online-schema-change-adapters-gate", "docs/online-schema-change-adapters.md", []string{"online-schema-change adapters", "make online-schema-change-adapters-gate"}, "examples/online-schema-change-adapters-gate.json", "examples/online-schema-negative-control.json", "internal/dbsemantics/semantics_test.go"),
+			mainApprenticeshipTrack("backfill", "partial-backfill", "internal/backfillplanner/planner.go", "BuildPlan", "CompletenessProof", "staged-backfill-planner-gate", "docs/staged-backfill-planner.md", []string{"Staged data-backfill plan", "make staged-backfill-planner-gate"}, "examples/staged-backfill-plan.json", "examples/staged-backfill-store-incomplete.json", "internal/backfillplanner/planner_test.go"),
+		},
+	})
+	out := filepath.Join(t.TempDir(), "contributor-apprenticeship")
+	if err := run([]string{"contributor-apprenticeship", "--spec", specPath, "--root", root, "--out", out, "--json"}); err != nil {
+		t.Fatalf("contributor-apprenticeship failed: %v", err)
+	}
+	var report education.ApprenticeshipReport
+	readMainTestJSON(t, filepath.Join(out, "contributor-apprenticeship.json"), &report)
+	if !report.OK || report.Summary.Tracks != 3 || report.Summary.GraduatedTracks != 3 || report.Summary.DeliverablesVerified != 12 {
+		t.Fatalf("unexpected contributor apprenticeship report: %#v", report)
+	}
+	if report.Summary.EvidenceArtifacts != 15 || len(report.Tracks[0].Evidence[0].SHA256) != 64 {
+		t.Fatalf("expected evidence hashes, got %#v", report.Summary)
+	}
+	if stat, err := os.Stat(filepath.Join(out, "contributor-apprenticeship.md")); err != nil || stat.Size() == 0 {
+		t.Fatalf("expected contributor-apprenticeship.md to be written, stat=%#v err=%v", stat, err)
+	}
+}
+
+func mainApprenticeshipTrack(id, hazard, detectorPath, symbol, signal, gate, doc string, phrases []string, fixture, negative, evidencePath string) education.ApprenticeshipTrack {
+	return education.ApprenticeshipTrack{
+		ID:            id,
+		Title:         id + " apprenticeship",
+		HazardClass:   hazard,
+		ContributorID: id + "-contributor",
+		MentorID:      id + "-mentor",
+		Repo:          "example/repo",
+		Detector: education.ApprenticeshipDetector{
+			Path:           detectorPath,
+			Symbol:         symbol,
+			ExpectedSignal: signal,
+			EvidencePaths:  []string{evidencePath},
+		},
+		Gate: education.ApprenticeshipGate{
+			Name:              gate,
+			Commands:          []string{"make " + gate},
+			ExpectedArtifacts: []string{"gate-summary.json"},
+			NegativeControls: []education.ApprenticeshipNegativeControl{{
+				ID:                     "negative",
+				Mutation:               "remove the proof marker",
+				ExpectedCounterexample: "missing proof is rejected",
+			}},
+		},
+		Documentation: education.ApprenticeshipDocumentation{Path: doc, RequiredPhrases: phrases},
+		Fixture:       education.ApprenticeshipFixture{Path: fixture, Minimized: true, NegativeControlPath: negative},
+		Review:        education.ApprenticeshipReview{Reviewers: []string{id + "-reviewer-a", id + "-reviewer-b"}, MentorSignoff: true, MergedPRs: []string{"local:" + id}},
+	}
+}
+
 func TestReviewerFairnessAuditCommandWritesReports(t *testing.T) {
 	root := t.TempDir()
 	writeMainTestFile(t, root, "docs/acceptance-study.md", "paired reviews with adjudicated false positives\n")
