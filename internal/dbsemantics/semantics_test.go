@@ -427,6 +427,139 @@ func TestReplicationLagRiskUsesEngineSpecificEvidence(t *testing.T) {
 	}
 }
 
+func TestPartitionShardingSemanticsCoverRoutingSwapAndRebalance(t *testing.T) {
+	cases := []struct {
+		name          string
+		engine        Engine
+		version       string
+		sql           string
+		operation     string
+		class         string
+		table         string
+		tenantKey     string
+		partition     string
+		target        string
+		requiresRoute bool
+		requiresCopy  bool
+	}{
+		{
+			name:      "postgres-attach-partition",
+			engine:    EnginePostgres,
+			version:   "16",
+			sql:       "ALTER TABLE events ATTACH PARTITION events_tenant_42 FOR VALUES IN (42); -- partition_key=tenant_id",
+			operation: "partition_attach",
+			class:     "high",
+			table:     "events",
+			partition: "events_tenant_42",
+			target:    "events_tenant_42",
+		},
+		{
+			name:      "mysql-exchange-partition",
+			engine:    EngineMySQL,
+			version:   "8.0.34",
+			sql:       "ALTER TABLE orders EXCHANGE PARTITION p2024 WITH TABLE orders_stage WITHOUT VALIDATION;",
+			operation: "partition_exchange",
+			class:     "high",
+			table:     "orders",
+			partition: "p2024",
+			target:    "orders_stage",
+		},
+		{
+			name:      "sqlserver-switch-partition",
+			engine:    EngineSQLServer,
+			version:   "2022",
+			sql:       "ALTER TABLE orders SWITCH PARTITION 12 TO orders_archive PARTITION 12;",
+			operation: "partition_switch",
+			class:     "high",
+			table:     "orders",
+			partition: "12",
+			target:    "orders_archive",
+		},
+		{
+			name:          "tenant-route-map-update",
+			engine:        EnginePostgres,
+			version:       "16",
+			sql:           "UPDATE tenant_route_map SET shard_id = 'shard_17', routing_version = routing_version + 1 WHERE tenant_id = 42;",
+			operation:     "tenant_routing",
+			class:         "medium",
+			table:         "tenant_route_map",
+			tenantKey:     "tenant_id",
+			target:        "shard_17",
+			requiresRoute: true,
+		},
+		{
+			name:         "rebalance-shard-map",
+			engine:       EngineMySQL,
+			version:      "8.0.34",
+			sql:          "UPDATE shard_map SET target_shard = 'shard_b' WHERE tenant_id BETWEEN 100 AND 199 /* rebalance source_shard=shard_a target_shard=shard_b chunk=500 */;",
+			operation:    "rebalance",
+			class:        "high",
+			table:        "shard_map",
+			tenantKey:    "tenant_id",
+			target:       "shard_b",
+			requiresCopy: true,
+		},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			report, err := Evaluate(tc.engine, tc.version, tc.name+".sql", []byte(tc.sql))
+			if err != nil {
+				t.Fatal(err)
+			}
+			if report.Summary.PartitionShardingFindings != 1 {
+				t.Fatalf("expected one partition/sharding finding, got summary=%#v statements=%#v", report.Summary, report.Statements)
+			}
+			semantics := report.Statements[0].PartitionSharding
+			if semantics == nil {
+				t.Fatalf("missing partition/sharding semantics: %#v", report.Statements[0])
+			}
+			if semantics.Operation != tc.operation || semantics.Class != tc.class || semantics.Table != tc.table {
+				t.Fatalf("unexpected partition/sharding semantics for %s: %#v", tc.name, semantics)
+			}
+			if tc.tenantKey != "" && semantics.TenantKey != tc.tenantKey {
+				t.Fatalf("expected tenant key %s, got %#v", tc.tenantKey, semantics)
+			}
+			if tc.partition != "" && semantics.Partition != tc.partition {
+				t.Fatalf("expected partition %s, got %#v", tc.partition, semantics)
+			}
+			if tc.target != "" && semantics.TargetObject != tc.target {
+				t.Fatalf("expected target %s, got %#v", tc.target, semantics)
+			}
+			if tc.requiresRoute && !semantics.RequiresDoubleRouting {
+				t.Fatalf("expected double-routing obligation: %#v", semantics)
+			}
+			if tc.requiresCopy && !semantics.RequiresRebalanceBackfill {
+				t.Fatalf("expected rebalance backfill obligation: %#v", semantics)
+			}
+			if len(semantics.Hazards) < 3 || len(semantics.Evidence) < 2 || len(semantics.Obligations) < 4 {
+				t.Fatalf("semantics should carry hazards, evidence, and obligations: %#v", semantics)
+			}
+			if !hasRule(report, "partition_sharding."+tc.operation) {
+				t.Fatalf("missing partition/sharding rule for %s in %#v", tc.operation, report.Statements[0].Rules)
+			}
+		})
+	}
+}
+
+func TestPartitionShardingSemanticsHasNegativeControlAndStableHash(t *testing.T) {
+	sql := []byte("UPDATE invoices SET status = 'paid' WHERE tenant_id = 42;")
+	first, err := Evaluate(EnginePostgres, "16", "tenant-scoped.sql", sql)
+	if err != nil {
+		t.Fatal(err)
+	}
+	second, err := Evaluate(EnginePostgres, "16", "tenant-scoped.sql", sql)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if first.Hash != second.Hash {
+		t.Fatalf("expected deterministic partition/sharding hash, got %s and %s", first.Hash, second.Hash)
+	}
+	if first.Summary.PartitionShardingFindings != 0 || first.Statements[0].PartitionSharding != nil {
+		t.Fatalf("ordinary tenant-scoped DML should not be route-map semantics: %#v", first.Statements[0])
+	}
+}
+
 func TestRejectsUnsupportedEngineAndBadVersion(t *testing.T) {
 	if _, err := ResolveProfile(Engine("db2"), "11"); err == nil {
 		t.Fatal("expected unsupported engine error")

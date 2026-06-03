@@ -77,7 +77,7 @@ every capability in \tool{} is backed by a reproducible \emph{gate}: a script th
 capability against real, pinned public code and fails loudly on drift. \tool{} currently ships more
 than 600 such gates over 560 documented capabilities, spanning relational migrations across nine
 ecosystems, versioned database semantics, lock-mode simulations, online-schema-change adapters,
-and conditional replication-lag analysis
+conditional replication-lag analysis, and partition/shard routing semantics
 across eight production engines, five NoSQL engines,
 four data-pipeline frameworks, protobuf/Avro schema compatibility,
 infrastructure/data ordering, a research-grade evaluation methodology that includes blinded
@@ -133,7 +133,7 @@ ranks the risks, and prints the next commands that can run immediately.
   \item A \textbf{deterministic, provenance-carrying fact layer} for data-change risk that is derived
   from real repositories without pre-authored schemas (Section~\ref{sec:facts}).
   \item A \textbf{breadth of analysis} that unifies relational migrations (nine ecosystems),
-  versioned database semantics, online-schema-change adapters, and lock-mode conflict simulations
+  versioned database semantics, online-schema-change adapters, partition/shard routing semantics, and lock-mode conflict simulations
   (eight engines), NoSQL changes (five engines), data pipelines
   (four frameworks), protobuf/Avro schema compatibility, and
   infrastructure/data ordering under one fact model (Section~\ref{sec:breadth}).
@@ -380,6 +380,7 @@ seven-framework unit matrix.
 surface resolves PostgreSQL, MySQL, SQLite, SQL Server, Oracle, BigQuery, Snowflake, and ClickHouse
 profiles and attaches statement-level rules for transactional DDL, implicit commits, atomic DDL,
 concurrent or online index behavior, online-schema-change adapters, conditional replication-lag risk,
+tenant routing, partition swaps, shard rebalancing,
 instant or metadata-only column addition, \code{CREATE OR REPLACE}
 replacement, Snowflake Time Travel recovery, partition-aware DDL, and ClickHouse asynchronous
 mutations. This matters because the same migration can be metadata-only on PostgreSQL~15 but a table
@@ -399,6 +400,10 @@ non-atomic-execution obligations rather than being mistaken for comments around 
 cloud table replacement, and asynchronous mutations, requiring each positive case to name conditional
 read-replica, CDC, or event-stream hazards plus catch-up obligations, while a MySQL~8 metadata-only
 add-column control remains unflagged. The
+\code{partition-sharding-semantics-gate} adds tenant route-map updates, PostgreSQL partition attach,
+MySQL exchange partition, SQL Server switch partition, ClickHouse replace partition, BigQuery
+partitioned replacement, and a shard-rebalance case; it requires stable operation/scope/source/target
+fields, hazards, evidence, and obligations, while an ordinary tenant-scoped update remains quiet. The
 \code{db-version-semantics-gate} exercises one checked SQL fixture across all eight engines plus an
 unsupported-engine negative control.
 
@@ -468,7 +473,7 @@ the real repository each is proven against.
 \textbf{Surface} & \textbf{Fact kinds} & \textbf{Real-repo proof} \\
 \midrule
 Relational migrations & \code{schema\_evolution}, \code{migration\_root} & \code{laravel/laravel}, \code{lobsters/lobsters} \\
-Database engine semantics & \code{db\_semantics}, \code{engine\_profile}, \code{lock\_simulation}, \code{online\_schema\_change}, \code{replication\_lag\_risk} & 8-engine versioned fixture + lock-mode simulator + online-schema-change adapter gate + replication-lag risk gate + unsupported-engine negative control \\
+Database engine semantics & \code{db\_semantics}, \code{engine\_profile}, \code{lock\_simulation}, \code{online\_schema\_change}, \code{replication\_lag\_risk}, \code{partition\_sharding} & 8-engine versioned fixture + lock-mode simulator + online-schema-change adapter gate + replication-lag risk gate + partition/sharding semantics gate + unsupported-engine negative control \\
 NoSQL changes & \code{nosql\_change} & \code{laaksomavrick/twitter-go} \\
 Data pipelines & \code{data\_pipeline\_change} & \code{harrydevforlife/building-lakehouse} \\
 Schema compatibility & \code{schema\_compatibility} & \code{apache/avro} \\
@@ -973,6 +978,7 @@ dozens of schema-evolution hazards & \code{apache/avro} \\
 8 engine-specific lock-mode simulations with documented evidence and container-smoke fixtures & \gate{lock-mode-simulator-gate} \\
 5 online-schema-change adapters with explicit trigger/binlog/cutover obligations & \gate{online-schema-change-adapters-gate} \\
 4 replication-lag hazards plus 1 metadata-only no-lag control & \gate{replication-lag-risk-gate} \\
+7 partition/shard routing findings plus 1 ordinary-DML control & \gate{partition-sharding-semantics-gate} \\
 600+ gates / 560+ docs / 540+ examples & repository inventory \\
 \bottomrule
 \end{tabular}
@@ -1446,7 +1452,7 @@ evidence. The remaining frontier is not another isolated detector; it is the tra
 generational artifact to shared infrastructure. The open roadmap items around this transition include:
 production-grade remediation loops for rollback, repair escrow, and patch-series safety; a
 federated, checksum-mirrored, withdrawal-aware, challenge-ready public evidence marketplace with
-externally adopted governance; deeper partitioning, rollback, query-plan, and data-volume semantics
+externally adopted governance; deeper rollback, query-plan, data-volume, and engine-negative-control semantics
 on top of the new versioned production-database profiles;
 socio-technical accountability for appeals, fairness, ethics, and detector deprecation; education and
 certification materials that make migration safety teachable; resilient offline, edge, confidential,

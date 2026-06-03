@@ -1,0 +1,123 @@
+{
+  "version": "patchline.partition-sharding-semantics-gate/v1",
+  "claim": "Patchline models partitioning and sharding semantics as operational proof obligations, not as generic SQL keyword matches. The gate drives the real db-semantics CLI over common tenant routing, partition swap, and shard rebalancing operations across PostgreSQL, MySQL, SQL Server, ClickHouse, and BigQuery. Each positive case must report a stable partition_sharding object with operation, routing surface, affected scope, hazards, engine evidence, and rollout obligations; an ordinary tenant-scoped update must remain unflagged so the detector does not flood normal multi-tenant DML.",
+  "minimum_findings": 5,
+  "cases": [
+    {
+      "id": "postgres-attach-tenant-partition",
+      "engine": "postgres",
+      "version": "16",
+      "sql": "ALTER TABLE events ATTACH PARTITION events_tenant_42 FOR VALUES IN (42); -- partition_key=tenant_id",
+      "expect": {
+        "finding": true,
+        "operation": "partition_attach",
+        "class": "high",
+        "table": "events",
+        "scope": "partition",
+        "partition": "events_tenant_42",
+        "target": "events_tenant_42"
+      }
+    },
+    {
+      "id": "mysql-exchange-partition",
+      "engine": "mysql",
+      "version": "8.0.34",
+      "sql": "ALTER TABLE orders EXCHANGE PARTITION p2024 WITH TABLE orders_stage WITHOUT VALIDATION;",
+      "expect": {
+        "finding": true,
+        "operation": "partition_exchange",
+        "class": "high",
+        "table": "orders",
+        "scope": "partition",
+        "partition": "p2024",
+        "target": "orders_stage"
+      }
+    },
+    {
+      "id": "sqlserver-switch-partition",
+      "engine": "sqlserver",
+      "version": "2022",
+      "sql": "ALTER TABLE orders SWITCH PARTITION 12 TO orders_archive PARTITION 12;",
+      "expect": {
+        "finding": true,
+        "operation": "partition_switch",
+        "class": "high",
+        "table": "orders",
+        "scope": "partition",
+        "partition": "12",
+        "target": "orders_archive"
+      }
+    },
+    {
+      "id": "postgres-tenant-route-map",
+      "engine": "postgres",
+      "version": "16",
+      "sql": "UPDATE tenant_route_map SET shard_id = 'shard_17', routing_version = routing_version + 1 WHERE tenant_id = 42;",
+      "expect": {
+        "finding": true,
+        "operation": "tenant_routing",
+        "class": "medium",
+        "table": "tenant_route_map",
+        "scope": "tenant",
+        "tenant_key": "tenant_id",
+        "target": "shard_17"
+      }
+    },
+    {
+      "id": "mysql-shard-rebalance",
+      "engine": "mysql",
+      "version": "8.0.34",
+      "sql": "UPDATE shard_map SET target_shard = 'shard_b' WHERE tenant_id BETWEEN 100 AND 199 /* rebalance source_shard=shard_a target_shard=shard_b chunk=500 */;",
+      "expect": {
+        "finding": true,
+        "operation": "rebalance",
+        "class": "high",
+        "table": "shard_map",
+        "scope": "tenant-range",
+        "tenant_key": "tenant_id",
+        "target": "shard_b",
+        "requires_rebalance_backfill": true,
+        "mitigation": true
+      }
+    },
+    {
+      "id": "clickhouse-replace-partition",
+      "engine": "clickhouse",
+      "version": "24.1",
+      "sql": "ALTER TABLE events REPLACE PARTITION '202401' FROM events_stage;",
+      "expect": {
+        "finding": true,
+        "operation": "partition_replace",
+        "class": "high",
+        "table": "events",
+        "scope": "partition",
+        "partition": "202401",
+        "target": "events_stage"
+      }
+    },
+    {
+      "id": "bigquery-partitioned-replace",
+      "engine": "bigquery",
+      "version": "2024.2",
+      "sql": "CREATE OR REPLACE TABLE analytics.events$20240101 PARTITION BY event_date AS SELECT * FROM analytics.events_stage;",
+      "expect": {
+        "finding": true,
+        "operation": "partition_replace",
+        "class": "high",
+        "table": "analytics.events",
+        "scope": "partition",
+        "partition": "20240101",
+        "target": "analytics.events_stage"
+      }
+    },
+    {
+      "id": "tenant-scoped-dml-control",
+      "engine": "postgres",
+      "version": "16",
+      "sql": "UPDATE invoices SET status = 'paid' WHERE tenant_id = 42;",
+      "expect": {
+        "finding": false
+      }
+    }
+  ]
+}

@@ -153,6 +153,8 @@ Run `make online-schema-change-adapters-gate` to prove `db-semantics` recognizes
 
 Run `make replication-lag-risk-gate` to prove `db-semantics` links table rewrites, copy alters, online schema changes, replacements, and async mutations to conditional read replica, CDC, and event-stream lag obligations.
 
+Run `make partition-sharding-semantics-gate` to prove `db-semantics` models partitioning and sharding semantics for tenant routing, partition swap, and rebalancing operations without flagging ordinary tenant-scoped DML.
+
 <details>
 <summary><strong>Full verification catalog</strong> — 600+ reproducible <code>make &lt;name&gt;-gate</code> checks, each with a positive proof and a negative control on real public-repo data (click to expand)</summary>
 

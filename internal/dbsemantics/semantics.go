@@ -14,6 +14,8 @@ import (
 
 const ReportVersion = "patchline.db-semantics/v1"
 
+const sqlIdentifierCapture = "[`\"\\[\\]A-Za-z0-9_.$-]+"
+
 type Engine string
 
 const (
@@ -78,6 +80,7 @@ type StatementSemantics struct {
 	Lock               LockSimulation      `json:"lock_simulation"`
 	OnlineSchemaChange *OnlineSchemaChange `json:"online_schema_change,omitempty"`
 	ReplicationLagRisk *ReplicationLagRisk `json:"replication_lag_risk,omitempty"`
+	PartitionSharding  *PartitionSharding  `json:"partition_sharding,omitempty"`
 }
 
 type RuleFinding struct {
@@ -107,6 +110,7 @@ type Summary struct {
 	DDLBlockingLocks           int      `json:"ddl_blocking_locks"`
 	OnlineSchemaChangeAdapters int      `json:"online_schema_change_adapters,omitempty"`
 	ReplicationLagRisks        int      `json:"replication_lag_risks,omitempty"`
+	PartitionShardingFindings  int      `json:"partition_sharding_findings,omitempty"`
 	Tables                     []string `json:"tables"`
 }
 
@@ -163,6 +167,25 @@ type ReplicationLagRisk struct {
 	Evidence             []Evidence `json:"evidence"`
 	Obligations          []string   `json:"obligations"`
 	Mitigations          []string   `json:"mitigations,omitempty"`
+}
+
+type PartitionSharding struct {
+	Class                     string     `json:"class"`
+	Operation                 string     `json:"operation"`
+	RoutingSurface            string     `json:"routing_surface"`
+	AffectedScope             string     `json:"affected_scope"`
+	Table                     string     `json:"table,omitempty"`
+	TenantKey                 string     `json:"tenant_key,omitempty"`
+	PartitionKey              string     `json:"partition_key,omitempty"`
+	Partition                 string     `json:"partition,omitempty"`
+	SourceObject              string     `json:"source_object,omitempty"`
+	TargetObject              string     `json:"target_object,omitempty"`
+	RequiresDoubleRouting     bool       `json:"requires_double_routing"`
+	RequiresRebalanceBackfill bool       `json:"requires_rebalance_backfill"`
+	Hazards                   []string   `json:"hazards"`
+	Evidence                  []Evidence `json:"evidence"`
+	Obligations               []string   `json:"obligations"`
+	Mitigations               []string   `json:"mitigations,omitempty"`
 }
 
 func SupportedEngines() []Engine {
@@ -228,6 +251,9 @@ func Evaluate(engine Engine, version, source string, content []byte) (Report, er
 		}
 		if statement.ReplicationLagRisk != nil {
 			report.Summary.ReplicationLagRisks++
+		}
+		if statement.PartitionSharding != nil {
+			report.Summary.PartitionShardingFindings++
 		}
 		report.Summary.VersionSpecificRules += len(statement.Rules)
 		report.Summary.ProofObligations += len(statement.Obligations)
@@ -412,6 +438,7 @@ func evaluateStatement(index int, sql string, profile Profile) StatementSemantic
 		applyClickHouse(&statement, tokens, profile)
 	}
 	applyReplicationLagRisk(&statement, sql, tokens, profile)
+	applyPartitionSharding(&statement, sql, tokens, profile)
 	sort.Slice(statement.Rules, func(i, j int) bool { return statement.Rules[i].ID < statement.Rules[j].ID })
 	sort.Strings(statement.Obligations)
 	return statement
@@ -720,6 +747,301 @@ func replicationLagMitigations(sql string, osc *OnlineSchemaChange) []string {
 		mitigations = append(mitigations, "online schema-change adapter reduces foreground writer blocking but still requires lag-bound cutover evidence")
 	}
 	return mitigations
+}
+
+func applyPartitionSharding(statement *StatementSemantics, sql string, tokens []string, profile Profile) {
+	semantics := detectPartitionSharding(*statement, sql, tokens, profile)
+	if semantics == nil {
+		return
+	}
+	statement.PartitionSharding = semantics
+	statement.Rules = append(statement.Rules, RuleFinding{
+		ID:       "partition_sharding." + semantics.Operation,
+		Severity: semantics.Class,
+		Verdict:  "conditional",
+		Evidence: semantics.RoutingSurface + " changes " + semantics.AffectedScope + " and must be proven against tenant routing, partition visibility, and rebalancing invariants",
+	})
+	statement.Obligations = append(statement.Obligations, semantics.Obligations...)
+	statement.EngineFacts = append(statement.EngineFacts,
+		EngineFact{"partition_sharding_operation", semantics.Operation},
+		EngineFact{"partition_sharding_scope", semantics.AffectedScope},
+	)
+	if semantics.TenantKey != "" {
+		statement.EngineFacts = append(statement.EngineFacts, EngineFact{"tenant_routing_key", semantics.TenantKey})
+	}
+	if semantics.PartitionKey != "" {
+		statement.EngineFacts = append(statement.EngineFacts, EngineFact{"partition_key", semantics.PartitionKey})
+	}
+}
+
+func detectPartitionSharding(statement StatementSemantics, sql string, tokens []string, profile Profile) *PartitionSharding {
+	if profile.Engine == EngineSQLite {
+		return nil
+	}
+	if semantics := detectPartitionSwap(statement, sql, tokens, profile); semantics != nil {
+		return semantics
+	}
+	if semantics := detectRebalanceOperation(statement, sql, tokens, profile); semantics != nil {
+		return semantics
+	}
+	if semantics := detectTenantRoutingOperation(statement, sql, tokens, profile); semantics != nil {
+		return semantics
+	}
+	return nil
+}
+
+func detectPartitionSwap(statement StatementSemantics, sql string, tokens []string, profile Profile) *PartitionSharding {
+	lower := strings.ToLower(sql)
+	partition := firstIdentifierAfter(lower, `(?i)\bpartition\s+['"]?(`+sqlIdentifierCapture+`)`)
+	target := ""
+	operation := ""
+	switch profile.Engine {
+	case EnginePostgres:
+		if contains(tokens, "attach") && contains(tokens, "partition") {
+			operation = "partition_attach"
+			target = firstIdentifierAfter(lower, `(?i)\battach\s+partition\s+(`+sqlIdentifierCapture+`)`)
+		} else if contains(tokens, "detach") && contains(tokens, "partition") {
+			operation = "partition_detach"
+			target = firstIdentifierAfter(lower, `(?i)\bdetach\s+partition\s+(`+sqlIdentifierCapture+`)`)
+		}
+	case EngineMySQL, EngineOracle:
+		if contains(tokens, "exchange") && contains(tokens, "partition") {
+			operation = "partition_exchange"
+			target = firstIdentifierAfter(lower, `(?i)\bwith\s+table\s+(`+sqlIdentifierCapture+`)`)
+		}
+	case EngineSQLServer:
+		if contains(tokens, "switch") && contains(tokens, "partition") {
+			operation = "partition_switch"
+			target = firstIdentifierAfter(lower, `(?i)\bto\s+(`+sqlIdentifierCapture+`)`)
+		}
+	case EngineBigQuery:
+		if isCreateOrReplaceTable(tokens) && (contains(tokens, "partition") || strings.Contains(lower, "partition by")) {
+			operation = "partition_replace"
+			partition = extractBigQueryPartition(sql)
+			target = firstIdentifierAfter(lower, `(?i)\bfrom\s+(`+sqlIdentifierCapture+`)`)
+		}
+	case EngineSnowflake:
+		if isCreateOrReplaceTable(tokens) && (contains(tokens, "cluster") || contains(tokens, "partition")) {
+			operation = "partition_replace"
+			target = firstIdentifierAfter(lower, `(?i)\bfrom\s+(`+sqlIdentifierCapture+`)`)
+		}
+	case EngineClickHouse:
+		if contains(tokens, "replace") && contains(tokens, "partition") {
+			operation = "partition_replace"
+			target = firstIdentifierAfter(lower, `(?i)\bfrom\s+(`+sqlIdentifierCapture+`)`)
+		} else if contains(tokens, "move") && contains(tokens, "partition") {
+			operation = "partition_move"
+			target = firstIdentifierAfter(lower, `(?i)\bto\s+(`+sqlIdentifierCapture+`)`)
+		}
+	}
+	if operation == "" {
+		return nil
+	}
+	semantics := partitionShardingBase(statement, profile, operation, "partition-metadata", "partition")
+	semantics.Class = "high"
+	semantics.Partition = cleanIdentifier(partition)
+	semantics.SourceObject = statement.Table
+	semantics.TargetObject = cleanIdentifier(target)
+	semantics.PartitionKey = partitionKeyFromSQL(sql)
+	semantics.Hazards = append(semantics.Hazards,
+		"partition swap can make a whole tenant or time range appear, disappear, or point at a staging object at metadata speed",
+		"partition constraints and validation queries must prove the exchanged object contains only the intended slice",
+	)
+	semantics.Obligations = append(semantics.Obligations,
+		"prove source and target partition boundaries, constraints, row counts, and checksums before and after the swap",
+		"record rollback-by-swap or restore procedure that preserves the same partition boundary",
+	)
+	semantics.RequiresDoubleRouting = true
+	finalizePartitionSharding(semantics)
+	return semantics
+}
+
+func detectRebalanceOperation(statement StatementSemantics, sql string, tokens []string, profile Profile) *PartitionSharding {
+	lower := strings.ToLower(sql)
+	if !(contains(tokens, "rebalance") || contains(tokens, "reshard") || contains(tokens, "move") && (contains(tokens, "shard") || contains(tokens, "partition")) || contains(tokens, "split") && contains(tokens, "partition") || contains(tokens, "merge") && contains(tokens, "partition")) {
+		return nil
+	}
+	semantics := partitionShardingBase(statement, profile, "rebalance", "shard-map-or-partition-movement", "tenant-range")
+	semantics.Class = "high"
+	semantics.TenantKey = tenantKeyFromSQL(sql)
+	semantics.PartitionKey = partitionKeyFromSQL(sql)
+	semantics.SourceObject = cleanIdentifier(firstIdentifierAfter(lower, `(?i)\bfrom\s+(`+sqlIdentifierCapture+`)`))
+	semantics.TargetObject = cleanIdentifier(firstIdentifierAfter(lower, `(?i)\bto\s+(`+sqlIdentifierCapture+`)`))
+	if semantics.SourceObject == "" {
+		semantics.SourceObject = cleanIdentifier(firstIdentifierAfter(lower, `(?i)\bsource[_\s]+shard\s*[=:]\s*['"]?([A-Za-z0-9_.$-]+)`))
+	}
+	if semantics.TargetObject == "" {
+		semantics.TargetObject = cleanIdentifier(firstIdentifierAfter(lower, `(?i)\btarget[_\s]+shard\s*[=:]\s*['"]?([A-Za-z0-9_.$-]+)`))
+	}
+	semantics.RequiresDoubleRouting = true
+	semantics.RequiresRebalanceBackfill = true
+	semantics.Hazards = append(semantics.Hazards,
+		"rebalance can route reads to the destination before every copied row and secondary index is consistent",
+		"dual-write or double-read windows can duplicate, drop, or split a tenant range unless checkpoints are monotonic",
+	)
+	semantics.Obligations = append(semantics.Obligations,
+		"prove old and new routing maps overlap safely during the double-routing window",
+		"record per-shard copy checkpoints, reconciliation queries, and cutover criteria before deleting old routes",
+	)
+	if strings.Contains(lower, "chunk") {
+		semantics.Mitigations = append(semantics.Mitigations, "rebalance declares chunked movement; replay must preserve chunk order and checkpoint bounds")
+	}
+	finalizePartitionSharding(semantics)
+	return semantics
+}
+
+func detectTenantRoutingOperation(statement StatementSemantics, sql string, tokens []string, profile Profile) *PartitionSharding {
+	lower := strings.ToLower(sql)
+	routeTable := looksLikeRoutingTable(statement.Table) || contains(tokens, "shard_key") || contains(tokens, "shard_id") || contains(tokens, "route") && (contains(tokens, "tenant") || contains(tokens, "shard"))
+	if !routeTable {
+		return nil
+	}
+	if statement.Kind != "update" && statement.Kind != "insert" && statement.Kind != "merge" && statement.Kind != "replace" {
+		return nil
+	}
+	tenantKey := tenantKeyFromSQL(sql)
+	if tenantKey == "" && !contains(tokens, "shard_key") && !contains(tokens, "shard_id") {
+		return nil
+	}
+	semantics := partitionShardingBase(statement, profile, "tenant_routing", "tenant-route-map", "tenant")
+	semantics.Class = "medium"
+	semantics.TenantKey = tenantKey
+	semantics.SourceObject = cleanIdentifier(firstIdentifierAfter(lower, `(?i)\bold[_\s]+shard\s*[=:]\s*['"]?([A-Za-z0-9_.$-]+)`))
+	semantics.TargetObject = cleanIdentifier(firstIdentifierAfter(lower, `(?i)\bnew[_\s]+shard\s*[=:]\s*['"]?([A-Za-z0-9_.$-]+)`))
+	if semantics.TargetObject == "" {
+		semantics.TargetObject = cleanIdentifier(firstIdentifierAfter(lower, `(?i)\bshard[_\s]*id\s*=\s*['"]?([A-Za-z0-9_.$-]+)`))
+	}
+	semantics.RequiresDoubleRouting = true
+	semantics.Hazards = append(semantics.Hazards,
+		"tenant route updates can split reads and writes across old and new shards during deploy skew",
+		"route-map changes must be monotonic with cache invalidation, writer fencing, and fallback reads",
+	)
+	semantics.Obligations = append(semantics.Obligations,
+		"prove route-map writes are scoped to intended tenant keys and include cache invalidation or version fencing",
+		"record double-read or fallback routing behavior until old shard ownership is retired",
+	)
+	if strings.Contains(lower, "routing_version") || strings.Contains(lower, "route_version") {
+		semantics.Mitigations = append(semantics.Mitigations, "routing version column provides a replayable cutover fence if writers check it")
+	}
+	finalizePartitionSharding(semantics)
+	return semantics
+}
+
+func partitionShardingBase(statement StatementSemantics, profile Profile, operation, surface, scope string) *PartitionSharding {
+	return &PartitionSharding{
+		Class:          "medium",
+		Operation:      operation,
+		RoutingSurface: surface,
+		AffectedScope:  scope,
+		Table:          statement.Table,
+		Hazards: []string{
+			"operation depends on deployment-specific partition or shard routing not fully observable from one SQL statement",
+		},
+		Evidence: partitionShardingEvidence(profile.Engine),
+		Obligations: []string{
+			"bind the statement to explicit tenant, partition, or shard ownership evidence before rollout",
+			"run deterministic before/after route and partition membership checks on a production-like snapshot",
+		},
+	}
+}
+
+func partitionShardingEvidence(engine Engine) []Evidence {
+	switch engine {
+	case EnginePostgres:
+		return []Evidence{
+			{"postgres.partitioning", "declarative partition ATTACH/DETACH changes parent-table routing through partition constraints"},
+			{"postgres.explicit_locking", "partition DDL still takes table locks on parent and child objects"},
+		}
+	case EngineMySQL:
+		return []Evidence{
+			{"mysql.partition_exchange", "EXCHANGE PARTITION swaps table contents into a partition when structural and constraint requirements hold"},
+			{"mysql.metadata_locks", "partition operations acquire metadata locks and can implicitly commit"},
+		}
+	case EngineSQLServer:
+		return []Evidence{
+			{"sqlserver.partition_switch", "ALTER TABLE SWITCH moves a partition between tables as a metadata operation with aligned constraints"},
+			{"sqlserver.schema_modification_locks", "partition switching uses schema modification locks on participating tables"},
+		}
+	case EngineOracle:
+		return []Evidence{
+			{"oracle.exchange_partition", "EXCHANGE PARTITION swaps segment ownership with strict validation choices"},
+			{"oracle.ddl_implicit_commit", "partition DDL commits outside caller-controlled rollback"},
+		}
+	case EngineBigQuery:
+		return []Evidence{
+			{"bigquery.partition_pruning", "partition filters and decorators define mutation and scan scope"},
+			{"bigquery.table_metadata_jobs", "partitioned table replacement is a metadata job over table resources"},
+		}
+	case EngineSnowflake:
+		return []Evidence{
+			{"snowflake.clustering", "clustering and table replacement change micro-partition pruning and object identity"},
+			{"snowflake.time_travel", "recovery depends on retention windows rather than transactional rollback"},
+		}
+	case EngineClickHouse:
+		return []Evidence{
+			{"clickhouse.partition_operations", "partition replace, move, attach, detach, and drop are metadata-heavy operations over table parts"},
+			{"clickhouse.replicated_merge_tree", "replicated table parts must converge across replicas after partition movement"},
+		}
+	default:
+		return nil
+	}
+}
+
+func finalizePartitionSharding(semantics *PartitionSharding) {
+	sort.Strings(semantics.Hazards)
+	sort.Slice(semantics.Evidence, func(i, j int) bool { return semantics.Evidence[i].Ref < semantics.Evidence[j].Ref })
+	sort.Strings(semantics.Obligations)
+	sort.Strings(semantics.Mitigations)
+}
+
+func looksLikeRoutingTable(table string) bool {
+	table = strings.ToLower(table)
+	return strings.Contains(table, "tenant_route") ||
+		strings.Contains(table, "tenant_shard") ||
+		strings.Contains(table, "shard_map") ||
+		strings.Contains(table, "shard_route") ||
+		strings.Contains(table, "routing")
+}
+
+func tenantKeyFromSQL(sql string) string {
+	lower := strings.ToLower(sql)
+	for _, pattern := range []string{
+		`(?i)\b(tenant_id|account_id|org_id|organization_id|customer_id)\b`,
+		`(?i)\btenant[_\s-]*key\s*[=:]\s*['"]?([A-Za-z0-9_.$-]+)`,
+	} {
+		if value := firstIdentifierAfter(lower, pattern); value != "" {
+			return cleanIdentifier(value)
+		}
+	}
+	return ""
+}
+
+func partitionKeyFromSQL(sql string) string {
+	lower := strings.ToLower(sql)
+	for _, pattern := range []string{
+		`(?i)\bpartition\s+by\s+(?:range|list|hash)?\s*\(?\s*(` + sqlIdentifierCapture + `)`,
+		`(?i)\bpartition[_\s-]*key\s*[=:]\s*['"]?([A-Za-z0-9_.$-]+)`,
+	} {
+		if value := firstIdentifierAfter(lower, pattern); value != "" {
+			return cleanIdentifier(value)
+		}
+	}
+	return ""
+}
+
+func extractBigQueryPartition(sql string) string {
+	if match := regexp.MustCompile(`(?i)\$([0-9]{6,8})`).FindStringSubmatch(sql); len(match) == 2 {
+		return match[1]
+	}
+	return ""
+}
+
+func firstIdentifierAfter(sql, pattern string) string {
+	match := regexp.MustCompile(pattern).FindStringSubmatch(sql)
+	if len(match) < 2 {
+		return ""
+	}
+	return cleanIdentifier(strings.Trim(match[1], `'"`))
 }
 
 func likelyPointLookup(tokens []string) bool {
