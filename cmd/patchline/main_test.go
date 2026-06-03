@@ -29,6 +29,7 @@ import (
 	"github.com/thehalleyyoung/patchline/internal/incidentdrill"
 	"github.com/thehalleyyoung/patchline/internal/incidentpostmortem"
 	"github.com/thehalleyyoung/patchline/internal/intake"
+	"github.com/thehalleyyoung/patchline/internal/misuseresistance"
 	"github.com/thehalleyyoung/patchline/internal/patchseries"
 	"github.com/thehalleyyoung/patchline/internal/project"
 	"github.com/thehalleyyoung/patchline/internal/remediationcost"
@@ -1404,6 +1405,58 @@ func TestEthicsReviewTemplateCommandWritesReports(t *testing.T) {
 	}
 	if stat, err := os.Stat(filepath.Join(out, "ethics-review-template.md")); err != nil || stat.Size() == 0 {
 		t.Fatalf("expected ethics-review-template.md to be written, stat=%#v err=%v", stat, err)
+	}
+}
+
+func TestMisuseResistanceCommandWritesReports(t *testing.T) {
+	root := t.TempDir()
+	for rel, contents := range map[string]string{
+		"evidence/certificates.md": "certificate normalization, proof obligations, verifier quorum, and negative controls\n",
+		"evidence/scoreboard.md":   "scoreboard duplicate checks, signed reproduction logs, and disclosure holds\n",
+		"evidence/adoption.md":     "signed aggregate adoption metrics, fairness audits, and citation-quality review\n",
+		"evidence/governance.md":   "independent reviewer recusal and governance board minutes\n",
+		"evidence/simulation.md":   "forged certificate, duplicate scoreboard, and inflated adoption negative controls\n",
+	} {
+		writeMainTestFile(t, root, rel, contents)
+	}
+	specPath := filepath.Join(root, "misuse-resistance.json")
+	writeMainTestFile(t, root, "misuse-resistance.json", `{
+  "version": "patchline.misuse-resistance/v1",
+  "name": "main test misuse-resistance analysis",
+  "as_of_date": "2026-03-01T00:00:00Z",
+  "criteria": {
+    "required_surfaces": ["certificates", "scoreboards", "adoption_metrics"],
+    "min_independent_reviewers": 2,
+    "min_controls_per_scenario": 3,
+    "min_control_types_per_scenario": 3,
+    "max_risk_score": 0.8,
+    "review_cadence_days": 120,
+    "require_evidence_paths": true,
+    "require_simulation": true,
+    "require_public_failure_mode": true,
+    "require_control_owner": true,
+    "require_passed_simulation": true
+  },
+  "scenarios": [
+    {"scenario_id":"certificate-proof-stuffing","surface":"certificates","adversary":"malicious submitter","attack_goal":"smuggle assumed obligations into a passing certificate","attack_vectors":["stale hash replay","unchecked obligation"],"target_asset":"certificate verifier","public_failure_mode":"weakened certificate is accepted without independent proof","risk_score":0.7,"last_reviewed":"2026-02-01T00:00:00Z","reviewer_roles":["certificate reviewer","external verifier"],"controls":[{"control_id":"cert-hash","type":"hash_binding","description":"bind obligations to canonical hashes","owner":"verifier","evidence_paths":["evidence/certificates.md"]},{"control_id":"cert-review","type":"independent_review","description":"require independent conformance review","owner":"board","evidence_paths":["evidence/governance.md"]},{"control_id":"cert-negative","type":"negative_control","description":"keep weakened certificate fixtures failing","owner":"gate maintainer","evidence_paths":["evidence/simulation.md"]}],"simulations":[{"simulation_id":"cert-forgery","attempted_vector":"replace checked with assumed obligation","expected_outcome":"rejected before release","observed_outcome":"rejected by negative control","passed":true}]},
+    {"scenario_id":"scoreboard-sybil-submission","surface":"scoreboards","adversary":"benchmark gamer","attack_goal":"inflate public rank with duplicate submissions","attack_vectors":["duplicate evidence","missing log"],"target_asset":"challenge scoreboard","public_failure_mode":"rank changes without reproducible logs or duplicate collapse","risk_score":0.72,"last_reviewed":"2026-02-01T00:00:00Z","reviewer_roles":["benchmark reviewer","replication reviewer"],"controls":[{"control_id":"score-dedup","type":"deduplication","description":"collapse duplicate submissions","owner":"curator","evidence_paths":["evidence/scoreboard.md"]},{"control_id":"score-log","type":"reproducibility_log","description":"require signed reproduction logs","owner":"challenge maintainer","evidence_paths":["evidence/scoreboard.md"]},{"control_id":"score-disclosure","type":"responsible_disclosure","description":"hold undisclosed examples","owner":"governance board","evidence_paths":["evidence/governance.md"]}],"simulations":[{"simulation_id":"score-duplicate","attempted_vector":"submit same hazard twice","expected_outcome":"duplicate rejected","observed_outcome":"duplicate rejected before publication","passed":true}]},
+    {"scenario_id":"adoption-metric-inflation","surface":"adoption_metrics","adversary":"growth marketer","attack_goal":"overstate incident prevention with self reports","attack_vectors":["superficial citation","unsigned aggregate"],"target_asset":"adoption dashboard","public_failure_mode":"impact claims increase without signed aggregate and fairness evidence","risk_score":0.68,"last_reviewed":"2026-02-01T00:00:00Z","reviewer_roles":["methods reviewer","fairness reviewer"],"controls":[{"control_id":"adoption-aggregate","type":"signed_aggregate","description":"require signed source-free aggregates","owner":"adoption steward","evidence_paths":["evidence/adoption.md"]},{"control_id":"adoption-burden","type":"burden_audit","description":"audit reviewer burden parity","owner":"fairness maintainer","evidence_paths":["evidence/adoption.md"]},{"control_id":"adoption-citation","type":"citation_quality","description":"separate meaningful adoption from superficial mentions","owner":"impact reviewer","evidence_paths":["evidence/adoption.md","evidence/governance.md"]}],"simulations":[{"simulation_id":"adoption-forgery","attempted_vector":"report prevented incidents without signed aggregate","expected_outcome":"claim excluded","observed_outcome":"claim excluded before publication","passed":true}]}
+  ]
+}`)
+	out := filepath.Join(t.TempDir(), "misuse-resistance")
+	if err := run([]string{"misuse-resistance", "--spec", specPath, "--root", root, "--out", out, "--json"}); err != nil {
+		t.Fatalf("misuse-resistance failed: %v", err)
+	}
+	var report misuseresistance.Report
+	readMainTestJSON(t, filepath.Join(out, "misuse-resistance.json"), &report)
+	if !report.OK || report.Summary.Surfaces != 3 || report.Summary.Scenarios != 3 || report.Summary.Controls != 9 || report.Summary.FailedSimulations != 0 {
+		t.Fatalf("unexpected misuse-resistance report: %#v", report)
+	}
+	if len(report.Surfaces) != 3 || len(report.Surfaces[0].Evidence) == 0 || report.Surfaces[0].Evidence[0].SHA256 == "" {
+		t.Fatalf("expected surface evidence hashes, got %#v", report.Surfaces)
+	}
+	if stat, err := os.Stat(filepath.Join(out, "misuse-resistance.md")); err != nil || stat.Size() == 0 {
+		t.Fatalf("expected misuse-resistance.md to be written, stat=%#v err=%v", stat, err)
 	}
 }
 

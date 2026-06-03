@@ -53,6 +53,7 @@ import (
 	"github.com/thehalleyyoung/patchline/internal/invariant"
 	"github.com/thehalleyyoung/patchline/internal/ledger"
 	"github.com/thehalleyyoung/patchline/internal/migration"
+	"github.com/thehalleyyoung/patchline/internal/misuseresistance"
 	"github.com/thehalleyyoung/patchline/internal/patchseries"
 	"github.com/thehalleyyoung/patchline/internal/plugins"
 	"github.com/thehalleyyoung/patchline/internal/policy"
@@ -459,6 +460,8 @@ func run(args []string) error {
 		return ethicsReviewTemplateCommand(args[1:], hasFlag(args[1:], "--json"))
 	case "explainability-audit":
 		return explainabilityAuditCommand(args[1:], hasFlag(args[1:], "--json"))
+	case "misuse-resistance":
+		return misuseResistanceCommand(args[1:], hasFlag(args[1:], "--json"))
 	case "feedback":
 		return feedbackCommand(args[1:])
 	case "security":
@@ -617,6 +620,7 @@ Usage:
   patchline governance-risk-register --spec governance-risk-register.json --root repo-root --out dir [--json]
   patchline ethics-review-template --spec ethics-review-template.json --root repo-root --out dir [--json]
   patchline explainability-audit --spec explainability-audit.json --root repo-root --out dir [--json]
+  patchline misuse-resistance --spec misuse-resistance.json --root repo-root --out dir [--json]
   patchline feedback counterfactual-log --feedback live-feedback.json --history policy-history.json --out dir [--json]
   patchline feedback online-eval --feedback live-feedback.json --spec online-evaluation.json --out dir [--json]
   patchline feedback active-learning-queue --spec active-learning.json --out dir [--json]
@@ -15261,6 +15265,39 @@ func explainabilityAuditCommand(args []string, jsonOut bool) error {
 		return writeJSON(os.Stdout, report)
 	}
 	fmt.Printf("wrote explainability audit ok=%t reviews=%d reviewers=%d verdicts=%d supported_rate=%.2f counterexamples=%d to %s\n", report.OK, report.Summary.Reviews, report.Summary.Reviewers, report.Summary.Verdicts, report.Summary.SupportedRate, report.Summary.Counterexamples, outPath)
+	return nil
+}
+
+func misuseResistanceCommand(args []string, jsonOut bool) error {
+	usage := "patchline misuse-resistance --spec misuse-resistance.json --root repo-root --out <dir> [--json]"
+	specPath, outPath, err := feedbackSpecOut(args, usage)
+	if err != nil {
+		return err
+	}
+	rootPath := "."
+	if value, ok := flagValue(args, "--root"); ok && value != "" {
+		rootPath = value
+	}
+	file, err := os.Open(specPath)
+	if err != nil {
+		return err
+	}
+	defer file.Close()
+	spec, err := misuseresistance.ReadSpec(file)
+	if err != nil {
+		return err
+	}
+	report, err := misuseresistance.BuildReport(spec, rootPath)
+	if err != nil {
+		return err
+	}
+	if err := misuseresistance.WriteArtifacts(outPath, report); err != nil {
+		return err
+	}
+	if jsonOut {
+		return writeJSON(os.Stdout, report)
+	}
+	fmt.Printf("wrote misuse-resistance analysis ok=%t surfaces=%d scenarios=%d controls=%d failed_simulations=%d counterexamples=%d to %s\n", report.OK, report.Summary.Surfaces, report.Summary.Scenarios, report.Summary.Controls, report.Summary.FailedSimulations, report.Summary.Counterexamples, outPath)
 	return nil
 }
 

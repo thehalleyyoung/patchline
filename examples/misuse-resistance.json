@@ -1,0 +1,207 @@
+{
+  "version": "patchline.misuse-resistance/v1",
+  "name": "Patchline misuse-resistance analysis for claims and public incentives",
+  "as_of_date": "2026-03-01T00:00:00Z",
+  "criteria": {
+    "required_surfaces": [
+      "certificates",
+      "scoreboards",
+      "adoption_metrics"
+    ],
+    "min_independent_reviewers": 2,
+    "min_controls_per_scenario": 3,
+    "min_control_types_per_scenario": 3,
+    "max_risk_score": 0.8,
+    "review_cadence_days": 120,
+    "require_evidence_paths": true,
+    "require_simulation": true,
+    "require_public_failure_mode": true,
+    "require_control_owner": true,
+    "require_passed_simulation": true
+  },
+  "scenarios": [
+    {
+      "scenario_id": "certificate-proof-stuffing",
+      "surface": "certificates",
+      "adversary": "malicious certificate submitter",
+      "attack_goal": "smuggle assumed obligations or stale witness hashes into a passing certificate",
+      "attack_vectors": [
+        "reuse a hash from an older normalized certificate",
+        "mark proof obligations as checked without matching evidence",
+        "hide weakened obligations behind equivalent-looking wording"
+      ],
+      "target_asset": "PLCI certificate and conformance vectors",
+      "public_failure_mode": "a certificate appears valid even though an obligation was only assumed or came from stale evidence",
+      "risk_score": 0.7,
+      "last_reviewed": "2026-02-01T00:00:00Z",
+      "reviewer_roles": [
+        "certificate maintainer",
+        "external conformance reviewer"
+      ],
+      "controls": [
+        {
+          "control_id": "certificate-canonical-hash-binding",
+          "type": "hash_binding",
+          "description": "Normalize every certificate before signing and compare obligation hashes against executable conformance vectors.",
+          "owner": "certificate verifier",
+          "evidence_paths": [
+            "docs/certificate-standard.md",
+            "docs/certificate-interchange-language.md"
+          ]
+        },
+        {
+          "control_id": "certificate-independent-review",
+          "type": "independent_review",
+          "description": "Require reviewers who did not author the certificate or the checker implementation before new certificate examples enter a release.",
+          "owner": "conformance board",
+          "evidence_paths": [
+            "docs/certificate-interop-dashboard.md",
+            "docs/governance-risk-register.md"
+          ]
+        },
+        {
+          "control_id": "certificate-negative-control",
+          "type": "negative_control",
+          "description": "Keep weakened-obligation vectors that must fail normalization, diff, and conformance checks.",
+          "owner": "certificate gate maintainer",
+          "evidence_paths": [
+            "docs/certificate-composition.md",
+            "docs/explainability-audit.md"
+          ]
+        }
+      ],
+      "simulations": [
+        {
+          "simulation_id": "certificate-assumed-obligation",
+          "attempted_vector": "Replace a checked frame obligation with an assumed one while preserving the rest of the certificate.",
+          "expected_outcome": "Normalization/diff/conformance reports reject the weakened certificate before publication.",
+          "observed_outcome": "Rejected by certificate diff and conformance negative controls.",
+          "passed": true,
+          "reproduction_path": "make certificate-composition-gate"
+        }
+      ]
+    },
+    {
+      "scenario_id": "scoreboard-sybil-submission",
+      "surface": "scoreboards",
+      "adversary": "benchmark gamer",
+      "attack_goal": "inflate leaderboard rank with duplicate, non-reproducible, or identity-split submissions",
+      "attack_vectors": [
+        "submit near-duplicate marketplace evidence under multiple organizations",
+        "hide failing logs while reporting only favorable aggregate scores",
+        "game challenge novelty with minimally changed fixtures"
+      ],
+      "target_asset": "public challenge scoreboard and benchmark leaderboard",
+      "public_failure_mode": "scoreboard rank improves without a reproducible gate run, unique evidence, or responsible-disclosure clearance",
+      "risk_score": 0.72,
+      "last_reviewed": "2026-02-01T00:00:00Z",
+      "reviewer_roles": [
+        "benchmark reviewer",
+        "external replication reviewer"
+      ],
+      "controls": [
+        {
+          "control_id": "scoreboard-duplicate-collapse",
+          "type": "deduplication",
+          "description": "Collapse exact and near-duplicate submitted evidence before prevalence or leaderboard accounting.",
+          "owner": "benchmark curator",
+          "evidence_paths": [
+            "docs/evidence-marketplace.md",
+            "docs/leaderboard.md"
+          ]
+        },
+        {
+          "control_id": "scoreboard-reproducible-logs",
+          "type": "reproducibility_log",
+          "description": "Publish signed run logs and reference outputs for every accepted challenge score.",
+          "owner": "challenge track maintainer",
+          "evidence_paths": [
+            "docs/evidence-marketplace.md",
+            "docs/reproducibility-reports.md"
+          ]
+        },
+        {
+          "control_id": "scoreboard-disclosure-hold",
+          "type": "responsible_disclosure",
+          "description": "Hold public scoring for examples that have not cleared disclosure and minimization requirements.",
+          "owner": "evidence governance board",
+          "evidence_paths": [
+            "docs/evidence-governance-board.md",
+            "docs/evidence-appeal-workflow.md"
+          ]
+        }
+      ],
+      "simulations": [
+        {
+          "simulation_id": "duplicate-score-inflation",
+          "attempted_vector": "Submit the same hazard through two identities and omit the failed reproduction log.",
+          "expected_outcome": "Duplicate detection and missing-log checks prevent scoreboard publication.",
+          "observed_outcome": "Rejected before scoreboard import; duplicate prevalence is not inflated.",
+          "passed": true,
+          "reproduction_path": "make adversarial-challenge-gate"
+        }
+      ]
+    },
+    {
+      "scenario_id": "adoption-metric-inflation",
+      "surface": "adoption_metrics",
+      "adversary": "growth marketer",
+      "attack_goal": "overstate Patchline adoption or incident prevention with unaudited self-reports",
+      "attack_vectors": [
+        "count superficial citations as meaningful use",
+        "report prevented incidents without signed aggregate evidence",
+        "merge high-burden teams into favorable aggregate cohorts"
+      ],
+      "target_asset": "adoption dashboard, incident-prevention scoreboard, and paper impact claims",
+      "public_failure_mode": "growth claims increase without signed aggregate evidence, reviewer-burden parity, or citation-quality checks",
+      "risk_score": 0.68,
+      "last_reviewed": "2026-02-01T00:00:00Z",
+      "reviewer_roles": [
+        "methods reviewer",
+        "fairness reviewer"
+      ],
+      "controls": [
+        {
+          "control_id": "adoption-signed-aggregate",
+          "type": "signed_aggregate",
+          "description": "Accept only source-free signed aggregate metrics above privacy thresholds.",
+          "owner": "adoption evidence steward",
+          "evidence_paths": [
+            "docs/federated-benchmark-split.md",
+            "docs/incident-prevention-scoreboard.md"
+          ]
+        },
+        {
+          "control_id": "adoption-fairness-audit",
+          "type": "burden_audit",
+          "description": "Gate adoption claims on reviewer burden, false-positive, and escalation parity audits.",
+          "owner": "fairness audit maintainer",
+          "evidence_paths": [
+            "docs/reviewer-fairness-audit.md",
+            "docs/maintainer-acceptance-study.md"
+          ]
+        },
+        {
+          "control_id": "adoption-citation-quality",
+          "type": "citation_quality",
+          "description": "Separate meaningful adoption and replication from superficial mentions before impact claims are reported.",
+          "owner": "impact evidence reviewer",
+          "evidence_paths": [
+            "docs/citation-adoption-tracking.md",
+            "docs/adoption-case-studies.md"
+          ]
+        }
+      ],
+      "simulations": [
+        {
+          "simulation_id": "self-report-inflation",
+          "attempted_vector": "Report a large prevented-incident count without signed aggregates or fairness evidence.",
+          "expected_outcome": "Adoption evidence stays excluded from claims and dashboards.",
+          "observed_outcome": "Rejected because the source-free aggregate and fairness-audit evidence are missing.",
+          "passed": true,
+          "reproduction_path": "make incident-prevention-scoreboard-gate"
+        }
+      ]
+    }
+  ]
+}

@@ -78,7 +78,8 @@ rotation, review-cadence, and mitigation gates, an ethics-review template gates 
 live feedback loops, and adopter outcome studies on consent, minimization, retention, human oversight,
 preregistration, and hashed evidence, an explainability audit requires independent reviewers to judge
 whether hashed evidence trails support stated verdicts before those verdicts feed claims or certificates,
-and an incident-response drill rehearses
+and a misuse-resistance analysis adversarially checks certificates, scoreboards, and adoption metrics
+before an incident-response drill rehearses
 hypothetical Patchline false negatives as public incidents with disclosure/remediation deadlines,
 evidence hashes, regression-gate closure, and leak-safe summaries;
 the same marketplace now hosts a public adversarial-migration challenge whose certificate-bound,
@@ -160,7 +161,7 @@ ranks the risks, and prints the next commands that can run immediately.
   \item A \textbf{gate-backed reproducibility and evaluation methodology}---over 614 gates, blinded
   false-positive adjudication, seeded false-negative recall, ablations, standardized effect sizes,
   severity calibration, a duplicate-safe certificate-backed public evidence marketplace, deterministic
-  governance-board lifecycle decisions, hash-bound appeal resolution, reviewer-fairness burden/false-positive/escalation audits, change-management approval binding, governance-risk concentration audits, ethics-review controls for data sources, live learning, and outcome studies, independent explainability audits for stated verdicts, adversarial-challenge scoring, signed federated benchmark
+  governance-board lifecycle decisions, hash-bound appeal resolution, reviewer-fairness burden/false-positive/escalation audits, change-management approval binding, governance-risk concentration audits, ethics-review controls for data sources, live learning, and outcome studies, independent explainability audits for stated verdicts, misuse-resistance checks for certificates/scoreboards/adoption metrics, adversarial-challenge scoring, signed federated benchmark
   aggregates for private adopters, and accountable-use mappings from autonomous or blocking capabilities
   to required human oversight---designed for artifact
   evaluation and best-paper-grade rigor
@@ -274,6 +275,9 @@ reviewers, risk score, and hashed evidence. & \code{ethics-review-template.json}
 \code{explainability-audit} & Require independent reviewers to judge whether cited evidence trails
 support stated verdicts; hash every cited file and reject disagreement, unsupported judgments, non-independent
 reviews, path escapes, and optional SHA-256 mismatches. & \code{explainability-audit.json}, \code{.md} \\
+\code{misuse-resistance} & Check certificate, scoreboard, and adoption-metric gaming scenarios with
+independent reviewers, diverse controls, hashed evidence, public-safe failure modes, and passing attack
+simulations. & \code{misuse-resistance.json}, \code{.md} \\
 \code{incident-response-drill} & Rehearse a hypothetical Patchline false negative as a public incident;
 check disclosure/remediation timelines, role separation, evidence hashes, regression-gate closure, and
 leak-safe public summaries. & \code{incident-response-drill.json}, \code{.md} \\
@@ -1081,6 +1085,7 @@ owner-routed rollback playbooks for broad writes & \gate{remediation-playbook-ga
 4 governance-risk domains / 12 controlled assets with owner/org concentration bounds, hash-backed evidence, deterministic review cadence, and stale/escaped-evidence controls & \gate{governance-risk-register-gate} \\
 3 ethics-review areas covering data-source intake, live feedback, and outcome studies with consent/minimization/retention/oversight/preregistration obligations; missing controls and stale/escaped evidence refuted & \gate{ethics-review-template-gate} \\
 2 stated verdicts / 4 independent explainability reviews with hashed evidence trails, full agreement, and disagreement plus hash-mismatch controls refuted & \gate{explainability-audit-gate} \\
+3 misuse-resistance surfaces covering certificate proof-stuffing, scoreboard sybil submissions, and adoption-metric inflation with 9 controls, hashed evidence, passing simulations, and targeted negative controls & \gate{misuse-resistance-gate} \\
 7-event public false-negative drill with disclosure/remediation deadlines, 4 distinct roles, regression-gate hash binding, and private-marker controls & \gate{incident-response-drill-gate} \\
 2 public-safe adversarial migrations scored from verified artifacts and analyzer-backed high-risk proofs; embargoed publication refuted & \gate{adversarial-challenge-gate} \\
 3 private benchmark cases published as signed aggregate-only metrics; tampering/leakage rejected & \gate{federated-benchmark-split-gate} \\
@@ -1793,7 +1798,7 @@ Trust stack & \code{signed-provenance-chain-gate}, \code{reproducible-build-atte
 \code{merkle-audit-log-gate}, \code{sbom-pinned-deps-gate}, \code{red-team-adversarial-gate},
 \code{evidence-governance-board-gate}, \code{evidence-appeal-workflow-gate},
 \code{change-management-integration-gate}, \code{governance-risk-register-gate},
-\code{ethics-review-template-gate}, \code{explainability-audit-gate}, \code{incident-response-drill-gate} \\
+\code{ethics-review-template-gate}, \code{explainability-audit-gate}, \code{misuse-resistance-gate}, \code{incident-response-drill-gate} \\
 Reviewer \& community & \code{quickstart-sixty-seconds-gate}, \code{inline-review-surface-gate},
 \code{ci-pr-bot-gate}, \code{governance-policy-gate}, \code{citation-doi-gate} \\
 Research frontier & \code{learned-risk-model-gate}, \code{neuro-symbolic-verdict-gate},
