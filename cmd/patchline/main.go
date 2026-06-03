@@ -76,6 +76,7 @@ import (
 	"github.com/thehalleyyoung/patchline/internal/rollbackplanner"
 	"github.com/thehalleyyoung/patchline/internal/semantics"
 	"github.com/thehalleyyoung/patchline/internal/solver"
+	"github.com/thehalleyyoung/patchline/internal/supplychainsim"
 	"github.com/thehalleyyoung/patchline/internal/symbolic"
 	"github.com/thehalleyyoung/patchline/internal/workflow"
 )
@@ -253,10 +254,17 @@ func run(args []string) error {
 		}
 		return verifyArtifact(args[1], args[2:], hasFlag(args[2:], "--json"))
 	case "supply-chain":
-		if len(args) < 2 || args[1] != "provenance" {
-			return errors.New("usage: patchline supply-chain provenance --artifact kind=path [--subject subject] [--source ref] [--command command] [--out provenance.json] [--json]")
+		if len(args) < 2 {
+			return errors.New("usage: patchline supply-chain <provenance|simulate> ...")
 		}
-		return supplyChainProvenance(args[2:], hasFlag(args[2:], "--json"))
+		switch args[1] {
+		case "provenance":
+			return supplyChainProvenance(args[2:], hasFlag(args[2:], "--json"))
+		case "simulate":
+			return supplyChainSimulate(args[2:], hasFlag(args[2:], "--json"))
+		default:
+			return errors.New("usage: patchline supply-chain <provenance|simulate> ...")
+		}
 	case "release":
 		if len(args) < 2 || args[1] != "checksums" {
 			return errors.New("usage: patchline release checksums --artifact path [--subject subject] --seed-hex seed --out dir [--json]")
@@ -590,6 +598,8 @@ Usage:
   patchline attestation-keygen [--json]
   patchline sign-artifact <artifact.json> --subject subject --seed-hex seed [--out attestation.json] [--json]
   patchline verify-artifact <attestation.json> --artifact artifact.json [--json]
+  patchline supply-chain provenance --artifact kind=path [--subject subject] [--source ref] [--command command] [--out provenance.json] [--json]
+  patchline supply-chain simulate --spec supply-chain-compromise.json --root repo-root --out dir [--json]
   patchline generate-sql <manifest.json> [--json]
   patchline rollback-plan <manifest.json> [--json]
   patchline transaction-plan <manifest.json> [--json]
@@ -13394,6 +13404,45 @@ func supplyChainProvenance(args []string, jsonOut bool) error {
 		return writeJSON(os.Stdout, report)
 	}
 	fmt.Printf("supply-chain provenance wrote %s artifacts=%d complete=%t hash=%s\n", *outPath, report.Summary.Artifacts, report.Verification.Complete, report.ReportHash)
+	return nil
+}
+
+func supplyChainSimulate(args []string, jsonOut bool) error {
+	usage := "patchline supply-chain simulate --spec supply-chain-compromise.json --root repo-root --out <dir> [--json]"
+	specPath, outPath, err := feedbackSpecOut(args, usage)
+	if err != nil {
+		return err
+	}
+	rootPath := "."
+	if value, ok := flagValue(args, "--root"); ok && value != "" {
+		rootPath = value
+	}
+	file, err := os.Open(specPath)
+	if err != nil {
+		return err
+	}
+	defer file.Close()
+	spec, err := supplychainsim.ReadSpec(file)
+	if err != nil {
+		return err
+	}
+	report, err := supplychainsim.BuildReport(spec, rootPath)
+	if err != nil {
+		return err
+	}
+	if err := supplychainsim.WriteArtifacts(outPath, report); err != nil {
+		return err
+	}
+	if jsonOut {
+		if err := writeJSON(os.Stdout, report); err != nil {
+			return err
+		}
+	} else {
+		fmt.Printf("wrote supply-chain simulation ok=%t simulations=%d dependency=%d archives=%d releases=%d signals=%d counterexamples=%d to %s\n", report.OK, report.Summary.Simulations, report.Summary.DependencyPoisoning, report.Summary.MaliciousArchives, report.Summary.ForgedReleaseMetadata, report.Summary.AttackSignals, report.Summary.Counterexamples, outPath)
+	}
+	if !report.OK {
+		return codedError{code: 2, err: errors.New("supply-chain compromise simulation failed")}
+	}
 	return nil
 }
 

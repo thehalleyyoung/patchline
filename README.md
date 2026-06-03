@@ -163,6 +163,7 @@ Run `resilient-analysis --spec examples/resilient-analysis.json` to replay distr
 
 Run `hardware-signing --spec examples/hardware-signing.json` to verify release, gate, and certificate artifacts with hardware-backed signing, threshold approval, recovery shares, and key-rotation drills; reproduce it with `make hardware-signing-gate`.
 Run `make disaster-recovery-exercise-gate` to rebuild the public corpus, docs, release manifest, and certificate logs, restore them from checksum-verified mirrors, and reject unrecoverable mirror loss; see [docs/disaster-recovery-exercise.md](docs/disaster-recovery-exercise.md).
+Run `supply-chain simulate --spec examples/supply-chain-compromise-sim.json` for supply-chain compromise simulations covering dependency poisoning, malicious archives, and forged release metadata; reproduce it with `make supply-chain-compromise-sim-gate`.
 
 Run `explainability-audit --spec examples/explainability-audit.json` to verify independent reviewers agree evidence trails support stated verdicts, with hash-mismatch and disagreement negative controls; reproduce it with `make explainability-audit-gate`.
 

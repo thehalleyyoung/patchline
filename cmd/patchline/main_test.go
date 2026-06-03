@@ -42,6 +42,7 @@ import (
 	"github.com/thehalleyyoung/patchline/internal/resilientanalysis"
 	"github.com/thehalleyyoung/patchline/internal/reviewerfairness"
 	"github.com/thehalleyyoung/patchline/internal/rollbackplanner"
+	"github.com/thehalleyyoung/patchline/internal/supplychainsim"
 )
 
 func TestExitCodeDefaultsToUsageOrGenericFailure(t *testing.T) {
@@ -1942,6 +1943,151 @@ func TestHardwareSigningCommandWritesReports(t *testing.T) {
 	}
 	if stat, err := os.Stat(filepath.Join(out, "hardware-signing.md")); err != nil || stat.Size() == 0 {
 		t.Fatalf("expected hardware-signing.md to be written, stat=%#v err=%v", stat, err)
+	}
+}
+
+func TestSupplyChainCompromiseSimulationCommandWritesReports(t *testing.T) {
+	root := t.TempDir()
+	files := map[string]string{
+		"evidence/simulation.md":         "dependency poisoning, malicious archive, and forged release metadata simulations\n",
+		"evidence/dependency.md":         "lockfile drift and typosquat source rejected before package import\n",
+		"evidence/dependency-allow.md":   "approved dependency signer list and transitive allowlist review\n",
+		"evidence/archive.md":            "archive traversal, symlink escape, and executable payload quarantined\n",
+		"evidence/release.md":            "forged release metadata rejected against pinned ref, commit, and certificate log\n",
+		"dependency/go.mod":              "module example.com/service\nrequire github.com/patchline/core v1.0.0\n",
+		"dependency/go.sum":              "github.com/patchline/core v1.0.0 h1:trusted\n",
+		"dependency/core-1.0.0.tgz":      "poisoned dependency payload\n",
+		"dependency/core-1.0.0.sig":      "signature by mallory\n",
+		"archives/toolkit.tar":           "archive with traversal entry modelled in spec\n",
+		"archives/toolkit.tar.sig":       "archive signature by mallory\n",
+		"release/patchline-1.0.0.tar.gz": "forged release archive bytes\n",
+		"release/metadata.json":          `{"version":"1.0.1","ref":"refs/tags/v1.0.1","sha256":"sha256:1111111111111111111111111111111111111111111111111111111111111111"}` + "\n",
+		"release/metadata.sig":           "metadata signature by mallory\n",
+		"release/certificate-log.jsonl":  `{"release":"patchline-1.0.0","signer":"release-root"}` + "\n",
+	}
+	for path, contents := range files {
+		writeMainTestFile(t, root, path, contents)
+	}
+	badHash := "sha256:0000000000000000000000000000000000000000000000000000000000000000"
+	spec := supplychainsim.Spec{
+		Version: supplychainsim.SpecVersion,
+		Name:    "main test supply-chain compromise simulations",
+		Claim:   "Patchline replays dependency poisoning, malicious archive, and forged release metadata simulations and requires every compromise signal to be detected, rejected, quarantined, and hash-backed.",
+		Criteria: supplychainsim.Criteria{
+			RequiredAttackKinds:              []string{"dependency_poisoning", "malicious_archive", "forged_release_metadata"},
+			MinSimulationsPerKind:            1,
+			RequireDetection:                 true,
+			RequireRejection:                 true,
+			RequireQuarantine:                true,
+			RequireEvidenceHashes:            true,
+			RequireDependencyLockIntegrity:   true,
+			RequireArchiveEntrySafety:        true,
+			RequireReleaseMetadataIntegrity:  true,
+			RequireSignatureOrCertificateLog: true,
+		},
+		Simulations: []supplychainsim.Simulation{
+			{
+				ID:              "dependency-typosquat",
+				Kind:            "dependency_poisoning",
+				Target:          "github.com/patchline/core",
+				AttackGoal:      "replace a pinned module with a typosquat registry source and transitive payload",
+				ExpectedOutcome: "rejected",
+				Detected:        true,
+				Rejected:        true,
+				Quarantined:     true,
+				Dependency: &supplychainsim.DependencySimulation{
+					PackageName:            "github.com/patch1ine/core",
+					ExpectedPackageName:    "github.com/patchline/core",
+					Version:                "v1.0.0",
+					Source:                 "https://registry.example.invalid/patch1ine/core",
+					ExpectedSource:         "https://proxy.golang.org/github.com/patchline/core",
+					ManifestPath:           "dependency/go.mod",
+					LockfilePath:           "dependency/go.sum",
+					ExpectedLockfileSHA256: badHash,
+					PackagePath:            "dependency/core-1.0.0.tgz",
+					ExpectedPackageSHA256:  badHash,
+					SignaturePath:          "dependency/core-1.0.0.sig",
+					SignerID:               "mallory",
+					AllowedSigners:         []string{"release-root"},
+					Transitive:             true,
+					TransitiveAllowlisted:  false,
+					AllowlistEvidencePaths: []string{"evidence/dependency-allow.md"},
+				},
+				EvidencePaths: []string{"evidence/dependency.md"},
+			},
+			{
+				ID:              "archive-traversal",
+				Kind:            "malicious_archive",
+				Target:          "patchline-toolkit.tar",
+				AttackGoal:      "smuggle traversal, symlink escape, and executable payload entries into a release archive",
+				ExpectedOutcome: "rejected",
+				Detected:        true,
+				Rejected:        true,
+				Quarantined:     true,
+				Archive: &supplychainsim.ArchiveSimulation{
+					ArchivePath:           "archives/toolkit.tar",
+					ExpectedArchiveSHA256: badHash,
+					SignaturePath:         "archives/toolkit.tar.sig",
+					SignerID:              "mallory",
+					AllowedSigners:        []string{"release-root"},
+					QuarantinePath:        "quarantine/archives/toolkit.tar",
+					Entries: []supplychainsim.ArchiveEntry{
+						{Path: "../scripts/postinstall.sh", Kind: "file", SHA256: "sha256:2222222222222222222222222222222222222222222222222222222222222222", ExpectedSHA256: "sha256:3333333333333333333333333333333333333333333333333333333333333333", Executable: true},
+						{Path: `..\scripts\postinstall.ps1`, Kind: "file"},
+						{Path: "safe/link", Kind: "symlink", LinkTarget: "../../.ssh/config"},
+						{Path: "safe/windows-link", Kind: "symlink", LinkTarget: `C:\Users\runner\.ssh\config`},
+					},
+				},
+				EvidencePaths: []string{"evidence/archive.md"},
+			},
+			{
+				ID:              "release-metadata-forgery",
+				Kind:            "forged_release_metadata",
+				Target:          "patchline release metadata",
+				AttackGoal:      "publish a stale tag and forged digest under an unapproved signer",
+				ExpectedOutcome: "rejected",
+				Detected:        true,
+				Rejected:        true,
+				Quarantined:     true,
+				ReleaseMetadata: &supplychainsim.ReleaseMetadataSimulation{
+					ReleaseID:              "patchline-1.0.0",
+					Version:                "1.0.1",
+					ExpectedVersion:        "1.0.0",
+					Ref:                    "refs/tags/v1.0.1",
+					ExpectedRef:            "refs/tags/v1.0.0",
+					Commit:                 "deadbeef",
+					ExpectedCommit:         "0123456789abcdef0123456789abcdef01234567",
+					ArtifactPath:           "release/patchline-1.0.0.tar.gz",
+					ExpectedArtifactSHA256: badHash,
+					MetadataArtifactSHA256: "sha256:1111111111111111111111111111111111111111111111111111111111111111",
+					ManifestPath:           "release/metadata.json",
+					ExpectedManifestSHA256: badHash,
+					SignaturePath:          "release/metadata.sig",
+					SignerID:               "mallory",
+					AllowedSigners:         []string{"release-root"},
+					CertificateLogPath:     "release/certificate-log.jsonl",
+				},
+				EvidencePaths: []string{"evidence/release.md"},
+			},
+		},
+		EvidencePaths: []string{"evidence/simulation.md"},
+	}
+	specPath := filepath.Join(root, "supply-chain-compromise.json")
+	writeMainTestJSONFile(t, specPath, spec)
+	out := filepath.Join(t.TempDir(), "supply-chain-sim")
+	if err := run([]string{"supply-chain", "simulate", "--spec", specPath, "--root", root, "--out", out, "--json"}); err != nil {
+		t.Fatalf("supply-chain simulate failed: %v", err)
+	}
+	var report supplychainsim.Report
+	readMainTestJSON(t, filepath.Join(out, "supply-chain-sim.json"), &report)
+	if !report.OK || report.Summary.DependencyPoisoning != 1 || report.Summary.MaliciousArchives != 1 || report.Summary.ForgedReleaseMetadata != 1 || report.Summary.AttackSignals < 15 {
+		t.Fatalf("unexpected supply-chain simulation report: %#v", report)
+	}
+	if report.Summary.DetectedAttacks != 3 || report.Summary.RejectedAttacks != 3 || report.Summary.QuarantinedAttacks != 3 {
+		t.Fatalf("expected all simulations detected/rejected/quarantined, got %#v", report.Summary)
+	}
+	if stat, err := os.Stat(filepath.Join(out, "supply-chain-sim.md")); err != nil || stat.Size() == 0 {
+		t.Fatalf("expected supply-chain-sim.md to be written, stat=%#v err=%v", stat, err)
 	}
 }
 

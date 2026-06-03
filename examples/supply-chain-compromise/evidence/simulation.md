@@ -1,0 +1,1 @@
+Supply-chain compromise drill covering dependency poisoning, malicious archives, and forged release metadata. Each modeled compromise has a concrete artifact signal, a gate owner, a rejection decision, and quarantine evidence.

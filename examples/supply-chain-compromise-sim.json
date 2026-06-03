@@ -1,0 +1,141 @@
+{
+  "version": "patchline.supply-chain-compromise-simulation/v1",
+  "name": "Patchline supply-chain compromise simulations",
+  "claim": "Patchline does not merely record release provenance: it replays concrete supply-chain compromise simulations for dependency poisoning, malicious archives, and forged release metadata, then requires every compromised artifact signal to be detected, rejected, quarantined, and backed by local evidence hashes. The gate mutates those controls into undetected, unrejected, unquarantined attacks with missing signatures and certificate evidence, and requires deterministic counterexamples instead of trusting release metadata.",
+  "criteria": {
+    "required_attack_kinds": [
+      "dependency_poisoning",
+      "malicious_archive",
+      "forged_release_metadata"
+    ],
+    "min_simulations_per_kind": 1,
+    "require_detection": true,
+    "require_rejection": true,
+    "require_quarantine": true,
+    "require_evidence_hashes": true,
+    "require_dependency_lock_integrity": true,
+    "require_archive_entry_safety": true,
+    "require_release_metadata_integrity": true,
+    "require_signature_or_certificate_log": true
+  },
+  "simulations": [
+    {
+      "id": "dependency-typosquat",
+      "kind": "dependency_poisoning",
+      "target": "github.com/patchline/core",
+      "attack_goal": "replace a pinned module with a typosquat registry source, changed package bytes, lockfile drift, unapproved signer, and unallowlisted transitive dependency",
+      "expected_outcome": "rejected",
+      "detected": true,
+      "rejected": true,
+      "quarantined": true,
+      "dependency": {
+        "package_name": "github.com/patch1ine/core",
+        "expected_package_name": "github.com/patchline/core",
+        "version": "v1.0.0",
+        "source": "https://registry.example.invalid/patch1ine/core",
+        "expected_source": "https://proxy.golang.org/github.com/patchline/core",
+        "manifest_path": "examples/supply-chain-compromise/dependency/go.mod",
+        "lockfile_path": "examples/supply-chain-compromise/dependency/go.sum",
+        "expected_lockfile_sha256": "sha256:0000000000000000000000000000000000000000000000000000000000000000",
+        "package_path": "examples/supply-chain-compromise/dependency/core-1.0.0.tgz",
+        "expected_package_sha256": "sha256:0000000000000000000000000000000000000000000000000000000000000000",
+        "signature_path": "examples/supply-chain-compromise/dependency/core-1.0.0.sig",
+        "signer_id": "mallory",
+        "allowed_signers": [
+          "release-root"
+        ],
+        "transitive": true,
+        "transitive_allowlisted": false,
+        "allowlist_evidence_paths": [
+          "examples/supply-chain-compromise/evidence/dependency-allow.md"
+        ]
+      },
+      "evidence_paths": [
+        "examples/supply-chain-compromise/evidence/dependency.md"
+      ]
+    },
+    {
+      "id": "archive-traversal",
+      "kind": "malicious_archive",
+      "target": "patchline-toolkit.tar",
+      "attack_goal": "smuggle traversal, symlink escape, executable payload, changed entry hash, changed archive hash, and unapproved signer into a release archive",
+      "expected_outcome": "rejected",
+      "detected": true,
+      "rejected": true,
+      "quarantined": true,
+      "archive": {
+        "archive_path": "examples/supply-chain-compromise/archives/toolkit.tar",
+        "expected_archive_sha256": "sha256:0000000000000000000000000000000000000000000000000000000000000000",
+        "signature_path": "examples/supply-chain-compromise/archives/toolkit.tar.sig",
+        "signer_id": "mallory",
+        "allowed_signers": [
+          "release-root"
+        ],
+        "quarantine_path": "quarantine/supply-chain/archives/toolkit.tar",
+        "entries": [
+          {
+            "path": "../scripts/postinstall.sh",
+            "kind": "file",
+            "sha256": "sha256:2222222222222222222222222222222222222222222222222222222222222222",
+            "expected_sha256": "sha256:3333333333333333333333333333333333333333333333333333333333333333",
+            "executable": true,
+            "executable_allowed": false
+          },
+          {
+            "path": "..\\scripts\\postinstall.ps1",
+            "kind": "file"
+          },
+          {
+            "path": "safe/link",
+            "kind": "symlink",
+            "link_target": "../../.ssh/config"
+          },
+          {
+            "path": "safe/windows-link",
+            "kind": "symlink",
+            "link_target": "C:\\Users\\runner\\.ssh\\config"
+          }
+        ]
+      },
+      "evidence_paths": [
+        "examples/supply-chain-compromise/evidence/archive.md"
+      ]
+    },
+    {
+      "id": "release-metadata-forgery",
+      "kind": "forged_release_metadata",
+      "target": "patchline release metadata",
+      "attack_goal": "publish a stale version, ref, commit, forged artifact digest, changed manifest hash, and unapproved release metadata signer",
+      "expected_outcome": "rejected",
+      "detected": true,
+      "rejected": true,
+      "quarantined": true,
+      "release_metadata": {
+        "release_id": "patchline-1.0.0",
+        "version": "1.0.1",
+        "expected_version": "1.0.0",
+        "ref": "refs/tags/v1.0.1",
+        "expected_ref": "refs/tags/v1.0.0",
+        "commit": "deadbeef",
+        "expected_commit": "0123456789abcdef0123456789abcdef01234567",
+        "artifact_path": "examples/supply-chain-compromise/release/patchline-1.0.0.tar.gz",
+        "expected_artifact_sha256": "sha256:0000000000000000000000000000000000000000000000000000000000000000",
+        "metadata_artifact_sha256": "sha256:1111111111111111111111111111111111111111111111111111111111111111",
+        "manifest_path": "examples/supply-chain-compromise/release/metadata.json",
+        "expected_manifest_sha256": "sha256:0000000000000000000000000000000000000000000000000000000000000000",
+        "signature_path": "examples/supply-chain-compromise/release/metadata.sig",
+        "signer_id": "mallory",
+        "allowed_signers": [
+          "release-root"
+        ],
+        "certificate_log_path": "examples/supply-chain-compromise/release/certificate-log.jsonl"
+      },
+      "evidence_paths": [
+        "examples/supply-chain-compromise/evidence/release.md"
+      ]
+    }
+  ],
+  "evidence_paths": [
+    "examples/supply-chain-compromise/evidence/simulation.md"
+  ]
+}

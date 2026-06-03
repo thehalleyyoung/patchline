@@ -10,7 +10,7 @@
 \contentsline {paragraph}{P5: Everything is gated.}{6}{section.2}%
 \contentsline {section}{\numberline {3}System Architecture}{6}{section.3}%
 \contentsline {paragraph}{Resumability, offline operation, resilience, and release trust.}{10}{table.1}%
-\contentsline {subsection}{\numberline {3.1}Artifact contract}{10}{subsection.3.1}%
+\contentsline {subsection}{\numberline {3.1}Artifact contract}{11}{subsection.3.1}%
 \contentsline {section}{\numberline {4}The Project-Native Fact Layer}{11}{section.4}%
 \contentsline {paragraph}{Sources and reproducibility.}{12}{section.4}%
 \contentsline {section}{\numberline {5}Breadth of Data-Change Analysis}{12}{section.5}%
@@ -114,4 +114,4 @@
 \contentsline {section}{\numberline {D}Infrastructure/Data Ordering Markers}{33}{appendix.D}%
 \contentsline {section}{\numberline {E}Selected Gate Catalog}{33}{appendix.E}%
 \contentsline {section}{\numberline {F}Security and Privacy Model}{35}{appendix.F}%
-\contentsline {section}{\numberline {G}Reproduction Guide}{35}{appendix.G}%
+\contentsline {section}{\numberline {G}Reproduction Guide}{36}{appendix.G}%

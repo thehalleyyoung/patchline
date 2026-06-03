@@ -99,9 +99,10 @@ k-thresholded aggregate metrics.
 Critically,
 every capability in \tool{} is backed by a reproducible \emph{gate}: a script that proves the
 capability against real, pinned public code and fails loudly on drift. \tool{} currently ships more
-than 620 such gates over 565 documented capabilities, now including resilient distributed-analysis
-and hardware-signing verifiers that replay worker loss, cache corruption, partitions, threshold
-release/gate/certificate signatures, recovery shares, key rotation, and revocation before accepting a corpus run or trusted artifact; the broader gate catalog spans relational migrations across nine
+than 621 such gates over 566 documented capabilities, now including supply-chain compromise simulations
+for dependency poisoning, malicious archives, and forged release metadata, plus resilient distributed-analysis
+and hardware-signing verifiers for worker loss, cache corruption, partitions, threshold signatures,
+recovery, rotation, and revocation before accepting a corpus run or trusted artifact; the broader gate catalog spans relational migrations across nine
 ecosystems, versioned database semantics with pinned reproducibility reports, computed unsafe counter-profile controls, lock-mode simulations, online-schema-change adapters,
 conditional replication-lag analysis, query-plan regression preflight, data-volume-aware runtime estimates, partition/shard routing semantics, and rollback-feasibility verdicts
 across eight production engines, five NoSQL engines,
@@ -356,10 +357,10 @@ deterministic reviewer artifact that pins engine versions, local runtime or emul
 where available, embedded/managed-service profiles where not, and observed profile, rule, lock,
 rollback, query-plan, runtime, replication, and partition evidence rows. &
 \code{reproducibility-report.json}, \code{.md} \\
-\code{resilient-analysis}, \code{hardware-signing} & Replay distributed analysis evidence under worker
+\code{resilient-analysis}, \code{hardware-signing}, \code{supply-chain simulate} & Replay distributed analysis evidence under worker
 loss, cache corruption, deterministic leases, and recovered partitions; verify release, gate, and
 certificate artifacts against hardware attestations, thresholds, recovery shares, logs, reports, and
-key-rotation/revocation drills. & \code{resilient-analysis.json}, \code{hardware-signing.json}, \code{.md} \\
+key-rotation/revocation drills; reject dependency poisoning, malicious archive, and forged metadata simulations. & \code{resilient-analysis.json}, \code{hardware-signing.json}, \code{supply-chain-sim.json}, \code{.md} \\
 \code{propose} & Generate bounded interventions (guards, tests) within an explicit budget; quarantine
 them as untrusted artifacts. & \code{proposal.patch}, \code{patchline-proposals/} \\
 \code{compare} & Deterministically re-analyze proposed changes; accept or reject by evidence delta. &
@@ -374,7 +375,7 @@ A cross-cutting \emph{gate layer} sits beside the pipeline. Each gate is a self-
 (a) validates a versioned example specification, (b) checks that the relevant documentation and the
 README still describe the capability, (c) runs the capability against real pinned code, (d) asserts
 machine-checkable invariants on the output, and (e) writes a \code{gate-summary.json}. The repository
-currently ships \textbf{more than 620 gates}, \textbf{more than 565 capability documents}, and \textbf{more than 600 example
+currently ships \textbf{more than 621 gates}, \textbf{more than 566 capability documents}, and \textbf{more than 600 example
 specifications}, with a single analyzer core of roughly 2{,}900 lines of Go.
 
 \paragraph{Resumability, offline operation, resilience, and release trust.} \code{repo analyze --resume} reuses existing fetch,
@@ -385,7 +386,9 @@ telemetry-disabled, egress-free, and rollback-backed before entering air-gapped 
 \code{resilient-analysis} gate then stress-tests distributed corpus execution: a lost worker must hand
 off its task to a surviving worker, corrupt cache bytes must be detected by SHA-256 and quarantined
 before a rebuilt result is accepted, and tasks affected by a recovered partition must still complete
-exactly once. \code{hardware-signing} extends the same evidence discipline to releases: archives, gate
+exactly once. \code{supply-chain simulate} replays dependency poisoning, malicious archives, and forged
+release metadata and requires each compromised signal to be detected, rejected, and quarantined before
+trusting metadata. \code{hardware-signing} extends the same evidence discipline to releases: archives, gate
 outputs, and certificate ledgers must be threshold-signed by attested hardware identities and backed by
 offline-root recovery shares plus key-rotation, recovery, and revocation drills. The
 \code{disaster-recovery-exercise} gate closes the loop by rebuilding the public corpus, hosted docs,
@@ -1224,7 +1227,8 @@ re-derive every headline number from pinned inputs with a single command. Each s
 produced it; a \emph{reproducible-build attestation} proves byte-identical rebuilds; a
 \emph{Merkle audit log} makes the analysis history tamper-evident; an SBOM with pinned
 dependencies, a secret-leak canary scanner, and a differential-privacy statistics mode round out
-the disclosure surface. A red-team adversarial suite, a fuzzing harness, an explicit
+the disclosure surface. Supply-chain compromise simulations add falsifiable dependency-poisoning,
+malicious-archive, and forged-release-metadata negative controls. A red-team adversarial suite, a fuzzing harness, an explicit
 soundness-boundary gate, and a written threat model document precisely where determinism ends and
 operator judgment begins---stated as tests, not prose.
 
@@ -1862,7 +1866,8 @@ Stratification & \code{ecosystem-balanced-benchmark-gate}, \code{repository-size
 \code{migration-age-stratification-gate}, \code{longitudinal-public-reruns-gate} \\
 Security \& privacy & \code{secret-scan-gate}, \code{archive-security-gate}, \code{threat-model-gate},
 \code{redaction-stability-gate}, \code{privacy-metrics-gate}, \code{live-feedback-ingestion-gate},
-\code{feedback-retention-lifecycle-gate}, \code{supply-chain-provenance-gate} \\
+\code{feedback-retention-lifecycle-gate}, \code{supply-chain-provenance-gate},
+\code{supply-chain-compromise-sim-gate} \\
 Robustness \& DX & \code{fuzz-coverage-gate}, \code{parser-dashboard-gate},
 \code{fixture-minimizer-gate}, \code{onboarding-quest-gate}, \code{performance-budget-gate} \\
 Artifact \& paper & \code{reviewer-walkthrough-gate}, \code{artifact-evaluation-kit-gate},

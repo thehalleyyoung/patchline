@@ -17,6 +17,7 @@
 .PHONY: resilient-analysis-gate
 .PHONY: hardware-signing-gate
 .PHONY: disaster-recovery-exercise-gate
+.PHONY: supply-chain-compromise-sim-gate
 
 build:
 	go build -o bin/patchline ./cmd/patchline
@@ -1227,6 +1228,9 @@ hardware-signing-gate:
 
 disaster-recovery-exercise-gate:
 	bash scripts/disaster-recovery-exercise-gate.sh
+
+supply-chain-compromise-sim-gate:
+	bash scripts/supply-chain-compromise-sim-gate.sh
 
 industry-working-group-gate:
 	bash scripts/industry-working-group-gate.sh
