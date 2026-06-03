@@ -1,0 +1,22 @@
+{
+  "version": "patchline.redacted-hazard-example/v1",
+  "summary": "Redacted Rails migration backfills a customer-facing column without a bounded guard.",
+  "hazard_class": "broad-backfill-without-guard",
+  "source": {
+    "repo": "lobsters/lobsters",
+    "commit": "3b80b47aa5aaba37ec44413e7d1dc96fcf1585b6",
+    "subpath": "db/migrate"
+  },
+  "evidence": [
+    {
+      "path": "db/migrate/<redacted_timestamp>_backfill_<redacted_table>.rb",
+      "line_range": "12-18",
+      "snippet": "<model>.find_each { |row| row.update!(<redacted_column>: <redacted_value>) }"
+    }
+  ],
+  "redaction": {
+    "identifiers": "stable placeholders",
+    "literals": "stable placeholders",
+    "owners": "omitted"
+  }
+}

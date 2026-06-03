@@ -1,0 +1,27 @@
+{
+  "version": "patchline.redacted-hazard-example/v1",
+  "summary": "Redacted Django migration tightens nullability before the backfill proof covers all existing rows.",
+  "hazard_class": "constraint-tightening-before-complete-backfill",
+  "source": {
+    "repo": "django/django",
+    "commit": "5b8d2f4a5a2d9e6f6c5d4b3a2a19081716151413",
+    "subpath": "django/contrib/auth/migrations"
+  },
+  "evidence": [
+    {
+      "path": "django/contrib/auth/migrations/<redacted>_alter_<redacted_field>.py",
+      "line_range": "20-27",
+      "snippet": "migrations.AlterField(..., null=False)"
+    },
+    {
+      "path": "django/contrib/auth/migrations/<redacted>_backfill_<redacted_field>.py",
+      "line_range": "31-42",
+      "snippet": "QuerySet.filter(<redacted_field>__isnull=True).update(...)"
+    }
+  ],
+  "redaction": {
+    "identifiers": "stable placeholders",
+    "literals": "stable placeholders",
+    "owners": "omitted"
+  }
+}

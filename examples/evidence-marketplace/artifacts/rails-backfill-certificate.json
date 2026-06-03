@@ -1,0 +1,22 @@
+{
+  "version": "patchline.redacted-certificate-witness/v1",
+  "certificate_id": "cert-redacted-rails-backfill",
+  "obligations": [
+    "redaction-reviewed",
+    "license-cleared",
+    "artifact-hashes-verified",
+    "reproducible-without-private-data"
+  ],
+  "checks": [
+    {
+      "id": "redaction-reviewed",
+      "ok": true,
+      "evidence": "reviewer confirmed identifiers, owners, literals, and row values are placeholders"
+    },
+    {
+      "id": "artifact-hashes-verified",
+      "ok": true,
+      "evidence": "marketplace publisher recomputes SHA-256 for every listed artifact"
+    }
+  ]
+}

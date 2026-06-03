@@ -1,0 +1,22 @@
+{
+  "version": "patchline.redacted-certificate-witness/v1",
+  "certificate_id": "cert-redacted-django-nullability",
+  "obligations": [
+    "redaction-reviewed",
+    "license-cleared",
+    "artifact-hashes-verified",
+    "reproducible-without-private-data"
+  ],
+  "checks": [
+    {
+      "id": "license-cleared",
+      "ok": true,
+      "evidence": "publisher declares the redacted example under the registry license"
+    },
+    {
+      "id": "reproducible-without-private-data",
+      "ok": true,
+      "evidence": "the marketplace gate validates the example without private source or credentials"
+    }
+  ]
+}

@@ -19,6 +19,7 @@ import (
 	"github.com/thehalleyyoung/patchline/internal/backfillplanner"
 	"github.com/thehalleyyoung/patchline/internal/canaryvalidate"
 	"github.com/thehalleyyoung/patchline/internal/evidence"
+	"github.com/thehalleyyoung/patchline/internal/evidencemarketplace"
 	"github.com/thehalleyyoung/patchline/internal/expandcontract"
 	"github.com/thehalleyyoung/patchline/internal/feedback"
 	"github.com/thehalleyyoung/patchline/internal/incidentpostmortem"
@@ -64,6 +65,41 @@ func TestPluginsListAndProbeCommands(t *testing.T) {
 		if stat, err := os.Stat(filepath.Join(out, rel)); err != nil || stat.Size() == 0 {
 			t.Fatalf("expected %s to be written, stat=%#v err=%v", rel, stat, err)
 		}
+	}
+}
+
+func TestEvidenceMarketplacePublishCommandWritesReports(t *testing.T) {
+	root := t.TempDir()
+	registry := mainTestEvidenceMarketplaceRegistry(t, root)
+	registryPath := filepath.Join(root, "registry.json")
+	writeMainTestJSONFile(t, registryPath, registry)
+	out := filepath.Join(t.TempDir(), "marketplace")
+	if err := run([]string{"evidence-marketplace", "publish", "--registry", registryPath, "--out", out, "--json"}); err != nil {
+		t.Fatalf("evidence marketplace publish failed: %v", err)
+	}
+	var report evidencemarketplace.Report
+	readMainTestJSON(t, filepath.Join(out, "marketplace.json"), &report)
+	if !report.OK || report.Summary.Published != 1 || report.Summary.ArtifactsVerified != 2 {
+		t.Fatalf("unexpected marketplace report: %#v", report)
+	}
+	for _, rel := range []string{"marketplace.json", "marketplace.md", "index.html"} {
+		if stat, err := os.Stat(filepath.Join(out, rel)); err != nil || stat.Size() == 0 {
+			t.Fatalf("expected %s to be written, stat=%#v err=%v", rel, stat, err)
+		}
+	}
+
+	bad := registry
+	bad.Examples[0].Certificate.SubjectHash = "sha256:0000000000000000000000000000000000000000000000000000000000000000"
+	badPath := filepath.Join(root, "bad-registry.json")
+	writeMainTestJSONFile(t, badPath, bad)
+	badOut := filepath.Join(t.TempDir(), "bad-marketplace")
+	if err := run([]string{"evidence-marketplace", "publish", "--registry", badPath, "--out", badOut, "--json"}); err == nil || exitCode(err) != 2 {
+		t.Fatalf("expected rejected marketplace with exit code 2, got %v", err)
+	}
+	var rejected evidencemarketplace.Report
+	readMainTestJSON(t, filepath.Join(badOut, "marketplace.json"), &rejected)
+	if rejected.OK || len(rejected.Rejected) != 1 {
+		t.Fatalf("expected rejected report, got %#v", rejected)
 	}
 }
 
@@ -2433,6 +2469,21 @@ func writeMainTestFile(t *testing.T, root, rel, content string) {
 	}
 }
 
+func writeMainTestJSONFile(t *testing.T, path string, value any) {
+	t.Helper()
+	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	data, err := json.MarshalIndent(value, "", "  ")
+	if err != nil {
+		t.Fatal(err)
+	}
+	data = append(data, '\n')
+	if err := os.WriteFile(path, data, 0o644); err != nil {
+		t.Fatal(err)
+	}
+}
+
 func readMainTestJSON(t *testing.T, path string, target any) {
 	t.Helper()
 	data, err := os.ReadFile(path)
@@ -2442,6 +2493,85 @@ func readMainTestJSON(t *testing.T, path string, target any) {
 	if err := json.Unmarshal(data, target); err != nil {
 		t.Fatalf("failed to decode %s: %v\n%s", path, err, string(data))
 	}
+}
+
+func mainTestEvidenceMarketplaceRegistry(t *testing.T, root string) evidencemarketplace.Registry {
+	t.Helper()
+	writeMainTestFile(t, root, "artifacts/redacted-hazard.json", `{
+  "version": "patchline.redacted-hazard-example/v1",
+  "finding": "redacted stable-risk for unsafe migration guard",
+  "evidence": [{"path": "migrations/20260101010101_add_status.sql", "snippet": "ALTER TABLE <table> ADD COLUMN <column>"}]
+}
+`)
+	writeMainTestFile(t, root, "artifacts/cert-witness.json", `{
+  "version": "patchline.redacted-certificate-witness/v1",
+  "checks": ["redaction-reviewed", "license-cleared", "artifact-hashes-verified", "reproducible-without-private-data"]
+}
+`)
+	example := evidencemarketplace.Example{
+		ID:           "redacted-unsafe-migration-guard",
+		Title:        "Redacted unsafe migration guard",
+		Organization: "Example Data Platform",
+		Ecosystem:    "postgres",
+		HazardClass:  "unsafe-schema-change-without-guard",
+		Source: evidencemarketplace.Source{
+			Host:    "github",
+			Repo:    "public/example-data-platform",
+			Ref:     "refs/heads/main",
+			Commit:  "fedcba9876543210fedcba9876543210fedcba98",
+			Subpath: "migrations",
+		},
+		LicenseSPDX: "CC0-1.0",
+		Consent:     "Example Data Platform approved publication of this redacted certificate-backed hazard example under the declared public license.",
+		Redaction: evidencemarketplace.Redaction{
+			Reviewed:      true,
+			RawDataShared: false,
+			Method:        "all project, table, owner, and literal names replaced by stable placeholders",
+			Fields:        []string{"project names", "table names", "literal values"},
+			Reviewer:      "artifact-review",
+		},
+		Artifacts: []evidencemarketplace.Artifact{
+			{Path: "artifacts/redacted-hazard.json", Role: "redacted-hazard-example", SHA256: mainTestFileHash(t, filepath.Join(root, "artifacts/redacted-hazard.json")), Redacted: true},
+			{Path: "artifacts/cert-witness.json", Role: "certificate-witness", SHA256: mainTestFileHash(t, filepath.Join(root, "artifacts/cert-witness.json")), Redacted: true},
+		},
+		Certificate: evidencemarketplace.Certificate{
+			ID:       "cert-redacted-unsafe-migration-guard",
+			Issuer:   "patchline-test-issuer",
+			IssuedAt: "2026-06-02T21:22:11Z",
+			Obligations: []string{
+				"redaction-reviewed",
+				"license-cleared",
+				"artifact-hashes-verified",
+				"reproducible-without-private-data",
+			},
+		},
+		Reproduction: []string{
+			"go run ./cmd/patchline evidence-marketplace publish --registry examples/evidence-marketplace/registry.json --out results/generated/evidence-marketplace --json",
+			"jq -e '.summary.published >= 1' results/generated/evidence-marketplace/marketplace.json",
+		},
+		Limitations: []string{"The example proves publication mechanics and certificate obligations without exposing raw project data."},
+	}
+	example.Certificate.SubjectHash = evidencemarketplace.ExpectedSubjectHash(example)
+	return evidencemarketplace.Registry{
+		Version: evidencemarketplace.RegistryVersion,
+		Claim:   "The public evidence marketplace admits only redacted, license-cleared, certificate-backed examples with reproducible commands and verified artifact hashes.",
+		Marketplace: evidencemarketplace.Metadata{
+			Name:       "Patchline public evidence marketplace",
+			Maintainer: "Patchline maintainers",
+			PolicyURL:  "docs/evidence-marketplace.md",
+		},
+		Examples: []evidencemarketplace.Example{example},
+	}
+}
+
+func mainTestFileHash(t *testing.T, path string) string {
+	t.Helper()
+	data, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	sum := sha256.Sum256(data)
+	return "sha256:" + hex.EncodeToString(sum[:])
 }
 
 func containsString(values []string, want string) bool {

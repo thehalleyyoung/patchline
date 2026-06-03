@@ -417,6 +417,8 @@ func run(args []string) error {
 		}
 		outPath, _ := flagValue(args[3:], "--out")
 		return adaptEvidence(args[1], args[2], hasFlag(args[3:], "--json"), outPath)
+	case "evidence-marketplace":
+		return evidenceMarketplaceCommand(args[1:])
 	case "expand-contract-template":
 		return expandContractTemplate(args[1:], hasFlag(args[1:], "--json"))
 	case "backfill-plan":
@@ -570,6 +572,7 @@ Usage:
   patchline artifact-benchmark compare <actual.json> <expected.json> [--json]
   patchline ingest-evidence <events.jsonl> [--json] [--out graph.json]
   patchline adapt-evidence <otlp|datadog|postgres|github|migration-runner|jira|linear> <input.json> [--json] [--out events.jsonl]
+  patchline evidence-marketplace publish --registry registry.json --out dir [--json]
   patchline expand-contract-template --spec expand-contract.json --out dir [--json]
   patchline backfill-plan --spec backfill-plan.json --store store.json --out dir [--json]
   patchline canary-validate --spec canary-validation.json --before before.json --after after.json --out dir [--json]
