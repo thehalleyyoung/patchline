@@ -99,9 +99,9 @@ k-thresholded aggregate metrics.
 Critically,
 every capability in \tool{} is backed by a reproducible \emph{gate}: a script that proves the
 capability against real, pinned public code and fails loudly on drift. \tool{} currently ships more
-than 620 such gates over 565 documented capabilities, now including a resilient distributed-analysis
-verifier that replays worker loss, hash-detected cache corruption, quarantine/rebuild, deterministic
-leases, and partial network partitions before accepting a corpus run; the broader gate catalog spans relational migrations across nine
+than 620 such gates over 565 documented capabilities, now including resilient distributed-analysis
+and hardware-signing verifiers that replay worker loss, cache corruption, partitions, threshold
+release/gate/certificate signatures, recovery shares, key rotation, and revocation before accepting a corpus run or trusted artifact; the broader gate catalog spans relational migrations across nine
 ecosystems, versioned database semantics with pinned reproducibility reports, computed unsafe counter-profile controls, lock-mode simulations, online-schema-change adapters,
 conditional replication-lag analysis, query-plan regression preflight, data-volume-aware runtime estimates, partition/shard routing semantics, and rollback-feasibility verdicts
 across eight production engines, five NoSQL engines,
@@ -356,9 +356,10 @@ deterministic reviewer artifact that pins engine versions, local runtime or emul
 where available, embedded/managed-service profiles where not, and observed profile, rule, lock,
 rollback, query-plan, runtime, replication, and partition evidence rows. &
 \code{reproducibility-report.json}, \code{.md} \\
-\code{resilient-analysis} & Replay distributed analysis evidence under worker loss, hash-detected
-cache corruption, quarantine/rebuild, deterministic leases, recovered partial network partitions, and
-duplicate-completion rejection. & \code{resilient-analysis.json}, \code{.md} \\
+\code{resilient-analysis}, \code{hardware-signing} & Replay distributed analysis evidence under worker
+loss, cache corruption, deterministic leases, and recovered partitions; verify release, gate, and
+certificate artifacts against hardware attestations, thresholds, recovery shares, logs, reports, and
+key-rotation/revocation drills. & \code{resilient-analysis.json}, \code{hardware-signing.json}, \code{.md} \\
 \code{propose} & Generate bounded interventions (guards, tests) within an explicit budget; quarantine
 them as untrusted artifacts. & \code{proposal.patch}, \code{patchline-proposals/} \\
 \code{compare} & Deterministically re-analyze proposed changes; accept or reject by evidence delta. &
@@ -376,7 +377,7 @@ machine-checkable invariants on the output, and (e) writes a \code{gate-summary.
 currently ships \textbf{more than 620 gates}, \textbf{more than 565 capability documents}, and \textbf{more than 600 example
 specifications}, with a single analyzer core of roughly 2{,}900 lines of Go.
 
-\paragraph{Resumability, offline operation, and resilience.} \code{repo analyze --resume} reuses existing fetch,
+\paragraph{Resumability, offline operation, resilience, and release trust.} \code{repo analyze --resume} reuses existing fetch,
 inventory, intake, baseline, proposal, and compare artifacts while changing later settings, and
 \code{repo offline} validates cached inputs and generated reports without any network access, while
 \code{offline-deploy} checks regulated edge profiles whose install/update bundles are SHA-256 pinned,
@@ -384,7 +385,9 @@ telemetry-disabled, egress-free, and rollback-backed before entering air-gapped 
 \code{resilient-analysis} gate then stress-tests distributed corpus execution: a lost worker must hand
 off its task to a surviving worker, corrupt cache bytes must be detected by SHA-256 and quarantined
 before a rebuilt result is accepted, and tasks affected by a recovered partition must still complete
-exactly once.
+exactly once. \code{hardware-signing} extends the same evidence discipline to releases: archives, gate
+outputs, and certificate ledgers must be threshold-signed by attested hardware identities and backed by
+offline-root recovery shares plus key-rotation, recovery, and revocation drills.
 
 \subsection{Artifact contract}
 Every stage writes a stable set of files so that downstream stages, gates, and reviewers can rely on

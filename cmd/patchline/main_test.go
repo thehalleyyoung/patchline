@@ -28,6 +28,7 @@ import (
 	"github.com/thehalleyyoung/patchline/internal/explainabilityaudit"
 	"github.com/thehalleyyoung/patchline/internal/feedback"
 	"github.com/thehalleyyoung/patchline/internal/governancerisk"
+	"github.com/thehalleyyoung/patchline/internal/hardwaresigning"
 	"github.com/thehalleyyoung/patchline/internal/incidentdrill"
 	"github.com/thehalleyyoung/patchline/internal/incidentpostmortem"
 	"github.com/thehalleyyoung/patchline/internal/intake"
@@ -1853,6 +1854,97 @@ func TestResilientAnalysisCommandWritesReports(t *testing.T) {
 	}
 }
 
+func TestHardwareSigningCommandWritesReports(t *testing.T) {
+	root := t.TempDir()
+	files := map[string]string{
+		"evidence/signing-policy.md":        "hardware-backed signing policy\n",
+		"evidence/release.md":               "release signing evidence\n",
+		"evidence/gate.md":                  "gate signing evidence\n",
+		"evidence/certificate.md":           "certificate signing evidence\n",
+		"artifacts/release.tar.gz":          "release artifact\n",
+		"artifacts/gate.json":               `{"gate":"hardware-signing","ok":true}` + "\n",
+		"artifacts/certificate.plci":        "certificate artifact\n",
+		"signatures/release.sig":            "release signature\n",
+		"signatures/gate.sig":               "gate signature\n",
+		"signatures/certificate.sig":        "certificate signature\n",
+		"keys/release-root.pub":             "release root public key\n",
+		"keys/gate-signer.pub":              "gate signer public key\n",
+		"keys/certificate-signer.pub":       "certificate signer public key\n",
+		"attestations/release-root.json":    `{"device":"yubikey"}` + "\n",
+		"attestations/gate-signer.json":     `{"device":"hsm"}` + "\n",
+		"attestations/certificate.json":     `{"device":"kms-hsm"}` + "\n",
+		"recovery/release-root.share":       "release root recovery share\n",
+		"recovery/gate-signer.share":        "gate signer recovery share\n",
+		"recovery/certificate-signer.share": "certificate signer recovery share\n",
+		"logs/release.jsonl":                `{"artifact":"release"}` + "\n",
+		"logs/gate.jsonl":                   `{"artifact":"gate"}` + "\n",
+		"logs/certificate.jsonl":            `{"artifact":"certificate"}` + "\n",
+		"gate-reports/release.json":         `{"ok":true}` + "\n",
+		"gate-reports/gate.json":            `{"ok":true}` + "\n",
+		"gate-reports/certificate.json":     `{"ok":true}` + "\n",
+		"drills/key-rotation.md":            "key rotation drill evidence\n",
+		"drills/key-rotation-result.json":   `{"ok":true}` + "\n",
+		"drills/recovery.md":                "recovery drill evidence\n",
+		"drills/recovery-result.json":       `{"ok":true}` + "\n",
+		"drills/revocation.md":              "revocation drill evidence\n",
+		"drills/revocation-result.json":     `{"ok":true}` + "\n",
+	}
+	for path, contents := range files {
+		writeMainTestFile(t, root, path, contents)
+	}
+	spec := hardwaresigning.Spec{
+		Version: hardwaresigning.SpecVersion,
+		Name:    "main test hardware signing",
+		Claim:   "Patchline verifies release, gate, and certificate artifacts signed by attested hardware-backed identities with threshold approval and key-rotation, recovery, and revocation drills.",
+		Criteria: hardwaresigning.Criteria{
+			RequiredArtifactKinds:    []string{"release", "gate", "certificate"},
+			MinSigningIdentities:     3,
+			MinArtifactsPerKind:      1,
+			RequireHardwareBacking:   true,
+			RequireAttestation:       true,
+			RequireThresholdApproval: true,
+			RequireKeyRotationDrill:  true,
+			RequireRecoveryDrill:     true,
+			RequireRevocationDrill:   true,
+			RequireOfflineRoot:       true,
+			RequireEvidenceHashes:    true,
+		},
+		SigningIdentities: []hardwaresigning.SigningIdentity{
+			mainSigningIdentity("release-root", "offline-root", "yubikey", true, "attestations/release-root.json", "keys/release-root.pub", "recovery/release-root.share", "evidence/release.md"),
+			mainSigningIdentity("gate-signer", "gate-signer", "hsm", false, "attestations/gate-signer.json", "keys/gate-signer.pub", "recovery/gate-signer.share", "evidence/gate.md"),
+			mainSigningIdentity("certificate-signer", "certificate-signer", "kms-hsm", false, "attestations/certificate.json", "keys/certificate-signer.pub", "recovery/certificate-signer.share", "evidence/certificate.md"),
+		},
+		SignedArtifacts: []hardwaresigning.SignedArtifact{
+			mainSignedArtifact(t, root, "release", "release", "artifacts/release.tar.gz", "signatures/release.sig", []string{"release-root", "gate-signer"}, "logs/release.jsonl", "gate-reports/release.json", "evidence/release.md"),
+			mainSignedArtifact(t, root, "gate", "gate", "artifacts/gate.json", "signatures/gate.sig", []string{"gate-signer", "release-root"}, "logs/gate.jsonl", "gate-reports/gate.json", "evidence/gate.md"),
+			mainSignedArtifact(t, root, "certificate", "certificate", "artifacts/certificate.plci", "signatures/certificate.sig", []string{"certificate-signer", "release-root"}, "logs/certificate.jsonl", "gate-reports/certificate.json", "evidence/certificate.md"),
+		},
+		Drills: []hardwaresigning.Drill{
+			mainSigningDrill("rotation", "key_rotation", "release", "release-root", "gate-signer", "drills/key-rotation.md", "drills/key-rotation-result.json"),
+			mainSigningDrill("recovery", "recovery", "release", "release-root", "release-root", "drills/recovery.md", "drills/recovery-result.json"),
+			mainSigningDrill("revocation", "revocation", "gate", "gate-signer", "certificate-signer", "drills/revocation.md", "drills/revocation-result.json"),
+		},
+		EvidencePaths: []string{"evidence/signing-policy.md"},
+	}
+	specPath := filepath.Join(root, "hardware-signing.json")
+	writeMainTestJSONFile(t, specPath, spec)
+	out := filepath.Join(t.TempDir(), "hardware-signing")
+	if err := run([]string{"hardware-signing", "--spec", specPath, "--root", root, "--out", out, "--json"}); err != nil {
+		t.Fatalf("hardware-signing failed: %v", err)
+	}
+	var report hardwaresigning.Report
+	readMainTestJSON(t, filepath.Join(out, "hardware-signing.json"), &report)
+	if !report.OK || report.Summary.SigningIdentities != 3 || report.Summary.SignedArtifacts != 3 || report.Summary.ThresholdApprovedArtifacts != 3 || report.Summary.Drills != 3 {
+		t.Fatalf("unexpected hardware-signing report: %#v", report)
+	}
+	if len(report.SignedArtifacts) == 0 || len(report.SignedArtifacts[0].Artifact.SHA256) != 71 {
+		t.Fatalf("expected sha256-prefixed artifact hash, got %#v", report.SignedArtifacts)
+	}
+	if stat, err := os.Stat(filepath.Join(out, "hardware-signing.md")); err != nil || stat.Size() == 0 {
+		t.Fatalf("expected hardware-signing.md to be written, stat=%#v err=%v", stat, err)
+	}
+}
+
 func mainOfflineProfile(t *testing.T, root, id, environment, target, cliPath, dataPath, updatePath, manifestPath, updateSignaturePath, evidencePath, rollbackEvidencePath string) offlinedeploy.Profile {
 	t.Helper()
 	return offlinedeploy.Profile{
@@ -1906,6 +1998,51 @@ func mainOfflineProfile(t *testing.T, root, id, environment, target, cliPath, da
 			Commands:             []string{"patchline bundle import --bundle " + dataPath + " --offline"},
 			EvidencePaths:        []string{rollbackEvidencePath},
 		},
+	}
+}
+
+func mainSigningIdentity(id, role, hardwareType string, offlineRoot bool, attestationPath, publicKeyPath, recoverySharePath, evidencePath string) hardwaresigning.SigningIdentity {
+	return hardwaresigning.SigningIdentity{
+		ID:                 id,
+		Role:               role,
+		HardwareType:       hardwareType,
+		Slot:               id + "-slot",
+		OfflineRoot:        offlineRoot,
+		AttestationPath:    attestationPath,
+		PublicKeyPath:      publicKeyPath,
+		RecoverySharePaths: []string{recoverySharePath},
+		EvidencePaths:      []string{evidencePath},
+	}
+}
+
+func mainSignedArtifact(t *testing.T, root, id, kind, path, signaturePath string, signerIDs []string, certificateLogPath, gateReportPath, evidencePath string) hardwaresigning.SignedArtifact {
+	t.Helper()
+	return hardwaresigning.SignedArtifact{
+		ID:                 id,
+		Kind:               kind,
+		Path:               path,
+		SHA256:             mainTestFileHash(t, filepath.Join(root, filepath.FromSlash(path))),
+		SignaturePath:      signaturePath,
+		SignerIDs:          signerIDs,
+		Threshold:          2,
+		CertificateLogPath: certificateLogPath,
+		GateReportPath:     gateReportPath,
+		EvidencePaths:      []string{evidencePath},
+	}
+}
+
+func mainSigningDrill(id, kind, artifactID, oldSignerID, newSignerID, evidencePath, resultPath string) hardwaresigning.Drill {
+	return hardwaresigning.Drill{
+		ID:            id,
+		Kind:          kind,
+		ArtifactID:    artifactID,
+		OldSignerID:   oldSignerID,
+		NewSignerID:   newSignerID,
+		Steps:         []string{"prepare hardware signing ceremony", "rotate or recover key", "verify signed artifact"},
+		StartedAt:     "2026-06-03T10:00:00Z",
+		CompletedAt:   "2026-06-03T10:10:00Z",
+		EvidencePaths: []string{evidencePath},
+		ResultPaths:   []string{resultPath},
 	}
 }
 

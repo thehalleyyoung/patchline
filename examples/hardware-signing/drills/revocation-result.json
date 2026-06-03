@@ -1,0 +1,1 @@
+{"kind":"revocation","artifact":"release-gate","old_signer":"gate-signer","new_signer":"certificate-signer","ok":true}

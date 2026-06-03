@@ -161,6 +161,8 @@ Run `offline-deploy --spec examples/offline-deploy.json` to verify regulated edg
 
 Run `resilient-analysis --spec examples/resilient-analysis.json` to replay distributed analysis under worker loss, cache corruption, and partial network partitions; reproduce it with `make resilient-analysis-gate`.
 
+Run `hardware-signing --spec examples/hardware-signing.json` to verify release, gate, and certificate artifacts with hardware-backed signing, threshold approval, recovery shares, and key-rotation drills; reproduce it with `make hardware-signing-gate`.
+
 Run `explainability-audit --spec examples/explainability-audit.json` to verify independent reviewers agree evidence trails support stated verdicts, with hash-mismatch and disagreement negative controls; reproduce it with `make explainability-audit-gate`.
 
 Run `change-management-verify --spec <spec>` to prove organizational approvals are bound to passed Patchline gates, hash-pinned reports, rollback evidence, and emergency expiry; reproduce it with `make change-management-integration-gate`.

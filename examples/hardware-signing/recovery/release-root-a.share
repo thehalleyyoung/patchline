@@ -1,0 +1,1 @@
+sealed-share release-root shard=a threshold=2-of-3 escrow=maintainer-council

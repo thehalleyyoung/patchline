@@ -48,6 +48,7 @@ import (
 	"github.com/thehalleyyoung/patchline/internal/gate"
 	"github.com/thehalleyyoung/patchline/internal/goldenfixture"
 	"github.com/thehalleyyoung/patchline/internal/governancerisk"
+	"github.com/thehalleyyoung/patchline/internal/hardwaresigning"
 	"github.com/thehalleyyoung/patchline/internal/historical"
 	"github.com/thehalleyyoung/patchline/internal/incidentdrill"
 	"github.com/thehalleyyoung/patchline/internal/incidentpostmortem"
@@ -477,6 +478,8 @@ func run(args []string) error {
 		return offlineDeployCommand(args[1:], hasFlag(args[1:], "--json"))
 	case "resilient-analysis":
 		return resilientAnalysisCommand(args[1:], hasFlag(args[1:], "--json"))
+	case "hardware-signing":
+		return hardwareSigningCommand(args[1:], hasFlag(args[1:], "--json"))
 	case "reviewer-fairness-audit":
 		return reviewerFairnessAuditCommand(args[1:], hasFlag(args[1:], "--json"))
 	case "change-management-verify":
@@ -652,6 +655,7 @@ Usage:
   patchline localized-teaching-examples --spec localized-teaching-examples.json --root repo-root --out dir [--json]
   patchline offline-deploy --spec offline-deploy.json --root repo-root --out dir [--json]
   patchline resilient-analysis --spec resilient-analysis.json --root repo-root --out dir [--json]
+  patchline hardware-signing --spec hardware-signing.json --root repo-root --out dir [--json]
   patchline reviewer-fairness-audit --spec reviewer-fairness-audit.json --root repo-root --out dir [--json]
   patchline change-management-verify --spec change-management.json --root repo-root --out dir [--json]
   patchline governance-risk-register --spec governance-risk-register.json --root repo-root --out dir [--json]
@@ -15511,6 +15515,45 @@ func resilientAnalysisCommand(args []string, jsonOut bool) error {
 	}
 	if !report.OK {
 		return codedError{code: 2, err: errors.New("resilient analysis validation failed")}
+	}
+	return nil
+}
+
+func hardwareSigningCommand(args []string, jsonOut bool) error {
+	usage := "patchline hardware-signing --spec hardware-signing.json --root repo-root --out <dir> [--json]"
+	specPath, outPath, err := feedbackSpecOut(args, usage)
+	if err != nil {
+		return err
+	}
+	rootPath := "."
+	if value, ok := flagValue(args, "--root"); ok && value != "" {
+		rootPath = value
+	}
+	file, err := os.Open(specPath)
+	if err != nil {
+		return err
+	}
+	defer file.Close()
+	spec, err := hardwaresigning.ReadSpec(file)
+	if err != nil {
+		return err
+	}
+	report, err := hardwaresigning.BuildReport(spec, rootPath)
+	if err != nil {
+		return err
+	}
+	if err := hardwaresigning.WriteArtifacts(outPath, report); err != nil {
+		return err
+	}
+	if jsonOut {
+		if err := writeJSON(os.Stdout, report); err != nil {
+			return err
+		}
+	} else {
+		fmt.Printf("wrote hardware signing ok=%t identities=%d artifacts=%d threshold_approved=%d drills=%d counterexamples=%d to %s\n", report.OK, report.Summary.SigningIdentities, report.Summary.SignedArtifacts, report.Summary.ThresholdApprovedArtifacts, report.Summary.Drills, report.Summary.Counterexamples, outPath)
+	}
+	if !report.OK {
+		return codedError{code: 2, err: errors.New("hardware signing validation failed")}
 	}
 	return nil
 }

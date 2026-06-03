@@ -1,0 +1,189 @@
+{
+  "version": "patchline.hardware-signing/v1",
+  "name": "Patchline hardware-backed release signing",
+  "claim": "Patchline proves that release, gate, and certificate artifacts are not merely checksummed files: each artifact is bound to attested hardware-backed signing identities, threshold approval, certificate-log continuity, gate-report evidence, recovery shares, and replayed key-rotation, recovery, and revocation drills. The gate mutates the spec into forged hashes, missing signatures, missing attestations, lost recovery shares, absent certificate logs, absent gate reports, insufficient signer thresholds, and missing drill evidence, then requires deterministic counterexamples instead of trusting release metadata.",
+  "criteria": {
+    "required_artifact_kinds": [
+      "release",
+      "gate",
+      "certificate"
+    ],
+    "min_signing_identities": 3,
+    "min_artifacts_per_kind": 1,
+    "require_hardware_backing": true,
+    "require_attestation": true,
+    "require_threshold_approval": true,
+    "require_key_rotation_drill": true,
+    "require_recovery_drill": true,
+    "require_revocation_drill": true,
+    "require_offline_root": true,
+    "require_evidence_hashes": true
+  },
+  "signing_identities": [
+    {
+      "id": "release-root",
+      "role": "offline-root",
+      "hardware_type": "yubikey",
+      "slot": "9c",
+      "offline_root": true,
+      "attestation_path": "examples/hardware-signing/attestations/release-root.json",
+      "public_key_path": "examples/hardware-signing/keys/release-root.pub",
+      "recovery_share_paths": [
+        "examples/hardware-signing/recovery/release-root-a.share"
+      ],
+      "evidence_paths": [
+        "examples/hardware-signing/evidence/release-window.md"
+      ]
+    },
+    {
+      "id": "gate-signer",
+      "role": "gate-signer",
+      "hardware_type": "hsm",
+      "slot": "gate",
+      "offline_root": false,
+      "attestation_path": "examples/hardware-signing/attestations/gate-signer.json",
+      "public_key_path": "examples/hardware-signing/keys/gate-signer.pub",
+      "recovery_share_paths": [
+        "examples/hardware-signing/recovery/gate-signer-a.share"
+      ],
+      "evidence_paths": [
+        "examples/hardware-signing/evidence/gate-window.md"
+      ]
+    },
+    {
+      "id": "certificate-signer",
+      "role": "certificate-signer",
+      "hardware_type": "kms-hsm",
+      "slot": "certificate",
+      "offline_root": false,
+      "attestation_path": "examples/hardware-signing/attestations/certificate-signer.json",
+      "public_key_path": "examples/hardware-signing/keys/certificate-signer.pub",
+      "recovery_share_paths": [
+        "examples/hardware-signing/recovery/certificate-signer-a.share"
+      ],
+      "evidence_paths": [
+        "examples/hardware-signing/evidence/certificate-window.md"
+      ]
+    }
+  ],
+  "signed_artifacts": [
+    {
+      "id": "patchline-release",
+      "kind": "release",
+      "path": "examples/hardware-signing/artifacts/patchline-1.0.0.tar.gz",
+      "sha256": "sha256:dc661e89d52358802751477eec3e45c038222aaf6ef3cdd9cd6d81d3246dd3c9",
+      "signature_path": "examples/hardware-signing/signatures/release.sig",
+      "signer_ids": [
+        "release-root",
+        "gate-signer"
+      ],
+      "threshold": 2,
+      "certificate_log_path": "examples/hardware-signing/logs/release-log.jsonl",
+      "gate_report_path": "examples/hardware-signing/gate-reports/release-gate.json",
+      "evidence_paths": [
+        "examples/hardware-signing/evidence/release-window.md"
+      ]
+    },
+    {
+      "id": "release-gate",
+      "kind": "gate",
+      "path": "examples/hardware-signing/artifacts/release-gate.json",
+      "sha256": "sha256:5127427920071c84c80b22bac89dc90077b807177502e3f9712df36126c8292b",
+      "signature_path": "examples/hardware-signing/signatures/gate.sig",
+      "signer_ids": [
+        "gate-signer",
+        "release-root"
+      ],
+      "threshold": 2,
+      "certificate_log_path": "examples/hardware-signing/logs/gate-log.jsonl",
+      "gate_report_path": "examples/hardware-signing/gate-reports/gate-gate.json",
+      "evidence_paths": [
+        "examples/hardware-signing/evidence/gate-window.md"
+      ]
+    },
+    {
+      "id": "certificate-ledger",
+      "kind": "certificate",
+      "path": "examples/hardware-signing/artifacts/certificate-ledger.plci",
+      "sha256": "sha256:092d5f237ec11ac58dc4959257124b7fd199e582f25cbedb702b809e0f1f294c",
+      "signature_path": "examples/hardware-signing/signatures/certificate.sig",
+      "signer_ids": [
+        "certificate-signer",
+        "release-root"
+      ],
+      "threshold": 2,
+      "certificate_log_path": "examples/hardware-signing/logs/certificate-log.jsonl",
+      "gate_report_path": "examples/hardware-signing/gate-reports/certificate-gate.json",
+      "evidence_paths": [
+        "examples/hardware-signing/evidence/certificate-window.md"
+      ]
+    }
+  ],
+  "drills": [
+    {
+      "id": "rotate-release-root",
+      "kind": "key_rotation",
+      "artifact_id": "patchline-release",
+      "old_signer_id": "release-root",
+      "new_signer_id": "gate-signer",
+      "steps": [
+        "freeze release metadata",
+        "enroll replacement hardware key",
+        "re-sign gate artifact",
+        "verify certificate log continuity"
+      ],
+      "started_at": "2026-06-03T10:00:00Z",
+      "completed_at": "2026-06-03T10:18:00Z",
+      "evidence_paths": [
+        "examples/hardware-signing/drills/key-rotation.md"
+      ],
+      "result_paths": [
+        "examples/hardware-signing/drills/key-rotation-result.json"
+      ]
+    },
+    {
+      "id": "recover-release-root",
+      "kind": "recovery",
+      "artifact_id": "patchline-release",
+      "old_signer_id": "release-root",
+      "new_signer_id": "release-root",
+      "steps": [
+        "unseal recovery share",
+        "enroll replacement token",
+        "verify old release signature",
+        "publish recovery result"
+      ],
+      "started_at": "2026-06-03T11:00:00Z",
+      "completed_at": "2026-06-03T11:21:00Z",
+      "evidence_paths": [
+        "examples/hardware-signing/drills/recovery.md"
+      ],
+      "result_paths": [
+        "examples/hardware-signing/drills/recovery-result.json"
+      ]
+    },
+    {
+      "id": "revoke-gate-signer",
+      "kind": "revocation",
+      "artifact_id": "release-gate",
+      "old_signer_id": "gate-signer",
+      "new_signer_id": "certificate-signer",
+      "steps": [
+        "append revocation to ledger",
+        "reject stale gate signature",
+        "accept replacement threshold quorum"
+      ],
+      "started_at": "2026-06-03T12:00:00Z",
+      "completed_at": "2026-06-03T12:16:00Z",
+      "evidence_paths": [
+        "examples/hardware-signing/drills/revocation.md"
+      ],
+      "result_paths": [
+        "examples/hardware-signing/drills/revocation-result.json"
+      ]
+    }
+  ],
+  "evidence_paths": [
+    "examples/hardware-signing/evidence/signing-policy.md"
+  ]
+}

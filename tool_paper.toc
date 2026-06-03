@@ -9,7 +9,7 @@
 \contentsline {paragraph}{P4: Never over-claim.}{6}{section.2}%
 \contentsline {paragraph}{P5: Everything is gated.}{6}{section.2}%
 \contentsline {section}{\numberline {3}System Architecture}{6}{section.3}%
-\contentsline {paragraph}{Resumability, offline operation, and resilience.}{10}{table.1}%
+\contentsline {paragraph}{Resumability, offline operation, resilience, and release trust.}{10}{table.1}%
 \contentsline {subsection}{\numberline {3.1}Artifact contract}{10}{subsection.3.1}%
 \contentsline {section}{\numberline {4}The Project-Native Fact Layer}{11}{section.4}%
 \contentsline {paragraph}{Sources and reproducibility.}{11}{section.4}%

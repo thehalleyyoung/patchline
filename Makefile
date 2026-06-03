@@ -15,6 +15,7 @@
 .PHONY: open-textbook-companion-gate
 .PHONY: offline-deploy-gate
 .PHONY: resilient-analysis-gate
+.PHONY: hardware-signing-gate
 
 build:
 	go build -o bin/patchline ./cmd/patchline
@@ -1219,6 +1220,9 @@ offline-deploy-gate:
 
 resilient-analysis-gate:
 	bash scripts/resilient-analysis-gate.sh
+
+hardware-signing-gate:
+	bash scripts/hardware-signing-gate.sh
 
 industry-working-group-gate:
 	bash scripts/industry-working-group-gate.sh
