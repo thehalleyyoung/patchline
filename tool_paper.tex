@@ -99,8 +99,8 @@ k-thresholded aggregate metrics.
 Critically,
 every capability in \tool{} is backed by a reproducible \emph{gate}: a script that proves the
 capability against real, pinned public code and fails loudly on drift. \tool{} currently ships more
-than 624 such gates over 569 documented capabilities, now including resource-adaptive analysis profiles
-for laptops, CI runners, air-gapped servers, and public-good hosted service tiers, supply-chain compromise simulations
+than 625 such gates over 570 documented capabilities, now including release-channel isolation proofs for
+stable certificates, resource-adaptive profiles for laptops, CI, air-gapped servers, and public-good hosted tiers, supply-chain compromise simulations
 for dependency poisoning, malicious archives, and forged release metadata, plus resilient distributed-analysis,
 hardware-signing, confidential-computing, and accelerator-free learned-component verifiers for worker loss, cache corruption, partitions, threshold signatures,
 recovery, rotation, revocation, and verifiable enclave attestation before accepting a corpus run or trusted artifact; the broader gate catalog spans relational migrations across nine
@@ -172,12 +172,12 @@ ranks the risks, and prints the next commands that can run immediately.
   \item A \textbf{runtime and observability evidence} layer that scores findings on independent
   static-risk and observed-runtime axes using OpenTelemetry, Datadog-style, and Prometheus/Grafana
   exports (Section~\ref{sec:runtime}).
-  \item A \textbf{gate-backed reproducibility and evaluation methodology}---over 624 gates, blinded
+  \item A \textbf{gate-backed reproducibility and evaluation methodology}---over 625 gates, blinded
   false-positive adjudication, seeded false-negative recall, ablations, standardized effect sizes,
   severity calibration, a duplicate-safe certificate-backed public evidence marketplace, deterministic
   governance-board lifecycle decisions, hash-bound appeal resolution, reviewer-fairness burden/false-positive/escalation audits, workforce-impact difference-in-differences with suppressed-escalation and teaching-to-test controls, change-management approval binding, governance-risk concentration audits, ethics-review controls for data sources, live learning, and outcome studies, independent explainability audits for stated verdicts, misuse-resistance checks for certificates/scoreboards/adoption metrics, transparent detector deprecation, adversarial-challenge scoring, signed federated benchmark
   aggregates for private adopters, and accountable-use mappings from autonomous or blocking capabilities
-  to required human oversight---designed for artifact
+  to required human oversight, and release-channel isolation preventing experimental detectors from changing stable certificates---designed for artifact
   evaluation and best-paper-grade rigor
   (Sections~\ref{sec:repro}--\ref{sec:eval}).
 \end{enumerate}
@@ -358,14 +358,15 @@ deterministic reviewer artifact that pins engine versions, local runtime or emul
 where available, embedded/managed-service profiles where not, and observed profile, rule, lock,
 rollback, query-plan, runtime, replication, and partition evidence rows. &
 \code{reproducibility-report.json}, \code{.md} \\
-\code{resilient-analysis}, \code{hardware-signing}, \code{confidential-computing}, \code{accelerator-fallbacks}, \code{resource-profiles}, \code{supply-chain simulate} & Replay distributed analysis evidence under worker
+\code{resilient-analysis}, \code{hardware-signing}, \code{confidential-computing}, \code{accelerator-fallbacks}, \code{resource-profiles}, \code{release-channel-isolation}, \code{supply-chain simulate} & Replay distributed analysis evidence under worker
 loss, cache corruption, deterministic leases, and recovered partitions; verify release, gate, and
 certificate artifacts against hardware attestations, thresholds, recovery shares, logs, reports, and
 key-rotation/revocation drills; bind private corpus workloads to enclave quotes, verifier reports,
 key-release policy, encrypted inputs, redacted aggregates, private retained outputs, and replay proofs;
 prove every learned fixture has CPU-only pinned replay and parity; verify deterministic resource budgets,
 cache policy, native-test policy, and graceful degradation for laptop, CI, offline, and hosted tiers;
-reject dependency poisoning, malicious archive, and forged metadata simulations. & \code{resilient-analysis.json}, \code{hardware-signing.json}, \code{confidential-computing.json}, \code{accelerator-fallbacks.json}, \code{resource-profiles.json}, \code{supply-chain-sim.json}, \code{.md} \\
+prove experimental detector output changes a naive certificate hash but not stable certificate results;
+reject dependency poisoning, malicious archive, and forged metadata simulations. & \code{resilient-analysis.json}, \code{hardware-signing.json}, \code{confidential-computing.json}, \code{accelerator-fallbacks.json}, \code{resource-profiles.json}, \code{release-channel-isolation.json}, \code{supply-chain-sim.json}, \code{.md} \\
 \code{propose} & Generate bounded interventions (guards, tests) within an explicit budget; quarantine
 them as untrusted artifacts. & \code{proposal.patch}, \code{patchline-proposals/} \\
 \code{compare} & Deterministically re-analyze proposed changes; accept or reject by evidence delta. &
@@ -1199,7 +1200,8 @@ owner-routed rollback playbooks for broad writes & \gate{remediation-playbook-ga
 2 public-safe adversarial migrations scored from verified artifacts and analyzer-backed high-risk proofs; embargoed publication refuted & \gate{adversarial-challenge-gate} \\
 3 private benchmark cases published as signed aggregate-only metrics; tampering/leakage rejected & \gate{federated-benchmark-split-gate} \\
 4 public artifact classes restored from checksum mirrors; 3 primary mirror failures and an all-mirrors-lost certificate-log control rejected & \gate{disaster-recovery-exercise-gate} \\
-4 resource profiles (laptop, CI, air-gapped, hosted public-good) with 8 deterministic command plans and 4 bounded budgets; LLM, offline-network, cache, cost, and evidence controls rejected & \gate{resource-profiles-gate} \\
+4 resource profiles with 8 deterministic command plans and 4 bounded budgets; LLM, offline-network, cache, cost, and evidence controls rejected & \gate{resource-profiles-gate} \\
+stable certificate hash unchanged after 2 experimental detector findings injected, while naive and mutated hashes differ; experimental-reference certificate rejected & \gate{release-channel-isolation-gate} \\
 3 payout-approved minimized false-negative/ecosystem-gap bounty reproductions; unsupported bounty rejected & \gate{open-problem-bounty-board-gate} \\
 9 Cassandra changes incl.\ destructive drops & \code{laaksomavrick/twitter-go} \\
 17 $\rightarrow$ 1 line, 1-minimal reproduction & delta-debugging oracle \\

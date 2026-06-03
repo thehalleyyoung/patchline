@@ -165,6 +165,7 @@ Run `hardware-signing --spec examples/hardware-signing.json` to verify release, 
 Confidential-computing evaluation (`make confidential-computing-gate`) verifies private corpus analysis with verifiable enclave attestation, encrypted inputs, key-release policy, redacted aggregate outputs, and replay evidence.
 Deterministic accelerator-free fallbacks (`make accelerator-fallbacks-gate`) prove every repository-discovered learned component has a pinned CPU-only replay with parity evidence.
 Resource-adaptive profiles (`make resource-profiles-gate`) prove laptop, CI, air-gapped, and hosted public-good runs use explicit deterministic budgets, cache policy, native-test policy, graceful degradation, and hash-backed outputs.
+Release-channel isolation (`make release-channel-isolation-gate`) proves experimental detectors can change a naive certificate hash but cannot change stable certificate results.
 Run `make disaster-recovery-exercise-gate` to rebuild the public corpus, docs, release manifest, and certificate logs, restore them from checksum-verified mirrors, and reject unrecoverable mirror loss; see [docs/disaster-recovery-exercise.md](docs/disaster-recovery-exercise.md).
 Run `supply-chain simulate --spec examples/supply-chain-compromise-sim.json` for supply-chain compromise simulations covering dependency poisoning, malicious archives, and forged release metadata; reproduce it with `make supply-chain-compromise-sim-gate`.
 

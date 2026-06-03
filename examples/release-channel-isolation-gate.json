@@ -1,0 +1,194 @@
+{
+  "version": "patchline.release-channel-isolation-gate/v1",
+  "name": "Patchline release-channel isolation for stable certificates",
+  "claim": "Patchline proves release-channel isolation by recomputing stable certificate subjects from stable detector results before and after injecting experimental detector output into the same input pool. The gate requires explicit channel tags, disjoint detector identities, stable-only certificate references, byte-identical isolated hashes, a changed naive non-isolating hash, and two targeted negative controls, so experimental detectors can remain visible as advisory evidence without changing stable certificate results.",
+  "real_repo": "patchline (self): certificate gates, ratified format, resource profiles",
+  "channels": [
+    {
+      "id": "stable",
+      "description": "Release-blocking detectors whose outputs may feed stable PLCI certificate results."
+    },
+    {
+      "id": "experimental",
+      "description": "Advisory detectors under evaluation; their findings may be displayed but cannot affect stable certificate hashes."
+    }
+  ],
+  "stable_certificate": {
+    "id": "plci-stable-2026-06",
+    "channel": "stable",
+    "policy": "stable-only-release",
+    "subjects": [
+      "schema.accounts.email",
+      "migration.orders.status"
+    ],
+    "allowed_detector_ids": [
+      "stable-sql-risk",
+      "stable-rollback-proof",
+      "stable-provenance-link"
+    ],
+    "evidence_paths": [
+      "docs/ratified-certificate-format.md",
+      "docs/resource-profiles.md"
+    ]
+  },
+  "detectors": [
+    {
+      "id": "stable-sql-risk",
+      "channel": "stable",
+      "kind": "deterministic-sql-risk",
+      "version": "2026.06",
+      "evidence": "ratified-certificate-format-gate"
+    },
+    {
+      "id": "stable-rollback-proof",
+      "channel": "stable",
+      "kind": "rollback-feasibility",
+      "version": "2026.06",
+      "evidence": "resource-profiles-gate"
+    },
+    {
+      "id": "stable-provenance-link",
+      "channel": "stable",
+      "kind": "provenance-closure",
+      "version": "2026.06",
+      "evidence": "certificate-composition-gate"
+    },
+    {
+      "id": "exp-learned-blast-radius",
+      "channel": "experimental",
+      "kind": "learned-ranking",
+      "version": "2026.06-exp",
+      "evidence": "accelerator-fallbacks-gate",
+      "advisory_only": true
+    },
+    {
+      "id": "exp-large-language-reviewer",
+      "channel": "experimental",
+      "kind": "llm-reviewer-simulation",
+      "version": "2026.06-exp",
+      "evidence": "reviewer-sim-gate",
+      "advisory_only": true
+    }
+  ],
+  "baseline_results": [
+    {
+      "id": "stable-result-001",
+      "channel": "stable",
+      "detector_id": "stable-sql-risk",
+      "subject": "schema.accounts.email",
+      "verdict": "guarded",
+      "risk_score": 0.18,
+      "evidence_hash": "sha256:1111111111111111111111111111111111111111111111111111111111111111"
+    },
+    {
+      "id": "stable-result-002",
+      "channel": "stable",
+      "detector_id": "stable-rollback-proof",
+      "subject": "migration.orders.status",
+      "verdict": "rollback-proof-present",
+      "risk_score": 0.12,
+      "evidence_hash": "sha256:2222222222222222222222222222222222222222222222222222222222222222"
+    },
+    {
+      "id": "stable-result-003",
+      "channel": "stable",
+      "detector_id": "stable-provenance-link",
+      "subject": "schema.accounts.email",
+      "verdict": "provenance-closed",
+      "risk_score": 0.08,
+      "evidence_hash": "sha256:3333333333333333333333333333333333333333333333333333333333333333"
+    }
+  ],
+  "contaminated_results": [
+    {
+      "id": "stable-result-001",
+      "channel": "stable",
+      "detector_id": "stable-sql-risk",
+      "subject": "schema.accounts.email",
+      "verdict": "guarded",
+      "risk_score": 0.18,
+      "evidence_hash": "sha256:1111111111111111111111111111111111111111111111111111111111111111"
+    },
+    {
+      "id": "stable-result-002",
+      "channel": "stable",
+      "detector_id": "stable-rollback-proof",
+      "subject": "migration.orders.status",
+      "verdict": "rollback-proof-present",
+      "risk_score": 0.12,
+      "evidence_hash": "sha256:2222222222222222222222222222222222222222222222222222222222222222"
+    },
+    {
+      "id": "stable-result-003",
+      "channel": "stable",
+      "detector_id": "stable-provenance-link",
+      "subject": "schema.accounts.email",
+      "verdict": "provenance-closed",
+      "risk_score": 0.08,
+      "evidence_hash": "sha256:3333333333333333333333333333333333333333333333333333333333333333"
+    },
+    {
+      "id": "experimental-result-001",
+      "channel": "experimental",
+      "detector_id": "exp-learned-blast-radius",
+      "subject": "schema.accounts.email",
+      "verdict": "learned-review-would-escalate",
+      "risk_score": 0.91,
+      "evidence_hash": "sha256:eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+      "advisory_only": true
+    },
+    {
+      "id": "experimental-result-002",
+      "channel": "experimental",
+      "detector_id": "exp-large-language-reviewer",
+      "subject": "migration.orders.status",
+      "verdict": "llm-reviewer-suggests-extra-test",
+      "risk_score": 0.74,
+      "evidence_hash": "sha256:ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+      "advisory_only": true
+    }
+  ],
+  "negative_controls": {
+    "experimental_reference_certificate": {
+      "id": "bad-stable-cert-exp-ref",
+      "channel": "stable",
+      "policy": "stable-only-release",
+      "subjects": [
+        "schema.accounts.email"
+      ],
+      "allowed_detector_ids": [
+        "stable-sql-risk",
+        "exp-learned-blast-radius"
+      ]
+    },
+    "mutated_stable_results": [
+      {
+        "id": "stable-result-001",
+        "channel": "stable",
+        "detector_id": "stable-sql-risk",
+        "subject": "schema.accounts.email",
+        "verdict": "unguarded-after-mutation",
+        "risk_score": 0.88,
+        "evidence_hash": "sha256:9999999999999999999999999999999999999999999999999999999999999999"
+      },
+      {
+        "id": "stable-result-002",
+        "channel": "stable",
+        "detector_id": "stable-rollback-proof",
+        "subject": "migration.orders.status",
+        "verdict": "rollback-proof-present",
+        "risk_score": 0.12,
+        "evidence_hash": "sha256:2222222222222222222222222222222222222222222222222222222222222222"
+      },
+      {
+        "id": "stable-result-003",
+        "channel": "stable",
+        "detector_id": "stable-provenance-link",
+        "subject": "schema.accounts.email",
+        "verdict": "provenance-closed",
+        "risk_score": 0.08,
+        "evidence_hash": "sha256:3333333333333333333333333333333333333333333333333333333333333333"
+      }
+    ]
+  }
+}

@@ -20,6 +20,7 @@
 .PHONY: accelerator-fallbacks-gate
 .PHONY: disaster-recovery-exercise-gate
 .PHONY: supply-chain-compromise-sim-gate
+.PHONY: release-channel-isolation-gate
 
 build:
 	go build -o bin/patchline ./cmd/patchline
@@ -1236,6 +1237,9 @@ accelerator-fallbacks-gate:
 
 resource-profiles-gate:
 	bash scripts/resource-profiles-gate.sh
+
+release-channel-isolation-gate:
+	bash scripts/release-channel-isolation-gate.sh
 
 disaster-recovery-exercise-gate:
 	bash scripts/disaster-recovery-exercise-gate.sh
