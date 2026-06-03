@@ -1,0 +1,53 @@
+{
+  "version": "patchline.canary-validation/v1",
+  "name": "invoice external id canary validation",
+  "sample_policy": {
+    "source": "redacted billing replica tenant-stratified sample",
+    "redacted": true,
+    "production_like": true,
+    "sampling_basis": "stable hash of tenant id, invoice age bucket, and migration risk id",
+    "expected_rows": 3,
+    "min_rows": 3,
+    "min_matched_rows": 3,
+    "redaction_salt": "local-canary-validation-gate-salt-2026"
+  },
+  "invariants": [
+    {
+      "id": "invoice-row-count",
+      "kind": "row_count",
+      "table": "invoices",
+      "allowed_delta": 0
+    },
+    {
+      "id": "external-id-not-null",
+      "kind": "not_null",
+      "table": "invoices",
+      "columns": ["external_id"]
+    },
+    {
+      "id": "external-id-unique",
+      "kind": "unique",
+      "table": "invoices",
+      "columns": ["external_id"]
+    },
+    {
+      "id": "external-id-derived",
+      "kind": "equals",
+      "table": "invoices",
+      "source_column": "legacy_external_id",
+      "target_column": "external_id"
+    },
+    {
+      "id": "stable-business-fields",
+      "kind": "unchanged",
+      "table": "invoices",
+      "columns": ["account_id", "amount_cents", "status"]
+    },
+    {
+      "id": "only-external-id-changes",
+      "kind": "changed_only",
+      "table": "invoices",
+      "allowed_change_columns": ["external_id"]
+    }
+  ]
+}

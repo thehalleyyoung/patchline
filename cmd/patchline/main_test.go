@@ -16,6 +16,7 @@ import (
 	"github.com/thehalleyyoung/patchline/internal/artifact"
 	"github.com/thehalleyyoung/patchline/internal/attest"
 	"github.com/thehalleyyoung/patchline/internal/backfillplanner"
+	"github.com/thehalleyyoung/patchline/internal/canaryvalidate"
 	"github.com/thehalleyyoung/patchline/internal/evidence"
 	"github.com/thehalleyyoung/patchline/internal/expandcontract"
 	"github.com/thehalleyyoung/patchline/internal/feedback"
@@ -161,6 +162,65 @@ func TestBackfillPlanCommandWritesReports(t *testing.T) {
 		t.Fatalf("unexpected backfill plan report: %#v", report)
 	}
 	for _, rel := range []string{"backfill-plan.md", "backfill-plan.sql"} {
+		if stat, err := os.Stat(filepath.Join(out, rel)); err != nil || stat.Size() == 0 {
+			t.Fatalf("expected %s to be written, stat=%#v err=%v", rel, stat, err)
+		}
+	}
+}
+
+func TestCanaryValidateCommandWritesReports(t *testing.T) {
+	root := t.TempDir()
+	specPath := filepath.Join(root, "canary-validation.json")
+	beforePath := filepath.Join(root, "before.json")
+	afterPath := filepath.Join(root, "after.json")
+	writeMainTestFile(t, root, "canary-validation.json", `{
+  "version": "patchline.canary-validation/v1",
+  "name": "invoice external id canary validation",
+  "sample_policy": {
+    "source": "redacted billing replica sample",
+    "redacted": true,
+    "production_like": true,
+    "sampling_basis": "deterministic tenant-stratified hash sample",
+    "expected_rows": 2,
+    "min_rows": 2,
+    "min_matched_rows": 2,
+    "redaction_salt": "main-test-canary-salt"
+  },
+  "invariants": [
+    {"id":"invoice-row-count","kind":"row_count","table":"invoices","allowed_delta":0},
+    {"id":"external-id-not-null","kind":"not_null","table":"invoices","columns":["external_id"]},
+    {"id":"external-id-unique","kind":"unique","table":"invoices","columns":["external_id"]},
+    {"id":"external-id-derived","kind":"equals","table":"invoices","source_column":"legacy_external_id","target_column":"external_id"},
+    {"id":"stable-business-fields","kind":"unchanged","table":"invoices","columns":["account_id","amount_cents","status"]},
+    {"id":"only-external-id-changes","kind":"changed_only","table":"invoices","allowed_change_columns":["external_id"]}
+  ]
+}`)
+	writeMainTestFile(t, root, "before.json", `{
+  "tables": {
+    "invoices": {
+      "1": {"id":"1","account_id":"acct-a","amount_cents":"1000","status":"paid","legacy_external_id":"inv-1","external_id":""},
+      "2": {"id":"2","account_id":"acct-b","amount_cents":"2000","status":"open","legacy_external_id":"inv-2","external_id":""}
+    }
+  }
+}`)
+	writeMainTestFile(t, root, "after.json", `{
+  "tables": {
+    "invoices": {
+      "1": {"id":"1","account_id":"acct-a","amount_cents":"1000","status":"paid","legacy_external_id":"inv-1","external_id":"inv-1"},
+      "2": {"id":"2","account_id":"acct-b","amount_cents":"2000","status":"open","legacy_external_id":"inv-2","external_id":"inv-2"}
+    }
+  }
+}`)
+	out := filepath.Join(t.TempDir(), "canary-validation")
+	if err := run([]string{"canary-validate", "--spec", specPath, "--before", beforePath, "--after", afterPath, "--out", out, "--json"}); err != nil {
+		t.Fatalf("canary-validate failed: %v", err)
+	}
+	var report canaryvalidate.Report
+	readMainTestJSON(t, filepath.Join(out, "canary-validation.json"), &report)
+	if !report.OK || report.Summary.Checked != 6 || report.Summary.MatchedRows != 2 || !report.Privacy.HashOnlyEvidence {
+		t.Fatalf("unexpected canary validation report: %#v", report)
+	}
+	for _, rel := range []string{"canary-validation.md", "canary-validation.sql"} {
 		if stat, err := os.Stat(filepath.Join(out, rel)); err != nil || stat.Size() == 0 {
 			t.Fatalf("expected %s to be written, stat=%#v err=%v", rel, stat, err)
 		}

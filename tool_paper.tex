@@ -49,7 +49,9 @@ and only within an explicit budget---generates bounded interventions that are qu
 \emph{deterministically re-analyzed and rejected} if they do not improve the evidence. Its remediation
 surface now also derives invariant-backed expand/contract templates, uses a staged backfill planner to
 gate constraint-tightening and compatibility-code deletion on an exhaustive replay-store proof, and
-turns baseline hazard classes into owner-routed remediation playbooks with rollback points. Critically,
+turns baseline hazard classes into owner-routed remediation playbooks with rollback points, while a
+canary-data protocol compares pre/post migration invariants on sampled, redacted, production-like
+snapshots and emits only hash-based counterexamples. Critically,
 every capability in \tool{} is backed by a reproducible \emph{gate}: a script that proves the
 capability against real, pinned public code and fails loudly on drift. \tool{} currently ships more
 than 600 such gates over 560 documented capabilities, spanning relational migrations across nine
@@ -195,6 +197,8 @@ vocabulary. & \code{intake} artifacts \\
 trace-to-code evidence. & \code{baseline.json}, \code{baseline.sarif} \\
 \code{playbook} & Map baseline hazard classes to runbook steps, rollback points, validation commands,
 and owner handoffs. & \code{playbook.json}, \code{playbook.md} \\
+\code{canary-validate} & Compare pre/post migration invariants on sampled, redacted, production-like
+snapshots with hash-only counterexamples. & \code{canary-validation.json}, \code{.md}, \code{.sql} \\
 \code{propose} & Generate bounded interventions (guards, tests) within an explicit budget; quarantine
 them as untrusted artifacts. & \code{proposal.patch}, \code{patchline-proposals/} \\
 \code{compare} & Deterministically re-analyze proposed changes; accept or reject by evidence delta. &
@@ -443,6 +447,16 @@ fixture with a broad \code{UPDATE}, CODEOWNERS, and operational notes, runs inve
 and asserts that the resulting JSON and Markdown contain the hazard classes, rollback stages, and
 owner handoff.
 
+\paragraph{Canary-data validation.} The \code{canary-validate} command lets teams validate the
+release on a local, redacted sample without exporting private data. A versioned spec declares the
+sampling policy, redaction status, matched-row thresholds, and invariants such as row-count
+preservation, \code{NOT NULL}, uniqueness, source/target equality, stable business columns, and a
+bounded write set. Given pre/post replay-store snapshots, \tool{} reports aggregate counts, snapshot
+hashes, row hashes, and cell hashes---never sampled row values, row identifiers, or the redaction salt.
+The \gate{canary-validation-gate} checks a passing invoice migration with six invariants and then runs
+a negative post snapshot that duplicates a unique value, leaves one target empty, and mutates a stable
+business field; the bad snapshot must be refuted by exact hash-only counterexamples.
+
 \paragraph{The accept/reject decision.} Table~\ref{tab:compare} makes the compare contract precise.
 Each proposed artifact is scored on the same fact-derived axes as the baseline, and the decision is a
 pure function of the evidence delta---never of a model's self-reported confidence. An artifact that
@@ -683,6 +697,7 @@ Blast-radius \& proof-hole ranking & no & no & yes \\
 Runtime-trace corroboration & no & no & yes \\
 Bounded, quarantined interventions & no & no & yes \\
 Owner-routed rollback playbooks & no & no & yes \\
+Pre/post canary invariant validation & no & no & yes \\
 Deterministic, byte-stable artifacts & no & partial & yes \\
 Real-repo proof gates & no & no & yes \\
 \bottomrule
@@ -703,6 +718,7 @@ hermetic local fixture with the same analyzer pipeline.
 158 files / 328 ranked risks / 100 provenance slices & \code{lobsters/lobsters} \code{db/migrate} \\
 8 review artifacts, 0 failed deterministic checks & same run, bounded budget \\
 owner-routed rollback playbooks for broad writes & \gate{remediation-playbook-gate} \\
+6 checked canary invariants; bad post-snapshot refuted & \gate{canary-validation-gate} \\
 9 Cassandra changes incl.\ destructive drops & \code{laaksomavrick/twitter-go} \\
 17 $\rightarrow$ 1 line, 1-minimal reproduction & delta-debugging oracle \\
 3 pipeline frameworks in one repo & \code{harrydevforlife/building-lakehouse} \\
@@ -1179,7 +1195,7 @@ deterministic analysis, bounded generation, real-repo gates, formal and causal s
 safety cases, standards hooks, privacy-preserving reviewer-outcome aggregation, and long-horizon impact
 evidence. The remaining frontier is not another isolated detector; it is the transition from a
 generational artifact to shared infrastructure. The open roadmap items around this transition include:
-production-grade remediation loops for rollback, repair escrow, playbooks, and patch-series safety; a
+production-grade remediation loops for rollback, repair escrow, and patch-series safety; a
 public evidence marketplace with licenses, bounties, minimization, and governance; engine-version
 semantics for production databases, locks, replication, partitioning, and online schema change;
 socio-technical accountability for appeals, fairness, ethics, and detector deprecation; education and
@@ -1360,7 +1376,7 @@ Migration breadth & \code{multi-ecosystem-migration-gate}, \code{nosql-change-ga
 \code{data-pipeline-gate}, \code{schema-compat-gate}, \code{infra-ordering-gate} \\
 Intervention safety & \code{generated-code-quarantine-gate}, \code{rejected-generated-gate},
 \code{intervention-regression-archive-gate}, \code{expand-contract-templates-gate},
-\code{staged-backfill-planner-gate}, \code{reviewability-examples-gate} \\
+\code{staged-backfill-planner-gate}, \code{canary-validation-gate}, \code{reviewability-examples-gate} \\
 Runtime evidence & \code{otel-trace-gen-gate}, \code{datadog-timeline-gate}, \code{prom-grafana-gate},
 \code{runtime-confidence-gate} \\
 Evaluation rigor & \code{fp-adjudication-gate}, \code{fn-discovery-gate}, \code{ablation-study-gate},
@@ -1420,7 +1436,9 @@ excluded from native execution unless the user explicitly enables an allowlist o
 Redaction is byte-stable across repeated and resumed runs, secret-scanning proves that redacted
 reports, prompts, bundles, and CI artifacts do not leak deterministic canary values, and an aggregate
 privacy-metrics mode emits source-free risk trends with salted cohort identifiers so results can be
-shared without raw evidence. The source-free live-feedback ingester applies the same discipline to
+shared without raw evidence. The canary-validation protocol applies that discipline to local
+production-like samples: generated reports contain only snapshot hashes, row hashes, and cell hashes,
+not sampled values or redaction salts. The source-free live-feedback ingester applies the same discipline to
 adopter reviewer outcomes: it stores no source, diffs, paths, raw evidence, finding IDs, evidence
 hashes, adopter IDs, or salts, and low-count detector groups are folded into a dimension-free residual
 bucket. Counterfactual replay over previous releases consumes only those published groups, excludes

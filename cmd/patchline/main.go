@@ -26,6 +26,7 @@ import (
 	"github.com/thehalleyyoung/patchline/internal/backfillplanner"
 	"github.com/thehalleyyoung/patchline/internal/bench"
 	"github.com/thehalleyyoung/patchline/internal/bundle"
+	"github.com/thehalleyyoung/patchline/internal/canaryvalidate"
 	"github.com/thehalleyyoung/patchline/internal/canonical"
 	"github.com/thehalleyyoung/patchline/internal/certdiff"
 	"github.com/thehalleyyoung/patchline/internal/certlang"
@@ -414,6 +415,8 @@ func run(args []string) error {
 		return expandContractTemplate(args[1:], hasFlag(args[1:], "--json"))
 	case "backfill-plan":
 		return backfillPlanCommand(args[1:], hasFlag(args[1:], "--json"))
+	case "canary-validate":
+		return canaryValidateCommand(args[1:], hasFlag(args[1:], "--json"))
 	case "feedback":
 		return feedbackCommand(args[1:])
 	case "security":
@@ -551,6 +554,7 @@ Usage:
   patchline adapt-evidence <otlp|datadog|postgres|github|migration-runner|jira|linear> <input.json> [--json] [--out events.jsonl]
   patchline expand-contract-template --spec expand-contract.json --out dir [--json]
   patchline backfill-plan --spec backfill-plan.json --store store.json --out dir [--json]
+  patchline canary-validate --spec canary-validation.json --before before.json --after after.json --out dir [--json]
   patchline feedback counterfactual-log --feedback live-feedback.json --history policy-history.json --out dir [--json]
   patchline feedback online-eval --feedback live-feedback.json --spec online-evaluation.json --out dir [--json]
   patchline feedback active-learning-queue --spec active-learning.json --out dir [--json]
@@ -14630,6 +14634,60 @@ func backfillPlanCommand(args []string, jsonOut bool) error {
 		return writeJSON(os.Stdout, report)
 	}
 	fmt.Printf("wrote staged backfill plan for %s.%s with %d checked row(s) to %s\n", report.Scope.Table, report.Scope.TargetColumn, report.Summary.RowsChecked, outPath)
+	return nil
+}
+
+func canaryValidateCommand(args []string, jsonOut bool) error {
+	usage := "patchline canary-validate --spec canary-validation.json --before before.json --after after.json --out <dir> [--json]"
+	specPath, outPath, err := feedbackSpecOut(args, usage)
+	if err != nil {
+		return err
+	}
+	beforePath, ok := flagValue(args, "--before")
+	if !ok || beforePath == "" {
+		return errors.New("usage: " + usage)
+	}
+	afterPath, ok := flagValue(args, "--after")
+	if !ok || afterPath == "" {
+		return errors.New("usage: " + usage)
+	}
+	file, err := os.Open(specPath)
+	if err != nil {
+		return err
+	}
+	defer file.Close()
+	spec, err := canaryvalidate.ReadSpec(file)
+	if err != nil {
+		return err
+	}
+	before, err := readStore(beforePath)
+	if err != nil {
+		return err
+	}
+	after, err := readStore(afterPath)
+	if err != nil {
+		return err
+	}
+	report, err := canaryvalidate.BuildReport(spec, before, after)
+	if err != nil {
+		return err
+	}
+	if err := os.MkdirAll(outPath, 0o755); err != nil {
+		return err
+	}
+	if err := writeJSONArtifact(filepath.Join(outPath, "canary-validation.json"), report); err != nil {
+		return err
+	}
+	if err := os.WriteFile(filepath.Join(outPath, "canary-validation.md"), []byte(canaryvalidate.RenderMarkdown(report)), 0o644); err != nil {
+		return err
+	}
+	if err := os.WriteFile(filepath.Join(outPath, "canary-validation.sql"), []byte(canaryvalidate.RenderSQL(report)), 0o644); err != nil {
+		return err
+	}
+	if jsonOut {
+		return writeJSON(os.Stdout, report)
+	}
+	fmt.Printf("wrote canary validation report ok=%t invariants=%d refuted=%d matched_rows=%d to %s\n", report.OK, report.Summary.Invariants, report.Summary.Refuted, report.Summary.MatchedRows, outPath)
 	return nil
 }
 

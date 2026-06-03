@@ -123,6 +123,8 @@ Run `backfill-plan` to gate constraint tightening and compatibility-code deletio
 
 Run `repo playbook --baseline <baseline-dir>` to convert hazard classes into owner-routed remediation runbooks with rollback points; reproduce it with `make remediation-playbook-gate`.
 
+Run `canary-validate --spec <spec> --before <snapshot> --after <snapshot>` to compare redacted production-like canary snapshots before/after a migration with hash-only invariant counterexamples; reproduce it with `make canary-validation-gate`.
+
 Run `golden-fixture generate --github owner/repo --ref <sha> --subpath <path> --out <dir>` to turn a real-repo slice into a tiny deterministic Go test without vendoring the full repository; see [docs/golden-fixtures.md](docs/golden-fixtures.md).
 
 <details>

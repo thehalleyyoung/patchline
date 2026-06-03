@@ -1,0 +1,30 @@
+{
+  "tables": {
+    "invoices": {
+      "1": {
+        "id": "1",
+        "account_id": "acct_a_redacted",
+        "amount_cents": "1000",
+        "status": "disabled",
+        "legacy_external_id": "inv_redacted_001",
+        "external_id": "inv_redacted_001"
+      },
+      "2": {
+        "id": "2",
+        "account_id": "acct_b_redacted",
+        "amount_cents": "2000",
+        "status": "open",
+        "legacy_external_id": "inv_redacted_002",
+        "external_id": "inv_redacted_001"
+      },
+      "3": {
+        "id": "3",
+        "account_id": "acct_c_redacted",
+        "amount_cents": "3000",
+        "status": "paid",
+        "legacy_external_id": "inv_redacted_003",
+        "external_id": ""
+      }
+    }
+  }
+}
