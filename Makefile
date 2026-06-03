@@ -1390,6 +1390,10 @@ partition-sharding-semantics-gate:
 db-rollback-feasibility-gate:
 	bash scripts/db-rollback-feasibility-gate.sh
 
+.PHONY: query-plan-regression-gate
+query-plan-regression-gate:
+	bash scripts/query-plan-regression-gate.sh
+
 federated-benchmark-split-gate:
 	bash scripts/federated-benchmark-split-gate.sh
 

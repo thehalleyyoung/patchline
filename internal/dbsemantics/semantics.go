@@ -82,6 +82,7 @@ type StatementSemantics struct {
 	ReplicationLagRisk  *ReplicationLagRisk  `json:"replication_lag_risk,omitempty"`
 	PartitionSharding   *PartitionSharding   `json:"partition_sharding,omitempty"`
 	RollbackFeasibility *RollbackFeasibility `json:"rollback_feasibility,omitempty"`
+	QueryPlanRegression *QueryPlanRegression `json:"query_plan_regression,omitempty"`
 }
 
 type RuleFinding struct {
@@ -118,6 +119,8 @@ type Summary struct {
 	IrreversibleMetadataRollbacks int      `json:"irreversible_metadata_rollbacks,omitempty"`
 	ConditionalRollbacks          int      `json:"conditional_rollbacks,omitempty"`
 	RefutedRollbacks              int      `json:"refuted_rollbacks,omitempty"`
+	QueryPlanRegressionChecks     int      `json:"query_plan_regression_checks,omitempty"`
+	QueryPlanRegressions          int      `json:"query_plan_regressions,omitempty"`
 	Tables                        []string `json:"tables"`
 }
 
@@ -212,6 +215,55 @@ type RollbackFeasibility struct {
 	FailureModes          []string   `json:"failure_modes,omitempty"`
 }
 
+type QueryPlanRegression struct {
+	Engine                  Engine                   `json:"engine"`
+	Class                   string                   `json:"class"`
+	Status                  string                   `json:"status"`
+	ChangeKind              string                   `json:"change_kind"`
+	Table                   string                   `json:"table,omitempty"`
+	Index                   string                   `json:"index,omitempty"`
+	Columns                 []string                 `json:"columns,omitempty"`
+	RepresentativeWorkloads []RepresentativeWorkload `json:"representative_workloads"`
+	BeforePlans             []QueryPlanSnapshot      `json:"before_plans"`
+	AfterPlans              []QueryPlanSnapshot      `json:"after_plans"`
+	Regressions             []PlanRegression         `json:"regressions,omitempty"`
+	Evidence                []Evidence               `json:"evidence"`
+	Obligations             []string                 `json:"obligations"`
+	Handoffs                []string                 `json:"handoffs,omitempty"`
+}
+
+type RepresentativeWorkload struct {
+	Name             string   `json:"name"`
+	Shape            string   `json:"shape"`
+	Query            string   `json:"query,omitempty"`
+	Table            string   `json:"table,omitempty"`
+	PredicateColumns []string `json:"predicate_columns,omitempty"`
+	SortColumns      []string `json:"sort_columns,omitempty"`
+	JoinColumns      []string `json:"join_columns,omitempty"`
+	Source           string   `json:"source"`
+}
+
+type QueryPlanSnapshot struct {
+	Workload     string   `json:"workload"`
+	Phase        string   `json:"phase"`
+	AccessPath   string   `json:"access_path"`
+	PlanClass    string   `json:"plan_class"`
+	UsesIndex    bool     `json:"uses_index"`
+	Index        string   `json:"index,omitempty"`
+	Columns      []string `json:"columns,omitempty"`
+	SortRequired bool     `json:"sort_required"`
+	Stability    string   `json:"stability"`
+	Notes        []string `json:"notes,omitempty"`
+}
+
+type PlanRegression struct {
+	Workload         string `json:"workload"`
+	Severity         string `json:"severity"`
+	BeforeAccessPath string `json:"before_access_path"`
+	AfterAccessPath  string `json:"after_access_path"`
+	Reason           string `json:"reason"`
+}
+
 func SupportedEngines() []Engine {
 	engines := []Engine{
 		EnginePostgres,
@@ -296,6 +348,10 @@ func Evaluate(engine Engine, version, source string, content []byte) (Report, er
 			case "refuted":
 				report.Summary.RefutedRollbacks++
 			}
+		}
+		if queryPlan := statement.QueryPlanRegression; queryPlan != nil {
+			report.Summary.QueryPlanRegressionChecks++
+			report.Summary.QueryPlanRegressions += len(queryPlan.Regressions)
 		}
 		report.Summary.VersionSpecificRules += len(statement.Rules)
 		report.Summary.ProofObligations += len(statement.Obligations)
@@ -482,6 +538,7 @@ func evaluateStatement(index int, sql string, profile Profile) StatementSemantic
 	applyReplicationLagRisk(&statement, sql, tokens, profile)
 	applyPartitionSharding(&statement, sql, tokens, profile)
 	applyRollbackFeasibility(&statement, tokens, profile)
+	applyQueryPlanRegression(&statement, sql, tokens, profile)
 	sort.Slice(statement.Rules, func(i, j int) bool { return statement.Rules[i].ID < statement.Rules[j].ID })
 	sort.Strings(statement.Obligations)
 	return statement
@@ -838,6 +895,493 @@ func applyRollbackFeasibility(statement *StatementSemantics, tokens []string, pr
 		EngineFact{"rollback_implicit_commit", strconv.FormatBool(feasibility.ImplicitCommit)},
 		EngineFact{"rollback_irreversible_metadata", strconv.FormatBool(feasibility.IrreversibleMetadata)},
 	)
+}
+
+func applyQueryPlanRegression(statement *StatementSemantics, sql string, tokens []string, profile Profile) {
+	regression := detectQueryPlanRegression(*statement, sql, tokens, profile)
+	if regression == nil {
+		return
+	}
+	statement.QueryPlanRegression = regression
+	statement.Rules = append(statement.Rules, RuleFinding{
+		ID:       "query_plan." + regression.Class,
+		Severity: queryPlanSeverity(*regression),
+		Verdict:  regression.Status,
+		Evidence: queryPlanRuleEvidence(*regression),
+	})
+	statement.Obligations = append(statement.Obligations, regression.Obligations...)
+	statement.EngineFacts = append(statement.EngineFacts,
+		EngineFact{"query_plan_change_kind", regression.ChangeKind},
+		EngineFact{"query_plan_class", regression.Class},
+		EngineFact{"query_plan_regressions", strconv.Itoa(len(regression.Regressions))},
+	)
+	if regression.Index != "" {
+		statement.EngineFacts = append(statement.EngineFacts, EngineFact{"query_plan_index", regression.Index})
+	}
+	if len(regression.Columns) > 0 {
+		statement.EngineFacts = append(statement.EngineFacts, EngineFact{"query_plan_columns", strings.Join(regression.Columns, ",")})
+	}
+}
+
+func detectQueryPlanRegression(statement StatementSemantics, sql string, tokens []string, profile Profile) *QueryPlanRegression {
+	if isCreateIndexChange(statement, tokens) {
+		table := nonEmptyString(statement.Table, tableFromIndexCreate(sql, tokens))
+		columns := extractIndexColumns(sql)
+		if len(columns) == 0 {
+			columns = columnsFromTokensAfter(tokens, "on", 3)
+		}
+		if len(columns) == 0 {
+			return nil
+		}
+		index := indexNameFromCreate(tokens)
+		workloads := representativeIndexWorkloads(table, columns, "synthesized from the index key list in this migration statement")
+		regression := queryPlanBase(statement, profile, "index_addition_plan_check", "checked", "index_create", table, index, columns, workloads)
+		regression.BeforePlans = planSnapshots(workloads, "before", "table_scan_or_sort", "baseline-without-new-index", false, "", columns, true, []string{
+			"qualitative baseline: representative predicates or ordering cannot rely on the new index before the migration",
+		})
+		regression.AfterPlans = planSnapshots(workloads, "after", "index_range_scan", "candidate-index-assisted", true, index, columns, false, []string{
+			"qualitative after-plan: the new index can serve representative lookup, ordering, or join-probe workloads if native EXPLAIN confirms selectivity",
+		})
+		regression.Obligations = append(regression.Obligations,
+			"capture before/after engine-native EXPLAIN plans for each synthesized workload before trusting the index-addition improvement",
+			"prove the new index is used by at least one production, fixture, or query-shape workload before counting it as a remediation",
+		)
+		regression.Handoffs = append(regression.Handoffs,
+			"run patchline db-dry-run or an engine-native EXPLAIN harness against the synthesized workloads",
+			"run make index-coverage-gate when hot-query and covered-column fixtures are available",
+		)
+		finalizeQueryPlanRegression(regression)
+		return regression
+	}
+	if isDropIndexChange(tokens) {
+		table := tableFromDropIndex(tokens)
+		index := indexNameFromDrop(tokens)
+		workloads := []RepresentativeWorkload{{
+			Name:   "dropped-index-dependent-workload",
+			Shape:  "unknown_index_dependency",
+			Table:  table,
+			Source: "DROP INDEX does not contain the original key-column list; supply catalog, migration history, or index-coverage evidence",
+		}}
+		regression := queryPlanBase(statement, profile, "index_drop_regression", "conditional", "index_drop", table, index, nil, workloads)
+		regression.BeforePlans = planSnapshots(workloads, "before", "dropped_index_access_path", "catalog-dependent", true, index, nil, false, []string{
+			"qualitative before-plan: dropped index may have served predicates, ordering, joins, or uniqueness-sensitive probes",
+		})
+		regression.AfterPlans = planSnapshots(workloads, "after", "unproven_table_scan_or_sort", "regression-risk", false, "", nil, true, []string{
+			"qualitative after-plan: without the dropped index definition, Patchline requires catalog or hot-query evidence before ruling out a scan or sort regression",
+		})
+		regression.Regressions = append(regression.Regressions, PlanRegression{
+			Workload:         workloads[0].Name,
+			Severity:         "high",
+			BeforeAccessPath: "dropped_index_access_path",
+			AfterAccessPath:  "unproven_table_scan_or_sort",
+			Reason:           "the migration removes an access path but does not carry the covered columns or representative workload evidence needed to prove no query-plan regression",
+		})
+		regression.Obligations = append(regression.Obligations,
+			"attach the dropped index definition, covered columns, and hot-query list before approving the removal",
+			"record before/after EXPLAIN output for every query whose predicate, join, or order key overlaps the dropped index",
+		)
+		regression.Handoffs = append(regression.Handoffs,
+			"run make index-coverage-gate with the dropped index definition and hot-query fixture",
+			"run patchline db-dry-run or an engine-native EXPLAIN harness after restoring the representative workload list",
+		)
+		finalizeQueryPlanRegression(regression)
+		return regression
+	}
+	changeKind, column := columnPlanChange(tokens)
+	if changeKind == "" {
+		return nil
+	}
+	columns := []string{column}
+	workloads := representativeColumnWorkloads(statement.Table, column, changeKind)
+	class := "column_shape_regression"
+	status := "conditional"
+	severity := "medium"
+	afterPath := "statistics_or_cast_replan_required"
+	reason := "changing a column type, collation, or nullability can invalidate statistics, casts, sort order, or index eligibility for representative workloads"
+	if changeKind == "column_drop" {
+		class = "column_drop_regression"
+		severity = "high"
+		afterPath = "unplannable_missing_column"
+		reason = "dropping a column can make projected, filtered, joined, or ordered representative workloads invalid rather than merely slower"
+	}
+	regression := queryPlanBase(statement, profile, class, status, changeKind, statement.Table, "", columns, workloads)
+	regression.BeforePlans = planSnapshots(workloads, "before", "existing_column_access_path", "catalog-dependent", false, "", columns, false, []string{
+		"qualitative before-plan: representative workloads can reference the existing column before this migration",
+	})
+	regression.AfterPlans = planSnapshots(workloads, "after", afterPath, "regression-risk", false, "", columns, true, []string{
+		"qualitative after-plan: the changed column requires plan, statistics, projection, and compatibility evidence before rollout",
+	})
+	for _, workload := range workloads {
+		regression.Regressions = append(regression.Regressions, PlanRegression{
+			Workload:         workload.Name,
+			Severity:         severity,
+			BeforeAccessPath: "existing_column_access_path",
+			AfterAccessPath:  afterPath,
+			Reason:           reason,
+		})
+	}
+	regression.Obligations = append(regression.Obligations,
+		"prove no production, ORM, query-builder, or prepared-statement workload still projects, filters, joins, or sorts by "+column,
+		"record before/after EXPLAIN plans and compatibility checks for every representative workload that references "+column,
+	)
+	regression.Handoffs = append(regression.Handoffs,
+		"run make query-shape-gate or the query-shape extractor to recover code-level workloads that mention the changed column",
+		"run patchline db-dry-run or an engine-native EXPLAIN harness against those workloads before rollout",
+	)
+	finalizeQueryPlanRegression(regression)
+	return regression
+}
+
+func queryPlanBase(statement StatementSemantics, profile Profile, class, status, changeKind, table, index string, columns []string, workloads []RepresentativeWorkload) *QueryPlanRegression {
+	regression := &QueryPlanRegression{
+		Engine:                  profile.Engine,
+		Class:                   class,
+		Status:                  status,
+		ChangeKind:              changeKind,
+		Table:                   table,
+		Index:                   index,
+		Columns:                 uniqueStringsPreserveOrder(columns),
+		RepresentativeWorkloads: workloads,
+		Evidence:                queryPlanEvidence(profile.Engine),
+		Obligations: []string{
+			"classify query-plan impact with the resolved " + string(profile.Engine) + " " + profile.ResolvedVersion + " engine profile",
+			"treat Patchline plan snapshots as qualitative preflight obligations, not measured EXPLAIN costs",
+		},
+	}
+	if table != "" {
+		regression.Obligations = append(regression.Obligations, "bind query-plan evidence to table "+table+" using migration history, catalog statistics, or workload traces")
+	}
+	return regression
+}
+
+func representativeIndexWorkloads(table string, columns []string, source string) []RepresentativeWorkload {
+	tableName := nonEmptyString(table, "affected_table")
+	columns = uniqueStringsPreserveOrder(columns)
+	if len(columns) == 0 {
+		return nil
+	}
+	first := columns[0]
+	workloads := []RepresentativeWorkload{
+		{
+			Name:             "lookup_by_" + first,
+			Shape:            "predicate_lookup",
+			Query:            "SELECT * FROM " + tableName + " WHERE " + first + " = ?",
+			Table:            table,
+			PredicateColumns: []string{first},
+			Source:           source,
+		},
+		{
+			Name:        "ordered_page_by_" + first,
+			Shape:       "ordered_page",
+			Query:       "SELECT * FROM " + tableName + " ORDER BY " + first + " LIMIT 50",
+			Table:       table,
+			SortColumns: []string{first},
+			Source:      source,
+		},
+		{
+			Name:        "join_probe_by_" + first,
+			Shape:       "join_probe",
+			Query:       "SELECT child.* FROM child JOIN " + tableName + " ON child." + first + " = " + tableName + "." + first,
+			Table:       table,
+			JoinColumns: []string{first},
+			Source:      source,
+		},
+	}
+	if len(columns) > 1 {
+		composite := strings.Join(columns, ", ")
+		workloads = append(workloads, RepresentativeWorkload{
+			Name:             "composite_lookup_by_" + strings.Join(columns, "_"),
+			Shape:            "composite_predicate_lookup",
+			Query:            "SELECT * FROM " + tableName + " WHERE " + columns[0] + " = ? AND " + columns[1] + " = ?",
+			Table:            table,
+			PredicateColumns: append([]string(nil), columns...),
+			SortColumns:      append([]string(nil), columns...),
+			Source:           source + "; composite key order " + composite,
+		})
+	}
+	return workloads
+}
+
+func representativeColumnWorkloads(table, column, changeKind string) []RepresentativeWorkload {
+	tableName := nonEmptyString(table, "affected_table")
+	source := "synthesized from " + changeKind + " migration column"
+	return []RepresentativeWorkload{
+		{
+			Name:             "predicate_by_" + column,
+			Shape:            "column_predicate",
+			Query:            "SELECT * FROM " + tableName + " WHERE " + column + " = ?",
+			Table:            table,
+			PredicateColumns: []string{column},
+			Source:           source,
+		},
+		{
+			Name:        "ordered_page_by_" + column,
+			Shape:       "column_ordering",
+			Query:       "SELECT * FROM " + tableName + " ORDER BY " + column + " LIMIT 50",
+			Table:       table,
+			SortColumns: []string{column},
+			Source:      source,
+		},
+		{
+			Name:   "projection_of_" + column,
+			Shape:  "column_projection",
+			Query:  "SELECT " + column + " FROM " + tableName + " LIMIT 50",
+			Table:  table,
+			Source: source,
+		},
+	}
+}
+
+func planSnapshots(workloads []RepresentativeWorkload, phase, accessPath, planClass string, usesIndex bool, index string, columns []string, sortRequired bool, notes []string) []QueryPlanSnapshot {
+	snapshots := make([]QueryPlanSnapshot, 0, len(workloads))
+	for _, workload := range workloads {
+		snapshot := QueryPlanSnapshot{
+			Workload:     workload.Name,
+			Phase:        phase,
+			AccessPath:   accessPath,
+			PlanClass:    planClass,
+			UsesIndex:    usesIndex,
+			Index:        index,
+			Columns:      append([]string(nil), columns...),
+			SortRequired: sortRequired,
+			Stability:    "qualitative_static_preflight",
+			Notes:        append([]string(nil), notes...),
+		}
+		snapshots = append(snapshots, snapshot)
+	}
+	return snapshots
+}
+
+func queryPlanSeverity(regression QueryPlanRegression) string {
+	if len(regression.Regressions) == 0 {
+		return "low"
+	}
+	for _, item := range regression.Regressions {
+		if item.Severity == "high" {
+			return "high"
+		}
+	}
+	return "medium"
+}
+
+func queryPlanRuleEvidence(regression QueryPlanRegression) string {
+	switch regression.Class {
+	case "index_addition_plan_check":
+		return "index addition creates candidate before/after representative workloads that require native plan evidence before crediting an improvement"
+	case "index_drop_regression":
+		return "index removal can regress predicates, ordering, or joins unless dropped-index coverage and before/after plans are proven"
+	case "column_drop_regression":
+		return "column removal can invalidate representative projections, predicates, joins, or ordering workloads"
+	default:
+		return "column shape changes can alter planner statistics, casts, sort order, or index eligibility and require before/after plan evidence"
+	}
+}
+
+func queryPlanEvidence(engine Engine) []Evidence {
+	evidence := []Evidence{
+		{"patchline.index_coverage", "the index-coverage worker proves hot queries against index covered-column fixtures when catalog evidence is available"},
+		{"patchline.db_dry_run_explain", "the database dry-run surface can capture engine-native EXPLAIN statements for migration-adjacent SQL"},
+	}
+	switch engine {
+	case EnginePostgres:
+		evidence = append(evidence, Evidence{"postgres.explain", "EXPLAIN exposes selected scans, sorts, joins, and index usage for representative workloads"})
+	case EngineMySQL:
+		evidence = append(evidence, Evidence{"mysql.explain", "EXPLAIN reports access type, possible keys, chosen key, and row estimates for representative workloads"})
+	case EngineSQLite:
+		evidence = append(evidence, Evidence{"sqlite.explain_query_plan", "EXPLAIN QUERY PLAN reports scan/search choices over available indexes"})
+	case EngineSQLServer:
+		evidence = append(evidence, Evidence{"sqlserver.execution_plan", "showplan output exposes scans, seeks, joins, and sort operators"})
+	case EngineOracle:
+		evidence = append(evidence, Evidence{"oracle.explain_plan", "EXPLAIN PLAN records access paths and join methods for representative SQL"})
+	case EngineBigQuery:
+		evidence = append(evidence, Evidence{"bigquery.query_plan", "query job statistics expose stages, read volume, and partition pruning evidence"})
+	case EngineSnowflake:
+		evidence = append(evidence, Evidence{"snowflake.query_profile", "query profiles expose pruning, scan, join, and spill behavior"})
+	case EngineClickHouse:
+		evidence = append(evidence, Evidence{"clickhouse.explain", "EXPLAIN PIPELINE/PLAN exposes read, index, and sort pipeline choices"})
+	}
+	return evidence
+}
+
+func finalizeQueryPlanRegression(regression *QueryPlanRegression) {
+	regression.Columns = uniqueStringsPreserveOrder(regression.Columns)
+	sort.Slice(regression.Evidence, func(i, j int) bool { return regression.Evidence[i].Ref < regression.Evidence[j].Ref })
+	sort.Strings(regression.Obligations)
+	sort.Strings(regression.Handoffs)
+	sort.Slice(regression.Regressions, func(i, j int) bool {
+		if regression.Regressions[i].Severity == regression.Regressions[j].Severity {
+			return regression.Regressions[i].Workload < regression.Regressions[j].Workload
+		}
+		return regression.Regressions[i].Severity > regression.Regressions[j].Severity
+	})
+}
+
+func isCreateIndexChange(statement StatementSemantics, tokens []string) bool {
+	if statement.Kind == "create" && contains(tokens, "index") {
+		return true
+	}
+	return statement.Kind == "alter" && contains(tokens, "add") && (contains(tokens, "index") || contains(tokens, "key"))
+}
+
+func isDropIndexChange(tokens []string) bool {
+	if len(tokens) >= 2 && tokens[0] == "drop" && tokens[1] == "index" {
+		return true
+	}
+	return contains(tokens, "drop") && (contains(tokens, "index") || contains(tokens, "key"))
+}
+
+func columnPlanChange(tokens []string) (string, string) {
+	if isAddColumn(tokens) {
+		return "", ""
+	}
+	for i := 0; i+2 < len(tokens); i++ {
+		if tokens[i] == "drop" && tokens[i+1] == "column" {
+			return "column_drop", cleanIdentifier(tokens[i+2])
+		}
+		if tokens[i] == "rename" && tokens[i+1] == "column" {
+			return "column_rename", cleanIdentifier(tokens[i+2])
+		}
+		if tokens[i] == "alter" && tokens[i+1] == "column" {
+			return "column_modify", cleanIdentifier(tokens[i+2])
+		}
+		if tokens[i] == "modify" && tokens[i+1] == "column" {
+			return "column_modify", cleanIdentifier(tokens[i+2])
+		}
+	}
+	for i := 0; i+1 < len(tokens); i++ {
+		if tokens[i] == "modify" {
+			next := cleanIdentifier(tokens[i+1])
+			if next != "" && next != "constraint" {
+				return "column_modify", next
+			}
+		}
+	}
+	return "", ""
+}
+
+func tableFromIndexCreate(sql string, tokens []string) string {
+	if table := firstIdentifierAfter(sql, `(?i)\bon\s+(`+sqlIdentifierCapture+`)`); table != "" {
+		return table
+	}
+	if contains(tokens, "alter") {
+		return tokenAfter(tokens, "table")
+	}
+	return ""
+}
+
+func tableFromDropIndex(tokens []string) string {
+	if table := tokenAfter(tokens, "on"); table != "" {
+		return table
+	}
+	index := indexNameFromDrop(tokens)
+	if dot := strings.Index(index, "."); dot > 0 {
+		return cleanIdentifier(index[:dot])
+	}
+	return ""
+}
+
+func indexNameFromCreate(tokens []string) string {
+	for i, token := range tokens {
+		if token != "index" && token != "key" {
+			continue
+		}
+		for j := i + 1; j < len(tokens); j++ {
+			switch tokens[j] {
+			case "concurrently", "if", "not", "exists", "unique", "clustered", "nonclustered", "fulltext", "spatial":
+				continue
+			}
+			if tokens[j] == "on" || tokens[j] == "using" {
+				return ""
+			}
+			return cleanIdentifier(tokens[j])
+		}
+	}
+	return ""
+}
+
+func indexNameFromDrop(tokens []string) string {
+	for i, token := range tokens {
+		if token != "index" && token != "key" {
+			continue
+		}
+		for j := i + 1; j < len(tokens); j++ {
+			switch tokens[j] {
+			case "if", "exists":
+				continue
+			}
+			if tokens[j] == "on" {
+				return ""
+			}
+			return cleanIdentifier(tokens[j])
+		}
+	}
+	return ""
+}
+
+func extractIndexColumns(sql string) []string {
+	patterns := []string{
+		`(?is)\bon\s+` + sqlIdentifierCapture + `\s*(?:using\s+` + sqlIdentifierCapture + `\s*)?\(([^)]*)\)`,
+		`(?is)\badd\s+(?:unique\s+|fulltext\s+|spatial\s+)?(?:index|key)(?:\s+` + sqlIdentifierCapture + `)?\s*\(([^)]*)\)`,
+	}
+	for _, pattern := range patterns {
+		match := regexp.MustCompile(pattern).FindStringSubmatch(sql)
+		if len(match) == 2 {
+			if columns := splitColumnList(match[1]); len(columns) > 0 {
+				return columns
+			}
+		}
+	}
+	return nil
+}
+
+func splitColumnList(list string) []string {
+	parts := strings.Split(list, ",")
+	columns := make([]string, 0, len(parts))
+	identifier := regexp.MustCompile("[`\"\\[]?([A-Za-z_][A-Za-z0-9_.$]*)")
+	for _, part := range parts {
+		part = strings.TrimSpace(part)
+		match := identifier.FindStringSubmatch(part)
+		if len(match) != 2 {
+			continue
+		}
+		column := cleanIdentifier(strings.ToLower(match[1]))
+		switch column {
+		case "asc", "desc", "nulls", "where", "include":
+			continue
+		}
+		columns = append(columns, column)
+	}
+	return uniqueStringsPreserveOrder(columns)
+}
+
+func columnsFromTokensAfter(tokens []string, token string, limit int) []string {
+	start := tokenIndex(tokens, token)
+	if start < 0 {
+		return nil
+	}
+	var columns []string
+	for i := start + 2; i < len(tokens) && len(columns) < limit; i++ {
+		switch tokens[i] {
+		case "where", "include", "with", "using":
+			return columns
+		}
+		columns = append(columns, cleanIdentifier(tokens[i]))
+	}
+	return uniqueStringsPreserveOrder(columns)
+}
+
+func uniqueStringsPreserveOrder(values []string) []string {
+	seen := map[string]bool{}
+	var result []string
+	for _, value := range values {
+		value = cleanIdentifier(strings.TrimSpace(value))
+		if value == "" || seen[value] {
+			continue
+		}
+		seen[value] = true
+		result = append(result, value)
+	}
+	return result
 }
 
 func detectRollbackFeasibility(statement StatementSemantics, tokens []string, profile Profile) *RollbackFeasibility {

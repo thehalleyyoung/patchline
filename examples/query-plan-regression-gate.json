@@ -1,0 +1,73 @@
+{
+  "version": "patchline.query-plan-regression-gate/v1",
+  "claim": "Patchline's db-semantics report emits deterministic query-plan regression preflight checks for representative workloads around index and column changes without fabricating measured EXPLAIN costs. The gate proves index creation yields before/after qualitative workloads that must be confirmed by native plans, index removal is treated as a regression risk until dropped-index coverage and hot-query evidence are supplied, column type or drop changes produce workload-specific regression obligations, and a plain ADD COLUMN control stays quiet.",
+  "real_repo": "synthetic-from-real public migration patterns: PostgreSQL concurrent indexes, MySQL DROP INDEX ON table, and PostgreSQL ALTER COLUMN / DROP COLUMN migrations",
+  "minimum_findings": 4,
+  "cases": [
+    {
+      "id": "postgres-concurrent-index",
+      "engine": "postgres",
+      "version": "16",
+      "sql": "CREATE INDEX CONCURRENTLY idx_accounts_status ON accounts(status, created_at);",
+      "expect": {
+        "finding": true,
+        "class": "index_addition_plan_check",
+        "change_kind": "index_create",
+        "regressions": 0,
+        "table": "accounts",
+        "index": "idx_accounts_status"
+      }
+    },
+    {
+      "id": "mysql-drop-index",
+      "engine": "mysql",
+      "version": "8.0.34",
+      "sql": "DROP INDEX idx_accounts_status ON accounts;",
+      "expect": {
+        "finding": true,
+        "class": "index_drop_regression",
+        "change_kind": "index_drop",
+        "regressions": 1,
+        "table": "accounts",
+        "index": "idx_accounts_status"
+      }
+    },
+    {
+      "id": "postgres-alter-column-type",
+      "engine": "postgres",
+      "version": "16",
+      "sql": "ALTER TABLE accounts ALTER COLUMN status TYPE varchar(64);",
+      "expect": {
+        "finding": true,
+        "class": "column_shape_regression",
+        "change_kind": "column_modify",
+        "regressions": 3,
+        "table": "accounts",
+        "index": ""
+      }
+    },
+    {
+      "id": "postgres-drop-column",
+      "engine": "postgres",
+      "version": "16",
+      "sql": "ALTER TABLE accounts DROP COLUMN legacy_status;",
+      "expect": {
+        "finding": true,
+        "class": "column_drop_regression",
+        "change_kind": "column_drop",
+        "regressions": 3,
+        "table": "accounts",
+        "index": ""
+      }
+    },
+    {
+      "id": "postgres-add-column-control",
+      "engine": "postgres",
+      "version": "16",
+      "sql": "ALTER TABLE accounts ADD COLUMN status text;",
+      "expect": {
+        "finding": false
+      }
+    }
+  ]
+}

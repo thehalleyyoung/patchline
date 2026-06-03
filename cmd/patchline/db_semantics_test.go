@@ -77,6 +77,28 @@ func TestDBSemanticsCommandWritesRollbackFeasibilityReport(t *testing.T) {
 	}
 }
 
+func TestDBSemanticsCommandWritesQueryPlanRegressionReport(t *testing.T) {
+	root := t.TempDir()
+	sqlPath := filepath.Join(root, "index.sql")
+	writeMainTestFile(t, root, "index.sql", "CREATE INDEX CONCURRENTLY idx_accounts_status ON accounts(status);")
+	outPath := filepath.Join(root, "query-plan-report.json")
+	if err := run([]string{"db-semantics", "--engine", "postgres", "--version", "16", "--sql", sqlPath, "--out", outPath, "--json"}); err != nil {
+		t.Fatalf("db-semantics command failed: %v", err)
+	}
+	var report dbsemantics.Report
+	readMainTestJSON(t, outPath, &report)
+	if report.Summary.QueryPlanRegressionChecks != 1 || report.Summary.QueryPlanRegressions != 0 {
+		t.Fatalf("expected query-plan check summary, got %#v", report.Summary)
+	}
+	queryPlan := report.Statements[0].QueryPlanRegression
+	if queryPlan == nil || queryPlan.Class != "index_addition_plan_check" || len(queryPlan.RepresentativeWorkloads) == 0 || len(queryPlan.BeforePlans) == 0 || len(queryPlan.AfterPlans) == 0 {
+		t.Fatalf("unexpected query-plan report: %#v", queryPlan)
+	}
+	if !mainDBSemanticsHasRule(report, "query_plan.index_addition_plan_check") {
+		t.Fatalf("expected query-plan rule, got %#v", report.Statements[0].Rules)
+	}
+}
+
 func TestDBSemanticsCommandRejectsUnknownEngine(t *testing.T) {
 	err := run([]string{"db-semantics", "--engine", "toydb", "--version", "1", "--sql", "select 1;", "--json"})
 	if err == nil {

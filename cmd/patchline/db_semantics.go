@@ -68,6 +68,14 @@ func dbSemanticsCommand(args []string) error {
 				rollback.RecoveryMechanism,
 			)
 		}
+		if queryPlan := statement.QueryPlanRegression; queryPlan != nil {
+			fmt.Printf("      query-plan class=%s change=%s workloads=%d regressions=%d\n",
+				queryPlan.Class,
+				queryPlan.ChangeKind,
+				len(queryPlan.RepresentativeWorkloads),
+				len(queryPlan.Regressions),
+			)
+		}
 		for _, rule := range statement.Rules {
 			fmt.Printf("      - %s %s: %s\n", rule.Severity, rule.ID, rule.Evidence)
 		}

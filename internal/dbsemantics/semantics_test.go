@@ -1,6 +1,9 @@
 package dbsemantics
 
-import "testing"
+import (
+	"strings"
+	"testing"
+)
 
 func TestCatalogCoversStage66Engines(t *testing.T) {
 	want := map[Engine]bool{
@@ -705,6 +708,138 @@ func TestRollbackFeasibilityHasSelectControlAndStableHash(t *testing.T) {
 	}
 	if first.Summary.RollbackFeasibilityChecks != 0 || first.Statements[0].RollbackFeasibility != nil {
 		t.Fatalf("read-only control should not emit rollback feasibility: %#v", first.Statements[0])
+	}
+}
+
+func TestQueryPlanRegressionChecksIndexAndColumnChanges(t *testing.T) {
+	cases := []struct {
+		name        string
+		engine      Engine
+		version     string
+		sql         string
+		class       string
+		changeKind  string
+		table       string
+		index       string
+		column      string
+		regressions int
+	}{
+		{
+			name:       "postgres-index-addition",
+			engine:     EnginePostgres,
+			version:    "16",
+			sql:        "CREATE INDEX CONCURRENTLY idx_accounts_status ON accounts(status, created_at);",
+			class:      "index_addition_plan_check",
+			changeKind: "index_create",
+			table:      "accounts",
+			index:      "idx_accounts_status",
+			column:     "status",
+		},
+		{
+			name:        "mysql-index-drop",
+			engine:      EngineMySQL,
+			version:     "8.0.34",
+			sql:         "DROP INDEX idx_accounts_status ON accounts;",
+			class:       "index_drop_regression",
+			changeKind:  "index_drop",
+			table:       "accounts",
+			index:       "idx_accounts_status",
+			regressions: 1,
+		},
+		{
+			name:        "postgres-column-type-change",
+			engine:      EnginePostgres,
+			version:     "16",
+			sql:         "ALTER TABLE accounts ALTER COLUMN status TYPE varchar(64);",
+			class:       "column_shape_regression",
+			changeKind:  "column_modify",
+			table:       "accounts",
+			column:      "status",
+			regressions: 3,
+		},
+		{
+			name:        "postgres-column-drop",
+			engine:      EnginePostgres,
+			version:     "16",
+			sql:         "ALTER TABLE accounts DROP COLUMN legacy_status;",
+			class:       "column_drop_regression",
+			changeKind:  "column_drop",
+			table:       "accounts",
+			column:      "legacy_status",
+			regressions: 3,
+		},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			report, err := Evaluate(tc.engine, tc.version, tc.name+".sql", []byte(tc.sql))
+			if err != nil {
+				t.Fatal(err)
+			}
+			if report.Summary.QueryPlanRegressionChecks != 1 || report.Summary.QueryPlanRegressions != tc.regressions {
+				t.Fatalf("unexpected query-plan summary: %#v", report.Summary)
+			}
+			queryPlan := report.Statements[0].QueryPlanRegression
+			if queryPlan == nil {
+				t.Fatalf("missing query-plan regression: %#v", report.Statements[0])
+			}
+			if queryPlan.Class != tc.class || queryPlan.ChangeKind != tc.changeKind || queryPlan.Table != tc.table || queryPlan.Index != tc.index {
+				t.Fatalf("unexpected query-plan regression for %s: %#v", tc.name, queryPlan)
+			}
+			if tc.column != "" && !stringSliceContains(queryPlan.Columns, tc.column) {
+				t.Fatalf("expected query-plan column %s, got %#v", tc.column, queryPlan.Columns)
+			}
+			if len(queryPlan.RepresentativeWorkloads) == 0 || len(queryPlan.BeforePlans) != len(queryPlan.RepresentativeWorkloads) || len(queryPlan.AfterPlans) != len(queryPlan.RepresentativeWorkloads) {
+				t.Fatalf("expected matched workloads and before/after plan snapshots: %#v", queryPlan)
+			}
+			if len(queryPlan.Evidence) < 2 || len(queryPlan.Obligations) < 3 || len(queryPlan.Handoffs) == 0 {
+				t.Fatalf("query-plan check should carry evidence, obligations, and handoffs: %#v", queryPlan)
+			}
+			if tc.regressions == 0 && queryPlan.AfterPlans[0].AccessPath != "index_range_scan" {
+				t.Fatalf("index addition should model an index-assisted after plan: %#v", queryPlan.AfterPlans)
+			}
+			if tc.regressions > 0 && len(queryPlan.Regressions) != tc.regressions {
+				t.Fatalf("expected %d regressions, got %#v", tc.regressions, queryPlan.Regressions)
+			}
+			if !hasRule(report, "query_plan."+tc.class) {
+				t.Fatalf("missing query-plan rule for %s in %#v", tc.class, report.Statements[0].Rules)
+			}
+		})
+	}
+}
+
+func TestQueryPlanRegressionDoesNotInventPostgresDropIndexCoverage(t *testing.T) {
+	report, err := Evaluate(EnginePostgres, "16", "drop-index.sql", []byte("DROP INDEX idx_accounts_status;"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	queryPlan := report.Statements[0].QueryPlanRegression
+	if queryPlan == nil {
+		t.Fatalf("expected drop-index regression risk: %#v", report.Statements[0])
+	}
+	if queryPlan.Table != "" || len(queryPlan.Columns) != 0 {
+		t.Fatalf("PostgreSQL DROP INDEX should not invent table or covered columns: %#v", queryPlan)
+	}
+	if len(queryPlan.RepresentativeWorkloads) != 1 || queryPlan.RepresentativeWorkloads[0].Query != "" || !strings.Contains(queryPlan.RepresentativeWorkloads[0].Source, "does not contain") {
+		t.Fatalf("expected catalog-evidence placeholder workload, got %#v", queryPlan.RepresentativeWorkloads)
+	}
+}
+
+func TestQueryPlanRegressionHasAddColumnControlAndStableHash(t *testing.T) {
+	sql := []byte("ALTER TABLE accounts ADD COLUMN status text;")
+	first, err := Evaluate(EnginePostgres, "16", "add-column.sql", sql)
+	if err != nil {
+		t.Fatal(err)
+	}
+	second, err := Evaluate(EnginePostgres, "16", "add-column.sql", sql)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if first.Hash != second.Hash {
+		t.Fatalf("expected deterministic query-plan hash, got %s and %s", first.Hash, second.Hash)
+	}
+	if first.Summary.QueryPlanRegressionChecks != 0 || first.Statements[0].QueryPlanRegression != nil {
+		t.Fatalf("plain ADD COLUMN should not emit a query-plan regression check: %#v", first.Statements[0])
 	}
 }
 

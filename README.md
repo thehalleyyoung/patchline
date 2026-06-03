@@ -149,6 +149,8 @@ Run `golden-fixture generate --github owner/repo --ref <sha> --subpath <path> --
 
 Run `db-semantics --engine <engine> --sql <sql-or-path>` to get versioned DDL semantics, lock conflicts, and rollback feasibility for transactional DDL, implicit commits, and irreversible metadata; reproduce with `make lock-mode-simulator-gate` and `make db-rollback-feasibility-gate`.
 
+Run `make query-plan-regression-gate` to prove `db-semantics` emits before/after representative workload checks for index and column query-plan regression risk without inventing measured `EXPLAIN` costs.
+
 Run `make online-schema-change-adapters-gate` to prove `db-semantics` recognizes online-schema-change adapters: pt-online-schema-change (pt-osc), gh-ost, native concurrent indexes, and Rails/Django helpers with cutover obligations.
 
 Run `make replication-lag-risk-gate` to prove `db-semantics` links table rewrites, copy alters, online schema changes, replacements, and async mutations to conditional read replica, CDC, and event-stream lag obligations.
