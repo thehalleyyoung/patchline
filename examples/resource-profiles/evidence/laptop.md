@@ -1,0 +1,1 @@
+The laptop profile uses a small file/line/token/change budget, skips optional native tests, permits cache reuse, and degrades to deterministic inventory plus baseline analysis when optional tooling is absent.

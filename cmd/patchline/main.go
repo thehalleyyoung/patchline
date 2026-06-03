@@ -74,6 +74,7 @@ import (
 	"github.com/thehalleyyoung/patchline/internal/replay"
 	"github.com/thehalleyyoung/patchline/internal/reproduce"
 	"github.com/thehalleyyoung/patchline/internal/resilientanalysis"
+	"github.com/thehalleyyoung/patchline/internal/resourceprofile"
 	"github.com/thehalleyyoung/patchline/internal/reviewerfairness"
 	"github.com/thehalleyyoung/patchline/internal/rollbackplanner"
 	"github.com/thehalleyyoung/patchline/internal/semantics"
@@ -494,6 +495,8 @@ func run(args []string) error {
 		return confidentialComputingCommand(args[1:], hasFlag(args[1:], "--json"))
 	case "accelerator-fallbacks":
 		return acceleratorFallbacksCommand(args[1:], hasFlag(args[1:], "--json"))
+	case "resource-profiles":
+		return resourceProfilesCommand(args[1:], hasFlag(args[1:], "--json"))
 	case "reviewer-fairness-audit":
 		return reviewerFairnessAuditCommand(args[1:], hasFlag(args[1:], "--json"))
 	case "change-management-verify":
@@ -674,6 +677,7 @@ Usage:
   patchline hardware-signing --spec hardware-signing.json --root repo-root --out dir [--json]
   patchline confidential-computing --spec confidential-computing.json --root repo-root --out dir [--json]
   patchline accelerator-fallbacks --spec accelerator-fallbacks.json --root repo-root --out dir [--json]
+  patchline resource-profiles --spec resource-profiles.json --root repo-root --out dir [--json]
   patchline reviewer-fairness-audit --spec reviewer-fairness-audit.json --root repo-root --out dir [--json]
   patchline change-management-verify --spec change-management.json --root repo-root --out dir [--json]
   patchline governance-risk-register --spec governance-risk-register.json --root repo-root --out dir [--json]
@@ -15689,6 +15693,45 @@ func acceleratorFallbacksCommand(args []string, jsonOut bool) error {
 	}
 	if !report.OK {
 		return codedError{code: 2, err: errors.New("accelerator fallback validation failed")}
+	}
+	return nil
+}
+
+func resourceProfilesCommand(args []string, jsonOut bool) error {
+	usage := "patchline resource-profiles --spec resource-profiles.json --root repo-root --out <dir> [--json]"
+	specPath, outPath, err := feedbackSpecOut(args, usage)
+	if err != nil {
+		return err
+	}
+	rootPath := "."
+	if value, ok := flagValue(args, "--root"); ok && value != "" {
+		rootPath = value
+	}
+	file, err := os.Open(specPath)
+	if err != nil {
+		return err
+	}
+	defer file.Close()
+	spec, err := resourceprofile.ReadSpec(file)
+	if err != nil {
+		return err
+	}
+	report, err := resourceprofile.BuildReport(spec, rootPath)
+	if err != nil {
+		return err
+	}
+	if err := resourceprofile.WriteArtifacts(outPath, report); err != nil {
+		return err
+	}
+	if jsonOut {
+		if err := writeJSON(os.Stdout, report); err != nil {
+			return err
+		}
+	} else {
+		fmt.Printf("wrote resource profiles ok=%t profiles=%d tiers=%d commands=%d budgets=%d counterexamples=%d to %s\n", report.OK, report.Summary.Profiles, report.Summary.Tiers, report.Summary.CommandPlans, report.Summary.Budgets, report.Summary.Counterexamples, outPath)
+	}
+	if !report.OK {
+		return codedError{code: 2, err: errors.New("resource profile validation failed")}
 	}
 	return nil
 }

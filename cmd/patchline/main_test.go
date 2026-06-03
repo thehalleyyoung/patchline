@@ -42,6 +42,7 @@ import (
 	"github.com/thehalleyyoung/patchline/internal/remediationcost"
 	"github.com/thehalleyyoung/patchline/internal/repairescrow"
 	"github.com/thehalleyyoung/patchline/internal/resilientanalysis"
+	"github.com/thehalleyyoung/patchline/internal/resourceprofile"
 	"github.com/thehalleyyoung/patchline/internal/reviewerfairness"
 	"github.com/thehalleyyoung/patchline/internal/rollbackplanner"
 	"github.com/thehalleyyoung/patchline/internal/supplychainsim"
@@ -2082,6 +2083,7 @@ func TestAcceleratorFallbacksCommandWritesReports(t *testing.T) {
 		{id: "learned-risk-model", kind: "risk_model"},
 		{id: "rl-reviewer", kind: "review_policy"},
 	}
+
 	files := map[string]string{
 		"evidence/overview.md":    "accelerator-free fallback run evidence\n",
 		"evidence/component.md":   "component fallback evidence\n",
@@ -2181,6 +2183,92 @@ func TestAcceleratorFallbacksCommandWritesReports(t *testing.T) {
 	}
 	if stat, err := os.Stat(filepath.Join(out, "accelerator-fallbacks.md")); err != nil || stat.Size() == 0 {
 		t.Fatalf("expected accelerator-fallbacks.md to be written, stat=%#v err=%v", stat, err)
+	}
+}
+
+func TestResourceProfilesCommandWritesReports(t *testing.T) {
+	root := t.TempDir()
+	files := map[string]string{
+		"evidence/overview.md": "resource profile overview evidence\n",
+		"evidence/laptop.md":   "laptop profile evidence\n",
+		"evidence/ci.md":       "ci profile evidence\n",
+		"evidence/offline.md":  "offline profile evidence\n",
+		"evidence/hosted.md":   "hosted profile evidence\n",
+		"outputs/laptop.json":  `{"profile":"laptop","ok":true}` + "\n",
+		"outputs/ci.json":      `{"profile":"ci","ok":true}` + "\n",
+		"outputs/offline.json": `{"profile":"offline","ok":true}` + "\n",
+		"outputs/hosted.json":  `{"profile":"hosted","ok":true}` + "\n",
+	}
+	for path, contents := range files {
+		writeMainTestFile(t, root, path, contents)
+	}
+	ids := []string{"laptop-fast", "ci-balanced", "airgap-offline", "hosted-public-good"}
+	spec := resourceprofile.Spec{
+		Version: resourceprofile.SpecVersion,
+		Name:    "main test resource profiles",
+		Claim:   "Patchline maps constrained laptops, CI runners, air-gapped servers, and public-good hosted service tiers to deterministic bounded command plans.",
+		Criteria: resourceprofile.Criteria{
+			RequiredProfileIDs:          ids,
+			RequiredTiers:               []string{"laptop", "ci", "air-gapped", "hosted-public-good"},
+			MinProfiles:                 4,
+			MinCommandsPerProfile:       2,
+			MinBudgetsPerProfile:        1,
+			RequireEvidenceHashes:       true,
+			RequireDeterministic:        true,
+			RequireOfflineProfile:       true,
+			RequireCIProfile:            true,
+			RequireLaptopProfile:        true,
+			RequireHostedServiceProfile: true,
+			RequireNoNetworkWhenOffline: true,
+			RequireCacheStrategy:        true,
+			RequireNativeTestPolicy:     true,
+			RequireGracefulDegradation:  true,
+			MaxLaptopCPU:                4,
+			MaxLaptopMemoryMB:           8192,
+			MaxCIMinutes:                20,
+			MaxHostedCostCents:          50,
+		},
+		Profiles: []resourceprofile.Profile{
+			mainResourceProfile(t, root, "laptop-fast", "laptop", "evidence/laptop.md", "outputs/laptop.json", resourceprofile.Constraints{CPU: 2, MemoryMB: 4096, TimeoutMinutes: 8, NetworkAllowed: true, NativeTests: false}),
+			mainResourceProfile(t, root, "ci-balanced", "ci", "evidence/ci.md", "outputs/ci.json", resourceprofile.Constraints{CPU: 4, MemoryMB: 8192, TimeoutMinutes: 12, NetworkAllowed: true, NativeTests: true}),
+			mainResourceProfile(t, root, "airgap-offline", "air-gapped", "evidence/offline.md", "outputs/offline.json", resourceprofile.Constraints{CPU: 8, MemoryMB: 16384, TimeoutMinutes: 30, NetworkAllowed: false, NativeTests: false}),
+			mainResourceProfile(t, root, "hosted-public-good", "hosted-public-good", "evidence/hosted.md", "outputs/hosted.json", resourceprofile.Constraints{CPU: 2, MemoryMB: 4096, TimeoutMinutes: 10, MaxCostCents: 25, NetworkAllowed: true, NativeTests: false, HostedMultiTenant: true}),
+		},
+		EvidencePaths: []string{"evidence/overview.md"},
+	}
+	specPath := filepath.Join(root, "resource-profiles.json")
+	writeMainTestJSONFile(t, specPath, spec)
+	out := filepath.Join(t.TempDir(), "resource-profiles")
+	if err := run([]string{"resource-profiles", "--spec", specPath, "--root", root, "--out", out, "--json"}); err != nil {
+		t.Fatalf("resource-profiles failed: %v", err)
+	}
+	var report resourceprofile.Report
+	readMainTestJSON(t, filepath.Join(out, "resource-profiles.json"), &report)
+	if !report.OK || report.Summary.Profiles != 4 || report.Summary.Tiers != 4 || report.Summary.CommandPlans != 8 || report.Summary.Budgets != 4 {
+		t.Fatalf("unexpected resource profiles report: %#v", report)
+	}
+	if stat, err := os.Stat(filepath.Join(out, "resource-profiles.md")); err != nil || stat.Size() == 0 {
+		t.Fatalf("expected resource-profiles.md to be written, stat=%#v err=%v", stat, err)
+	}
+}
+
+func mainResourceProfile(t *testing.T, root, id, tier, evidence, output string, constraints resourceprofile.Constraints) resourceprofile.Profile {
+	t.Helper()
+	return resourceprofile.Profile{
+		ID:          id,
+		Tier:        tier,
+		Description: id + " profile",
+		Constraints: constraints,
+		Budgets:     []resourceprofile.Budget{{Name: "repo-analyze", Files: 8, Lines: 90, Tokens: 18000, Changes: 2}},
+		Commands: []resourceprofile.Command{
+			{Stage: "inventory", Args: []string{"patchline", "repo", "inventory", ".", "--out", "results/generated/" + id + "/inventory"}},
+			{Stage: "analyze", Args: []string{"patchline", "repo", "analyze", ".", "--stages", "inventory,baseline,compare", "--budget", "files=8,lines=90,tokens=18000,changes=2", "--no-llm", "--out", "results/generated/" + id + "/analysis"}},
+		},
+		CacheStrategy:       "reuse content-addressed caches",
+		NativeTestPolicy:    "run only profile-approved native tests",
+		DegradationBehavior: "emit proof holes rather than silent success",
+		Outputs:             []resourceprofile.ArtifactRef{{Path: output, SHA256: mainTestFileHash(t, filepath.Join(root, output))}},
+		EvidencePaths:       []string{evidence},
 	}
 }
 

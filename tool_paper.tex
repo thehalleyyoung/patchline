@@ -99,7 +99,8 @@ k-thresholded aggregate metrics.
 Critically,
 every capability in \tool{} is backed by a reproducible \emph{gate}: a script that proves the
 capability against real, pinned public code and fails loudly on drift. \tool{} currently ships more
-than 623 such gates over 568 documented capabilities, now including supply-chain compromise simulations
+than 624 such gates over 569 documented capabilities, now including resource-adaptive analysis profiles
+for laptops, CI runners, air-gapped servers, and public-good hosted service tiers, supply-chain compromise simulations
 for dependency poisoning, malicious archives, and forged release metadata, plus resilient distributed-analysis,
 hardware-signing, confidential-computing, and accelerator-free learned-component verifiers for worker loss, cache corruption, partitions, threshold signatures,
 recovery, rotation, revocation, and verifiable enclave attestation before accepting a corpus run or trusted artifact; the broader gate catalog spans relational migrations across nine
@@ -171,7 +172,7 @@ ranks the risks, and prints the next commands that can run immediately.
   \item A \textbf{runtime and observability evidence} layer that scores findings on independent
   static-risk and observed-runtime axes using OpenTelemetry, Datadog-style, and Prometheus/Grafana
   exports (Section~\ref{sec:runtime}).
-  \item A \textbf{gate-backed reproducibility and evaluation methodology}---over 623 gates, blinded
+  \item A \textbf{gate-backed reproducibility and evaluation methodology}---over 624 gates, blinded
   false-positive adjudication, seeded false-negative recall, ablations, standardized effect sizes,
   severity calibration, a duplicate-safe certificate-backed public evidence marketplace, deterministic
   governance-board lifecycle decisions, hash-bound appeal resolution, reviewer-fairness burden/false-positive/escalation audits, workforce-impact difference-in-differences with suppressed-escalation and teaching-to-test controls, change-management approval binding, governance-risk concentration audits, ethics-review controls for data sources, live learning, and outcome studies, independent explainability audits for stated verdicts, misuse-resistance checks for certificates/scoreboards/adoption metrics, transparent detector deprecation, adversarial-challenge scoring, signed federated benchmark
@@ -357,12 +358,14 @@ deterministic reviewer artifact that pins engine versions, local runtime or emul
 where available, embedded/managed-service profiles where not, and observed profile, rule, lock,
 rollback, query-plan, runtime, replication, and partition evidence rows. &
 \code{reproducibility-report.json}, \code{.md} \\
-\code{resilient-analysis}, \code{hardware-signing}, \code{confidential-computing}, \code{accelerator-fallbacks}, \code{supply-chain simulate} & Replay distributed analysis evidence under worker
+\code{resilient-analysis}, \code{hardware-signing}, \code{confidential-computing}, \code{accelerator-fallbacks}, \code{resource-profiles}, \code{supply-chain simulate} & Replay distributed analysis evidence under worker
 loss, cache corruption, deterministic leases, and recovered partitions; verify release, gate, and
 certificate artifacts against hardware attestations, thresholds, recovery shares, logs, reports, and
 key-rotation/revocation drills; bind private corpus workloads to enclave quotes, verifier reports,
 key-release policy, encrypted inputs, redacted aggregates, private retained outputs, and replay proofs;
-prove every learned fixture has CPU-only pinned replay and parity; reject dependency poisoning, malicious archive, and forged metadata simulations. & \code{resilient-analysis.json}, \code{hardware-signing.json}, \code{confidential-computing.json}, \code{accelerator-fallbacks.json}, \code{supply-chain-sim.json}, \code{.md} \\
+prove every learned fixture has CPU-only pinned replay and parity; verify deterministic resource budgets,
+cache policy, native-test policy, and graceful degradation for laptop, CI, offline, and hosted tiers;
+reject dependency poisoning, malicious archive, and forged metadata simulations. & \code{resilient-analysis.json}, \code{hardware-signing.json}, \code{confidential-computing.json}, \code{accelerator-fallbacks.json}, \code{resource-profiles.json}, \code{supply-chain-sim.json}, \code{.md} \\
 \code{propose} & Generate bounded interventions (guards, tests) within an explicit budget; quarantine
 them as untrusted artifacts. & \code{proposal.patch}, \code{patchline-proposals/} \\
 \code{compare} & Deterministically re-analyze proposed changes; accept or reject by evidence delta. &
@@ -377,7 +380,7 @@ A cross-cutting \emph{gate layer} sits beside the pipeline. Each gate is a self-
 (a) validates a versioned example specification, (b) checks that the relevant documentation and the
 README still describe the capability, (c) runs the capability against real pinned code, (d) asserts
 machine-checkable invariants on the output, and (e) writes a \code{gate-summary.json}. The repository
-currently ships \textbf{more than 623 gates}, \textbf{more than 568 capability documents}, and \textbf{more than 600 example
+currently ships \textbf{more than 624 gates}, \textbf{more than 569 capability documents}, and \textbf{more than 600 example
 specifications}, with a single analyzer core of roughly 2{,}900 lines of Go.
 
 \paragraph{Resumability, offline operation, resilience, and release trust.} \code{repo analyze --resume} reuses existing fetch,
@@ -823,6 +826,12 @@ content-addressed and cached, so repeated and resumed runs avoid redundant downl
 byte-stable for fixed inputs (P1), incremental and parallel corpus execution can safely cache and
 shard by repository without risking nondeterministic diffs. The build itself is kept honest by a
 performance-budget gate that fails if the hot analysis path regresses beyond a documented threshold.
+The \code{resource-profiles} verifier makes those engineering assumptions executable: a laptop profile
+caps CPU, memory, files, lines, tokens, and changes; a CI profile adds bounded safe native tests; an
+air-gapped profile forbids network access and requires cache-backed degradation; and a hosted public-good
+profile caps per-analysis cost. Its gate mutates profile coverage, LLM use, offline networking, cache
+policy, invalid budgets, evidence hashes, and hosted cost to prove constrained deployments degrade
+explicitly rather than silently pretending full-resource analysis ran.
 
 %======================================================================
 \section{Formal and Decision-Theoretic Guarantees}
@@ -1190,6 +1199,7 @@ owner-routed rollback playbooks for broad writes & \gate{remediation-playbook-ga
 2 public-safe adversarial migrations scored from verified artifacts and analyzer-backed high-risk proofs; embargoed publication refuted & \gate{adversarial-challenge-gate} \\
 3 private benchmark cases published as signed aggregate-only metrics; tampering/leakage rejected & \gate{federated-benchmark-split-gate} \\
 4 public artifact classes restored from checksum mirrors; 3 primary mirror failures and an all-mirrors-lost certificate-log control rejected & \gate{disaster-recovery-exercise-gate} \\
+4 resource profiles (laptop, CI, air-gapped, hosted public-good) with 8 deterministic command plans and 4 bounded budgets; LLM, offline-network, cache, cost, and evidence controls rejected & \gate{resource-profiles-gate} \\
 3 payout-approved minimized false-negative/ecosystem-gap bounty reproductions; unsupported bounty rejected & \gate{open-problem-bounty-board-gate} \\
 9 Cassandra changes incl.\ destructive drops & \code{laaksomavrick/twitter-go} \\
 17 $\rightarrow$ 1 line, 1-minimal reproduction & delta-debugging oracle \\
@@ -1203,7 +1213,7 @@ dozens of schema-evolution hazards & \code{apache/avro} \\
 3 data-volume runtime estimates plus 2 negative controls; deterministic hint hashes preserved & \gate{data-volume-runtime-gate} \\
 7 partition/shard routing findings plus 1 ordinary-DML control & \gate{partition-sharding-semantics-gate} \\
 8 rollback-feasibility findings plus 1 read-only control & \gate{db-rollback-feasibility-gate} \\
-600+ gates / 560+ docs / 540+ examples & repository inventory \\
+624+ gates / 569+ docs / 540+ examples & repository inventory \\
 \bottomrule
 \end{tabular}
 \end{table}

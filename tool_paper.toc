@@ -17,76 +17,76 @@
 \contentsline {subsection}{\numberline {5.1}Relational migrations across nine ecosystems}{12}{subsection.5.1}%
 \contentsline {paragraph}{Versioned production database semantics.}{12}{subsection.5.1}%
 \contentsline {subsection}{\numberline {5.2}NoSQL change detection across five engines}{13}{subsection.5.2}%
-\contentsline {subsection}{\numberline {5.3}Data-pipeline repair evidence across four frameworks}{13}{subsection.5.3}%
+\contentsline {subsection}{\numberline {5.3}Data-pipeline repair evidence across four frameworks}{14}{subsection.5.3}%
 \contentsline {subsection}{\numberline {5.4}Schema-registry and protobuf/Avro compatibility}{14}{subsection.5.4}%
 \contentsline {subsection}{\numberline {5.5}Infrastructure/data ordering}{14}{subsection.5.5}%
 \contentsline {subsection}{\numberline {5.6}Monorepo package boundaries}{14}{subsection.5.6}%
 \contentsline {paragraph}{Summary.}{14}{subsection.5.6}%
-\contentsline {section}{\numberline {6}Bounded Interventions and Deterministic Rejection}{15}{section.6}%
-\contentsline {paragraph}{Budgets.}{15}{section.6}%
-\contentsline {paragraph}{Quarantine.}{15}{section.6}%
+\contentsline {section}{\numberline {6}Bounded Interventions and Deterministic Rejection}{14}{section.6}%
+\contentsline {paragraph}{Budgets.}{14}{section.6}%
+\contentsline {paragraph}{Quarantine.}{14}{section.6}%
 \contentsline {paragraph}{Deterministic rejection.}{15}{section.6}%
 \contentsline {paragraph}{Generator-agnostic.}{15}{section.6}%
 \contentsline {paragraph}{Invariant-backed expand/contract templates.}{15}{section.6}%
 \contentsline {paragraph}{Staged backfill planning.}{15}{section.6}%
-\contentsline {paragraph}{Remediation playbooks.}{15}{section.6}%
+\contentsline {paragraph}{Remediation playbooks.}{16}{section.6}%
 \contentsline {paragraph}{Canary-data validation.}{16}{section.6}%
 \contentsline {paragraph}{Repair-risk escrow.}{16}{section.6}%
 \contentsline {paragraph}{Postmortem lessons as detector regressions.}{16}{section.6}%
 \contentsline {paragraph}{Verified multi-service rollback planning.}{16}{section.6}%
-\contentsline {paragraph}{Expected-loss remediation selection.}{16}{section.6}%
+\contentsline {paragraph}{Expected-loss remediation selection.}{17}{section.6}%
 \contentsline {paragraph}{Patch-series invariant preservation.}{17}{section.6}%
 \contentsline {paragraph}{Maintainer acceptance without uncertainty laundering.}{17}{section.6}%
 \contentsline {paragraph}{The accept/reject decision.}{17}{section.6}%
-\contentsline {section}{\numberline {7}Runtime and Observability Evidence}{17}{section.7}%
+\contentsline {section}{\numberline {7}Runtime and Observability Evidence}{18}{section.7}%
 \contentsline {subsection}{\numberline {7.1}Performance and scale}{18}{subsection.7.1}%
 \contentsline {section}{\numberline {8}Formal and Decision-Theoretic Guarantees}{18}{section.8}%
-\contentsline {paragraph}{Formal invariant extraction.}{18}{section.8}%
-\contentsline {paragraph}{Bounded symbolic execution and model checking.}{18}{section.8}%
-\contentsline {paragraph}{Causal attribution and counterfactual sensitivity.}{18}{section.8}%
+\contentsline {paragraph}{Formal invariant extraction.}{19}{section.8}%
+\contentsline {paragraph}{Bounded symbolic execution and model checking.}{19}{section.8}%
+\contentsline {paragraph}{Causal attribution and counterfactual sensitivity.}{19}{section.8}%
 \contentsline {paragraph}{Decision economics and abstention.}{19}{section.8}%
 \contentsline {paragraph}{Multi-agent review and interoperability.}{19}{section.8}%
-\contentsline {paragraph}{Release engineering as evidence.}{19}{section.8}%
-\contentsline {section}{\numberline {9}Reproducibility and the Gate Methodology}{19}{section.9}%
-\contentsline {paragraph}{Anatomy of a gate.}{19}{section.9}%
+\contentsline {paragraph}{Release engineering as evidence.}{20}{section.8}%
+\contentsline {section}{\numberline {9}Reproducibility and the Gate Methodology}{20}{section.9}%
+\contentsline {paragraph}{Anatomy of a gate.}{20}{section.9}%
 \contentsline {paragraph}{Robustness.}{20}{section.9}%
 \contentsline {paragraph}{Minimal reproductions.}{20}{section.9}%
 \contentsline {paragraph}{Drift protection.}{20}{table.caption.4}%
-\contentsline {paragraph}{Shared evidence without trust erosion.}{20}{table.caption.4}%
+\contentsline {paragraph}{Shared evidence without trust erosion.}{21}{table.caption.4}%
 \contentsline {paragraph}{Federated private benchmark aggregates.}{22}{table.caption.4}%
-\contentsline {paragraph}{Paying for minimized missing evidence.}{22}{table.caption.4}%
-\contentsline {paragraph}{Certification that tracks a moving target.}{22}{table.caption.4}%
+\contentsline {paragraph}{Paying for minimized missing evidence.}{23}{table.caption.4}%
+\contentsline {paragraph}{Certification that tracks a moving target.}{23}{table.caption.4}%
 \contentsline {section}{\numberline {10}Evaluation Methodology}{23}{section.10}%
 \contentsline {paragraph}{Blinded false-positive adjudication.}{23}{section.10}%
 \contentsline {paragraph}{Seeded false-negative recall.}{23}{section.10}%
 \contentsline {paragraph}{Ablations and effect sizes.}{23}{section.10}%
 \contentsline {paragraph}{Severity calibration.}{23}{section.10}%
 \contentsline {paragraph}{Stratification.}{23}{section.10}%
-\contentsline {paragraph}{Workforce impact without vanity metrics.}{23}{section.10}%
-\contentsline {paragraph}{Baselines.}{23}{section.10}%
-\contentsline {paragraph}{Headline measured results.}{23}{table.caption.5}%
+\contentsline {paragraph}{Workforce impact without vanity metrics.}{24}{section.10}%
+\contentsline {paragraph}{Baselines.}{24}{section.10}%
+\contentsline {paragraph}{Headline measured results.}{24}{table.caption.5}%
 \contentsline {section}{\numberline {11}From Analyzer to Trustworthy Artifact}{24}{section.11}%
 \contentsline {subsection}{\numberline {11.1}Empirical generalization and external replication}{24}{subsection.11.1}%
-\contentsline {subsection}{\numberline {11.2}Supply-chain trust and provenance}{24}{subsection.11.2}%
+\contentsline {subsection}{\numberline {11.2}Supply-chain trust and provenance}{25}{subsection.11.2}%
 \contentsline {subsection}{\numberline {11.3}Reviewer, developer, and community experience}{25}{subsection.11.3}%
 \contentsline {subsection}{\numberline {11.4}Research-frontier evidence}{25}{subsection.11.4}%
 \contentsline {section}{\numberline {12}Field-Defining Extensions: Foundations, Scale, and Lasting Impact}{25}{section.12}%
 \contentsline {paragraph}{Mechanized formal foundations.}{25}{section.12}%
-\contentsline {paragraph}{Ecosystem-scale evidence.}{25}{section.12}%
-\contentsline {paragraph}{A definitive evaluation design.}{25}{section.12}%
-\contentsline {paragraph}{Product-grade adoption.}{25}{section.12}%
+\contentsline {paragraph}{Ecosystem-scale evidence.}{26}{section.12}%
+\contentsline {paragraph}{A definitive evaluation design.}{26}{section.12}%
+\contentsline {paragraph}{Product-grade adoption.}{26}{section.12}%
 \contentsline {paragraph}{A learned-but-verified frontier.}{26}{section.12}%
 \contentsline {paragraph}{A lasting-impact dossier.}{26}{section.12}%
 \contentsline {section}{\numberline {13}From Field-Defining to Field-Standard: The 501--600 Frontier}{26}{section.13}%
 \contentsline {paragraph}{A deeper formal core.}{26}{section.13}%
 \contentsline {paragraph}{Planet-scale evidence.}{26}{section.13}%
-\contentsline {paragraph}{Causal and field rigor.}{26}{section.13}%
-\contentsline {paragraph}{Trustworthy autonomy.}{26}{section.13}%
+\contentsline {paragraph}{Causal and field rigor.}{27}{section.13}%
+\contentsline {paragraph}{Trustworthy autonomy.}{27}{section.13}%
 \contentsline {paragraph}{Definitional adoption and a learned-but-checkable frontier.}{27}{section.13}%
 \contentsline {paragraph}{Definitive artifact and lasting impact.}{27}{section.13}%
 \contentsline {paragraph}{From field-defining system to generational artifact (601--700).}{27}{table.caption.8}%
-\contentsline {paragraph}{Standard-scale certificate interchange.}{27}{table.caption.9}%
-\contentsline {section}{\numberline {14}Developer and Contributor Experience}{28}{section.14}%
+\contentsline {paragraph}{Standard-scale certificate interchange.}{28}{table.caption.9}%
+\contentsline {section}{\numberline {14}Developer and Contributor Experience}{29}{section.14}%
 \contentsline {section}{\numberline {15}Case Studies}{29}{section.15}%
 \contentsline {paragraph}{\texttt {lobsters/lobsters} (Rails, \texttt {db/migrate}).}{29}{section.15}%
 \contentsline {paragraph}{\texttt {apache/avro} (schema compatibility).}{29}{section.15}%
@@ -94,24 +94,24 @@
 \contentsline {paragraph}{\texttt {harrydevforlife/building-lakehouse} (pipelines).}{29}{section.15}%
 \contentsline {paragraph}{\texttt {laaksomavrick/twitter-go} (NoSQL + minimization).}{29}{section.15}%
 \contentsline {section}{\numberline {16}Related Work}{29}{section.16}%
-\contentsline {section}{\numberline {17}Threats to Validity}{29}{section.17}%
-\contentsline {paragraph}{Construct validity.}{29}{section.17}%
-\contentsline {paragraph}{Internal validity.}{29}{section.17}%
+\contentsline {section}{\numberline {17}Threats to Validity}{30}{section.17}%
+\contentsline {paragraph}{Construct validity.}{30}{section.17}%
+\contentsline {paragraph}{Internal validity.}{30}{section.17}%
 \contentsline {paragraph}{External validity.}{30}{section.17}%
 \contentsline {paragraph}{Known blind spots.}{30}{section.17}%
 \contentsline {section}{\numberline {18}Limitations}{30}{section.18}%
 \contentsline {section}{\numberline {19}Discussion}{30}{section.19}%
 \contentsline {paragraph}{Why a fact layer instead of a model.}{30}{section.19}%
 \contentsline {paragraph}{Why gates instead of unit tests.}{30}{section.19}%
-\contentsline {paragraph}{Generalization beyond data changes.}{30}{section.19}%
+\contentsline {paragraph}{Generalization beyond data changes.}{31}{section.19}%
 \contentsline {paragraph}{On the cost of conservatism.}{31}{section.19}%
 \contentsline {section}{\numberline {20}Future Work}{31}{section.20}%
 \contentsline {section}{\numberline {21}Conclusion}{31}{section.21}%
-\contentsline {paragraph}{Availability.}{31}{section.21}%
-\contentsline {section}{\numberline {A}A Worked End-to-End Example}{31}{appendix.A}%
+\contentsline {paragraph}{Availability.}{32}{section.21}%
+\contentsline {section}{\numberline {A}A Worked End-to-End Example}{32}{appendix.A}%
 \contentsline {section}{\numberline {B}Fact Schema Reference}{32}{appendix.B}%
 \contentsline {section}{\numberline {C}Detector Rule Catalog}{33}{appendix.C}%
 \contentsline {section}{\numberline {D}Infrastructure/Data Ordering Markers}{33}{appendix.D}%
 \contentsline {section}{\numberline {E}Selected Gate Catalog}{33}{appendix.E}%
 \contentsline {section}{\numberline {F}Security and Privacy Model}{35}{appendix.F}%
-\contentsline {section}{\numberline {G}Reproduction Guide}{35}{appendix.G}%
+\contentsline {section}{\numberline {G}Reproduction Guide}{36}{appendix.G}%

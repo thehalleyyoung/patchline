@@ -1,0 +1,93 @@
+{
+  "version": "patchline.resource-profiles/v1",
+  "name": "Patchline resource-adaptive analysis profiles",
+  "claim": "Patchline proves that constrained laptops, pull-request CI runners, air-gapped servers, and public-good hosted service tiers each get deterministic analysis plans with explicit CPU, memory, time, cost, native-test, network, cache, and graceful-degradation policies. The gate mutates missing tiers, excess laptop resources, offline networking, LLM use, missing cache policy, invalid budgets, and hosted cost overruns so profile promises are checked against real repository artifacts rather than accepted as prose.",
+  "criteria": {
+    "required_profile_ids": ["laptop-fast", "ci-balanced", "airgap-offline", "hosted-public-good"],
+    "required_tiers": ["laptop", "ci", "air-gapped", "hosted-public-good"],
+    "min_profiles": 4,
+    "min_commands_per_profile": 2,
+    "min_budgets_per_profile": 1,
+    "require_evidence_hashes": true,
+    "require_deterministic": true,
+    "require_offline_profile": true,
+    "require_ci_profile": true,
+    "require_laptop_profile": true,
+    "require_hosted_service_profile": true,
+    "require_no_network_when_offline": true,
+    "require_cache_strategy": true,
+    "require_native_test_policy": true,
+    "require_graceful_degradation": true,
+    "max_laptop_cpu": 4,
+    "max_laptop_memory_mb": 8192,
+    "max_ci_minutes": 20,
+    "max_hosted_cost_cents": 50
+  },
+  "profiles": [
+    {
+      "id": "laptop-fast",
+      "tier": "laptop",
+      "description": "Low-resource maintainer laptop profile for first-pass deterministic findings.",
+      "constraints": {"cpu":2,"memory_mb":4096,"timeout_minutes":8,"network_allowed":true,"native_tests":false,"llm_allowed":false},
+      "budgets": [{"name":"repo-analyze","files":8,"lines":90,"tokens":18000,"changes":2}],
+      "commands": [
+        {"stage":"inventory","args":["patchline","repo","inventory",".","--out","results/generated/profiles/laptop/inventory"]},
+        {"stage":"analyze","args":["patchline","repo","analyze",".","--stages","inventory,baseline,compare","--budget","files=8,lines=90,tokens=18000,changes=2","--no-llm","--out","results/generated/profiles/laptop/analysis"]}
+      ],
+      "cache_strategy": "reuse source, inventory, and baseline caches; skip fresh downloads when cache keys match",
+      "native_test_policy": "do not run project-native tests on laptops unless the maintainer opts in outside this profile",
+      "degradation_behavior": "emit deterministic inventory/baseline plus proof holes when optional compare inputs are missing",
+      "outputs": [{"path":"examples/resource-profiles/outputs/laptop.json","sha256":"sha256:e9bf049909e26969f188c14719dffb0dabf549d7b0afd778b73e753af4a3a3c1"}],
+      "evidence_paths": ["examples/resource-profiles/evidence/laptop.md"]
+    },
+    {
+      "id": "ci-balanced",
+      "tier": "ci",
+      "description": "Pull-request runner profile that trades more coverage for fixed wall-clock budget.",
+      "constraints": {"cpu":4,"memory_mb":8192,"timeout_minutes":12,"network_allowed":true,"native_tests":true,"llm_allowed":false},
+      "budgets": [{"name":"repo-analyze","files":16,"lines":140,"tokens":40000,"changes":3}],
+      "commands": [
+        {"stage":"inventory","args":["patchline","repo","inventory",".","--out","results/generated/profiles/ci/inventory"]},
+        {"stage":"analyze","args":["patchline","repo","analyze",".","--stages","inventory,baseline,propose,compare","--budget","files=16,lines=140,tokens=40000,changes=3","--ci","--no-llm","--out","results/generated/profiles/ci/analysis"]}
+      ],
+      "cache_strategy": "restore content-addressed repo and analysis caches before running fresh CI work",
+      "native_test_policy": "run only safe detected native tests inside the CI timeout",
+      "degradation_behavior": "keep SARIF and bundle outputs even when optional native tests are unavailable",
+      "outputs": [{"path":"examples/resource-profiles/outputs/ci.json","sha256":"sha256:3d7f7831072957a5cc3610f2de10fb8f90248f8c01081adcb5b0780467316f9b"}],
+      "evidence_paths": ["examples/resource-profiles/evidence/ci.md"]
+    },
+    {
+      "id": "airgap-offline",
+      "tier": "air-gapped",
+      "description": "Offline server profile for regulated or disconnected review environments.",
+      "constraints": {"cpu":8,"memory_mb":16384,"timeout_minutes":30,"network_allowed":false,"native_tests":false,"llm_allowed":false},
+      "budgets": [{"name":"repo-analyze","files":24,"lines":180,"tokens":60000,"changes":4}],
+      "commands": [
+        {"stage":"offline","args":["patchline","repo","offline","--analysis","results/generated/profiles/offline/analysis","--out","results/generated/profiles/offline/offline-check"]},
+        {"stage":"analyze","args":["patchline","repo","analyze",".","--stages","inventory,baseline,compare,deep","--budget","files=24,lines=180,tokens=60000,changes=4","--resume","--no-llm","--out","results/generated/profiles/offline/analysis"]}
+      ],
+      "cache_strategy": "use pre-warmed source archives and adapter outputs with no network refresh",
+      "native_test_policy": "do not run native tests that may fetch dependencies; record explicit unavailable status",
+      "degradation_behavior": "fail closed for missing cache entries and emit proof holes instead of synthetic success",
+      "outputs": [{"path":"examples/resource-profiles/outputs/offline.json","sha256":"sha256:a6b11dca0d747347882812b5eb3dd5417564796487ed325486c48a5761f9cc65"}],
+      "evidence_paths": ["examples/resource-profiles/evidence/offline.md"]
+    },
+    {
+      "id": "hosted-public-good",
+      "tier": "hosted-public-good",
+      "description": "Low-cost hosted service tier for public maintainers and reproducible demos.",
+      "constraints": {"cpu":2,"memory_mb":4096,"timeout_minutes":10,"max_cost_cents":25,"network_allowed":true,"native_tests":false,"llm_allowed":false,"hosted_multi_tenant":true},
+      "budgets": [{"name":"repo-analyze","files":10,"lines":100,"tokens":22000,"changes":2}],
+      "commands": [
+        {"stage":"quickstart","args":["patchline","quickstart","--github","owner/repo","--subpath","db/migrate","--out","results/generated/profiles/hosted/quickstart"]},
+        {"stage":"analyze","args":["patchline","repo","analyze","--github","owner/repo","--subpath","db/migrate","--stages","inventory,baseline,compare","--budget","files=10,lines=100,tokens=22000,changes=2","--no-llm","--out","results/generated/profiles/hosted/analysis"]}
+      ],
+      "cache_strategy": "deduplicate public archives and analysis facts across tenants by content hash only",
+      "native_test_policy": "do not execute repository-native code in the hosted public-good tier",
+      "degradation_behavior": "prefer smaller deterministic findings over queueing unbounded expensive jobs",
+      "outputs": [{"path":"examples/resource-profiles/outputs/hosted.json","sha256":"sha256:577c200a072fb002d734eefa4f6e7f888b68bdfadeae720e76e4d50b0e9c5ec3"}],
+      "evidence_paths": ["examples/resource-profiles/evidence/hosted.md"]
+    }
+  ],
+  "evidence_paths": ["examples/resource-profiles/evidence/overview.md"]
+}

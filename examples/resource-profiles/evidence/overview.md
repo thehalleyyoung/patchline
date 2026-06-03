@@ -1,0 +1,1 @@
+Patchline resource-adaptive profiles bind laptop, CI, air-gapped, and public-good hosted execution to deterministic budgets, cache strategy, native-test policy, graceful degradation, and hash-backed outputs.

@@ -1,0 +1,1 @@
+The air-gapped profile forbids network access, relies on pre-warmed content-addressed caches, runs no native tests that could fetch dependencies, and emits proof holes rather than hiding unavailable optional tools.
