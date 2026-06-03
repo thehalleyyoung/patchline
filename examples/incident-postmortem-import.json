@@ -1,0 +1,10 @@
+{
+  "version": "patchline.incident-postmortem-import/v1",
+  "name": "public postmortem remediation lessons to detector regressions",
+  "historical_suite": "historical-failures/suite.json",
+  "include_cases": [
+    "gitlab-2017-primary-db-removal",
+    "github-2018-mysql-split-brain"
+  ],
+  "min_regressions": 20
+}

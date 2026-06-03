@@ -52,7 +52,9 @@ gate constraint-tightening and compatibility-code deletion on an exhaustive repl
 turns baseline hazard classes into owner-routed remediation playbooks with rollback points, while a
 canary-data protocol compares pre/post migration invariants on sampled, redacted, production-like
 snapshots and emits only hash-based counterexamples, and a repair-risk escrow holds proposed fixes
-until distinct manual-review and certificate thresholds clear. Critically,
+until distinct manual-review and certificate thresholds clear, while an incident-postmortem importer
+turns public remediation lessons into detector regression tests with positive and negative controls.
+Critically,
 every capability in \tool{} is backed by a reproducible \emph{gate}: a script that proves the
 capability against real, pinned public code and fails loudly on drift. \tool{} currently ships more
 than 600 such gates over 560 documented capabilities, spanning relational migrations across nine
@@ -203,6 +205,9 @@ snapshots with hash-only counterexamples. & \code{canary-validation.json}, \code
 \code{repair-escrow} & Accumulate repair-bound evidence, distinct manual approvals, and valid
 certificates until release thresholds clear; reject revoked certificates and manual blocks. &
 \code{repair-escrow.json}, \code{repair-escrow.md} \\
+\code{incident-postmortem-import} & Import public postmortem source observations and emit detector
+regression fixtures plus a generated Go test package. & \code{incident-postmortem-import.json},
+\code{generated-tests/} \\
 \code{propose} & Generate bounded interventions (guards, tests) within an explicit budget; quarantine
 them as untrusted artifacts. & \code{proposal.patch}, \code{patchline-proposals/} \\
 \code{compare} & Deterministically re-analyze proposed changes; accept or reject by evidence delta. &
@@ -472,6 +477,16 @@ quantified obligations such as one more certificate or one more independent revi
 \gate{repair-risk-escrow-gate} proves all three outcomes on a billing remediation fixture: one released
 repair, two held repairs with different missing threshold dimensions, and two rejected repairs.
 
+\paragraph{Postmortem lessons as detector regressions.} The \code{incident-postmortem-import} command
+closes the loop from real incidents back into static and runtime detectors. Given the public historical
+failure suite, it imports source-observation JSONL derived from postmortems and follow-up remediation
+issues, maps each lesson to the real historical detector path, and writes positive fixtures plus quiet
+negative controls. The \gate{incident-postmortem-importer-gate} currently turns the GitLab 2017 primary
+database removal and GitHub 2018 MySQL split-brain reports into 27 checked regression tests spanning
+source-grounded lesson classification, destructive protected-table mutations, missing snapshot rollback,
+and split-brain conflicting writes; it then runs the generated Go test package against the checked-out
+analyzer.
+
 \paragraph{The accept/reject decision.} Table~\ref{tab:compare} makes the compare contract precise.
 Each proposed artifact is scored on the same fact-derived axes as the baseline, and the decision is a
 pure function of the evidence delta---never of a model's self-reported confidence. An artifact that
@@ -736,6 +751,7 @@ hermetic local fixture with the same analyzer pipeline.
 owner-routed rollback playbooks for broad writes & \gate{remediation-playbook-gate} \\
 6 checked canary invariants; bad post-snapshot refuted & \gate{canary-validation-gate} \\
 1 released, 2 held, 2 rejected repair proposals under escrow & \gate{repair-risk-escrow-gate} \\
+27 detector regressions imported from public postmortems & \gate{incident-postmortem-importer-gate} \\
 9 Cassandra changes incl.\ destructive drops & \code{laaksomavrick/twitter-go} \\
 17 $\rightarrow$ 1 line, 1-minimal reproduction & delta-debugging oracle \\
 3 pipeline frameworks in one repo & \code{harrydevforlife/building-lakehouse} \\
@@ -1394,7 +1410,7 @@ Migration breadth & \code{multi-ecosystem-migration-gate}, \code{nosql-change-ga
 Intervention safety & \code{generated-code-quarantine-gate}, \code{rejected-generated-gate},
 \code{intervention-regression-archive-gate}, \code{expand-contract-templates-gate},
 \code{staged-backfill-planner-gate}, \code{canary-validation-gate}, \code{repair-risk-escrow-gate},
-\code{reviewability-examples-gate} \\
+\code{incident-postmortem-importer-gate}, \code{reviewability-examples-gate} \\
 Runtime evidence & \code{otel-trace-gen-gate}, \code{datadog-timeline-gate}, \code{prom-grafana-gate},
 \code{runtime-confidence-gate} \\
 Evaluation rigor & \code{fp-adjudication-gate}, \code{fn-discovery-gate}, \code{ablation-study-gate},

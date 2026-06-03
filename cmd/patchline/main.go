@@ -42,6 +42,7 @@ import (
 	"github.com/thehalleyyoung/patchline/internal/gate"
 	"github.com/thehalleyyoung/patchline/internal/goldenfixture"
 	"github.com/thehalleyyoung/patchline/internal/historical"
+	"github.com/thehalleyyoung/patchline/internal/incidentpostmortem"
 	"github.com/thehalleyyoung/patchline/internal/intake"
 	"github.com/thehalleyyoung/patchline/internal/invariant"
 	"github.com/thehalleyyoung/patchline/internal/ledger"
@@ -420,6 +421,8 @@ func run(args []string) error {
 		return canaryValidateCommand(args[1:], hasFlag(args[1:], "--json"))
 	case "repair-escrow":
 		return repairEscrowCommand(args[1:], hasFlag(args[1:], "--json"))
+	case "incident-postmortem-import":
+		return incidentPostmortemImportCommand(args[1:], hasFlag(args[1:], "--json"))
 	case "feedback":
 		return feedbackCommand(args[1:])
 	case "security":
@@ -559,6 +562,7 @@ Usage:
   patchline backfill-plan --spec backfill-plan.json --store store.json --out dir [--json]
   patchline canary-validate --spec canary-validation.json --before before.json --after after.json --out dir [--json]
   patchline repair-escrow --spec repair-escrow.json --out dir [--json]
+  patchline incident-postmortem-import --spec incident-postmortem-import.json --out dir [--json]
   patchline feedback counterfactual-log --feedback live-feedback.json --history policy-history.json --out dir [--json]
   patchline feedback online-eval --feedback live-feedback.json --spec online-evaluation.json --out dir [--json]
   patchline feedback active-learning-queue --spec active-learning.json --out dir [--json]
@@ -14727,6 +14731,35 @@ func repairEscrowCommand(args []string, jsonOut bool) error {
 		return writeJSON(os.Stdout, report)
 	}
 	fmt.Printf("wrote repair-risk escrow report released=%d held=%d rejected=%d to %s\n", report.Summary.Released, report.Summary.Held, report.Summary.Rejected, outPath)
+	return nil
+}
+
+func incidentPostmortemImportCommand(args []string, jsonOut bool) error {
+	usage := "patchline incident-postmortem-import --spec incident-postmortem-import.json --out <dir> [--json]"
+	specPath, outPath, err := feedbackSpecOut(args, usage)
+	if err != nil {
+		return err
+	}
+	file, err := os.Open(specPath)
+	if err != nil {
+		return err
+	}
+	defer file.Close()
+	spec, err := incidentpostmortem.ReadSpec(file)
+	if err != nil {
+		return err
+	}
+	report, err := incidentpostmortem.BuildReport(spec, filepath.Dir(specPath))
+	if err != nil {
+		return err
+	}
+	if err := incidentpostmortem.WriteArtifacts(outPath, report); err != nil {
+		return err
+	}
+	if jsonOut {
+		return writeJSON(os.Stdout, report)
+	}
+	fmt.Printf("wrote incident-postmortem importer report cases=%d regressions=%d detectors=%d to %s\n", report.Summary.Cases, report.Summary.Regressions, report.Summary.Detectors, outPath)
 	return nil
 }
 

@@ -20,6 +20,7 @@ import (
 	"github.com/thehalleyyoung/patchline/internal/evidence"
 	"github.com/thehalleyyoung/patchline/internal/expandcontract"
 	"github.com/thehalleyyoung/patchline/internal/feedback"
+	"github.com/thehalleyyoung/patchline/internal/incidentpostmortem"
 	"github.com/thehalleyyoung/patchline/internal/intake"
 	"github.com/thehalleyyoung/patchline/internal/project"
 	"github.com/thehalleyyoung/patchline/internal/repairescrow"
@@ -269,6 +270,31 @@ func TestRepairEscrowCommandWritesReports(t *testing.T) {
 	}
 	if stat, err := os.Stat(filepath.Join(out, "repair-escrow.md")); err != nil || stat.Size() == 0 {
 		t.Fatalf("expected repair-escrow.md to be written, stat=%#v err=%v", stat, err)
+	}
+}
+
+func TestIncidentPostmortemImportCommandWritesReports(t *testing.T) {
+	root := mainTestRepoRoot(t)
+	specPath := filepath.Join(root, "examples", "incident-postmortem-import.json")
+	out := filepath.Join(t.TempDir(), "incident-postmortem-import")
+	if err := run([]string{"incident-postmortem-import", "--spec", specPath, "--out", out, "--json"}); err != nil {
+		t.Fatalf("incident-postmortem-import failed: %v", err)
+	}
+	var report incidentpostmortem.Report
+	readMainTestJSON(t, filepath.Join(out, "incident-postmortem-import.json"), &report)
+	if !report.OK || report.Summary.Cases != 2 || report.Summary.Regressions < 20 || report.Summary.Failed != 0 {
+		t.Fatalf("unexpected incident postmortem import report: %#v", report.Summary)
+	}
+	for _, rel := range []string{
+		"incident-postmortem-import.md",
+		"detector-regressions.json",
+		"generated-tests/incident_postmortem_regression_test.go",
+		report.Regressions[0].Positive.Path,
+		report.Regressions[0].Negatives[0].Path,
+	} {
+		if stat, err := os.Stat(filepath.Join(out, filepath.FromSlash(rel))); err != nil || stat.Size() == 0 {
+			t.Fatalf("expected %s to be written, stat=%#v err=%v", rel, stat, err)
+		}
 	}
 }
 

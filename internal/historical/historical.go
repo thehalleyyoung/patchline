@@ -244,6 +244,14 @@ func evidenceSignals(path, displayPath string) ([]Signal, error) {
 	if err != nil {
 		return nil, err
 	}
+	return EvidenceSignalsFromJSONL(displayPath, content)
+}
+
+func EvidenceSignals(path, displayPath string) ([]Signal, error) {
+	return evidenceSignals(path, displayPath)
+}
+
+func EvidenceSignalsFromJSONL(displayPath string, content []byte) ([]Signal, error) {
 	ingested, err := evidence.IngestJSONL(bytes.NewReader(content))
 	if err != nil {
 		return nil, err
@@ -260,7 +268,7 @@ func evidenceSignals(path, displayPath string) ([]Signal, error) {
 	for _, reportID := range reports {
 		signals = append(signals, newSignal("damaged-derived-report", displayPath, reportID, "damaged records flow into a derived report"))
 	}
-	conflicts, err := splitBrainConflicts(bytes.NewReader(content))
+	conflicts, err := SplitBrainConflicts(bytes.NewReader(content))
 	if err != nil {
 		return nil, err
 	}
@@ -271,7 +279,19 @@ func evidenceSignals(path, displayPath string) ([]Signal, error) {
 }
 
 func migrationSignals(path, displayPath string, protectedTables []string) ([]Signal, error) {
-	report, err := migration.AnalyzeFile(path)
+	content, err := os.ReadFile(path)
+	if err != nil {
+		return nil, err
+	}
+	return MigrationSignalsFromSQL(displayPath, content, protectedTables)
+}
+
+func MigrationSignals(path, displayPath string, protectedTables []string) ([]Signal, error) {
+	return migrationSignals(path, displayPath, protectedTables)
+}
+
+func MigrationSignalsFromSQL(displayPath string, content []byte, protectedTables []string) ([]Signal, error) {
+	report, err := migration.AnalyzeBytes(displayPath, content)
 	if err != nil {
 		return nil, err
 	}
@@ -297,12 +317,19 @@ func migrationSignals(path, displayPath string, protectedTables []string) ([]Sig
 }
 
 func repairSignals(path, displayPath string) ([]Signal, error) {
-	file, err := os.Open(path)
+	content, err := os.ReadFile(path)
 	if err != nil {
 		return nil, err
 	}
-	defer file.Close()
-	manifest, err := repair.ReadManifest(file)
+	return RepairSignalsFromJSON(displayPath, content)
+}
+
+func RepairSignals(path, displayPath string) ([]Signal, error) {
+	return repairSignals(path, displayPath)
+}
+
+func RepairSignalsFromJSON(displayPath string, content []byte) ([]Signal, error) {
+	manifest, err := repair.ReadManifest(bytes.NewReader(content))
 	if err != nil {
 		return nil, err
 	}
@@ -316,12 +343,15 @@ func repairSignals(path, displayPath string) ([]Signal, error) {
 }
 
 func SourceObservationSignals(path, displayPath string) ([]Signal, error) {
-	file, err := os.Open(path)
+	content, err := os.ReadFile(path)
 	if err != nil {
 		return nil, err
 	}
-	defer file.Close()
-	scanner := bufio.NewScanner(file)
+	return SourceObservationSignalsFromJSONL(displayPath, content)
+}
+
+func SourceObservationSignalsFromJSONL(displayPath string, content []byte) ([]Signal, error) {
+	scanner := bufio.NewScanner(bytes.NewReader(content))
 	scanner.Buffer(make([]byte, 0, 64*1024), 1024*1024)
 	var signals []Signal
 	lineNo := 0
@@ -379,7 +409,7 @@ func SourceObservationSignalID(kind string) string {
 	}
 }
 
-func splitBrainConflicts(reader io.Reader) ([]string, error) {
+func SplitBrainConflicts(reader io.Reader) ([]string, error) {
 	type bucket struct {
 		after   map[string]bool
 		writers map[string]bool

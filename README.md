@@ -127,6 +127,8 @@ Run `canary-validate --spec <spec> --before <snapshot> --after <snapshot>` to co
 
 Run `repair-escrow --spec <spec>` to hold proposed fixes until distinct manual-review and certificate thresholds clear; reproduce it with `make repair-risk-escrow-gate`.
 
+Run `incident-postmortem-import --spec <spec>` to convert public remediation lessons into detector regression tests with positive and negative controls; reproduce it with `make incident-postmortem-importer-gate`.
+
 Run `golden-fixture generate --github owner/repo --ref <sha> --subpath <path> --out <dir>` to turn a real-repo slice into a tiny deterministic Go test without vendoring the full repository; see [docs/golden-fixtures.md](docs/golden-fixtures.md).
 
 <details>
