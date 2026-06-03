@@ -1,6 +1,6 @@
 # Database version semantics
 
-Patchline's `db-semantics` command evaluates migration SQL against an explicit database engine and version instead of treating SQL as portable text. The current catalog covers PostgreSQL, MySQL, SQLite, SQL Server, Oracle, BigQuery, Snowflake, and ClickHouse with documented evidence for transactional DDL, implicit commits, atomic DDL, concurrent/online index behavior, online-schema-change adapters, instant or metadata-only column additions, create-or-replace replacement semantics, Time Travel recovery, partition-aware DDL, and asynchronous mutations.
+Patchline's `db-semantics` command evaluates migration SQL against an explicit database engine and version instead of treating SQL as portable text. The current catalog covers PostgreSQL, MySQL, SQLite, SQL Server, Oracle, BigQuery, Snowflake, and ClickHouse with documented evidence for transactional DDL, implicit commits, atomic DDL, concurrent/online index behavior, online-schema-change adapters, replication-lag risk, instant or metadata-only column additions, create-or-replace replacement semantics, Time Travel recovery, partition-aware DDL, and asynchronous mutations.
 
 The command emits deterministic JSON with the resolved profile, statement-level rules, proof obligations, risk counts, and a content hash:
 

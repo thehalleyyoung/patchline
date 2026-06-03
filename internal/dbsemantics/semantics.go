@@ -77,6 +77,7 @@ type StatementSemantics struct {
 	EngineFacts        EngineFactSlice     `json:"engine_facts"`
 	Lock               LockSimulation      `json:"lock_simulation"`
 	OnlineSchemaChange *OnlineSchemaChange `json:"online_schema_change,omitempty"`
+	ReplicationLagRisk *ReplicationLagRisk `json:"replication_lag_risk,omitempty"`
 }
 
 type RuleFinding struct {
@@ -105,6 +106,7 @@ type Summary struct {
 	WriterBlockingLocks        int      `json:"writer_blocking_locks"`
 	DDLBlockingLocks           int      `json:"ddl_blocking_locks"`
 	OnlineSchemaChangeAdapters int      `json:"online_schema_change_adapters,omitempty"`
+	ReplicationLagRisks        int      `json:"replication_lag_risks,omitempty"`
 	Tables                     []string `json:"tables"`
 }
 
@@ -150,6 +152,17 @@ type OnlineSchemaChange struct {
 	RequiresManualRollback bool       `json:"requires_manual_rollback"`
 	Evidence               []Evidence `json:"evidence"`
 	Obligations            []string   `json:"obligations"`
+}
+
+type ReplicationLagRisk struct {
+	Class                string     `json:"class"`
+	MigrationShape       string     `json:"migration_shape"`
+	EstimatedLagClass    string     `json:"estimated_lag_class"`
+	ConditionalPipelines []string   `json:"conditional_pipelines"`
+	Hazards              []string   `json:"hazards"`
+	Evidence             []Evidence `json:"evidence"`
+	Obligations          []string   `json:"obligations"`
+	Mitigations          []string   `json:"mitigations,omitempty"`
 }
 
 func SupportedEngines() []Engine {
@@ -212,6 +225,9 @@ func Evaluate(engine Engine, version, source string, content []byte) (Report, er
 		}
 		if statement.OnlineSchemaChange != nil {
 			report.Summary.OnlineSchemaChangeAdapters++
+		}
+		if statement.ReplicationLagRisk != nil {
+			report.Summary.ReplicationLagRisks++
 		}
 		report.Summary.VersionSpecificRules += len(statement.Rules)
 		report.Summary.ProofObligations += len(statement.Obligations)
@@ -395,6 +411,7 @@ func evaluateStatement(index int, sql string, profile Profile) StatementSemantic
 	case EngineClickHouse:
 		applyClickHouse(&statement, tokens, profile)
 	}
+	applyReplicationLagRisk(&statement, sql, tokens, profile)
 	sort.Slice(statement.Rules, func(i, j int) bool { return statement.Rules[i].ID < statement.Rules[j].ID })
 	sort.Strings(statement.Obligations)
 	return statement
@@ -500,6 +517,221 @@ func applyClickHouse(statement *StatementSemantics, tokens []string, _ Profile) 
 	if contains(tokens, "drop") && contains(tokens, "partition") {
 		statement.addRule("clickhouse.drop_partition_destructive", "high", "checked", "DROP PARTITION removes a data part from the table")
 	}
+}
+
+func applyReplicationLagRisk(statement *StatementSemantics, sql string, tokens []string, profile Profile) {
+	risk := detectReplicationLagRisk(*statement, sql, tokens, profile)
+	if risk == nil {
+		return
+	}
+	statement.ReplicationLagRisk = risk
+	statement.Rules = append(statement.Rules, RuleFinding{
+		ID:       "replication_lag." + risk.MigrationShape,
+		Severity: risk.Class,
+		Verdict:  "conditional",
+		Evidence: "migration shape can delay conditional read-replica, CDC, or event-stream consumers; topology must be proven before rollout",
+	})
+	statement.Obligations = append(statement.Obligations, risk.Obligations...)
+	statement.EngineFacts = append(statement.EngineFacts,
+		EngineFact{"replication_lag_shape", risk.MigrationShape},
+		EngineFact{"replication_lag_class", risk.Class},
+	)
+}
+
+func detectReplicationLagRisk(statement StatementSemantics, sql string, tokens []string, profile Profile) *ReplicationLagRisk {
+	if profile.Engine == EngineSQLite {
+		return nil
+	}
+	shape, lagClass, severity := replicationLagShape(statement, tokens, profile)
+	if shape == "" {
+		return nil
+	}
+	pipelines := conditionalReplicationPipelines(profile.Engine)
+	if len(pipelines) == 0 {
+		return nil
+	}
+	risk := &ReplicationLagRisk{
+		Class:                severity,
+		MigrationShape:       shape,
+		EstimatedLagClass:    lagClass,
+		ConditionalPipelines: pipelines,
+		Hazards:              replicationLagHazards(pipelines, shape),
+		Evidence:             replicationLagEvidence(profile.Engine, statement.OnlineSchemaChange),
+		Obligations:          replicationLagObligations(statement, shape, pipelines),
+		Mitigations:          replicationLagMitigations(sql, statement.OnlineSchemaChange),
+	}
+	sort.Strings(risk.ConditionalPipelines)
+	sort.Strings(risk.Hazards)
+	sort.Slice(risk.Evidence, func(i, j int) bool { return risk.Evidence[i].Ref < risk.Evidence[j].Ref })
+	sort.Strings(risk.Obligations)
+	sort.Strings(risk.Mitigations)
+	return risk
+}
+
+func replicationLagShape(statement StatementSemantics, tokens []string, profile Profile) (string, string, string) {
+	if statement.OnlineSchemaChange != nil {
+		return "online_schema_change", "chunked-copy-and-cutover", "medium"
+	}
+	if profile.Engine == EngineClickHouse && statement.Kind == "alter" && (contains(tokens, "delete") || contains(tokens, "update")) {
+		return "async_mutation", "background-mutation-catchup", "high"
+	}
+	if isCreateOrReplaceTable(tokens) {
+		return "table_replacement", "replacement-propagation", "high"
+	}
+	if statement.Kind == "drop" || statement.Kind == "truncate" {
+		return "destructive_metadata", "metadata-and-delete-propagation", "high"
+	}
+	if isAddColumnWithDefault(tokens) && profile.Engine == EnginePostgres && !profile.MetadataOnlyDefaults {
+		return "table_rewrite", "rewrite-redo-volume", "high"
+	}
+	if isAddColumn(tokens) && profile.Engine == EngineMySQL {
+		if contains(tokens, "copy") || !profile.InstantAddColumn {
+			return "copy_alter", "copy-redo-volume", "high"
+		}
+		return "", "", ""
+	}
+	if statement.Kind == "create" && contains(tokens, "index") {
+		switch profile.Engine {
+		case EnginePostgres:
+			return "index_build", "index-build-wal-volume", "medium"
+		case EngineSQLServer:
+			return "index_build", "index-build-redo-volume", "medium"
+		}
+	}
+	switch statement.Kind {
+	case "delete", "update", "merge", "replace":
+		if contains(tokens, "where") && likelyPointLookup(tokens) {
+			return "", "", ""
+		}
+		if contains(tokens, "where") {
+			return "bounded_mutation", "predicate-mutation-change-stream", "medium"
+		}
+		return "bulk_mutation", "unbounded-mutation-change-stream", "high"
+	}
+	return "", "", ""
+}
+
+func conditionalReplicationPipelines(engine Engine) []string {
+	switch engine {
+	case EnginePostgres, EngineMySQL, EngineSQLServer, EngineOracle:
+		return []string{"read_replica", "cdc", "event_stream"}
+	case EngineBigQuery, EngineSnowflake:
+		return []string{"cdc", "event_stream"}
+	case EngineClickHouse:
+		return []string{"read_replica", "event_stream"}
+	default:
+		return nil
+	}
+}
+
+func replicationLagHazards(pipelines []string, shape string) []string {
+	hazards := []string{"migration shape " + shape + " can create backlog before downstream consumers observe a consistent state"}
+	for _, pipeline := range pipelines {
+		switch pipeline {
+		case "read_replica":
+			hazards = append(hazards, "read replicas may serve old rows or schema until redo, WAL, binlog, or mutation queues catch up")
+		case "cdc":
+			hazards = append(hazards, "CDC consumers may see schema metadata, row-copy, or replacement events outside application deploy ordering")
+		case "event_stream":
+			hazards = append(hazards, "event-stream materializations may lag, duplicate, or reorder migration-derived change events")
+		}
+	}
+	return hazards
+}
+
+func replicationLagEvidence(engine Engine, osc *OnlineSchemaChange) []Evidence {
+	var evidence []Evidence
+	switch engine {
+	case EnginePostgres:
+		evidence = append(evidence,
+			Evidence{"postgres.streaming_replication", "WAL-heavy rewrites and index builds can delay physical read replicas"},
+			Evidence{"postgres.logical_decoding", "logical decoding and CDC slots must decode schema and row-change volume in order"},
+		)
+	case EngineMySQL:
+		evidence = append(evidence,
+			Evidence{"mysql.binary_log_replication", "row copy and DDL volume is serialized through binlog replication and can increase replica lag"},
+			Evidence{"mysql.cdc_connectors", "Debezium-style CDC and event-stream connectors consume the same ordered binlog evidence"},
+		)
+	case EngineSQLServer:
+		evidence = append(evidence,
+			Evidence{"sqlserver.availability_group_redo", "large DDL and DML operations can increase secondary redo queues"},
+			Evidence{"sqlserver.cdc_lsn", "CDC readers consume log sequence numbers and can lag behind bulk changes"},
+		)
+	case EngineOracle:
+		evidence = append(evidence,
+			Evidence{"oracle.data_guard_redo", "Data Guard apply lag depends on redo volume and DDL ordering"},
+			Evidence{"oracle.goldengate_trail", "GoldenGate-style CDC trails must carry DDL and row-change volume to downstream consumers"},
+		)
+	case EngineBigQuery:
+		evidence = append(evidence,
+			Evidence{"bigquery.table_metadata_jobs", "table replacement and large mutation jobs can publish metadata changes before downstream consumers refresh"},
+			Evidence{"bigquery.datastream_consumers", "Datastream or export-based CDC consumers need explicit freshness bounds after table replacement"},
+		)
+	case EngineSnowflake:
+		evidence = append(evidence,
+			Evidence{"snowflake.streams", "Streams and tasks observe table versions and can be invalidated or delayed by replacement-style changes"},
+			Evidence{"snowflake.create_or_replace", "CREATE OR REPLACE swaps object identity and must be coordinated with downstream event consumers"},
+		)
+	case EngineClickHouse:
+		evidence = append(evidence,
+			Evidence{"clickhouse.replicated_merge_tree", "replicated table parts and mutation queues can leave replicas at different mutation versions"},
+			Evidence{"clickhouse.mutations_async", "ALTER UPDATE/DELETE mutations run asynchronously and require system.mutations catch-up evidence"},
+		)
+	}
+	if osc != nil {
+		evidence = append(evidence, osc.Evidence...)
+	}
+	return evidence
+}
+
+func replicationLagObligations(statement StatementSemantics, shape string, pipelines []string) []string {
+	table := statement.Table
+	if table == "" {
+		table = "the affected object"
+	}
+	obligations := []string{
+		"confirm whether " + table + " feeds conditional read replicas, CDC connectors, or event streams before rollout",
+		"record preflight lag budget, rollout throttle, and post-change catch-up threshold for " + shape,
+		"bound changed rows, bytes, partitions, or table-copy volume using catalog statistics, fixture counts, or explicit table hints",
+	}
+	for _, pipeline := range pipelines {
+		switch pipeline {
+		case "read_replica":
+			obligations = append(obligations, "monitor read-replica replay lag before cutover and block promotion until it returns within budget")
+		case "cdc":
+			obligations = append(obligations, "prove CDC checkpoints advance past the migration without schema/row-event incompatibility")
+		case "event_stream":
+			obligations = append(obligations, "verify event-stream consumers rebuild or catch up before dependent application deploys read the new shape")
+		}
+	}
+	return obligations
+}
+
+func replicationLagMitigations(sql string, osc *OnlineSchemaChange) []string {
+	lower := strings.ToLower(sql)
+	var mitigations []string
+	if strings.Contains(lower, "max-lag") || strings.Contains(lower, "max_lag") || strings.Contains(lower, "maxlag") {
+		mitigations = append(mitigations, "migration declares a max-lag throttle that must be preserved in replay evidence")
+	}
+	if strings.Contains(lower, "chunk") || strings.Contains(lower, "chunk-time") {
+		mitigations = append(mitigations, "migration declares chunked copy settings that bound per-batch replication pressure")
+	}
+	if osc != nil && osc.Online {
+		mitigations = append(mitigations, "online schema-change adapter reduces foreground writer blocking but still requires lag-bound cutover evidence")
+	}
+	return mitigations
+}
+
+func likelyPointLookup(tokens []string) bool {
+	if !contains(tokens, "where") {
+		return false
+	}
+	for _, token := range tokens {
+		if token == "id" || strings.HasSuffix(token, ".id") || strings.HasSuffix(token, "_id") {
+			return true
+		}
+	}
+	return false
 }
 
 func supportedLockModes(engine Engine) []string {

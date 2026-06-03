@@ -1379,6 +1379,10 @@ db-version-semantics-gate:
 online-schema-change-adapters-gate:
 	bash scripts/online-schema-change-adapters-gate.sh
 
+.PHONY: replication-lag-risk-gate
+replication-lag-risk-gate:
+	bash scripts/replication-lag-risk-gate.sh
+
 federated-benchmark-split-gate:
 	bash scripts/federated-benchmark-split-gate.sh
 

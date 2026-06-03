@@ -76,7 +76,8 @@ Critically,
 every capability in \tool{} is backed by a reproducible \emph{gate}: a script that proves the
 capability against real, pinned public code and fails loudly on drift. \tool{} currently ships more
 than 600 such gates over 560 documented capabilities, spanning relational migrations across nine
-ecosystems, versioned database semantics, lock-mode simulations, and online-schema-change adapters
+ecosystems, versioned database semantics, lock-mode simulations, online-schema-change adapters,
+and conditional replication-lag analysis
 across eight production engines, five NoSQL engines,
 four data-pipeline frameworks, protobuf/Avro schema compatibility,
 infrastructure/data ordering, a research-grade evaluation methodology that includes blinded
@@ -378,7 +379,8 @@ seven-framework unit matrix.
 \tool{} now separates SQL dialect recognition from engine-version semantics. The \code{db-semantics}
 surface resolves PostgreSQL, MySQL, SQLite, SQL Server, Oracle, BigQuery, Snowflake, and ClickHouse
 profiles and attaches statement-level rules for transactional DDL, implicit commits, atomic DDL,
-concurrent or online index behavior, online-schema-change adapters, instant or metadata-only column addition, \code{CREATE OR REPLACE}
+concurrent or online index behavior, online-schema-change adapters, conditional replication-lag risk,
+instant or metadata-only column addition, \code{CREATE OR REPLACE}
 replacement, Snowflake Time Travel recovery, partition-aware DDL, and ClickHouse asynchronous
 mutations. This matters because the same migration can be metadata-only on PostgreSQL~15 but a table
 rewrite on PostgreSQL~10, instant on MySQL~8.0.34 but copy-style on MySQL~5.7, or synchronous-looking
@@ -393,6 +395,10 @@ mutation queues do not collapse into one misleading ``database lock'' story. The
 \code{gh-ost}, native concurrent indexes, Rails \code{strong\_migrations}, and Django
 \code{AddIndexConcurrently} emit explicit adapter records with cutover, trigger/binlog, rollback, and
 non-atomic-execution obligations rather than being mistaken for comments around ordinary DDL. The
+\code{replication-lag-risk-gate} then drives the same CLI over table rewrites, online schema changes,
+cloud table replacement, and asynchronous mutations, requiring each positive case to name conditional
+read-replica, CDC, or event-stream hazards plus catch-up obligations, while a MySQL~8 metadata-only
+add-column control remains unflagged. The
 \code{db-version-semantics-gate} exercises one checked SQL fixture across all eight engines plus an
 unsupported-engine negative control.
 
@@ -462,7 +468,7 @@ the real repository each is proven against.
 \textbf{Surface} & \textbf{Fact kinds} & \textbf{Real-repo proof} \\
 \midrule
 Relational migrations & \code{schema\_evolution}, \code{migration\_root} & \code{laravel/laravel}, \code{lobsters/lobsters} \\
-Database engine semantics & \code{db\_semantics}, \code{engine\_profile}, \code{lock\_simulation}, \code{online\_schema\_change} & 8-engine versioned fixture + lock-mode simulator + online-schema-change adapter gate + unsupported-engine negative control \\
+Database engine semantics & \code{db\_semantics}, \code{engine\_profile}, \code{lock\_simulation}, \code{online\_schema\_change}, \code{replication\_lag\_risk} & 8-engine versioned fixture + lock-mode simulator + online-schema-change adapter gate + replication-lag risk gate + unsupported-engine negative control \\
 NoSQL changes & \code{nosql\_change} & \code{laaksomavrick/twitter-go} \\
 Data pipelines & \code{data\_pipeline\_change} & \code{harrydevforlife/building-lakehouse} \\
 Schema compatibility & \code{schema\_compatibility} & \code{apache/avro} \\
@@ -966,6 +972,7 @@ dozens of schema-evolution hazards & \code{apache/avro} \\
 6/6 ecosystems fuzz-clean (0 crashes) & parser dashboard corpus \\
 8 engine-specific lock-mode simulations with documented evidence and container-smoke fixtures & \gate{lock-mode-simulator-gate} \\
 5 online-schema-change adapters with explicit trigger/binlog/cutover obligations & \gate{online-schema-change-adapters-gate} \\
+4 replication-lag hazards plus 1 metadata-only no-lag control & \gate{replication-lag-risk-gate} \\
 600+ gates / 560+ docs / 540+ examples & repository inventory \\
 \bottomrule
 \end{tabular}
@@ -1439,8 +1446,8 @@ evidence. The remaining frontier is not another isolated detector; it is the tra
 generational artifact to shared infrastructure. The open roadmap items around this transition include:
 production-grade remediation loops for rollback, repair escrow, and patch-series safety; a
 federated, checksum-mirrored, withdrawal-aware, challenge-ready public evidence marketplace with
-externally adopted governance; deeper lock, replication, partitioning, rollback, online-schema-change,
-and query-plan semantics on top of the new versioned production-database profiles;
+externally adopted governance; deeper partitioning, rollback, query-plan, and data-volume semantics
+on top of the new versioned production-database profiles;
 socio-technical accountability for appeals, fairness, ethics, and detector deprecation; education and
 certification materials that make migration safety teachable; resilient offline, edge, confidential,
 and disaster-recovery deployments; and an award-to-standard transition that externalizes benchmarks,

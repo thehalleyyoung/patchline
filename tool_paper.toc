@@ -19,18 +19,18 @@
 \contentsline {subsection}{\numberline {5.2}NoSQL change detection across five engines}{10}{subsection.5.2}%
 \contentsline {subsection}{\numberline {5.3}Data-pipeline repair evidence across four frameworks}{10}{subsection.5.3}%
 \contentsline {subsection}{\numberline {5.4}Schema-registry and protobuf/Avro compatibility}{10}{subsection.5.4}%
-\contentsline {subsection}{\numberline {5.5}Infrastructure/data ordering}{10}{subsection.5.5}%
+\contentsline {subsection}{\numberline {5.5}Infrastructure/data ordering}{11}{subsection.5.5}%
 \contentsline {subsection}{\numberline {5.6}Monorepo package boundaries}{11}{subsection.5.6}%
 \contentsline {paragraph}{Summary.}{11}{subsection.5.6}%
 \contentsline {section}{\numberline {6}Bounded Interventions and Deterministic Rejection}{11}{section.6}%
 \contentsline {paragraph}{Budgets.}{11}{section.6}%
-\contentsline {paragraph}{Quarantine.}{11}{section.6}%
+\contentsline {paragraph}{Quarantine.}{12}{section.6}%
 \contentsline {paragraph}{Deterministic rejection.}{12}{section.6}%
 \contentsline {paragraph}{Generator-agnostic.}{12}{section.6}%
 \contentsline {paragraph}{Invariant-backed expand/contract templates.}{12}{section.6}%
 \contentsline {paragraph}{Staged backfill planning.}{12}{section.6}%
 \contentsline {paragraph}{Remediation playbooks.}{12}{section.6}%
-\contentsline {paragraph}{Canary-data validation.}{12}{section.6}%
+\contentsline {paragraph}{Canary-data validation.}{13}{section.6}%
 \contentsline {paragraph}{Repair-risk escrow.}{13}{section.6}%
 \contentsline {paragraph}{Postmortem lessons as detector regressions.}{13}{section.6}%
 \contentsline {paragraph}{Verified multi-service rollback planning.}{13}{section.6}%
@@ -38,7 +38,7 @@
 \contentsline {paragraph}{Patch-series invariant preservation.}{14}{section.6}%
 \contentsline {paragraph}{Maintainer acceptance without uncertainty laundering.}{14}{section.6}%
 \contentsline {paragraph}{The accept/reject decision.}{14}{section.6}%
-\contentsline {section}{\numberline {7}Runtime and Observability Evidence}{14}{section.7}%
+\contentsline {section}{\numberline {7}Runtime and Observability Evidence}{15}{section.7}%
 \contentsline {subsection}{\numberline {7.1}Performance and scale}{15}{subsection.7.1}%
 \contentsline {section}{\numberline {8}Formal and Decision-Theoretic Guarantees}{15}{section.8}%
 \contentsline {paragraph}{Formal invariant extraction.}{15}{section.8}%

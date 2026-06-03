@@ -1,0 +1,68 @@
+{
+  "version": "patchline.replication-lag-risk-gate/v1",
+  "claim": "Patchline links migration shape to conditional replication-lag hazards without pretending to know a deployment topology. The gate drives the real db-semantics CLI over table rewrites, online schema-change adapters, cloud table replacement, and asynchronous mutations; each positive case must name read-replica, CDC, or event-stream risk classes with evidence and obligations, while a metadata-only MySQL 8 add-column control must remain unflagged.",
+  "minimum_risks": 4,
+  "cases": [
+    {
+      "id": "postgres-table-rewrite",
+      "engine": "postgres",
+      "version": "10",
+      "sql": "ALTER TABLE accounts ADD COLUMN status text DEFAULT 'active';",
+      "expect": {
+        "risk": true,
+        "shape": "table_rewrite",
+        "class": "high",
+        "pipeline": "read_replica",
+        "mitigation": false
+      }
+    },
+    {
+      "id": "mysql-gh-ost-lag-throttle",
+      "engine": "mysql",
+      "version": "8.0.34",
+      "sql": "ALTER TABLE accounts ADD COLUMN last_seen_at datetime\n  /* gh-ost --database app --table accounts --alter 'ADD COLUMN last_seen_at datetime' --max-lag-millis 1500 --chunk-size 1000 */;",
+      "expect": {
+        "risk": true,
+        "shape": "online_schema_change",
+        "class": "medium",
+        "pipeline": "cdc",
+        "mitigation": true
+      }
+    },
+    {
+      "id": "bigquery-table-replacement",
+      "engine": "bigquery",
+      "version": "2024.2",
+      "sql": "CREATE OR REPLACE TABLE analytics.daily AS SELECT * FROM analytics.stage;",
+      "expect": {
+        "risk": true,
+        "shape": "table_replacement",
+        "class": "high",
+        "pipeline": "event_stream",
+        "mitigation": false
+      }
+    },
+    {
+      "id": "clickhouse-async-mutation",
+      "engine": "clickhouse",
+      "version": "24.1",
+      "sql": "ALTER TABLE events DELETE WHERE created_at < now() - interval 30 day;",
+      "expect": {
+        "risk": true,
+        "shape": "async_mutation",
+        "class": "high",
+        "pipeline": "read_replica",
+        "mitigation": false
+      }
+    },
+    {
+      "id": "mysql-instant-add-column-control",
+      "engine": "mysql",
+      "version": "8.0.34",
+      "sql": "ALTER TABLE accounts ADD COLUMN metadata_only varchar(20);",
+      "expect": {
+        "risk": false
+      }
+    }
+  ]
+}

@@ -310,6 +310,123 @@ class Migration(migrations.Migration):
 	}
 }
 
+func TestReplicationLagRiskAnalysisLinksConditionalPipelines(t *testing.T) {
+	cases := []struct {
+		name      string
+		engine    Engine
+		version   string
+		sql       string
+		shape     string
+		pipeline  string
+		mitigated bool
+	}{
+		{
+			name:     "postgres-table-rewrite",
+			engine:   EnginePostgres,
+			version:  "10",
+			sql:      "ALTER TABLE accounts ADD COLUMN status text DEFAULT 'active';",
+			shape:    "table_rewrite",
+			pipeline: "read_replica",
+		},
+		{
+			name:      "mysql-gh-ost",
+			engine:    EngineMySQL,
+			version:   "8.0.34",
+			sql:       "ALTER TABLE accounts ADD COLUMN last_seen_at datetime /* gh-ost --database app --table accounts --alter 'ADD COLUMN last_seen_at datetime' --max-lag-millis 1500 */;",
+			shape:     "online_schema_change",
+			pipeline:  "cdc",
+			mitigated: true,
+		},
+		{
+			name:     "bigquery-replace",
+			engine:   EngineBigQuery,
+			version:  "2024.2",
+			sql:      "CREATE OR REPLACE TABLE analytics.daily AS SELECT * FROM analytics.stage;",
+			shape:    "table_replacement",
+			pipeline: "event_stream",
+		},
+		{
+			name:     "clickhouse-async-mutation",
+			engine:   EngineClickHouse,
+			version:  "24.1",
+			sql:      "ALTER TABLE events DELETE WHERE created_at < now() - interval 30 day;",
+			shape:    "async_mutation",
+			pipeline: "read_replica",
+		},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			report, err := Evaluate(tc.engine, tc.version, tc.name+".sql", []byte(tc.sql))
+			if err != nil {
+				t.Fatal(err)
+			}
+			if report.Summary.ReplicationLagRisks != 1 {
+				t.Fatalf("expected one replication lag risk, got summary=%#v statements=%#v", report.Summary, report.Statements)
+			}
+			lag := report.Statements[0].ReplicationLagRisk
+			if lag == nil {
+				t.Fatalf("missing replication lag risk: %#v", report.Statements[0])
+			}
+			if lag.MigrationShape != tc.shape || !stringSliceContains(lag.ConditionalPipelines, tc.pipeline) {
+				t.Fatalf("unexpected lag risk for %s: %#v", tc.name, lag)
+			}
+			if len(lag.Hazards) < 2 || len(lag.Evidence) == 0 || len(lag.Obligations) < 3 {
+				t.Fatalf("lag risk should carry hazards, evidence, and obligations: %#v", lag)
+			}
+			if tc.mitigated && len(lag.Mitigations) == 0 {
+				t.Fatalf("expected lag throttle mitigation for %s: %#v", tc.name, lag)
+			}
+			if !hasRule(report, "replication_lag."+tc.shape) {
+				t.Fatalf("missing replication lag rule for %s in %#v", tc.shape, report.Statements[0].Rules)
+			}
+		})
+	}
+}
+
+func TestReplicationLagRiskHasMetadataOnlyControlAndDeterministicHash(t *testing.T) {
+	sql := []byte("ALTER TABLE accounts ADD COLUMN status varchar(20);")
+	first, err := Evaluate(EngineMySQL, "8.0.34", "mysql80.sql", sql)
+	if err != nil {
+		t.Fatal(err)
+	}
+	second, err := Evaluate(EngineMySQL, "8.0.34", "mysql80.sql", sql)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if first.Hash != second.Hash {
+		t.Fatalf("expected deterministic report hash, got %s and %s", first.Hash, second.Hash)
+	}
+	if first.Summary.ReplicationLagRisks != 0 || first.Statements[0].ReplicationLagRisk != nil {
+		t.Fatalf("instant metadata-only add-column should be a no-lag control: %#v", first.Statements[0])
+	}
+}
+
+func TestReplicationLagRiskUsesEngineSpecificEvidence(t *testing.T) {
+	sql := []byte("UPDATE accounts SET status = 'archived';")
+	postgres, err := Evaluate(EnginePostgres, "16", "pg.sql", sql)
+	if err != nil {
+		t.Fatal(err)
+	}
+	mysql, err := Evaluate(EngineMySQL, "8.0.34", "mysql.sql", sql)
+	if err != nil {
+		t.Fatal(err)
+	}
+	pgLag := postgres.Statements[0].ReplicationLagRisk
+	myLag := mysql.Statements[0].ReplicationLagRisk
+	if pgLag == nil || myLag == nil {
+		t.Fatalf("expected replication lag risks for both engines: pg=%#v mysql=%#v", pgLag, myLag)
+	}
+	if !hasEvidence(pgLag.Evidence, "postgres.streaming_replication") {
+		t.Fatalf("postgres lag risk missing WAL/replica evidence: %#v", pgLag.Evidence)
+	}
+	if !hasEvidence(myLag.Evidence, "mysql.binary_log_replication") {
+		t.Fatalf("mysql lag risk missing binlog evidence: %#v", myLag.Evidence)
+	}
+	if pgLag.Evidence[0].Ref == myLag.Evidence[0].Ref {
+		t.Fatalf("engine evidence should differ: pg=%#v mysql=%#v", pgLag.Evidence, myLag.Evidence)
+	}
+}
+
 func TestRejectsUnsupportedEngineAndBadVersion(t *testing.T) {
 	if _, err := ResolveProfile(Engine("db2"), "11"); err == nil {
 		t.Fatal("expected unsupported engine error")
@@ -325,6 +442,24 @@ func hasRule(report Report, id string) bool {
 			if rule.ID == id {
 				return true
 			}
+		}
+	}
+	return false
+}
+
+func stringSliceContains(values []string, want string) bool {
+	for _, value := range values {
+		if value == want {
+			return true
+		}
+	}
+	return false
+}
+
+func hasEvidence(evidence []Evidence, ref string) bool {
+	for _, item := range evidence {
+		if item.Ref == ref {
+			return true
 		}
 	}
 	return false
