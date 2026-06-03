@@ -18,6 +18,7 @@ import (
 	"github.com/thehalleyyoung/patchline/internal/attest"
 	"github.com/thehalleyyoung/patchline/internal/backfillplanner"
 	"github.com/thehalleyyoung/patchline/internal/canaryvalidate"
+	"github.com/thehalleyyoung/patchline/internal/certificationrenewal"
 	"github.com/thehalleyyoung/patchline/internal/changemanagement"
 	"github.com/thehalleyyoung/patchline/internal/education"
 	"github.com/thehalleyyoung/patchline/internal/ethicsreview"
@@ -979,6 +980,114 @@ func TestPractitionerCertificationCommandWritesReports(t *testing.T) {
 	}
 	if stat, err := os.Stat(filepath.Join(out, "practitioner-certification.md")); err != nil || stat.Size() == 0 {
 		t.Fatalf("expected practitioner-certification.md to be written, stat=%#v err=%v", stat, err)
+	}
+}
+
+func TestCertificationRenewalCommandWritesReports(t *testing.T) {
+	root := t.TempDir()
+	writeMainTestFile(t, root, "Makefile", "certification-renewal-gate:\n\tbash scripts/certification-renewal-gate.sh\n")
+	writeMainTestFile(t, root, "scripts/certification-renewal-gate.sh", "#!/usr/bin/env bash\nset -euo pipefail\n")
+	writeMainTestFile(t, root, "docs/db-version-semantics.md", "Database version semantics evidence.\n")
+	writeMainTestFile(t, root, "docs/db-semantics-reproducibility.md", "Database semantics reproducibility evidence.\n")
+	writeMainTestFile(t, root, "docs/replication-lag-risk.md", "Replication lag evidence.\n")
+	writeMainTestFile(t, root, "docs/query-plan-regression.md", "Query plan regression evidence.\n")
+	writeMainTestFile(t, root, "docs/certification-renewal.md", "Certification renewal evidence.\n")
+	writeMainTestFile(t, root, "docs/practitioner-certification-exam.md", "Practitioner attestation evidence.\n")
+	writeMainTestFile(t, root, "examples/db-rollback-feasibility-gate.json", `{"version":"patchline.db-rollback-feasibility/v1"}`)
+	writeMainTestFile(t, root, "examples/db-dry-run-gate.json", `{"version":"patchline.db-dry-run/v1"}`)
+	writeMainTestFile(t, root, "examples/replication-lag-risk-gate.json", `{"version":"patchline.replication-lag-risk/v1"}`)
+	writeMainTestFile(t, root, "examples/query-plan-regression-gate.json", `{"version":"patchline.query-plan-regression/v1"}`)
+	specPath := filepath.Join(root, "certification-renewal.json")
+	writeMainTestFile(t, root, "certification-renewal.json", `{
+  "version": "patchline.certification-renewal/v1",
+  "name": "main test certification renewal",
+  "claim": "Patchline renews practitioner credentials only when active credentials cover newly introduced database-engine semantics, newly discovered hazard classes, evidence hashes, and reproducible gates.",
+  "as_of": "2026-03-20",
+  "criteria": {
+    "min_engine_semantics_updates": 2,
+    "min_new_hazard_classes": 2,
+    "passing_score_pct": 85,
+    "require_evidence_hashes": true,
+    "require_reproducible_gates": true
+  },
+  "engine_semantics": [
+    {
+      "id": "postgres-16-lock-modes",
+      "engine": "postgres",
+      "engine_version": "16",
+      "effective_date": "2026-02-15",
+      "source": "docs/db-version-semantics.md",
+      "summary": "PostgreSQL lock and rollback semantics are part of renewal.",
+      "required_topics": ["postgres-lock-modes","transactional-ddl"],
+      "evidence_paths": ["docs/db-version-semantics.md","examples/db-rollback-feasibility-gate.json"]
+    },
+    {
+      "id": "mysql-8-online-ddl",
+      "engine": "mysql",
+      "engine_version": "8.0",
+      "effective_date": "2026-02-20",
+      "source": "docs/db-semantics-reproducibility.md",
+      "summary": "MySQL online DDL and implicit commit behavior are renewal-critical.",
+      "required_topics": ["mysql-online-ddl","implicit-commit-rollback"],
+      "evidence_paths": ["docs/db-semantics-reproducibility.md","examples/db-dry-run-gate.json"]
+    }
+  ],
+  "hazard_classes": [
+    {
+      "id": "replication-lag-risk",
+      "hazard_class": "replication-lag-risk",
+      "discovered_at": "2026-02-25",
+      "severity": "high",
+      "source": "docs/replication-lag-risk.md",
+      "summary": "Renewal covers replica, CDC, and event-stream lag obligations.",
+      "required_topics": ["replication-lag-obligations","cdc-delay-hazards"],
+      "evidence_paths": ["docs/replication-lag-risk.md","examples/replication-lag-risk-gate.json"]
+    },
+    {
+      "id": "query-plan-regression",
+      "hazard_class": "query-plan-regression",
+      "discovered_at": "2026-03-01",
+      "severity": "medium",
+      "source": "docs/query-plan-regression.md",
+      "summary": "Renewal covers representative workload checks for index and column changes.",
+      "required_topics": ["representative-workloads","plan-regression-controls"],
+      "evidence_paths": ["docs/query-plan-regression.md","examples/query-plan-regression-gate.json"]
+    }
+  ],
+  "credentials": [
+    {"practitioner_id":"practitioner-a","credential_id":"patchline-migration-safety-2025","status":"active","issued_at":"2025-03-01","expires_at":"2027-03-01","track":"migration-safety"}
+  ],
+  "attempts": [
+    {
+      "practitioner_id":"practitioner-a",
+      "credential_id":"patchline-migration-safety-2025",
+      "submitted_at":"2026-03-15",
+      "score_pct":96,
+      "gate":"certification-renewal-gate",
+      "commands":["make certification-renewal-gate"],
+      "covered_engine_semantics":["postgres-16-lock-modes","mysql-8-online-ddl"],
+      "covered_hazard_classes":["replication-lag-risk","query-plan-regression"],
+      "covered_topics":["postgres-lock-modes","transactional-ddl","mysql-online-ddl","implicit-commit-rollback","replication-lag-obligations","cdc-delay-hazards","representative-workloads","plan-regression-controls"],
+      "evidence_paths":["docs/certification-renewal.md"],
+      "reviewer_evidence_hash":"17bdec798ae611ee11adfdca96dae07952cbd1ef3a18dde7ab56255652e4ca28",
+      "reviewer_attestation_path":"docs/practitioner-certification-exam.md"
+    }
+  ]
+}`)
+	out := filepath.Join(t.TempDir(), "certification-renewal")
+	if err := run([]string{"certification-renewal", "--spec", specPath, "--root", root, "--out", out, "--json"}); err != nil {
+		t.Fatalf("certification-renewal failed: %v", err)
+	}
+	var report certificationrenewal.Report
+	readMainTestJSON(t, filepath.Join(out, "certification-renewal.json"), &report)
+	if !report.OK || report.Summary.EngineSemanticsUpdates != 2 || report.Summary.NewHazardClasses != 2 || report.Summary.RenewedCredentials != 1 {
+		t.Fatalf("unexpected certification renewal report: %#v", report)
+	}
+	if len(report.EngineSemantics[0].Evidence) == 0 || report.EngineSemantics[0].Evidence[0].SHA256 == "" {
+		t.Fatalf("expected evidence hashes, got %#v", report.EngineSemantics)
+	}
+	if stat, err := os.Stat(filepath.Join(out, "certification-renewal.md")); err != nil || stat.Size() == 0 {
+		t.Fatalf("expected certification-renewal.md to be written, stat=%#v err=%v", stat, err)
 	}
 }
 

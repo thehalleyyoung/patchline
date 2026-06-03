@@ -30,6 +30,7 @@ import (
 	"github.com/thehalleyyoung/patchline/internal/canaryvalidate"
 	"github.com/thehalleyyoung/patchline/internal/canonical"
 	"github.com/thehalleyyoung/patchline/internal/certdiff"
+	"github.com/thehalleyyoung/patchline/internal/certificationrenewal"
 	"github.com/thehalleyyoung/patchline/internal/certlang"
 	"github.com/thehalleyyoung/patchline/internal/certplugfest"
 	"github.com/thehalleyyoung/patchline/internal/certrevocation"
@@ -454,6 +455,8 @@ func run(args []string) error {
 		return maintainerAcceptanceStudyCommand(args[1:], hasFlag(args[1:], "--json"))
 	case "practitioner-certification":
 		return practitionerCertificationCommand(args[1:], hasFlag(args[1:], "--json"))
+	case "certification-renewal":
+		return certificationRenewalCommand(args[1:], hasFlag(args[1:], "--json"))
 	case "classroom-lab-kits":
 		return classroomLabKitsCommand(args[1:], hasFlag(args[1:], "--json"))
 	case "longitudinal-education-study":
@@ -632,6 +635,7 @@ Usage:
   patchline patch-series-verify --spec patch-series.json --out dir [--json]
   patchline maintainer-acceptance-study --spec maintainer-acceptance-study.json --root repo-root --out dir [--json]
   patchline practitioner-certification --spec practitioner-certification.json --root repo-root --out dir [--json]
+  patchline certification-renewal --spec certification-renewal.json --root repo-root --out dir [--json]
   patchline classroom-lab-kits --spec classroom-lab-kits.json --root repo-root --out dir [--json]
   patchline longitudinal-education-study --spec longitudinal-education-study.json --root repo-root --out dir [--json]
   patchline workforce-impact-study --spec workforce-impact-study.json --root repo-root --out dir [--json]
@@ -15156,6 +15160,39 @@ func practitionerCertificationCommand(args []string, jsonOut bool) error {
 		return writeJSON(os.Stdout, report)
 	}
 	fmt.Printf("wrote practitioner certification exam ok=%t scenarios=%d gate_backed=%d candidates=%d passed=%d counterexamples=%d to %s\n", report.OK, report.Summary.Scenarios, report.Summary.GateBackedScenarios, report.Summary.Candidates, report.Summary.PassedCandidates, report.Summary.Counterexamples, outPath)
+	return nil
+}
+
+func certificationRenewalCommand(args []string, jsonOut bool) error {
+	usage := "patchline certification-renewal --spec certification-renewal.json --root repo-root --out <dir> [--json]"
+	specPath, outPath, err := feedbackSpecOut(args, usage)
+	if err != nil {
+		return err
+	}
+	rootPath := "."
+	if value, ok := flagValue(args, "--root"); ok && value != "" {
+		rootPath = value
+	}
+	file, err := os.Open(specPath)
+	if err != nil {
+		return err
+	}
+	defer file.Close()
+	spec, err := certificationrenewal.ReadSpec(file)
+	if err != nil {
+		return err
+	}
+	report, err := certificationrenewal.BuildReport(spec, rootPath)
+	if err != nil {
+		return err
+	}
+	if err := certificationrenewal.WriteArtifacts(outPath, report); err != nil {
+		return err
+	}
+	if jsonOut {
+		return writeJSON(os.Stdout, report)
+	}
+	fmt.Printf("wrote certification renewal ok=%t engine_semantics=%d hazard_classes=%d active_credentials=%d renewed=%d counterexamples=%d to %s\n", report.OK, report.Summary.EngineSemanticsUpdates, report.Summary.NewHazardClasses, report.Summary.ActiveCredentials, report.Summary.RenewedCredentials, report.Summary.Counterexamples, outPath)
 	return nil
 }
 

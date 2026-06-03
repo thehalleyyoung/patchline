@@ -1,0 +1,127 @@
+{
+  "version": "patchline.certification-renewal/v1",
+  "name": "Patchline migration-safety certification renewal",
+  "claim": "Patchline renews practitioner certification only when active credentials are re-checked against database-engine semantics that changed since the prior certification cycle and against newly discovered hazard classes. The process is deterministic: every engine update and hazard update has dated evidence, every active credential must submit a renewal attempt after the newest update, attempts must cover all required topics and update IDs, reviewer evidence is hash-bound, and a reproducible make gate proves the positive path, negative controls, and stable report hash.",
+  "as_of": "2026-03-20",
+  "criteria": {
+    "min_engine_semantics_updates": 2,
+    "min_new_hazard_classes": 2,
+    "passing_score_pct": 85,
+    "require_evidence_hashes": true,
+    "require_reproducible_gates": true
+  },
+  "engine_semantics": [
+    {
+      "id": "postgres-16-lock-modes",
+      "engine": "postgres",
+      "engine_version": "16",
+      "effective_date": "2026-02-15",
+      "source": "docs/db-version-semantics.md",
+      "summary": "Renewal covers PostgreSQL version-specific lock, transactional DDL, and rollback obligations.",
+      "required_topics": [
+        "postgres-lock-modes",
+        "transactional-ddl"
+      ],
+      "evidence_paths": [
+        "docs/db-version-semantics.md",
+        "examples/db-rollback-feasibility-gate.json"
+      ]
+    },
+    {
+      "id": "mysql-8-online-ddl",
+      "engine": "mysql",
+      "engine_version": "8.0",
+      "effective_date": "2026-02-20",
+      "source": "docs/db-semantics-reproducibility.md",
+      "summary": "Renewal covers MySQL online DDL, implicit commits, and reproducibility pins for engine behavior.",
+      "required_topics": [
+        "mysql-online-ddl",
+        "implicit-commit-rollback"
+      ],
+      "evidence_paths": [
+        "docs/db-semantics-reproducibility.md",
+        "examples/db-dry-run-gate.json"
+      ]
+    }
+  ],
+  "hazard_classes": [
+    {
+      "id": "replication-lag-risk",
+      "hazard_class": "replication-lag-risk",
+      "discovered_at": "2026-02-25",
+      "severity": "high",
+      "source": "docs/replication-lag-risk.md",
+      "summary": "Renewal covers read replica, CDC, and event-stream lag obligations introduced by migration shape.",
+      "required_topics": [
+        "replication-lag-obligations",
+        "cdc-delay-hazards"
+      ],
+      "evidence_paths": [
+        "docs/replication-lag-risk.md",
+        "examples/replication-lag-risk-gate.json"
+      ]
+    },
+    {
+      "id": "query-plan-regression",
+      "hazard_class": "query-plan-regression",
+      "discovered_at": "2026-03-01",
+      "severity": "medium",
+      "source": "docs/query-plan-regression.md",
+      "summary": "Renewal covers representative workload checks that prevent index and column changes from hiding query-plan regressions.",
+      "required_topics": [
+        "representative-workloads",
+        "plan-regression-controls"
+      ],
+      "evidence_paths": [
+        "docs/query-plan-regression.md",
+        "examples/query-plan-regression-gate.json"
+      ]
+    }
+  ],
+  "credentials": [
+    {
+      "practitioner_id": "certified-practitioner-demo",
+      "credential_id": "patchline-migration-safety-2025",
+      "status": "active",
+      "issued_at": "2025-03-01",
+      "expires_at": "2027-03-01",
+      "track": "migration-safety"
+    }
+  ],
+  "attempts": [
+    {
+      "practitioner_id": "certified-practitioner-demo",
+      "credential_id": "patchline-migration-safety-2025",
+      "submitted_at": "2026-03-15",
+      "score_pct": 96,
+      "gate": "certification-renewal-gate",
+      "commands": [
+        "make certification-renewal-gate"
+      ],
+      "covered_engine_semantics": [
+        "postgres-16-lock-modes",
+        "mysql-8-online-ddl"
+      ],
+      "covered_hazard_classes": [
+        "replication-lag-risk",
+        "query-plan-regression"
+      ],
+      "covered_topics": [
+        "postgres-lock-modes",
+        "transactional-ddl",
+        "mysql-online-ddl",
+        "implicit-commit-rollback",
+        "replication-lag-obligations",
+        "cdc-delay-hazards",
+        "representative-workloads",
+        "plan-regression-controls"
+      ],
+      "evidence_paths": [
+        "docs/certification-renewal.md",
+        "examples/certification-renewal.json"
+      ],
+      "reviewer_evidence_hash": "6bcdaea6913920243cbfcd854db722a42bae4282898280a30e3732db593a16f0",
+      "reviewer_attestation_path": "docs/practitioner-certification-exam.md"
+    }
+  ]
+}

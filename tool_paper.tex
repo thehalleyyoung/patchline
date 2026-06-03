@@ -70,9 +70,10 @@ a shared-evidence governance board then accepts, deprecates, or quarantines publ
 quorum, conflict checks, hash binding, and archive-preserving tombstones, an appeal workflow resolves
 disputed findings with preserved evidence, independent reviewer rationales, and resolution audit trails,
 and a reviewer-fairness audit gates reviewer burden, false positives, and escalation rates across teams
-and ecosystems using hashed review evidence, while practitioner certification, classroom lab kits,
-localized teaching examples, role-specific tutorials, a public skills taxonomy, contributor apprenticeship graduation, and a longitudinal education study turn reviewer training into gate-backed, evidence-hashed
-assessments: certification grades rubriced hands-on decisions, lab kits require instructor solution
+and ecosystems using hashed review evidence, while practitioner certification, certification renewal,
+classroom lab kits, localized teaching examples, role-specific tutorials, a public skills taxonomy, contributor apprenticeship graduation, and a longitudinal education study turn reviewer training into gate-backed, evidence-hashed
+assessments: certification grades rubriced hands-on decisions, renewal binds credentials to dated
+database-engine semantic updates and newly discovered hazard classes, lab kits require instructor solution
 gates and failing controls, localized lessons preserve byte-identical commands and identifiers across translations while checking accessibility, the taxonomy maps hazard classes to reviewer concepts, prerequisites, prompts, gates, and controls, tutorials compile app-developer, DBA, SRE, security-reviewer, and manager
 playbooks from real evidence paths, and the longitudinal study counts only blinded six-month detections that
 cite evidence and reproducing gates before comparing trained reviewers with controls; a workforce-impact
@@ -273,6 +274,10 @@ against generated plans while hashing the real artifacts reviewed and failing hi
 real evidence files, explicit rubrics, expected safety decisions, and required \code{make} gates; fail
 wrong decisions, missing rubric concepts, absent evidence, and non-reproducible answers. &
 \code{practitioner-certification.json}, \code{.md} \\
+\code{certification-renewal} & Renew active credentials only after attempts cover dated
+database-engine semantic updates, newly discovered hazard classes, all required topics, hash-bound
+reviewer evidence, and a reproducing gate after the newest update. &
+\code{certification-renewal.json}, \code{.md} \\
 \code{classroom-lab-kits} & Validate database, software-engineering, programming-languages, and
 DevOps lab kits against real evidence hashes, instructor solution gates, reproducing commands,
 expected artifacts, and negative controls. & \code{classroom-lab-kits.json}, \code{.md} \\
@@ -1035,6 +1040,16 @@ approved payout, and reject an unsupported item with no reproduction, no evidenc
 keeps the incentive loop aligned with the analysis loop: money rewards minimized examples that improve
 recall or ecosystem coverage, not unverifiable anecdotes.
 
+\paragraph{Certification that tracks a moving target.} The \code{certification-renewal} command prevents
+training claims from going stale as engines and hazard classes evolve. A renewal spec supplies a fixed
+\code{as\_of} date, engine-specific semantic updates validated against the same supported-engine set used
+by \code{db-semantics}, newly discovered hazard classes, active credentials, and dated attempts. The
+report hashes every update and reviewer-evidence file, computes the newest update date, and renews a
+credential only if a passing attempt after that date covers every required update ID and normalized topic
+while naming a real \code{make} gate. \gate{certification-renewal-gate} then mutates the attempt into a
+stale, topic-incomplete, hashless, non-reproducible renewal and requires all corresponding
+counterexamples to appear while the safe report hash remains stable.
+
 %======================================================================
 \section{Evaluation Methodology}
 \label{sec:eval}
@@ -1129,6 +1144,7 @@ owner-routed rollback playbooks for broad writes & \gate{remediation-playbook-ga
 5 migration-PR states preserve invariants; unsafe drop refuted & \gate{patch-series-verifier-gate} \\
 9 paired maintainer reviews; 38.55\% faster with full uncertainty recall; hidden-control refuted & \gate{maintainer-acceptance-study-gate} \\
 2 workforce cohorts / 8 observations with 100-point ownership and escalation diff-in-diff, 23-point learning diff-in-diff, 66.67-point held-out detection diff-in-diff, and confounding/suppressed-escalation/teaching-to-test controls refuted & \gate{workforce-impact-study-gate} \\
+2 engine-semantics updates and 2 newly discovered hazard classes force active credential renewal after the newest update; stale, incomplete, hashless, and non-reproducible attempts are refuted & \gate{certification-renewal-gate} \\
 2 public-release-eligible examples with reviewable gate reputation, duplicate-collapsed prevalence, and 4 mirrored artifacts imported into runnable benchmarks; corrupted certificate rejected & \gate{evidence-marketplace-gate} \\
 1 accepted, 1 deprecated, and 1 quarantined shared-evidence record; 4 archive artifacts preserved with tombstones; weak quorum/conflict/missing-tombstone controls rejected & \gate{evidence-governance-board-gate} \\
 3 disputed findings resolved with 6 preserved artifacts, 9 reviewer rationales, and controls for missing preservation, original approver reuse, and private markers & \gate{evidence-appeal-workflow-gate} \\
@@ -1634,7 +1650,7 @@ externally adopted governance and appeal audit trails; deeper rollback, query-pl
 on top of the new versioned production-database profiles;
 socio-technical accountability beyond accountable-use, reviewer-fairness, workforce-impact measurement,
 change-management binding, governance-risk registration, ethics review, explainability audit, misuse resistance, and detector
-deprecation; certification-renewal and textbook extensions for the education and
+deprecation; open-textbook extensions for the education and
 certification materials that make migration safety teachable; resilient offline, edge, confidential,
 and disaster-recovery deployments; and an award-to-standard transition that externalizes benchmarks,
 errata, conformance labels, and long-term stewardship. These items are intentionally recorded as future

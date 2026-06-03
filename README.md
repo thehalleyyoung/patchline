@@ -141,6 +141,8 @@ Run `reviewer-fairness-audit --spec <spec>` to gate reviewer burden, false posit
 
 Run `practitioner-certification --spec examples/practitioner-certification-exam.json` to grade hands-on, gate-backed migration-safety scenarios with reproducible evidence hashes; reproduce it with `make practitioner-certification-exam-gate`.
 
+Run `certification-renewal --spec examples/certification-renewal.json` to keep credentials current as database-engine semantics and hazard classes evolve; reproduce it with `make certification-renewal-gate`.
+
 Run `classroom-lab-kits --spec examples/classroom-lab-kits.json` to verify database, software-engineering, PL, and DevOps lab kits with evidence hashes, instructor solution gates, and failing negative controls; reproduce it with `make classroom-lab-kits-gate`.
 
 Run `longitudinal-education-study --spec examples/longitudinal-education-study.json` to measure whether Patchline-trained reviewers still catch real, gate-backed hazards months later versus a control cohort; reproduce it with `make longitudinal-education-study-gate`.
