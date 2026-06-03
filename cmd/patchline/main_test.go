@@ -1427,6 +1427,41 @@ func TestRepoOfflineRejectsInvalidAdapterResult(t *testing.T) {
 	}
 }
 
+func TestRepoPlaybookCommandWritesRemediationArtifacts(t *testing.T) {
+	root := t.TempDir()
+	writeMainTestFile(t, root, ".github/CODEOWNERS", "/db/migrate/ @org/db-team\n")
+	writeMainTestFile(t, root, "db/migrate/001_accounts.sql", "UPDATE accounts SET status = 'disabled';\n")
+	inv, err := project.InventoryPath(project.InventoryOptions{Path: root})
+	if err != nil {
+		t.Fatal(err)
+	}
+	intakeReport, err := intake.Run(context.Background(), intake.Options{Path: root})
+	if err != nil {
+		t.Fatal(err)
+	}
+	baseline := project.Baseline(inv, inv.Facts, intakeReport)
+	baselineDir := filepath.Join(t.TempDir(), "baseline")
+	if err := project.WriteBaseline(baselineDir, baseline); err != nil {
+		t.Fatal(err)
+	}
+	out := filepath.Join(t.TempDir(), "playbook")
+	if err := run([]string{"repo", "playbook", "--baseline", baselineDir, "--out", out, "--json"}); err != nil {
+		t.Fatalf("repo playbook failed: %v", err)
+	}
+	var report project.RemediationPlaybookReport
+	readMainTestJSON(t, filepath.Join(out, "playbook.json"), &report)
+	if report.Version != project.RemediationPlaybookVersion || report.Summary.Playbooks == 0 || report.Summary.RollbackPoints == 0 || report.Summary.CodeownersHandoffs == 0 {
+		t.Fatalf("unexpected playbook report: %#v", report)
+	}
+	md, err := os.ReadFile(filepath.Join(out, "playbook.md"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(string(md), "Remediation playbooks") || !strings.Contains(string(md), "@org/db-team") {
+		t.Fatalf("unexpected playbook markdown: %s", string(md))
+	}
+}
+
 func initMainTestGitRepo(t *testing.T) string {
 	t.Helper()
 	root := t.TempDir()

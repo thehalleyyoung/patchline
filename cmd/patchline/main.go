@@ -458,6 +458,7 @@ Usage:
   patchline repo analyze [<path>|--github owner/repo] [--ref ref] [--subpath path] [--stages inventory,baseline,propose,compare,deep] [--proposal-kind tests|guards|instrumentation|repair|all] [--budget files=N,lines=N,tokens=N,changes=N] [--ci] [--redact] [--resume] [--trace] [--no-llm] [--llm-command cmd] [--prompt-without-facts] [--out dir] [--json]
   patchline repo inventory <path> [--out dir] [--full] [--json]
   patchline repo baseline --inventory inventory-dir --intake intake-dir [--out dir] [--json]
+  patchline repo playbook --baseline baseline-dir [--out dir] [--json]
   patchline repo propose --from-report baseline-dir --proposal-kind tests|guards|instrumentation|repair|all [--budget files=N,lines=N,tokens=N,changes=N] [--no-llm] [--llm-command cmd] [--prompt-without-facts] [--out dir] [--json]
   patchline repo compare --before baseline-dir --after proposal-dir [--out dir] [--run-native-tests] [--json]
   patchline repo proposal-minimize --before baseline-dir --after proposal-dir [--out dir] [--json]
@@ -731,7 +732,7 @@ func certPlugfest(args []string) error {
 
 func repoCommand(args []string) error {
 	if len(args) == 0 {
-		return errors.New("usage: patchline repo <doctor|fetch|analyze|inventory|baseline|propose|compare|proposal-minimize|replay|suppressions|why-now|changes|hook|offline|notify-summary|minimize|recurrence|claims-evidence|figures> ...")
+		return errors.New("usage: patchline repo <doctor|fetch|analyze|inventory|baseline|playbook|propose|compare|proposal-minimize|replay|suppressions|why-now|changes|hook|offline|notify-summary|minimize|recurrence|claims-evidence|figures> ...")
 	}
 	switch args[0] {
 	case "doctor":
@@ -744,6 +745,8 @@ func repoCommand(args []string) error {
 		return repoInventory(args[1:])
 	case "baseline":
 		return repoBaseline(args[1:])
+	case "playbook":
+		return repoPlaybook(args[1:])
 	case "propose":
 		return repoPropose(args[1:])
 	case "compare":
@@ -4526,6 +4529,45 @@ func repoBaseline(args []string) error {
 	}
 	for _, command := range report.NativeChecks {
 		fmt.Printf("  native: %s # %s\n", command.Command, command.Reason)
+	}
+	return nil
+}
+
+func repoPlaybook(args []string) error {
+	fs := flag.NewFlagSet("repo playbook", flag.ContinueOnError)
+	fs.SetOutput(ioDiscard{})
+	baselinePath := fs.String("baseline", "", "baseline directory or baseline.json")
+	outPath := fs.String("out", "", "output directory")
+	jsonOut := fs.Bool("json", false, "emit JSON")
+	if err := fs.Parse(args); err != nil {
+		return err
+	}
+	if *baselinePath == "" || fs.NArg() != 0 {
+		return errors.New("usage: patchline repo playbook --baseline baseline-dir [--out dir] [--json]")
+	}
+	baseline, err := project.LoadBaseline(*baselinePath)
+	if err != nil {
+		return err
+	}
+	report := project.BuildRemediationPlaybook(baseline)
+	if *outPath != "" {
+		if err := project.WriteRemediationPlaybook(*outPath, report); err != nil {
+			return err
+		}
+	}
+	if *jsonOut {
+		return writeJSON(os.Stdout, report)
+	}
+	fmt.Printf("playbook baseline=%s playbooks=%d hazard_classes=%d rollback_points=%d owner_handoffs=%d hash=%s\n",
+		report.BaselineHash,
+		report.Summary.Playbooks,
+		report.Summary.HazardClasses,
+		report.Summary.RollbackPoints,
+		report.Summary.OwnerHandoffs,
+		report.Hash,
+	)
+	if *outPath != "" {
+		fmt.Printf("  out=%s\n", *outPath)
 	}
 	return nil
 }

@@ -1474,6 +1474,64 @@ func TestBaselineBuildsProvenanceSlices(t *testing.T) {
 	}
 }
 
+func TestRemediationPlaybookMapsHazardsToRunbookRollbackAndOwners(t *testing.T) {
+	root := t.TempDir()
+	writeFile(t, root, ".github/CODEOWNERS", "/db/migrate/ @org/db-team\n")
+	writeFile(t, root, "db/migrate/001_accounts.sql", "UPDATE accounts SET status = 'disabled';\n")
+	writeFile(t, root, "docs/inc-42.md", "Incident 42 accounts rollback runbook mentions accounts.")
+	inv, err := InventoryPath(InventoryOptions{Path: root})
+	if err != nil {
+		t.Fatal(err)
+	}
+	intakeReport, err := intake.Run(context.Background(), intake.Options{Path: root})
+	if err != nil {
+		t.Fatal(err)
+	}
+	baseline := Baseline(inv, inv.Facts, intakeReport)
+	if baseline.Summary.LockHazards == 0 || baseline.Summary.ProofMinimizations == 0 {
+		t.Fatalf("fixture should exercise hazard subreports: %#v", baseline.Summary)
+	}
+	report := BuildRemediationPlaybook(baseline)
+	again := BuildRemediationPlaybook(baseline)
+	if report.Hash == "" || report.Hash != again.Hash {
+		t.Fatalf("expected deterministic non-empty playbook hash: %q vs %q", report.Hash, again.Hash)
+	}
+	if report.Version != RemediationPlaybookVersion || report.Summary.Playbooks == 0 || report.Summary.RollbackPoints == 0 || report.Summary.OwnerHandoffs == 0 {
+		t.Fatalf("unexpected playbook summary: %#v", report)
+	}
+	var found RemediationPlaybook
+	for _, playbook := range report.Playbooks {
+		if playbook.Table == "accounts" {
+			found = playbook
+			break
+		}
+	}
+	if found.ID == "" {
+		t.Fatalf("missing accounts playbook: %#v", report.Playbooks)
+	}
+	for _, class := range []string{"broad-write", "transaction-boundary", "idempotency", "lock-concurrency", "proof-hole"} {
+		if !playbookHasHazardClass(found, class) {
+			t.Fatalf("expected hazard class %q in %#v", class, found.HazardClasses)
+		}
+	}
+	if !playbookHasOwner(found, "@org/db-team") {
+		t.Fatalf("expected CODEOWNERS handoff in %#v", found.OwnerHandoffs)
+	}
+	if !playbookHasRollbackStage(found, "before-execution") || !playbookHasRollbackStage(found, "during-execution") {
+		t.Fatalf("expected before and during rollback points: %#v", found.RollbackPoints)
+	}
+	if len(found.RunbookSteps) < 4 || !strings.Contains(report.Markdown, "owner handoffs") || !strings.Contains(report.Markdown, "Rollback points") {
+		t.Fatalf("expected markdown and runbook steps, got steps=%#v markdown=%s", found.RunbookSteps, report.Markdown)
+	}
+}
+
+func TestRemediationPlaybookHandlesEmptyBaseline(t *testing.T) {
+	report := BuildRemediationPlaybook(BaselineReport{Version: BaselineVersion, Hash: "baseline-empty"})
+	if report.Version != RemediationPlaybookVersion || report.Summary.Playbooks != 0 || report.Hash == "" {
+		t.Fatalf("unexpected empty playbook report: %#v", report)
+	}
+}
+
 func TestLoadInventoryAcceptsInventoryJSONPath(t *testing.T) {
 	root := t.TempDir()
 	writeFile(t, root, "db/migrate/001.sql", "update auth_user set is_active = false;")
@@ -2420,6 +2478,35 @@ func stringSliceContains(values []string, want string) bool {
 func hasDatalogRow(queries []DatalogQuery, name string) bool {
 	for _, query := range queries {
 		if query.Name == name && len(query.Rows) > 0 {
+			return true
+		}
+	}
+	return false
+}
+
+func playbookHasHazardClass(playbook RemediationPlaybook, class string) bool {
+	for _, hazard := range playbook.HazardClasses {
+		if hazard.Class == class {
+			return true
+		}
+	}
+	return false
+}
+
+func playbookHasOwner(playbook RemediationPlaybook, owner string) bool {
+	for _, handoff := range playbook.OwnerHandoffs {
+		for _, candidate := range handoff.Owners {
+			if candidate == owner {
+				return true
+			}
+		}
+	}
+	return false
+}
+
+func playbookHasRollbackStage(playbook RemediationPlaybook, stage string) bool {
+	for _, rollback := range playbook.RollbackPoints {
+		if rollback.Stage == stage {
 			return true
 		}
 	}
