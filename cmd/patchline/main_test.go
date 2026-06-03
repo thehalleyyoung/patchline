@@ -38,6 +38,7 @@ import (
 	"github.com/thehalleyyoung/patchline/internal/project"
 	"github.com/thehalleyyoung/patchline/internal/remediationcost"
 	"github.com/thehalleyyoung/patchline/internal/repairescrow"
+	"github.com/thehalleyyoung/patchline/internal/resilientanalysis"
 	"github.com/thehalleyyoung/patchline/internal/reviewerfairness"
 	"github.com/thehalleyyoung/patchline/internal/rollbackplanner"
 )
@@ -1756,6 +1757,99 @@ func TestOfflineDeployCommandWritesReports(t *testing.T) {
 	}
 	if stat, err := os.Stat(filepath.Join(out, "offline-deploy.md")); err != nil || stat.Size() == 0 {
 		t.Fatalf("expected offline-deploy.md to be written, stat=%#v err=%v", stat, err)
+	}
+}
+
+func TestResilientAnalysisCommandWritesReports(t *testing.T) {
+	root := t.TempDir()
+	writeMainTestFile(t, root, "evidence/runbook.md", "resilient distributed analysis runbook\n")
+	writeMainTestFile(t, root, "evidence/partition-log.jsonl", `{"partition":"az-a-az-c","state":"started"}
+{"partition":"az-a-az-c","state":"recovered"}
+`)
+	writeMainTestFile(t, root, "evidence/cache-manifest.md", "cache quarantine and rebuild evidence\n")
+	writeMainTestFile(t, root, "evidence/worker-loss.md", "worker-b lost, tenant task reassigned to worker-c\n")
+	writeMainTestFile(t, root, "results/accounts.json", `{"task":"accounts","risks":2}
+`)
+	writeMainTestFile(t, root, "results/tenant.json", `{"task":"tenant","risks":3}
+`)
+	writeMainTestFile(t, root, "cache/invoice.corrupt.json", `{"task":"invoice","risks":0,"stale":true}
+`)
+	writeMainTestFile(t, root, "cache/invoice.rebuilt.json", `{"task":"invoice","risks":4,"rebuilt":true}
+`)
+	accountsHash := mainTestFileHash(t, filepath.Join(root, "results/accounts.json"))
+	tenantHash := mainTestFileHash(t, filepath.Join(root, "results/tenant.json"))
+	invoiceHash := mainTestFileHash(t, filepath.Join(root, "cache/invoice.rebuilt.json"))
+	spec := resilientanalysis.Spec{
+		Version: resilientanalysis.SpecVersion,
+		Name:    "main test resilient analysis",
+		Claim:   "Patchline verifies resilient distributed analysis under worker loss, hash-detected cache corruption, cache quarantine, deterministic rebuild, and partial network partition recovery.",
+		Criteria: resilientanalysis.Criteria{
+			MinTasks:                             3,
+			MinWorkers:                           3,
+			RequireWorkerLossRecovery:            true,
+			RequireCacheQuarantine:               true,
+			RequireCacheRebuild:                  true,
+			RequirePartitionRecovery:             true,
+			RequireDeterministicLeases:           true,
+			RequireNoDuplicateAcceptedCompletion: true,
+			RequireEvidenceHashes:                true,
+		},
+		Workers: []resilientanalysis.Worker{
+			{ID: "worker-a", Zone: "az-a", InitiallyHealthy: true},
+			{ID: "worker-b", Zone: "az-b", InitiallyHealthy: true},
+			{ID: "worker-c", Zone: "az-c", InitiallyHealthy: true},
+		},
+		Tasks: []resilientanalysis.Task{
+			{ID: "accounts", Repo: "patchline/self", Subpath: "db/migrate", Shard: "00", ExpectedResultSHA256: accountsHash, EvidencePaths: []string{"evidence/runbook.md", "evidence/partition-log.jsonl"}},
+			{ID: "tenant", Repo: "patchline/self", Subpath: "services/tenant", Shard: "01", ExpectedResultSHA256: tenantHash, EvidencePaths: []string{"evidence/worker-loss.md"}},
+			{ID: "invoice", Repo: "patchline/self", Subpath: "services/billing", Shard: "02", ExpectedResultSHA256: invoiceHash, EvidencePaths: []string{"evidence/cache-manifest.md"}},
+		},
+		CacheArtifacts: []resilientanalysis.CacheArtifact{{
+			ID:             "invoice-cache",
+			TaskID:         "invoice",
+			Path:           "cache/invoice.corrupt.json",
+			ExpectedSHA256: invoiceHash,
+			RebuiltPath:    "cache/invoice.rebuilt.json",
+			EvidencePaths:  []string{"evidence/cache-manifest.md"},
+		}},
+		Partitions: []resilientanalysis.Partition{{
+			ID:              "az-a-az-c-partition",
+			AffectedWorkers: []string{"worker-a", "worker-c"},
+			StartTick:       2,
+			RecoveredTick:   5,
+			EvidencePaths:   []string{"evidence/partition-log.jsonl"},
+		}},
+		Events: []resilientanalysis.Event{
+			{ID: "lease-accounts-a1", Tick: 1, Kind: "lease_acquired", TaskID: "accounts", WorkerID: "worker-a", Attempt: 1, LeaseID: resilientanalysis.ExpectedLeaseID("accounts", 1, "worker-a")},
+			{ID: "lease-tenant-b1", Tick: 1, Kind: "lease_acquired", TaskID: "tenant", WorkerID: "worker-b", Attempt: 1, LeaseID: resilientanalysis.ExpectedLeaseID("tenant", 1, "worker-b")},
+			{ID: "lease-invoice-c1", Tick: 2, Kind: "lease_acquired", TaskID: "invoice", WorkerID: "worker-c", Attempt: 1, LeaseID: resilientanalysis.ExpectedLeaseID("invoice", 1, "worker-c")},
+			{ID: "worker-b-lost", Tick: 3, Kind: "worker_lost", WorkerID: "worker-b"},
+			{ID: "tenant-reassigned-c2", Tick: 4, Kind: "task_reassigned", TaskID: "tenant", WorkerID: "worker-c", Attempt: 2},
+			{ID: "lease-tenant-c2", Tick: 4, Kind: "lease_acquired", TaskID: "tenant", WorkerID: "worker-c", Attempt: 2, LeaseID: resilientanalysis.ExpectedLeaseID("tenant", 2, "worker-c")},
+			{ID: "invoice-cache-quarantined", Tick: 5, Kind: "cache_quarantined", ArtifactID: "invoice-cache"},
+			{ID: "invoice-cache-rebuilt", Tick: 6, Kind: "cache_rebuilt", ArtifactID: "invoice-cache"},
+			{ID: "complete-accounts", Tick: 6, Kind: "task_completed", TaskID: "accounts", WorkerID: "worker-a", Attempt: 1, ResultSHA256: accountsHash, Accepted: true},
+			{ID: "complete-tenant", Tick: 7, Kind: "task_completed", TaskID: "tenant", WorkerID: "worker-c", Attempt: 2, ResultSHA256: tenantHash, Accepted: true},
+			{ID: "complete-invoice", Tick: 7, Kind: "task_completed", TaskID: "invoice", WorkerID: "worker-c", Attempt: 1, ResultSHA256: invoiceHash, Accepted: true},
+		},
+		EvidencePaths: []string{"evidence/runbook.md", "evidence/partition-log.jsonl"},
+	}
+	specPath := filepath.Join(root, "resilient-analysis.json")
+	writeMainTestJSONFile(t, specPath, spec)
+	out := filepath.Join(t.TempDir(), "resilient-analysis")
+	if err := run([]string{"resilient-analysis", "--spec", specPath, "--root", root, "--out", out, "--json"}); err != nil {
+		t.Fatalf("resilient-analysis failed: %v", err)
+	}
+	var report resilientanalysis.Report
+	readMainTestJSON(t, filepath.Join(out, "resilient-analysis.json"), &report)
+	if !report.OK || report.Summary.CompletedTasks != 3 || report.Summary.RecoveredWorkerLossTasks != 1 || report.Summary.CorruptCaches != 1 || report.Summary.RebuiltCaches != 1 || report.Summary.RecoveredPartitions != 1 {
+		t.Fatalf("unexpected resilient analysis report: %#v", report)
+	}
+	if len(report.CacheArtifacts) != 1 || !report.CacheArtifacts[0].Corrupt || !report.CacheArtifacts[0].Quarantined || !report.CacheArtifacts[0].Rebuilt {
+		t.Fatalf("expected hash-detected cache corruption to be quarantined and rebuilt, got %#v", report.CacheArtifacts)
+	}
+	if stat, err := os.Stat(filepath.Join(out, "resilient-analysis.md")); err != nil || stat.Size() == 0 {
+		t.Fatalf("expected resilient-analysis.md to be written, stat=%#v err=%v", stat, err)
 	}
 }
 

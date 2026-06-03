@@ -1,0 +1,223 @@
+{
+  "version": "patchline.resilient-analysis/v1",
+  "name": "resilient distributed analysis gate",
+  "claim": "Patchline adds a resilient distributed analysis mode that is distinct from deterministic work scheduling: it replays real run evidence for worker loss, hash-detected cache corruption, quarantine and rebuild, deterministic leases, partial network partitions, and accepted task completions. The gate proves every task completes exactly once, a lost-worker task is reassigned and accepted on a surviving worker, a corrupt cache entry is detected by hashing committed fixture bytes and rebuilt before use, and tasks affected by a recovered partition still make accepted progress.",
+  "criteria": {
+    "min_tasks": 3,
+    "min_workers": 3,
+    "require_worker_loss_recovery": true,
+    "require_cache_quarantine": true,
+    "require_cache_rebuild": true,
+    "require_partition_recovery": true,
+    "require_deterministic_leases": true,
+    "require_no_duplicate_accepted_completion": true,
+    "require_evidence_hashes": true
+  },
+  "workers": [
+    {
+      "id": "worker-a",
+      "zone": "az-a",
+      "initially_healthy": true
+    },
+    {
+      "id": "worker-b",
+      "zone": "az-b",
+      "initially_healthy": true
+    },
+    {
+      "id": "worker-c",
+      "zone": "az-c",
+      "initially_healthy": true
+    }
+  ],
+  "tasks": [
+    {
+      "id": "accounts-backfill-risk",
+      "repo": "patchline/self",
+      "subpath": "examples/source-sql",
+      "shard": "00",
+      "expected_result_sha256": "sha256:3ce1d5a8ffea2f54e070f85e42a79d25498f8d4e20de1e7dce185e5d12eda60a",
+      "evidence_paths": [
+        "examples/resilient-analysis/evidence/runbook.md",
+        "examples/resilient-analysis/evidence/partition-log.jsonl"
+      ]
+    },
+    {
+      "id": "tenant-shard-sweep",
+      "repo": "patchline/self",
+      "subpath": "internal/project",
+      "shard": "01",
+      "expected_result_sha256": "sha256:484b736bb743723f58cf9a2f0b8d74ceacc5cfde507a02cffc3c02f872676782",
+      "evidence_paths": [
+        "examples/resilient-analysis/evidence/worker-loss-incident.md"
+      ]
+    },
+    {
+      "id": "invoice-delete-cache",
+      "repo": "patchline/self",
+      "subpath": "demos/billing",
+      "shard": "02",
+      "expected_result_sha256": "sha256:ba11e83d738be2c3fa464759cc564a27fd66e10bfd96c412b24f5b94c4ad241e",
+      "evidence_paths": [
+        "examples/resilient-analysis/evidence/cache-manifest.md"
+      ]
+    }
+  ],
+  "cache_artifacts": [
+    {
+      "id": "invoice-delete-cache-artifact",
+      "task_id": "invoice-delete-cache",
+      "path": "examples/resilient-analysis/cache/invoice-delete-cache.corrupt.json",
+      "expected_sha256": "sha256:ba11e83d738be2c3fa464759cc564a27fd66e10bfd96c412b24f5b94c4ad241e",
+      "rebuilt_path": "examples/resilient-analysis/cache/invoice-delete-cache.rebuilt.json",
+      "evidence_paths": [
+        "examples/resilient-analysis/evidence/cache-manifest.md"
+      ]
+    }
+  ],
+  "partitions": [
+    {
+      "id": "az-a-az-c-partition",
+      "affected_workers": [
+        "worker-a",
+        "worker-c"
+      ],
+      "start_tick": 2,
+      "recovered_tick": 5,
+      "evidence_paths": [
+        "examples/resilient-analysis/evidence/partition-log.jsonl"
+      ]
+    }
+  ],
+  "events": [
+    {
+      "id": "lease-accounts-a1",
+      "tick": 1,
+      "kind": "lease_acquired",
+      "task_id": "accounts-backfill-risk",
+      "worker_id": "worker-a",
+      "attempt": 1,
+      "lease_id": "lease:accounts-backfill-risk:01:worker-a",
+      "evidence_paths": [
+        "examples/resilient-analysis/evidence/runbook.md"
+      ]
+    },
+    {
+      "id": "lease-tenant-b1",
+      "tick": 1,
+      "kind": "lease_acquired",
+      "task_id": "tenant-shard-sweep",
+      "worker_id": "worker-b",
+      "attempt": 1,
+      "lease_id": "lease:tenant-shard-sweep:01:worker-b",
+      "evidence_paths": [
+        "examples/resilient-analysis/evidence/worker-loss-incident.md"
+      ]
+    },
+    {
+      "id": "lease-invoice-c1",
+      "tick": 2,
+      "kind": "lease_acquired",
+      "task_id": "invoice-delete-cache",
+      "worker_id": "worker-c",
+      "attempt": 1,
+      "lease_id": "lease:invoice-delete-cache:01:worker-c",
+      "evidence_paths": [
+        "examples/resilient-analysis/evidence/cache-manifest.md"
+      ]
+    },
+    {
+      "id": "worker-b-lost",
+      "tick": 3,
+      "kind": "worker_lost",
+      "worker_id": "worker-b",
+      "evidence_paths": [
+        "examples/resilient-analysis/evidence/worker-loss-incident.md"
+      ]
+    },
+    {
+      "id": "tenant-reassigned-c2",
+      "tick": 4,
+      "kind": "task_reassigned",
+      "task_id": "tenant-shard-sweep",
+      "worker_id": "worker-c",
+      "attempt": 2,
+      "evidence_paths": [
+        "examples/resilient-analysis/evidence/worker-loss-incident.md"
+      ]
+    },
+    {
+      "id": "lease-tenant-c2",
+      "tick": 4,
+      "kind": "lease_acquired",
+      "task_id": "tenant-shard-sweep",
+      "worker_id": "worker-c",
+      "attempt": 2,
+      "lease_id": "lease:tenant-shard-sweep:02:worker-c",
+      "evidence_paths": [
+        "examples/resilient-analysis/evidence/worker-loss-incident.md"
+      ]
+    },
+    {
+      "id": "invoice-cache-quarantined",
+      "tick": 5,
+      "kind": "cache_quarantined",
+      "artifact_id": "invoice-delete-cache-artifact",
+      "evidence_paths": [
+        "examples/resilient-analysis/evidence/cache-manifest.md"
+      ]
+    },
+    {
+      "id": "invoice-cache-rebuilt",
+      "tick": 6,
+      "kind": "cache_rebuilt",
+      "artifact_id": "invoice-delete-cache-artifact",
+      "evidence_paths": [
+        "examples/resilient-analysis/evidence/cache-manifest.md"
+      ]
+    },
+    {
+      "id": "complete-accounts",
+      "tick": 6,
+      "kind": "task_completed",
+      "task_id": "accounts-backfill-risk",
+      "worker_id": "worker-a",
+      "attempt": 1,
+      "result_sha256": "sha256:3ce1d5a8ffea2f54e070f85e42a79d25498f8d4e20de1e7dce185e5d12eda60a",
+      "accepted": true,
+      "evidence_paths": [
+        "examples/resilient-analysis/results/accounts-backfill-risk.json"
+      ]
+    },
+    {
+      "id": "complete-tenant",
+      "tick": 7,
+      "kind": "task_completed",
+      "task_id": "tenant-shard-sweep",
+      "worker_id": "worker-c",
+      "attempt": 2,
+      "result_sha256": "sha256:484b736bb743723f58cf9a2f0b8d74ceacc5cfde507a02cffc3c02f872676782",
+      "accepted": true,
+      "evidence_paths": [
+        "examples/resilient-analysis/results/tenant-shard-sweep.json"
+      ]
+    },
+    {
+      "id": "complete-invoice",
+      "tick": 7,
+      "kind": "task_completed",
+      "task_id": "invoice-delete-cache",
+      "worker_id": "worker-c",
+      "attempt": 1,
+      "result_sha256": "sha256:ba11e83d738be2c3fa464759cc564a27fd66e10bfd96c412b24f5b94c4ad241e",
+      "accepted": true,
+      "evidence_paths": [
+        "examples/resilient-analysis/cache/invoice-delete-cache.rebuilt.json"
+      ]
+    }
+  ],
+  "evidence_paths": [
+    "examples/resilient-analysis/evidence/runbook.md",
+    "examples/resilient-analysis/evidence/partition-log.jsonl"
+  ]
+}

@@ -159,6 +159,8 @@ Open textbook companion (`make open-textbook-companion-gate`) proves executable 
 
 Run `offline-deploy --spec examples/offline-deploy.json` to verify regulated edge/offline deployments with no network, no telemetry, pinned update bundles, local rollback evidence, and deterministic hashes; reproduce it with `make offline-deploy-gate`.
 
+Run `resilient-analysis --spec examples/resilient-analysis.json` to replay distributed analysis under worker loss, cache corruption, and partial network partitions; reproduce it with `make resilient-analysis-gate`.
+
 Run `explainability-audit --spec examples/explainability-audit.json` to verify independent reviewers agree evidence trails support stated verdicts, with hash-mismatch and disagreement negative controls; reproduce it with `make explainability-audit-gate`.
 
 Run `change-management-verify --spec <spec>` to prove organizational approvals are bound to passed Patchline gates, hash-pinned reports, rollback evidence, and emergency expiry; reproduce it with `make change-management-integration-gate`.

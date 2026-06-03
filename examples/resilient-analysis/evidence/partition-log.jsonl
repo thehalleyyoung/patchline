@@ -1,0 +1,2 @@
+{"tick":2,"partition":"az-a-az-c-partition","affected_workers":["worker-a","worker-c"],"state":"started"}
+{"tick":5,"partition":"az-a-az-c-partition","affected_workers":["worker-a","worker-c"],"state":"recovered"}

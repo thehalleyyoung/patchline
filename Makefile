@@ -14,6 +14,7 @@
 .PHONY: workforce-impact-study-gate
 .PHONY: open-textbook-companion-gate
 .PHONY: offline-deploy-gate
+.PHONY: resilient-analysis-gate
 
 build:
 	go build -o bin/patchline ./cmd/patchline
@@ -1215,6 +1216,9 @@ open-textbook-companion-gate:
 
 offline-deploy-gate:
 	bash scripts/offline-deploy-gate.sh
+
+resilient-analysis-gate:
+	bash scripts/resilient-analysis-gate.sh
 
 industry-working-group-gate:
 	bash scripts/industry-working-group-gate.sh
