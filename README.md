@@ -149,6 +149,8 @@ Run `contributor-apprenticeship --spec examples/contributor-apprenticeship.json`
 
 Reviewer skills taxonomy (`make skills-taxonomy-gate`) maps each hazard class to concepts, prerequisites, assessment prompts, evidence, gates, negative controls, and tutorial/certification crosswalks.
 
+Localized teaching examples (`make localized-teaching-examples-gate`) prove translated lessons preserve byte-identical technical tokens, cite evidence, cover accessibility checks, and fail negative controls.
+
 Run `explainability-audit --spec examples/explainability-audit.json` to verify independent reviewers agree evidence trails support stated verdicts, with hash-mismatch and disagreement negative controls; reproduce it with `make explainability-audit-gate`.
 
 Run `change-management-verify --spec <spec>` to prove organizational approvals are bound to passed Patchline gates, hash-pinned reports, rollback evidence, and emergency expiry; reproduce it with `make change-management-integration-gate`.

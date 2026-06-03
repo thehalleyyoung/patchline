@@ -1299,6 +1299,115 @@ func mainSkillHazard(hazard string, audiences []string, gate, docPath, fixturePa
 	}
 }
 
+func TestLocalizedTeachingExamplesCommandWritesReports(t *testing.T) {
+	root := t.TempDir()
+	writeMainTestFile(t, root, "Makefile", "localized-teaching-examples-gate:\n\tbash scripts/localized-teaching-examples-gate.sh\n\n")
+	writeMainTestFile(t, root, "scripts/localized-teaching-examples-gate.sh", "#!/usr/bin/env bash\nset -euo pipefail\n")
+	writeMainTestFile(t, root, "docs/classroom-lab-kits.md", "Classroom lab kit evidence.\n")
+	writeMainTestFile(t, root, "docs/db-semantics-reproducibility.md", "Database semantics evidence.\n")
+	writeMainTestFile(t, root, "docs/a11y-i18n-output.md", "Accessibility and i18n evidence.\n")
+	writeMainTestFile(t, root, "docs/accessibility-conformance.md", "WCAG conformance evidence.\n")
+	writeMainTestFile(t, root, "docs/localized-teaching-examples.md", "Localized teaching examples evidence.\n")
+	specPath := filepath.Join(root, "localized-teaching-examples.json")
+	writeMainTestJSONFile(t, specPath, education.LocalizedTeachingSpec{
+		Version: education.LocalizedTeachingSpecVersion,
+		Name:    "main test localized teaching examples",
+		Claim:   "Patchline validates localized teaching examples by preserving byte-identical commands and identifiers across translated lessons, hashing real evidence, checking accessibility requirements, and rejecting negative controls.",
+		Criteria: education.LocalizedTeachingCriteria{
+			RequiredLocales:                      []string{"es", "fr"},
+			RequiredAudiences:                    []string{"app-developer", "dba"},
+			RequiredAccessibilityChecks:          []string{"plain-language", "alt-text", "reading-order"},
+			MinExamples:                          2,
+			MinTranslationsPerExample:            2,
+			MinConceptsPerExample:                2,
+			MinTechnicalTermsPerTranslation:      3,
+			MinEquivalenceChecksPerTranslation:   2,
+			MinAccessibilityChecksPerTranslation: 3,
+			RequireTechnicalTerms:                true,
+			RequireEquivalenceChecks:             true,
+			RequireAccessibilityChecks:           true,
+			RequireReproducibleCommand:           true,
+			RequireNegativeControl:               true,
+		},
+		Examples: []education.LocalizedExample{
+			mainLocalizedExample("app", "app-developer", "make classroom-lab-kits-gate", "risk_id", "evidence_hash", "docs/classroom-lab-kits.md"),
+			mainLocalizedExample("dba", "dba", "make db-semantics-reproducibility-gate", "engine_version", "rollback_feasibility", "docs/db-semantics-reproducibility.md"),
+		},
+	})
+	out := filepath.Join(t.TempDir(), "localized-teaching-examples")
+	if err := run([]string{"localized-teaching-examples", "--spec", specPath, "--root", root, "--out", out, "--json"}); err != nil {
+		t.Fatalf("localized-teaching-examples failed: %v", err)
+	}
+	var report education.LocalizedTeachingReport
+	readMainTestJSON(t, filepath.Join(out, "localized-teaching-examples.json"), &report)
+	if !report.OK || report.Summary.Examples != 2 || report.Summary.Translations != 4 || report.Summary.TechnicalTerms != 12 || report.Summary.AccessibilityChecks != 12 {
+		t.Fatalf("unexpected localized teaching report: %#v", report)
+	}
+	if report.Summary.EvidenceArtifacts != 20 || len(report.Examples[0].Translations[0].Evidence[0].SHA256) != 64 {
+		t.Fatalf("expected evidence hashes, got %#v", report.Summary)
+	}
+	if stat, err := os.Stat(filepath.Join(out, "localized-teaching-examples.md")); err != nil || stat.Size() == 0 {
+		t.Fatalf("expected localized-teaching-examples.md to be written, stat=%#v err=%v", stat, err)
+	}
+}
+
+func mainLocalizedExample(id, audience, command, firstIdentifier, secondIdentifier, evidencePath string) education.LocalizedExample {
+	sourceText := "Run `" + command + "` and keep `" + firstIdentifier + "` plus `" + secondIdentifier + "` visible in the Patchline lesson."
+	return education.LocalizedExample{
+		ID:                id,
+		Audience:          audience,
+		SourceLocale:      "en",
+		Title:             id + " localized lesson",
+		SourceText:        sourceText,
+		Concepts:          []string{"technical equivalence", "accessible teaching"},
+		EvidencePaths:     []string{evidencePath, "docs/a11y-i18n-output.md"},
+		ReproduceCommands: []string{"make localized-teaching-examples-gate", "make " + strings.TrimPrefix(command, "make ")},
+		Translations: []education.LocalizedTranslation{
+			mainLocalizedTranslation("es", command, firstIdentifier, secondIdentifier, evidencePath),
+			mainLocalizedTranslation("fr", command, firstIdentifier, secondIdentifier, evidencePath),
+		},
+		NegativeControls: []education.LocalizedControl{{
+			ID:                     "translate-token",
+			Mutation:               "translate a preserved identifier",
+			ExpectedCounterexample: "missing preserved technical token",
+		}},
+	}
+}
+
+func mainLocalizedTranslation(locale, command, firstIdentifier, secondIdentifier, evidencePath string) education.LocalizedTranslation {
+	joiner := "y"
+	text := "Ejecute `" + command + "` y mantenga `" + firstIdentifier + "` y `" + secondIdentifier + "` visibles en la leccion Patchline."
+	if locale == "fr" {
+		joiner = "et"
+		text = "Executez `" + command + "` et gardez `" + firstIdentifier + "` et `" + secondIdentifier + "` visibles dans la lecon Patchline."
+	}
+	return education.LocalizedTranslation{
+		Locale: locale,
+		Title:  locale + " localized lesson",
+		Text:   text,
+		TechnicalTerms: []education.LocalizedTechnicalTerm{{
+			ID: "patchline", Source: "Patchline", Translation: "Patchline", MustPreserve: true,
+		}, {
+			ID: "first-identifier", Source: firstIdentifier, Translation: firstIdentifier, MustPreserve: true,
+		}, {
+			ID: "second-identifier", Source: secondIdentifier, Translation: secondIdentifier, MustPreserve: true,
+		}},
+		EquivalenceChecks: []education.LocalizedEquivalenceCheck{{
+			ID: "command-preserved", Kind: "command-preservation", SourceQuote: "`" + command + "`", TranslatedQuote: "`" + command + "`", PreservedTokens: []string{command},
+		}, {
+			ID: "identifiers-preserved", Kind: "identifier-preservation", SourceQuote: "`" + firstIdentifier + "` plus `" + secondIdentifier + "`", TranslatedQuote: "`" + firstIdentifier + "` " + joiner + " `" + secondIdentifier + "`", PreservedTokens: []string{firstIdentifier, secondIdentifier},
+		}},
+		AccessibilityChecks: []education.LocalizedAccessibilityCheck{{
+			ID: "plain-language", Type: "plain-language", Requirement: "plain language", EvidencePaths: []string{"docs/a11y-i18n-output.md"},
+		}, {
+			ID: "alt-text", Type: "alt-text", Requirement: "alt text names the command", EvidencePaths: []string{"docs/accessibility-conformance.md"},
+		}, {
+			ID: "reading-order", Type: "reading-order", Requirement: "command appears before decision", EvidencePaths: []string{"docs/localized-teaching-examples.md"},
+		}},
+		EvidencePaths: []string{evidencePath},
+	}
+}
+
 func TestReviewerFairnessAuditCommandWritesReports(t *testing.T) {
 	root := t.TempDir()
 	writeMainTestFile(t, root, "docs/acceptance-study.md", "paired reviews with adjudicated false positives\n")

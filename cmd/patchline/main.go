@@ -462,6 +462,8 @@ func run(args []string) error {
 		return contributorApprenticeshipCommand(args[1:], hasFlag(args[1:], "--json"))
 	case "skills-taxonomy":
 		return skillsTaxonomyCommand(args[1:], hasFlag(args[1:], "--json"))
+	case "localized-teaching-examples":
+		return localizedTeachingExamplesCommand(args[1:], hasFlag(args[1:], "--json"))
 	case "reviewer-fairness-audit":
 		return reviewerFairnessAuditCommand(args[1:], hasFlag(args[1:], "--json"))
 	case "change-management-verify":
@@ -632,6 +634,7 @@ Usage:
   patchline longitudinal-education-study --spec longitudinal-education-study.json --root repo-root --out dir [--json]
   patchline contributor-apprenticeship --spec contributor-apprenticeship.json --root repo-root --out dir [--json]
   patchline skills-taxonomy --spec skills-taxonomy.json --root repo-root --out dir [--json]
+  patchline localized-teaching-examples --spec localized-teaching-examples.json --root repo-root --out dir [--json]
   patchline reviewer-fairness-audit --spec reviewer-fairness-audit.json --root repo-root --out dir [--json]
   patchline change-management-verify --spec change-management.json --root repo-root --out dir [--json]
   patchline governance-risk-register --spec governance-risk-register.json --root repo-root --out dir [--json]
@@ -15282,6 +15285,39 @@ func skillsTaxonomyCommand(args []string, jsonOut bool) error {
 		return writeJSON(os.Stdout, report)
 	}
 	fmt.Printf("wrote skills taxonomy ok=%t hazard_classes=%d concepts=%d audiences=%d gate_backed=%d evidence=%d counterexamples=%d to %s\n", report.OK, report.Summary.HazardClasses, report.Summary.Concepts, report.Summary.ReviewerAudiences, report.Summary.GateBackedHazards, report.Summary.EvidenceArtifacts, report.Summary.Counterexamples, outPath)
+	return nil
+}
+
+func localizedTeachingExamplesCommand(args []string, jsonOut bool) error {
+	usage := "patchline localized-teaching-examples --spec localized-teaching-examples.json --root repo-root --out <dir> [--json]"
+	specPath, outPath, err := feedbackSpecOut(args, usage)
+	if err != nil {
+		return err
+	}
+	rootPath := "."
+	if value, ok := flagValue(args, "--root"); ok && value != "" {
+		rootPath = value
+	}
+	file, err := os.Open(specPath)
+	if err != nil {
+		return err
+	}
+	defer file.Close()
+	spec, err := education.ReadLocalizedTeachingSpec(file)
+	if err != nil {
+		return err
+	}
+	report, err := education.BuildLocalizedTeachingReport(spec, rootPath)
+	if err != nil {
+		return err
+	}
+	if err := education.WriteLocalizedTeachingArtifacts(outPath, report); err != nil {
+		return err
+	}
+	if jsonOut {
+		return writeJSON(os.Stdout, report)
+	}
+	fmt.Printf("wrote localized teaching examples ok=%t examples=%d translations=%d locales=%d audiences=%d terms=%d accessibility=%d counterexamples=%d to %s\n", report.OK, report.Summary.Examples, report.Summary.Translations, report.Summary.LocalesCovered, report.Summary.AudiencesCovered, report.Summary.TechnicalTerms, report.Summary.AccessibilityChecks, report.Summary.Counterexamples, outPath)
 	return nil
 }
 

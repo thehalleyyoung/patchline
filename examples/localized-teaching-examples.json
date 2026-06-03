@@ -1,0 +1,389 @@
+{
+  "version": "patchline.localized-teaching/v1",
+  "name": "Patchline localized teaching examples",
+  "claim": "Patchline localized teaching examples make migration-safety education global without weakening the evidence contract: every translation preserves byte-identical commands and identifiers, cites real evidence files, covers accessibility requirements, and includes a negative control that proves translated or inaccessible material fails deterministically.",
+  "criteria": {
+    "required_locales": [
+      "es",
+      "fr"
+    ],
+    "required_audiences": [
+      "app-developer",
+      "dba"
+    ],
+    "required_accessibility_checks": [
+      "plain-language",
+      "alt-text",
+      "reading-order"
+    ],
+    "min_examples": 2,
+    "min_translations_per_example": 2,
+    "min_concepts_per_example": 2,
+    "min_technical_terms_per_translation": 3,
+    "min_equivalence_checks_per_translation": 2,
+    "min_accessibility_checks_per_translation": 3,
+    "require_technical_terms": true,
+    "require_equivalence_checks": true,
+    "require_accessibility_checks": true,
+    "require_reproducible_command": true,
+    "require_negative_control": true
+  },
+  "examples": [
+    {
+      "id": "app-developer-backfill-lab",
+      "audience": "app-developer",
+      "source_locale": "en",
+      "title": "Backfill lab review",
+      "source_text": "Run `make classroom-lab-kits-gate` before approving a NOT NULL backfill lesson. The Patchline report must keep `risk_id` and `evidence_hash` visible so learners can trace the gate.",
+      "concepts": [
+        "backfill completeness",
+        "evidence-hash traceability"
+      ],
+      "evidence_paths": [
+        "docs/classroom-lab-kits.md",
+        "docs/a11y-i18n-output.md"
+      ],
+      "reproduce_commands": [
+        "make localized-teaching-examples-gate",
+        "make classroom-lab-kits-gate"
+      ],
+      "translations": [
+        {
+          "locale": "es",
+          "title": "Revision de laboratorio de backfill",
+          "text": "Ejecute `make classroom-lab-kits-gate` antes de aprobar una leccion de backfill NOT NULL. El informe Patchline debe mantener `risk_id` y `evidence_hash` visibles para que estudiantes puedan trazar el gate.",
+          "technical_terms": [
+            {
+              "id": "patchline",
+              "source": "Patchline",
+              "translation": "Patchline",
+              "must_preserve": true
+            },
+            {
+              "id": "not-null",
+              "source": "NOT NULL",
+              "translation": "NOT NULL",
+              "must_preserve": true
+            },
+            {
+              "id": "risk-id",
+              "source": "risk_id",
+              "translation": "risk_id",
+              "must_preserve": true
+            }
+          ],
+          "equivalence_checks": [
+            {
+              "id": "command-preserved",
+              "kind": "command-preservation",
+              "source_quote": "`make classroom-lab-kits-gate`",
+              "translated_quote": "`make classroom-lab-kits-gate`",
+              "preserved_tokens": [
+                "make classroom-lab-kits-gate"
+              ]
+            },
+            {
+              "id": "evidence-identifiers-preserved",
+              "kind": "identifier-preservation",
+              "source_quote": "`risk_id` and `evidence_hash`",
+              "translated_quote": "`risk_id` y `evidence_hash`",
+              "preserved_tokens": [
+                "risk_id",
+                "evidence_hash"
+              ]
+            }
+          ],
+          "accessibility_checks": [
+            {
+              "id": "plain-language",
+              "type": "plain-language",
+              "requirement": "Sentences keep the action, command, and evidence obligation explicit.",
+              "evidence_paths": [
+                "docs/a11y-i18n-output.md"
+              ]
+            },
+            {
+              "id": "alt-text",
+              "type": "alt-text",
+              "requirement": "Any screenshot alt text names the gate command and failing control.",
+              "evidence_paths": [
+                "docs/accessibility-conformance.md"
+              ]
+            },
+            {
+              "id": "reading-order",
+              "type": "reading-order",
+              "requirement": "The localized lesson preserves command-before-decision reading order.",
+              "evidence_paths": [
+                "docs/localized-teaching-examples.md"
+              ]
+            }
+          ],
+          "evidence_paths": [
+            "docs/classroom-lab-kits.md"
+          ]
+        },
+        {
+          "locale": "fr",
+          "title": "Revue de laboratoire de backfill",
+          "text": "Executez `make classroom-lab-kits-gate` avant d'approuver une lecon de backfill NOT NULL. Le rapport Patchline doit garder `risk_id` et `evidence_hash` visibles afin que les apprenants puissent tracer le gate.",
+          "technical_terms": [
+            {
+              "id": "patchline",
+              "source": "Patchline",
+              "translation": "Patchline",
+              "must_preserve": true
+            },
+            {
+              "id": "not-null",
+              "source": "NOT NULL",
+              "translation": "NOT NULL",
+              "must_preserve": true
+            },
+            {
+              "id": "risk-id",
+              "source": "risk_id",
+              "translation": "risk_id",
+              "must_preserve": true
+            }
+          ],
+          "equivalence_checks": [
+            {
+              "id": "command-preserved",
+              "kind": "command-preservation",
+              "source_quote": "`make classroom-lab-kits-gate`",
+              "translated_quote": "`make classroom-lab-kits-gate`",
+              "preserved_tokens": [
+                "make classroom-lab-kits-gate"
+              ]
+            },
+            {
+              "id": "evidence-identifiers-preserved",
+              "kind": "identifier-preservation",
+              "source_quote": "`risk_id` and `evidence_hash`",
+              "translated_quote": "`risk_id` et `evidence_hash`",
+              "preserved_tokens": [
+                "risk_id",
+                "evidence_hash"
+              ]
+            }
+          ],
+          "accessibility_checks": [
+            {
+              "id": "plain-language",
+              "type": "plain-language",
+              "requirement": "Sentences keep the action, command, and evidence obligation explicit.",
+              "evidence_paths": [
+                "docs/a11y-i18n-output.md"
+              ]
+            },
+            {
+              "id": "alt-text",
+              "type": "alt-text",
+              "requirement": "Any screenshot alt text names the gate command and failing control.",
+              "evidence_paths": [
+                "docs/accessibility-conformance.md"
+              ]
+            },
+            {
+              "id": "reading-order",
+              "type": "reading-order",
+              "requirement": "The localized lesson preserves command-before-decision reading order.",
+              "evidence_paths": [
+                "docs/localized-teaching-examples.md"
+              ]
+            }
+          ],
+          "evidence_paths": [
+            "docs/classroom-lab-kits.md"
+          ]
+        }
+      ],
+      "negative_controls": [
+        {
+          "id": "translate-risk-id",
+          "mutation": "Translate risk_id to riesgo_id in the localized text.",
+          "expected_counterexample": "missing_preserved_technical_token and missing_preserved_equivalence_token"
+        }
+      ]
+    },
+    {
+      "id": "dba-engine-semantics-lab",
+      "audience": "dba",
+      "source_locale": "en",
+      "title": "Engine semantics lab review",
+      "source_text": "Use `make db-semantics-reproducibility-gate` to compare PostgreSQL and MySQL lock semantics. Keep `engine_version` and `rollback_feasibility` unchanged so the database lesson remains auditable.",
+      "concepts": [
+        "engine-version semantics",
+        "rollback feasibility"
+      ],
+      "evidence_paths": [
+        "docs/db-semantics-reproducibility.md",
+        "docs/accessibility-conformance.md"
+      ],
+      "reproduce_commands": [
+        "make localized-teaching-examples-gate",
+        "make db-semantics-reproducibility-gate"
+      ],
+      "translations": [
+        {
+          "locale": "es",
+          "title": "Revision de semantica de motor",
+          "text": "Use `make db-semantics-reproducibility-gate` para comparar semantica de bloqueos PostgreSQL y MySQL. Mantenga `engine_version` y `rollback_feasibility` sin cambios para que la leccion de base de datos siga siendo auditable.",
+          "technical_terms": [
+            {
+              "id": "postgresql",
+              "source": "PostgreSQL",
+              "translation": "PostgreSQL",
+              "must_preserve": true
+            },
+            {
+              "id": "mysql",
+              "source": "MySQL",
+              "translation": "MySQL",
+              "must_preserve": true
+            },
+            {
+              "id": "engine-version",
+              "source": "engine_version",
+              "translation": "engine_version",
+              "must_preserve": true
+            }
+          ],
+          "equivalence_checks": [
+            {
+              "id": "command-preserved",
+              "kind": "command-preservation",
+              "source_quote": "`make db-semantics-reproducibility-gate`",
+              "translated_quote": "`make db-semantics-reproducibility-gate`",
+              "preserved_tokens": [
+                "make db-semantics-reproducibility-gate"
+              ]
+            },
+            {
+              "id": "engine-identifiers-preserved",
+              "kind": "identifier-preservation",
+              "source_quote": "`engine_version` and `rollback_feasibility`",
+              "translated_quote": "`engine_version` y `rollback_feasibility`",
+              "preserved_tokens": [
+                "engine_version",
+                "rollback_feasibility"
+              ]
+            }
+          ],
+          "accessibility_checks": [
+            {
+              "id": "plain-language",
+              "type": "plain-language",
+              "requirement": "The lesson states the command, engines, and rollback obligation plainly.",
+              "evidence_paths": [
+                "docs/a11y-i18n-output.md"
+              ]
+            },
+            {
+              "id": "alt-text",
+              "type": "alt-text",
+              "requirement": "Any diagram alt text names the two engines and lock-semantics comparison.",
+              "evidence_paths": [
+                "docs/accessibility-conformance.md"
+              ]
+            },
+            {
+              "id": "reading-order",
+              "type": "reading-order",
+              "requirement": "The translation preserves compare-before-decision reading order.",
+              "evidence_paths": [
+                "docs/localized-teaching-examples.md"
+              ]
+            }
+          ],
+          "evidence_paths": [
+            "docs/db-semantics-reproducibility.md"
+          ]
+        },
+        {
+          "locale": "fr",
+          "title": "Revue de semantique moteur",
+          "text": "Utilisez `make db-semantics-reproducibility-gate` pour comparer la semantique des verrous PostgreSQL et MySQL. Gardez `engine_version` et `rollback_feasibility` inchanges afin que la lecon de base de donnees reste auditable.",
+          "technical_terms": [
+            {
+              "id": "postgresql",
+              "source": "PostgreSQL",
+              "translation": "PostgreSQL",
+              "must_preserve": true
+            },
+            {
+              "id": "mysql",
+              "source": "MySQL",
+              "translation": "MySQL",
+              "must_preserve": true
+            },
+            {
+              "id": "engine-version",
+              "source": "engine_version",
+              "translation": "engine_version",
+              "must_preserve": true
+            }
+          ],
+          "equivalence_checks": [
+            {
+              "id": "command-preserved",
+              "kind": "command-preservation",
+              "source_quote": "`make db-semantics-reproducibility-gate`",
+              "translated_quote": "`make db-semantics-reproducibility-gate`",
+              "preserved_tokens": [
+                "make db-semantics-reproducibility-gate"
+              ]
+            },
+            {
+              "id": "engine-identifiers-preserved",
+              "kind": "identifier-preservation",
+              "source_quote": "`engine_version` and `rollback_feasibility`",
+              "translated_quote": "`engine_version` et `rollback_feasibility`",
+              "preserved_tokens": [
+                "engine_version",
+                "rollback_feasibility"
+              ]
+            }
+          ],
+          "accessibility_checks": [
+            {
+              "id": "plain-language",
+              "type": "plain-language",
+              "requirement": "The lesson states the command, engines, and rollback obligation plainly.",
+              "evidence_paths": [
+                "docs/a11y-i18n-output.md"
+              ]
+            },
+            {
+              "id": "alt-text",
+              "type": "alt-text",
+              "requirement": "Any diagram alt text names the two engines and lock-semantics comparison.",
+              "evidence_paths": [
+                "docs/accessibility-conformance.md"
+              ]
+            },
+            {
+              "id": "reading-order",
+              "type": "reading-order",
+              "requirement": "The translation preserves compare-before-decision reading order.",
+              "evidence_paths": [
+                "docs/localized-teaching-examples.md"
+              ]
+            }
+          ],
+          "evidence_paths": [
+            "docs/db-semantics-reproducibility.md"
+          ]
+        }
+      ],
+      "negative_controls": [
+        {
+          "id": "drop-reading-order",
+          "mutation": "Remove the reading-order accessibility check from one translation.",
+          "expected_counterexample": "missing_required_accessibility_check"
+        }
+      ]
+    }
+  ]
+}
