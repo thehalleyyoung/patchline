@@ -15303,7 +15303,7 @@ func misuseResistanceCommand(args []string, jsonOut bool) error {
 
 func feedbackCommand(args []string) error {
 	if len(args) == 0 {
-		return errors.New("usage: patchline feedback <ingest|threshold-update|counterfactual-log|online-eval|active-learning-queue|policy-freeze|calibration-monitor|retention-lifecycle|trust-regression|methodology-report> ...")
+		return errors.New("usage: patchline feedback <ingest|threshold-update|counterfactual-log|online-eval|active-learning-queue|policy-freeze|calibration-monitor|retention-lifecycle|trust-regression|methodology-report|detector-deprecation> ...")
 	}
 	switch args[0] {
 	case "ingest":
@@ -15333,6 +15333,8 @@ func feedbackCommand(args []string) error {
 		return feedbackTrustRegression(args[1:], hasFlag(args[1:], "--json"))
 	case "methodology-report":
 		return feedbackMethodologyReport(args[1:], hasFlag(args[1:], "--json"))
+	case "detector-deprecation":
+		return feedbackDetectorDeprecation(args[1:], hasFlag(args[1:], "--json"))
 	default:
 		return fmt.Errorf("unknown feedback command %q", args[0])
 	}
@@ -15717,6 +15719,39 @@ func feedbackMethodologyReport(args []string, jsonOut bool) error {
 	return nil
 }
 
+func feedbackDetectorDeprecation(args []string, jsonOut bool) error {
+	feedbackPath, specPath, outPath, err := feedbackFeedbackSpecOut(args, "patchline feedback detector-deprecation --feedback live-feedback.json --spec detector-deprecation.json --out <dir> [--json]")
+	if err != nil {
+		return err
+	}
+	report, err := readLiveFeedbackReport(feedbackPath)
+	if err != nil {
+		return err
+	}
+	spec, err := readDetectorDeprecationSpec(specPath)
+	if err != nil {
+		return err
+	}
+	deprecation, err := feedback.ComputeDetectorDeprecation(report, spec)
+	if err != nil {
+		return err
+	}
+	if err := os.MkdirAll(outPath, 0o755); err != nil {
+		return err
+	}
+	if err := writeJSONArtifact(filepath.Join(outPath, "detector-deprecation.json"), deprecation); err != nil {
+		return err
+	}
+	if err := os.WriteFile(filepath.Join(outPath, "detector-deprecation.md"), []byte(renderDetectorDeprecationMarkdown(deprecation)), 0o644); err != nil {
+		return err
+	}
+	if jsonOut {
+		return writeJSON(os.Stdout, deprecation)
+	}
+	fmt.Printf("wrote detector deprecation report with %d ready deprecation(s) and %d process violation(s) to %s\n", deprecation.Summary.ReadyToDeprecate, deprecation.Summary.ProcessViolations, outPath)
+	return nil
+}
+
 func feedbackSpecOut(args []string, usageText string) (string, string, error) {
 	specPath, ok := flagValue(args, "--spec")
 	if !ok || specPath == "" {
@@ -16044,6 +16079,39 @@ func renderMethodologyMarkdown(report feedback.MethodologyReport) string {
 	return b.String()
 }
 
+func renderDetectorDeprecationMarkdown(report feedback.DetectorDeprecationReport) string {
+	var b strings.Builder
+	fmt.Fprintf(&b, "# Transparent detector deprecation\n\n")
+	fmt.Fprintf(&b, "Patchline checked whether detectors that no longer meet precision or review-burden thresholds have a public, reviewable deprecation path before they can be retired.\n\n")
+	fmt.Fprintf(&b, "| Metric | Count |\n| --- | ---: |\n")
+	fmt.Fprintf(&b, "| Detectors evaluated | %d |\n", report.Summary.DetectorsEvaluated)
+	fmt.Fprintf(&b, "| Retained | %d |\n", report.Summary.Retained)
+	fmt.Fprintf(&b, "| Threshold failures | %d |\n", report.Summary.ThresholdFailures)
+	fmt.Fprintf(&b, "| Deprecation notices | %d |\n", report.Summary.DeprecationNotices)
+	fmt.Fprintf(&b, "| Ready to deprecate | %d |\n", report.Summary.ReadyToDeprecate)
+	fmt.Fprintf(&b, "| Process violations | %d |\n\n", report.Summary.ProcessViolations)
+	fmt.Fprintf(&b, "Evidence basis: `%s`; report hash: `%s`.\n\n", report.EvidenceBasis, report.Hash)
+	fmt.Fprintf(&b, "| Detector | Release | Status | Count | Precision bp | Avg burden | Notice age days | Process failures |\n")
+	fmt.Fprintf(&b, "| --- | --- | --- | ---: | ---: | ---: | ---: | --- |\n")
+	for _, detector := range report.Detectors {
+		failures := "none"
+		if len(detector.ProcessFailures) > 0 {
+			failures = strings.Join(detector.ProcessFailures, ", ")
+		}
+		fmt.Fprintf(&b, "| `%s` | `%s` | `%s` | %d | %d | %d | %d | `%s` |\n",
+			detector.Detector,
+			detector.Release,
+			detector.Status,
+			detector.Metrics.PublishedCount,
+			detector.Metrics.PrecisionBP,
+			detector.Metrics.AverageBurdenMinutes,
+			detector.NoticeAgeDays,
+			failures,
+		)
+	}
+	return b.String()
+}
+
 func ciGate(path string, opts gate.Options, jsonOut bool) error {
 	spec, err := readBenchmarkSpec(path)
 	if err != nil {
@@ -16357,6 +16425,15 @@ func readMethodologySpec(path string) (feedback.MethodologySpec, error) {
 	}
 	defer file.Close()
 	return feedback.ReadMethodologySpec(file)
+}
+
+func readDetectorDeprecationSpec(path string) (feedback.DetectorDeprecationSpec, error) {
+	file, err := os.Open(path)
+	if err != nil {
+		return feedback.DetectorDeprecationSpec{}, err
+	}
+	defer file.Close()
+	return feedback.ReadDetectorDeprecationSpec(file)
 }
 
 func readBenchmarkSpec(path string) (bench.Spec, error) {

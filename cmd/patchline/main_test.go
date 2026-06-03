@@ -1499,6 +1499,35 @@ func TestFeedbackLiveLearningCommandsWriteReports(t *testing.T) {
 		t.Fatalf("unexpected online evaluation: %#v", online.Summary)
 	}
 
+	writeMainTestFile(t, root, "detector-deprecation.json", `{
+  "version": "patchline.detector-deprecation/v1",
+  "claim": "Detector deprecation is transparent: Patchline evaluates source-free reviewer evidence against precision and burden thresholds, then requires public notice, independent review, appeal time, and migration guidance before retiring a detector.",
+  "as_of_date": "2026-06-15",
+  "min_evidence": 3,
+  "min_precision_bp": 9000,
+  "max_average_burden_minutes": 12,
+  "min_notice_days": 30,
+  "min_reviewer_roles": 2,
+  "min_appeal_window_days": 14,
+  "required_public_channels": ["release-notes", "public-roadmap"],
+  "detectors": [
+    {"detector":"orm.write-breadth","release":"v1.0.0","owner":"detector-maintainers","public_notice_id":"notice-orm-write-breadth-v1","notice_opened_at":"2026-05-01","public_channels":["release-notes","public-roadmap"],"reviewer_roles":["maintainer","dba"],"replacement_detector":"sql.destructive-ddl","migration_guide":"docs/detector-deprecation.md","appeal_window_days":21},
+    {"detector":"sql.destructive-ddl","release":"v1.0.0","owner":"detector-maintainers","public_notice_id":"notice-sql-destructive-v1","notice_opened_at":"2026-05-01","public_channels":["release-notes","public-roadmap"],"reviewer_roles":["maintainer","dba"],"replacement_detector":"none","migration_guide":"docs/detector-deprecation.md","appeal_window_days":21}
+  ]
+}`)
+	deprecationOut := filepath.Join(t.TempDir(), "deprecation")
+	if err := run([]string{"feedback", "detector-deprecation", "--feedback", filepath.Join(ingestOut, "live-feedback.json"), "--spec", filepath.Join(root, "detector-deprecation.json"), "--out", deprecationOut, "--json"}); err != nil {
+		t.Fatalf("detector deprecation failed: %v", err)
+	}
+	var deprecation feedback.DetectorDeprecationReport
+	readMainTestJSON(t, filepath.Join(deprecationOut, "detector-deprecation.json"), &deprecation)
+	if !deprecation.OK || deprecation.Summary.ReadyToDeprecate != 1 || deprecation.Summary.Retained != 1 {
+		t.Fatalf("unexpected deprecation report: %#v", deprecation.Summary)
+	}
+	if stat, err := os.Stat(filepath.Join(deprecationOut, "detector-deprecation.md")); err != nil || stat.Size() == 0 {
+		t.Fatalf("expected detector-deprecation.md to be written, stat=%#v err=%v", stat, err)
+	}
+
 	writeMainTestFile(t, root, "active-learning.json", `{
   "version": "patchline.adopter-active-learning/v1",
   "claim": "Adopter-local active learning ranks uncertain examples for local reviewer attention while publishing only aggregate uncertainty and information-gain metrics outside the organization.",

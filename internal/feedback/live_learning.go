@@ -15,22 +15,24 @@ import (
 )
 
 const (
-	OnlineEvaluationSpecVersion     = "patchline.safe-online-evaluation/v1"
-	OnlineEvaluationReportVersion   = "patchline.safe-online-evaluation-report/v1"
-	ActiveLearningSpecVersion       = "patchline.adopter-active-learning/v1"
-	ActiveLearningReportVersion     = "patchline.adopter-active-learning-report/v1"
-	PolicyFreezeSpecVersion         = "patchline.policy-freeze/v1"
-	PolicyFreezeReportVersion       = "patchline.policy-freeze-report/v1"
-	CalibrationMonitorSpecVersion   = "patchline.live-calibration-monitor/v1"
-	CalibrationMonitorReportVersion = "patchline.live-calibration-monitor-report/v1"
-	RetentionLifecycleSpecVersion   = "patchline.feedback-retention-lifecycle/v1"
-	RetentionLifecycleReportVersion = "patchline.feedback-retention-lifecycle-report/v1"
-	TrustRegressionSpecVersion      = "patchline.human-trust-regression/v1"
-	TrustRegressionReportVersion    = "patchline.human-trust-regression-report/v1"
-	MethodologySpecVersion          = "patchline.live-learning-methodology/v1"
-	MethodologyReportVersion        = "patchline.live-learning-methodology-report/v1"
-	basisPointsScale                = 10000
-	dateLayout                      = "2006-01-02"
+	OnlineEvaluationSpecVersion      = "patchline.safe-online-evaluation/v1"
+	OnlineEvaluationReportVersion    = "patchline.safe-online-evaluation-report/v1"
+	ActiveLearningSpecVersion        = "patchline.adopter-active-learning/v1"
+	ActiveLearningReportVersion      = "patchline.adopter-active-learning-report/v1"
+	PolicyFreezeSpecVersion          = "patchline.policy-freeze/v1"
+	PolicyFreezeReportVersion        = "patchline.policy-freeze-report/v1"
+	CalibrationMonitorSpecVersion    = "patchline.live-calibration-monitor/v1"
+	CalibrationMonitorReportVersion  = "patchline.live-calibration-monitor-report/v1"
+	RetentionLifecycleSpecVersion    = "patchline.feedback-retention-lifecycle/v1"
+	RetentionLifecycleReportVersion  = "patchline.feedback-retention-lifecycle-report/v1"
+	TrustRegressionSpecVersion       = "patchline.human-trust-regression/v1"
+	TrustRegressionReportVersion     = "patchline.human-trust-regression-report/v1"
+	MethodologySpecVersion           = "patchline.live-learning-methodology/v1"
+	MethodologyReportVersion         = "patchline.live-learning-methodology-report/v1"
+	DetectorDeprecationSpecVersion   = "patchline.detector-deprecation/v1"
+	DetectorDeprecationReportVersion = "patchline.detector-deprecation-report/v1"
+	basisPointsScale                 = 10000
+	dateLayout                       = "2006-01-02"
 )
 
 type LiveLearningPrivacy struct {
@@ -445,6 +447,72 @@ type MethodologyResult struct {
 	OverrelianceNotIncreased bool     `json:"overreliance_not_increased"`
 	BurdenNotIncreased       bool     `json:"burden_not_increased"`
 	Evidence                 []string `json:"evidence"`
+}
+
+type DetectorDeprecationSpec struct {
+	Version                 string                      `json:"version"`
+	Claim                   string                      `json:"claim"`
+	AsOfDate                string                      `json:"as_of_date"`
+	MinEvidence             int                         `json:"min_evidence"`
+	MinPrecisionBP          int                         `json:"min_precision_bp"`
+	MaxAverageBurdenMinutes int                         `json:"max_average_burden_minutes"`
+	MinNoticeDays           int                         `json:"min_notice_days"`
+	MinReviewerRoles        int                         `json:"min_reviewer_roles"`
+	MinAppealWindowDays     int                         `json:"min_appeal_window_days"`
+	RequiredPublicChannels  []string                    `json:"required_public_channels"`
+	Detectors               []DetectorDeprecationTarget `json:"detectors"`
+}
+
+type DetectorDeprecationTarget struct {
+	Detector            string   `json:"detector"`
+	Release             string   `json:"release"`
+	Owner               string   `json:"owner"`
+	PublicNoticeID      string   `json:"public_notice_id"`
+	NoticeOpenedAt      string   `json:"notice_opened_at"`
+	PublicChannels      []string `json:"public_channels"`
+	ReviewerRoles       []string `json:"reviewer_roles"`
+	ReplacementDetector string   `json:"replacement_detector"`
+	MigrationGuide      string   `json:"migration_guide"`
+	AppealWindowDays    int      `json:"appeal_window_days"`
+}
+
+type DetectorDeprecationReport struct {
+	Version       string                        `json:"version"`
+	OK            bool                          `json:"ok"`
+	FeedbackHash  string                        `json:"feedback_hash"`
+	SpecHash      string                        `json:"spec_hash"`
+	Hash          string                        `json:"hash"`
+	AsOfDate      string                        `json:"as_of_date"`
+	EvidenceBasis string                        `json:"evidence_basis"`
+	Privacy       LiveLearningPrivacy           `json:"privacy"`
+	Summary       DetectorDeprecationSummary    `json:"summary"`
+	Detectors     []DetectorDeprecationDecision `json:"detectors"`
+}
+
+type DetectorDeprecationSummary struct {
+	DetectorsEvaluated            int `json:"detectors_evaluated"`
+	Retained                      int `json:"retained"`
+	MonitoredInsufficientEvidence int `json:"monitored_insufficient_evidence"`
+	ThresholdFailures             int `json:"threshold_failures"`
+	DeprecationNotices            int `json:"deprecation_notices"`
+	ReadyToDeprecate              int `json:"ready_to_deprecate"`
+	ProcessViolations             int `json:"process_violations"`
+}
+
+type DetectorDeprecationDecision struct {
+	Detector              string                `json:"detector"`
+	Release               string                `json:"release"`
+	Owner                 string                `json:"owner,omitempty"`
+	Status                string                `json:"status"`
+	PublicNoticeID        string                `json:"public_notice_id,omitempty"`
+	NoticeAgeDays         int                   `json:"notice_age_days,omitempty"`
+	ReplacementDetector   string                `json:"replacement_detector,omitempty"`
+	MigrationGuide        string                `json:"migration_guide,omitempty"`
+	Metrics               OnlineDetectorMetrics `json:"metrics"`
+	ThresholdGates        []OnlineGateResult    `json:"threshold_gates"`
+	TransparencyGates     []OnlineGateResult    `json:"transparency_gates,omitempty"`
+	ProcessFailures       []string              `json:"process_failures,omitempty"`
+	MissingPublicChannels []string              `json:"missing_public_channels,omitempty"`
 }
 
 func ReadOnlineEvaluationSpec(reader io.Reader) (OnlineEvaluationSpec, error) {
@@ -1140,6 +1208,321 @@ func ComputeMethodologyReport(spec MethodologySpec) (MethodologyReport, error) {
 	return report, nil
 }
 
+func ReadDetectorDeprecationSpec(reader io.Reader) (DetectorDeprecationSpec, error) {
+	var spec DetectorDeprecationSpec
+	if err := readLiveLearningSpec(reader, &spec); err != nil {
+		return DetectorDeprecationSpec{}, err
+	}
+	if err := validateDetectorDeprecationSpec(spec); err != nil {
+		return DetectorDeprecationSpec{}, err
+	}
+	return spec, nil
+}
+
+func ComputeDetectorDeprecation(report Report, spec DetectorDeprecationSpec) (DetectorDeprecationReport, error) {
+	if report.Version != ReportVersion {
+		return DetectorDeprecationReport{}, fmt.Errorf("live feedback report version must be %s", ReportVersion)
+	}
+	if err := validateDetectorDeprecationSpec(spec); err != nil {
+		return DetectorDeprecationReport{}, err
+	}
+	asOf, err := parseSpecDate(spec.AsOfDate)
+	if err != nil {
+		return DetectorDeprecationReport{}, err
+	}
+	out := DetectorDeprecationReport{
+		Version:       DetectorDeprecationReportVersion,
+		OK:            true,
+		FeedbackHash:  canonical.Hash(report),
+		SpecHash:      canonical.Hash(spec),
+		AsOfDate:      spec.AsOfDate,
+		EvidenceBasis: "published_k_anonymous_groups_only",
+		Privacy:       defaultShareablePrivacy(),
+	}
+	targets := append([]DetectorDeprecationTarget(nil), spec.Detectors...)
+	sort.Slice(targets, func(i, j int) bool {
+		if targets[i].Detector != targets[j].Detector {
+			return targets[i].Detector < targets[j].Detector
+		}
+		return targets[i].Release < targets[j].Release
+	})
+	for _, target := range targets {
+		decision, err := evaluateDetectorDeprecation(report, spec, target, asOf)
+		if err != nil {
+			return DetectorDeprecationReport{}, err
+		}
+		out.Detectors = append(out.Detectors, decision)
+		out.Summary.DetectorsEvaluated++
+		switch decision.Status {
+		case "retained_thresholds_met":
+			out.Summary.Retained++
+		case "monitor_insufficient_evidence":
+			out.Summary.MonitoredInsufficientEvidence++
+		case "notice_open_in_review":
+			out.Summary.DeprecationNotices++
+		case "ready_to_deprecate":
+			out.Summary.DeprecationNotices++
+			out.Summary.ReadyToDeprecate++
+		case "blocked_process_violation":
+			out.Summary.ProcessViolations++
+			out.OK = false
+		}
+		for _, gate := range decision.ThresholdGates {
+			if gate.Name == "precision" || gate.Name == "review_burden" {
+				if !gate.Passed && decision.Metrics.PublishedCount >= spec.MinEvidence {
+					out.Summary.ThresholdFailures++
+					break
+				}
+			}
+		}
+	}
+	out.Hash = hashLiveLearning(out)
+	return out, nil
+}
+
+func validateDetectorDeprecationSpec(spec DetectorDeprecationSpec) error {
+	if spec.Version != DetectorDeprecationSpecVersion {
+		return fmt.Errorf("detector deprecation spec version must be %s", DetectorDeprecationSpecVersion)
+	}
+	if strings.TrimSpace(spec.Claim) == "" {
+		return errors.New("detector deprecation spec claim is required")
+	}
+	if _, err := parseSpecDate(spec.AsOfDate); err != nil {
+		return err
+	}
+	if spec.MinEvidence < MinKFloor {
+		return fmt.Errorf("detector deprecation min_evidence must be at least %d", MinKFloor)
+	}
+	if err := validateBasisPoints("min_precision_bp", spec.MinPrecisionBP); err != nil {
+		return err
+	}
+	if spec.MaxAverageBurdenMinutes <= 0 {
+		return errors.New("detector deprecation max_average_burden_minutes must be positive")
+	}
+	if spec.MinNoticeDays < 0 || spec.MinReviewerRoles <= 0 || spec.MinAppealWindowDays < 0 {
+		return errors.New("detector deprecation transparency minimums must be non-negative and require at least one reviewer role")
+	}
+	if len(spec.RequiredPublicChannels) == 0 {
+		return errors.New("detector deprecation requires at least one public channel")
+	}
+	seenChannels := map[string]struct{}{}
+	for _, channel := range spec.RequiredPublicChannels {
+		if !safeSourceFreeLabel(channel) {
+			return errors.New("detector deprecation public channels must be source-free labels")
+		}
+		seenChannels[channel] = struct{}{}
+	}
+	if len(seenChannels) != len(spec.RequiredPublicChannels) {
+		return errors.New("detector deprecation required public channels must be unique")
+	}
+	if len(spec.Detectors) == 0 {
+		return errors.New("detector deprecation spec requires detectors")
+	}
+	seenTargets := map[string]struct{}{}
+	for _, target := range spec.Detectors {
+		if err := validateDetectorRelease(target.Detector, target.Release); err != nil {
+			return err
+		}
+		key := target.Detector + "|" + target.Release
+		if _, ok := seenTargets[key]; ok {
+			return fmt.Errorf("duplicate detector deprecation target %s", key)
+		}
+		seenTargets[key] = struct{}{}
+		if target.Owner != "" && !safeSourceFreeLabel(target.Owner) {
+			return errors.New("detector deprecation owner must be source-free")
+		}
+		if target.PublicNoticeID != "" && (!safeIdentifier(target.PublicNoticeID) || sourceLikeValue(target.PublicNoticeID)) {
+			return errors.New("detector deprecation public_notice_id must be source-free")
+		}
+		if target.NoticeOpenedAt != "" {
+			if _, err := parseSpecDate(target.NoticeOpenedAt); err != nil {
+				return err
+			}
+		}
+		for _, channel := range target.PublicChannels {
+			if !safeSourceFreeLabel(channel) {
+				return errors.New("detector deprecation public channels must be source-free labels")
+			}
+		}
+		for _, role := range target.ReviewerRoles {
+			if !safeSourceFreeLabel(role) {
+				return errors.New("detector deprecation reviewer roles must be source-free labels")
+			}
+		}
+		if target.ReplacementDetector != "" && target.ReplacementDetector != "none" && (!safeIdentifier(target.ReplacementDetector) || sourceLikeValue(target.ReplacementDetector)) {
+			return errors.New("detector deprecation replacement_detector must be source-free")
+		}
+		if target.MigrationGuide != "" && !safeSourceFreeLabel(target.MigrationGuide) {
+			return errors.New("detector deprecation migration_guide must be source-free")
+		}
+		if target.AppealWindowDays < 0 {
+			return errors.New("detector deprecation appeal_window_days must be non-negative")
+		}
+	}
+	return nil
+}
+
+func evaluateDetectorDeprecation(report Report, spec DetectorDeprecationSpec, target DetectorDeprecationTarget, asOf time.Time) (DetectorDeprecationDecision, error) {
+	metrics := onlineMetrics(report, target.Detector, target.Release)
+	decision := DetectorDeprecationDecision{
+		Detector:            target.Detector,
+		Release:             target.Release,
+		Owner:               target.Owner,
+		PublicNoticeID:      target.PublicNoticeID,
+		ReplacementDetector: target.ReplacementDetector,
+		MigrationGuide:      target.MigrationGuide,
+		Metrics:             metrics,
+		ThresholdGates: []OnlineGateResult{
+			{
+				Name:       "minimum_evidence",
+				Passed:     metrics.PublishedCount >= spec.MinEvidence,
+				Observed:   metrics.PublishedCount,
+				Required:   spec.MinEvidence,
+				Comparator: ">=",
+			},
+			{
+				Name:       "precision",
+				Passed:     metrics.PrecisionBP >= spec.MinPrecisionBP,
+				Observed:   metrics.PrecisionBP,
+				Required:   spec.MinPrecisionBP,
+				Comparator: ">=",
+			},
+			{
+				Name:       "review_burden",
+				Passed:     metrics.AverageBurdenMinutes <= spec.MaxAverageBurdenMinutes && metrics.PublishedCount > 0,
+				Observed:   metrics.AverageBurdenMinutes,
+				Required:   spec.MaxAverageBurdenMinutes,
+				Comparator: "<=",
+			},
+		},
+	}
+	for i := range decision.ThresholdGates {
+		if !decision.ThresholdGates[i].Passed {
+			decision.ThresholdGates[i].FailureReason = "threshold_not_met"
+		}
+	}
+	if !decision.ThresholdGates[0].Passed {
+		decision.Status = "monitor_insufficient_evidence"
+		return decision, nil
+	}
+	if decision.ThresholdGates[1].Passed && decision.ThresholdGates[2].Passed {
+		decision.Status = "retained_thresholds_met"
+		return decision, nil
+	}
+	transparency, failures, missingChannels, noticeAge, err := detectorDeprecationTransparency(spec, target, asOf)
+	if err != nil {
+		return DetectorDeprecationDecision{}, err
+	}
+	decision.TransparencyGates = transparency
+	decision.ProcessFailures = failures
+	decision.MissingPublicChannels = missingChannels
+	decision.NoticeAgeDays = noticeAge
+	if len(failures) > 0 {
+		decision.Status = "blocked_process_violation"
+		return decision, nil
+	}
+	if noticeAge < requiredDetectorDeprecationNoticeAge(spec, target) {
+		decision.Status = "notice_open_in_review"
+		return decision, nil
+	}
+	decision.Status = "ready_to_deprecate"
+	return decision, nil
+}
+
+func detectorDeprecationTransparency(spec DetectorDeprecationSpec, target DetectorDeprecationTarget, asOf time.Time) ([]OnlineGateResult, []string, []string, int, error) {
+	var gates []OnlineGateResult
+	var failures []string
+	addPresenceGate := func(name, value string) {
+		passed := strings.TrimSpace(value) != ""
+		gate := OnlineGateResult{Name: name, Passed: passed, Comparator: "present"}
+		if passed {
+			gate.Observed = 1
+			gate.Required = 1
+		} else {
+			gate.FailureReason = "missing_transparency_field"
+			failures = append(failures, name)
+		}
+		gates = append(gates, gate)
+	}
+	addPresenceGate("owner", target.Owner)
+	addPresenceGate("public_notice", target.PublicNoticeID)
+	addPresenceGate("replacement_detector", target.ReplacementDetector)
+	addPresenceGate("migration_guide", target.MigrationGuide)
+
+	missingChannels := missingRequiredChannels(spec.RequiredPublicChannels, target.PublicChannels)
+	channelsGate := OnlineGateResult{
+		Name:       "required_public_channels",
+		Passed:     len(missingChannels) == 0,
+		Observed:   len(spec.RequiredPublicChannels) - len(missingChannels),
+		Required:   len(spec.RequiredPublicChannels),
+		Comparator: ">=",
+	}
+	if !channelsGate.Passed {
+		channelsGate.FailureReason = "missing_public_channel"
+		failures = append(failures, "required_public_channels")
+	}
+	gates = append(gates, channelsGate)
+
+	roles := uniqueSourceFreeLabels(target.ReviewerRoles)
+	rolesGate := OnlineGateResult{
+		Name:       "independent_reviewer_roles",
+		Passed:     len(roles) >= spec.MinReviewerRoles,
+		Observed:   len(roles),
+		Required:   spec.MinReviewerRoles,
+		Comparator: ">=",
+	}
+	if !rolesGate.Passed {
+		rolesGate.FailureReason = "insufficient_reviewer_roles"
+		failures = append(failures, "independent_reviewer_roles")
+	}
+	gates = append(gates, rolesGate)
+
+	appealGate := OnlineGateResult{
+		Name:       "appeal_window_days",
+		Passed:     target.AppealWindowDays >= spec.MinAppealWindowDays,
+		Observed:   target.AppealWindowDays,
+		Required:   spec.MinAppealWindowDays,
+		Comparator: ">=",
+	}
+	if !appealGate.Passed {
+		appealGate.FailureReason = "appeal_window_too_short"
+		failures = append(failures, "appeal_window_days")
+	}
+	gates = append(gates, appealGate)
+
+	noticeAge := -1
+	requiredNoticeAge := requiredDetectorDeprecationNoticeAge(spec, target)
+	noticeGate := OnlineGateResult{Name: "notice_age_days", Passed: false, Observed: noticeAge, Required: requiredNoticeAge, Comparator: ">="}
+	if target.NoticeOpenedAt == "" {
+		noticeGate.FailureReason = "missing_transparency_field"
+		failures = append(failures, "notice_opened_at")
+		gates = append(gates, noticeGate)
+		return gates, failures, missingChannels, noticeAge, nil
+	}
+	opened, err := parseSpecDate(target.NoticeOpenedAt)
+	if err != nil {
+		return nil, nil, nil, 0, err
+	}
+	noticeAge = int(asOf.Sub(opened).Hours() / 24)
+	noticeGate.Observed = noticeAge
+	noticeGate.Passed = noticeAge >= requiredNoticeAge
+	if noticeAge < 0 {
+		noticeGate.FailureReason = "notice_opened_in_future"
+		failures = append(failures, "notice_opened_in_future")
+	} else if !noticeGate.Passed {
+		noticeGate.FailureReason = "notice_or_appeal_period_in_progress"
+	}
+	gates = append(gates, noticeGate)
+	return gates, failures, missingChannels, noticeAge, nil
+}
+
+func requiredDetectorDeprecationNoticeAge(spec DetectorDeprecationSpec, target DetectorDeprecationTarget) int {
+	if target.AppealWindowDays > spec.MinNoticeDays {
+		return target.AppealWindowDays
+	}
+	return spec.MinNoticeDays
+}
+
 type calibrationAccumulator struct {
 	detector   string
 	release    string
@@ -1379,6 +1762,46 @@ func validateDetectorRelease(detector, release string) error {
 	return nil
 }
 
+func safeSourceFreeLabel(value string) bool {
+	value = strings.TrimSpace(value)
+	if value == "" || len(value) > 180 || strings.ContainsAny(value, "\r\n\t") {
+		return false
+	}
+	return !sourceLikeValue(value)
+}
+
+func missingRequiredChannels(required, observed []string) []string {
+	seen := map[string]struct{}{}
+	for _, channel := range observed {
+		seen[channel] = struct{}{}
+	}
+	var missing []string
+	for _, channel := range required {
+		if _, ok := seen[channel]; !ok {
+			missing = append(missing, channel)
+		}
+	}
+	sort.Strings(missing)
+	return missing
+}
+
+func uniqueSourceFreeLabels(values []string) []string {
+	seen := map[string]struct{}{}
+	for _, value := range values {
+		trimmed := strings.TrimSpace(value)
+		if trimmed == "" {
+			continue
+		}
+		seen[trimmed] = struct{}{}
+	}
+	out := make([]string, 0, len(seen))
+	for value := range seen {
+		out = append(out, value)
+	}
+	sort.Strings(out)
+	return out
+}
+
 func validateBasisPoints(name string, value int) error {
 	if value < 0 || value > basisPointsScale {
 		return fmt.Errorf("%s must be between 0 and %d", name, basisPointsScale)
@@ -1498,6 +1921,8 @@ func hashLiveLearning[T any](value T) string {
 	case *TrustRegressionReport:
 		typed.Hash = ""
 	case *MethodologyReport:
+		typed.Hash = ""
+	case *DetectorDeprecationReport:
 		typed.Hash = ""
 	}
 	return canonical.Hash(value)

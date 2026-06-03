@@ -78,8 +78,8 @@ rotation, review-cadence, and mitigation gates, an ethics-review template gates 
 live feedback loops, and adopter outcome studies on consent, minimization, retention, human oversight,
 preregistration, and hashed evidence, an explainability audit requires independent reviewers to judge
 whether hashed evidence trails support stated verdicts before those verdicts feed claims or certificates,
-and a misuse-resistance analysis adversarially checks certificates, scoreboards, and adoption metrics
-before an incident-response drill rehearses
+a misuse-resistance analysis checks certificate/scoreboard/adoption gaming, and detector-deprecation
+governance turns failing precision or burden evidence into public notices before an incident-response drill rehearses
 hypothetical Patchline false negatives as public incidents with disclosure/remediation deadlines,
 evidence hashes, regression-gate closure, and leak-safe summaries;
 the same marketplace now hosts a public adversarial-migration challenge whose certificate-bound,
@@ -89,7 +89,7 @@ k-thresholded aggregate metrics.
 Critically,
 every capability in \tool{} is backed by a reproducible \emph{gate}: a script that proves the
 capability against real, pinned public code and fails loudly on drift. \tool{} currently ships more
-than 615 such gates over 561 documented capabilities, spanning relational migrations across nine
+than 615 such gates over 560 documented capabilities, spanning relational migrations across nine
 ecosystems, versioned database semantics with pinned reproducibility reports, computed unsafe counter-profile controls, lock-mode simulations, online-schema-change adapters,
 conditional replication-lag analysis, query-plan regression preflight, data-volume-aware runtime estimates, partition/shard routing semantics, and rollback-feasibility verdicts
 across eight production engines, five NoSQL engines,
@@ -158,10 +158,10 @@ ranks the risks, and prints the next commands that can run immediately.
   \item A \textbf{runtime and observability evidence} layer that scores findings on independent
   static-risk and observed-runtime axes using OpenTelemetry, Datadog-style, and Prometheus/Grafana
   exports (Section~\ref{sec:runtime}).
-  \item A \textbf{gate-backed reproducibility and evaluation methodology}---over 614 gates, blinded
+  \item A \textbf{gate-backed reproducibility and evaluation methodology}---over 615 gates, blinded
   false-positive adjudication, seeded false-negative recall, ablations, standardized effect sizes,
   severity calibration, a duplicate-safe certificate-backed public evidence marketplace, deterministic
-  governance-board lifecycle decisions, hash-bound appeal resolution, reviewer-fairness burden/false-positive/escalation audits, change-management approval binding, governance-risk concentration audits, ethics-review controls for data sources, live learning, and outcome studies, independent explainability audits for stated verdicts, misuse-resistance checks for certificates/scoreboards/adoption metrics, adversarial-challenge scoring, signed federated benchmark
+  governance-board lifecycle decisions, hash-bound appeal resolution, reviewer-fairness burden/false-positive/escalation audits, change-management approval binding, governance-risk concentration audits, ethics-review controls for data sources, live learning, and outcome studies, independent explainability audits for stated verdicts, misuse-resistance checks for certificates/scoreboards/adoption metrics, transparent detector deprecation, adversarial-challenge scoring, signed federated benchmark
   aggregates for private adopters, and accountable-use mappings from autonomous or blocking capabilities
   to required human oversight---designed for artifact
   evaluation and best-paper-grade rigor
@@ -278,6 +278,9 @@ reviews, path escapes, and optional SHA-256 mismatches. & \code{explainability-a
 \code{misuse-resistance} & Check certificate, scoreboard, and adoption-metric gaming scenarios with
 independent reviewers, diverse controls, hashed evidence, public-safe failure modes, and passing attack
 simulations. & \code{misuse-resistance.json}, \code{.md} \\
+\code{feedback detector-deprecation} & Retire detectors only when source-free precision/burden evidence
+fails and public notice, independent review, appeal time, and migration guidance are present. &
+\code{detector-deprecation.json}, \code{.md} \\
 \code{incident-response-drill} & Rehearse a hypothetical Patchline false negative as a public incident;
 check disclosure/remediation timelines, role separation, evidence hashes, regression-gate closure, and
 leak-safe public summaries. & \code{incident-response-drill.json}, \code{.md} \\
@@ -952,6 +955,12 @@ Patchline evidence documents, then mutates one review into an unsupported disagr
 expected evidence hash; both negative controls must be rejected while the safe report hash remains
 stable across reruns.
 
+Detector lifecycle changes get the same treatment. The \code{feedback detector-deprecation} command
+uses only published k-anonymous live-feedback groups to identify detectors whose precision or
+review-burden evidence fails policy, then requires public notice, required public channels, independent
+reviewer roles, appeal time, owner, replacement/migration guidance, and deterministic notice age before
+emitting \code{ready\_to\_deprecate}; missing transparency is an \code{ok=false} process violation.
+
 Finally, \code{incident-response-drill} treats Patchline's own false negatives as rehearsable public
 incidents. The \gate{incident-response-drill-gate} validates a seven-event disclosure/remediation
 timeline, four distinct response roles, ten-plus hashed evidence artifacts, and a regression-gate report,
@@ -1086,6 +1095,7 @@ owner-routed rollback playbooks for broad writes & \gate{remediation-playbook-ga
 3 ethics-review areas covering data-source intake, live feedback, and outcome studies with consent/minimization/retention/oversight/preregistration obligations; missing controls and stale/escaped evidence refuted & \gate{ethics-review-template-gate} \\
 2 stated verdicts / 4 independent explainability reviews with hashed evidence trails, full agreement, and disagreement plus hash-mismatch controls refuted & \gate{explainability-audit-gate} \\
 3 misuse-resistance surfaces covering certificate proof-stuffing, scoreboard sybil submissions, and adoption-metric inflation with 9 controls, hashed evidence, passing simulations, and targeted negative controls & \gate{misuse-resistance-gate} \\
+2 detector deprecation decisions from source-free live feedback: 1 precision-failing detector ready after public notice, 1 retained detector; missing process, fresh/appeal notice, and burden-only controls checked & \gate{detector-deprecation-gate} \\
 7-event public false-negative drill with disclosure/remediation deadlines, 4 distinct roles, regression-gate hash binding, and private-marker controls & \gate{incident-response-drill-gate} \\
 2 public-safe adversarial migrations scored from verified artifacts and analyzer-backed high-risk proofs; embargoed publication refuted & \gate{adversarial-challenge-gate} \\
 3 private benchmark cases published as signed aggregate-only metrics; tampering/leakage rejected & \gate{federated-benchmark-split-gate} \\
@@ -1581,8 +1591,8 @@ federated, checksum-mirrored, withdrawal-aware, challenge-ready public evidence 
 externally adopted governance and appeal audit trails; deeper rollback, query-plan, data-volume, and engine-negative-control semantics
 on top of the new versioned production-database profiles;
 socio-technical accountability beyond accountable-use, reviewer-fairness, change-management binding,
-governance-risk registration, ethics review, and explainability audit, especially misuse resistance and
-detector deprecation; education and
+governance-risk registration, ethics review, explainability audit, misuse resistance, and detector
+deprecation; education and
 certification materials that make migration safety teachable; resilient offline, edge, confidential,
 and disaster-recovery deployments; and an award-to-standard transition that externalizes benchmarks,
 errata, conformance labels, and long-term stewardship. These items are intentionally recorded as future
@@ -1798,7 +1808,8 @@ Trust stack & \code{signed-provenance-chain-gate}, \code{reproducible-build-atte
 \code{merkle-audit-log-gate}, \code{sbom-pinned-deps-gate}, \code{red-team-adversarial-gate},
 \code{evidence-governance-board-gate}, \code{evidence-appeal-workflow-gate},
 \code{change-management-integration-gate}, \code{governance-risk-register-gate},
-\code{ethics-review-template-gate}, \code{explainability-audit-gate}, \code{misuse-resistance-gate}, \code{incident-response-drill-gate} \\
+\code{ethics-review-template-gate}, \code{explainability-audit-gate}, \code{misuse-resistance-gate},
+\code{detector-deprecation-gate}, \code{incident-response-drill-gate} \\
 Reviewer \& community & \code{quickstart-sixty-seconds-gate}, \code{inline-review-surface-gate},
 \code{ci-pr-bot-gate}, \code{governance-policy-gate}, \code{citation-doi-gate} \\
 Research frontier & \code{learned-risk-model-gate}, \code{neuro-symbolic-verdict-gate},
@@ -1868,6 +1879,7 @@ make adopter-active-learning-gate \quad\# local examples, aggregate uncertainty\
 make policy-freeze-gate \hspace{2.35em}\# high-stakes incident pinning\\
 make live-calibration-monitor-gate \quad\# decile drift alerts\\
 make feedback-retention-lifecycle-gate \quad\# expiry/anonymization proof\\
+make detector-deprecation-gate \quad\# public lifecycle for weak detectors\\
 make human-trust-regression-gate \quad\# explanation faithfulness checks\\
 make live-learning-methodology-gate \quad\# recall gain without over-reliance
 \end{quote}

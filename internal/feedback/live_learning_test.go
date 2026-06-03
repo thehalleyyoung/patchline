@@ -228,6 +228,109 @@ func TestMethodologyReportRequiresRecallGainWithoutOverrelianceIncrease(t *testi
 	assertNoLiveLearningLeak(t, report)
 }
 
+func TestDetectorDeprecationPublishesTransparentReadyDecision(t *testing.T) {
+	report, err := Ingest(strings.NewReader(fixture), Options{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	spec := detectorDeprecationSpec()
+	deprecation, err := ComputeDetectorDeprecation(report, spec)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !deprecation.OK || deprecation.Summary.ReadyToDeprecate != 1 || deprecation.Summary.Retained != 1 || deprecation.Summary.ProcessViolations != 0 {
+		t.Fatalf("unexpected detector deprecation summary: %#v", deprecation.Summary)
+	}
+	orm := detectorDeprecationFor(t, deprecation, "orm.write-breadth")
+	if orm.Status != "ready_to_deprecate" || orm.Metrics.PrecisionBP != 0 || orm.NoticeAgeDays < spec.MinNoticeDays {
+		t.Fatalf("false-positive detector should be transparently ready to deprecate: %#v", orm)
+	}
+	sql := detectorDeprecationFor(t, deprecation, "sql.destructive-ddl")
+	if sql.Status != "retained_thresholds_met" || sql.Metrics.PrecisionBP != 10000 {
+		t.Fatalf("passing detector should be retained: %#v", sql)
+	}
+	assertNoLiveLearningLeak(t, deprecation)
+	assertStableHash(t, deprecation.Hash, func() (string, error) {
+		next, err := ComputeDetectorDeprecation(report, spec)
+		return next.Hash, err
+	})
+	rehash := deprecation
+	if got := hashLiveLearning(rehash); got != deprecation.Hash {
+		t.Fatalf("hashLiveLearning should ignore populated hash field, got %q want %q", got, deprecation.Hash)
+	}
+}
+
+func TestDetectorDeprecationBlocksMissingTransparentProcess(t *testing.T) {
+	report, err := Ingest(strings.NewReader(fixture), Options{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	spec := detectorDeprecationSpec()
+	spec.Detectors[0].PublicNoticeID = ""
+	spec.Detectors[0].NoticeOpenedAt = ""
+	spec.Detectors[0].ReviewerRoles = []string{"maintainer"}
+	spec.Detectors[0].PublicChannels = []string{"release-notes"}
+	deprecation, err := ComputeDetectorDeprecation(report, spec)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if deprecation.OK || deprecation.Summary.ProcessViolations != 1 {
+		t.Fatalf("missing transparent process should fail report: %#v", deprecation.Summary)
+	}
+	orm := detectorDeprecationFor(t, deprecation, "orm.write-breadth")
+	if orm.Status != "blocked_process_violation" || len(orm.ProcessFailures) < 3 || len(orm.MissingPublicChannels) != 1 {
+		t.Fatalf("expected missing notice, reviewers, and channel failures: %#v", orm)
+	}
+}
+
+func TestDetectorDeprecationKeepsFreshCompleteNoticeInReview(t *testing.T) {
+	report, err := Ingest(strings.NewReader(fixture), Options{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	spec := detectorDeprecationSpec()
+	spec.Detectors[0].NoticeOpenedAt = "2026-06-10"
+	deprecation, err := ComputeDetectorDeprecation(report, spec)
+	if err != nil {
+		t.Fatal(err)
+	}
+	orm := detectorDeprecationFor(t, deprecation, "orm.write-breadth")
+	if !deprecation.OK || orm.Status != "notice_open_in_review" || orm.ProcessFailures != nil || orm.NoticeAgeDays >= spec.MinNoticeDays {
+		t.Fatalf("complete fresh notice should remain in review without process violation: report=%#v detector=%#v", deprecation.Summary, orm)
+	}
+}
+
+func TestDetectorDeprecationWaitsForAppealWindow(t *testing.T) {
+	report, err := Ingest(strings.NewReader(fixture), Options{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	spec := detectorDeprecationSpec()
+	spec.MinNoticeDays = 7
+	spec.Detectors[0].NoticeOpenedAt = "2026-06-01"
+	spec.Detectors[0].AppealWindowDays = 21
+	deprecation, err := ComputeDetectorDeprecation(report, spec)
+	if err != nil {
+		t.Fatal(err)
+	}
+	orm := detectorDeprecationFor(t, deprecation, "orm.write-breadth")
+	if !deprecation.OK || orm.Status != "notice_open_in_review" || orm.NoticeAgeDays != 14 {
+		t.Fatalf("notice should wait for longer appeal window before deprecation: report=%#v detector=%#v", deprecation.Summary, orm)
+	}
+	foundNoticeGate := false
+	for _, gate := range orm.TransparencyGates {
+		if gate.Name == "notice_age_days" && gate.Required != 21 {
+			t.Fatalf("notice age should require appeal window, got %#v", gate)
+		}
+		if gate.Name == "notice_age_days" {
+			foundNoticeGate = true
+		}
+	}
+	if !foundNoticeGate {
+		t.Fatalf("missing notice-age transparency gate: %#v", orm.TransparencyGates)
+	}
+}
+
 func onlineDetectorFor(t *testing.T, report OnlineEvaluationReport, detector string) OnlineDetectorReport {
 	t.Helper()
 	for _, item := range report.Detectors {
@@ -237,6 +340,17 @@ func onlineDetectorFor(t *testing.T, report OnlineEvaluationReport, detector str
 	}
 	t.Fatalf("missing detector %s in %#v", detector, report.Detectors)
 	return OnlineDetectorReport{}
+}
+
+func detectorDeprecationFor(t *testing.T, report DetectorDeprecationReport, detector string) DetectorDeprecationDecision {
+	t.Helper()
+	for _, item := range report.Detectors {
+		if item.Detector == detector {
+			return item
+		}
+	}
+	t.Fatalf("missing detector %s in %#v", detector, report.Detectors)
+	return DetectorDeprecationDecision{}
 }
 
 func policyFreezeSpec() PolicyFreezeSpec {
@@ -338,6 +452,47 @@ func methodologySpec() MethodologySpec {
 			{Gate: "safe-online-evaluation-gate", ReportHash: "hash-online", ReproductionCommand: "make safe-online-evaluation-gate"},
 			{Gate: "live-calibration-monitor-gate", ReportHash: "hash-calibration", ReproductionCommand: "make live-calibration-monitor-gate"},
 			{Gate: "human-trust-regression-gate", ReportHash: "hash-trust", ReproductionCommand: "make human-trust-regression-gate"},
+		},
+	}
+}
+
+func detectorDeprecationSpec() DetectorDeprecationSpec {
+	return DetectorDeprecationSpec{
+		Version:                 DetectorDeprecationSpecVersion,
+		Claim:                   "Detector deprecation is transparent: Patchline evaluates source-free reviewer evidence against precision and burden thresholds, then requires public notice, independent review, appeal time, and migration guidance before retiring a detector.",
+		AsOfDate:                "2026-06-15",
+		MinEvidence:             3,
+		MinPrecisionBP:          9000,
+		MaxAverageBurdenMinutes: 12,
+		MinNoticeDays:           30,
+		MinReviewerRoles:        2,
+		MinAppealWindowDays:     14,
+		RequiredPublicChannels:  []string{"release-notes", "public-roadmap"},
+		Detectors: []DetectorDeprecationTarget{
+			{
+				Detector:            "orm.write-breadth",
+				Release:             "v1.0.0",
+				Owner:               "detector-maintainers",
+				PublicNoticeID:      "notice-orm-write-breadth-v1",
+				NoticeOpenedAt:      "2026-05-01",
+				PublicChannels:      []string{"release-notes", "public-roadmap"},
+				ReviewerRoles:       []string{"maintainer", "dba"},
+				ReplacementDetector: "sql.destructive-ddl",
+				MigrationGuide:      "docs/detector-deprecation.md",
+				AppealWindowDays:    21,
+			},
+			{
+				Detector:            "sql.destructive-ddl",
+				Release:             "v1.0.0",
+				Owner:               "detector-maintainers",
+				PublicNoticeID:      "notice-sql-destructive-v1",
+				NoticeOpenedAt:      "2026-05-01",
+				PublicChannels:      []string{"release-notes", "public-roadmap"},
+				ReviewerRoles:       []string{"maintainer", "dba"},
+				ReplacementDetector: "none",
+				MigrationGuide:      "docs/detector-deprecation.md",
+				AppealWindowDays:    21,
+			},
 		},
 	}
 }

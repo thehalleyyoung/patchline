@@ -19,11 +19,11 @@
 \contentsline {subsection}{\numberline {5.2}NoSQL change detection across five engines}{12}{subsection.5.2}%
 \contentsline {subsection}{\numberline {5.3}Data-pipeline repair evidence across four frameworks}{12}{subsection.5.3}%
 \contentsline {subsection}{\numberline {5.4}Schema-registry and protobuf/Avro compatibility}{12}{subsection.5.4}%
-\contentsline {subsection}{\numberline {5.5}Infrastructure/data ordering}{12}{subsection.5.5}%
+\contentsline {subsection}{\numberline {5.5}Infrastructure/data ordering}{13}{subsection.5.5}%
 \contentsline {subsection}{\numberline {5.6}Monorepo package boundaries}{13}{subsection.5.6}%
 \contentsline {paragraph}{Summary.}{13}{subsection.5.6}%
 \contentsline {section}{\numberline {6}Bounded Interventions and Deterministic Rejection}{13}{section.6}%
-\contentsline {paragraph}{Budgets.}{13}{section.6}%
+\contentsline {paragraph}{Budgets.}{14}{section.6}%
 \contentsline {paragraph}{Quarantine.}{14}{section.6}%
 \contentsline {paragraph}{Deterministic rejection.}{14}{section.6}%
 \contentsline {paragraph}{Generator-agnostic.}{14}{section.6}%
@@ -53,23 +53,23 @@
 \contentsline {paragraph}{Minimal reproductions.}{19}{section.9}%
 \contentsline {paragraph}{Drift protection.}{19}{table.caption.4}%
 \contentsline {paragraph}{Shared evidence without trust erosion.}{20}{table.caption.4}%
-\contentsline {paragraph}{Federated private benchmark aggregates.}{21}{table.caption.4}%
+\contentsline {paragraph}{Federated private benchmark aggregates.}{22}{table.caption.4}%
 \contentsline {paragraph}{Paying for minimized missing evidence.}{22}{table.caption.4}%
 \contentsline {section}{\numberline {10}Evaluation Methodology}{22}{section.10}%
 \contentsline {paragraph}{Blinded false-positive adjudication.}{22}{section.10}%
 \contentsline {paragraph}{Seeded false-negative recall.}{22}{section.10}%
 \contentsline {paragraph}{Ablations and effect sizes.}{22}{section.10}%
 \contentsline {paragraph}{Severity calibration.}{22}{section.10}%
-\contentsline {paragraph}{Stratification.}{22}{section.10}%
+\contentsline {paragraph}{Stratification.}{23}{section.10}%
 \contentsline {paragraph}{Baselines.}{23}{section.10}%
 \contentsline {paragraph}{Headline measured results.}{23}{table.caption.5}%
 \contentsline {section}{\numberline {11}From Analyzer to Trustworthy Artifact}{23}{section.11}%
-\contentsline {subsection}{\numberline {11.1}Empirical generalization and external replication}{23}{subsection.11.1}%
+\contentsline {subsection}{\numberline {11.1}Empirical generalization and external replication}{24}{subsection.11.1}%
 \contentsline {subsection}{\numberline {11.2}Supply-chain trust and provenance}{24}{subsection.11.2}%
 \contentsline {subsection}{\numberline {11.3}Reviewer, developer, and community experience}{24}{subsection.11.3}%
 \contentsline {subsection}{\numberline {11.4}Research-frontier evidence}{24}{subsection.11.4}%
 \contentsline {section}{\numberline {12}Field-Defining Extensions: Foundations, Scale, and Lasting Impact}{24}{section.12}%
-\contentsline {paragraph}{Mechanized formal foundations.}{24}{section.12}%
+\contentsline {paragraph}{Mechanized formal foundations.}{25}{section.12}%
 \contentsline {paragraph}{Ecosystem-scale evidence.}{25}{section.12}%
 \contentsline {paragraph}{A definitive evaluation design.}{25}{section.12}%
 \contentsline {paragraph}{Product-grade adoption.}{25}{section.12}%
@@ -82,14 +82,14 @@
 \contentsline {paragraph}{Trustworthy autonomy.}{26}{section.13}%
 \contentsline {paragraph}{Definitional adoption and a learned-but-checkable frontier.}{26}{section.13}%
 \contentsline {paragraph}{Definitive artifact and lasting impact.}{26}{section.13}%
-\contentsline {paragraph}{From field-defining system to generational artifact (601--700).}{26}{table.caption.8}%
+\contentsline {paragraph}{From field-defining system to generational artifact (601--700).}{27}{table.caption.8}%
 \contentsline {paragraph}{Standard-scale certificate interchange.}{27}{table.caption.9}%
 \contentsline {section}{\numberline {14}Developer and Contributor Experience}{28}{section.14}%
 \contentsline {section}{\numberline {15}Case Studies}{28}{section.15}%
 \contentsline {paragraph}{\texttt {lobsters/lobsters} (Rails, \texttt {db/migrate}).}{28}{section.15}%
 \contentsline {paragraph}{\texttt {apache/avro} (schema compatibility).}{28}{section.15}%
 \contentsline {paragraph}{\texttt {helm/charts} (infra/data ordering).}{28}{section.15}%
-\contentsline {paragraph}{\texttt {harrydevforlife/building-lakehouse} (pipelines).}{28}{section.15}%
+\contentsline {paragraph}{\texttt {harrydevforlife/building-lakehouse} (pipelines).}{29}{section.15}%
 \contentsline {paragraph}{\texttt {laaksomavrick/twitter-go} (NoSQL + minimization).}{29}{section.15}%
 \contentsline {section}{\numberline {16}Related Work}{29}{section.16}%
 \contentsline {section}{\numberline {17}Threats to Validity}{29}{section.17}%
