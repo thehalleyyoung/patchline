@@ -19,6 +19,7 @@ import (
 	"github.com/thehalleyyoung/patchline/internal/backfillplanner"
 	"github.com/thehalleyyoung/patchline/internal/canaryvalidate"
 	"github.com/thehalleyyoung/patchline/internal/changemanagement"
+	"github.com/thehalleyyoung/patchline/internal/ethicsreview"
 	"github.com/thehalleyyoung/patchline/internal/evidence"
 	"github.com/thehalleyyoung/patchline/internal/evidencemarketplace"
 	"github.com/thehalleyyoung/patchline/internal/expandcontract"
@@ -1308,6 +1309,59 @@ func TestGovernanceRiskRegisterCommandWritesReports(t *testing.T) {
 	}
 	if stat, err := os.Stat(filepath.Join(out, "governance-risk-register.md")); err != nil || stat.Size() == 0 {
 		t.Fatalf("expected governance-risk-register.md to be written, stat=%#v err=%v", stat, err)
+	}
+}
+
+func TestEthicsReviewTemplateCommandWritesReports(t *testing.T) {
+	root := t.TempDir()
+	for rel, contents := range map[string]string{
+		"evidence/data-source.md":   "source license review, consent basis, minimization, retention, and withdrawal path\n",
+		"evidence/live-feedback.md": "local feedback loop with human oversight and no source-code collection\n",
+		"evidence/outcome-study.md": "outcome study preregistration, reviewer burden protocol, and evidence hashes\n",
+	} {
+		writeMainTestFile(t, root, rel, contents)
+	}
+	specPath := filepath.Join(root, "ethics-review-template.json")
+	writeMainTestFile(t, root, "ethics-review-template.json", `{
+  "version": "patchline.ethics-review-template/v1",
+  "name": "main test ethics review template",
+  "as_of_date": "2026-03-01T00:00:00Z",
+  "criteria": {
+    "required_review_areas": ["new_data_source", "live_feedback_loop", "adopter_outcome_study"],
+    "min_independent_reviewers": 2,
+    "max_risk_score": 0.7,
+    "review_cadence_days": 120,
+    "require_consent_basis": true,
+    "require_privacy_review": true,
+    "require_retention_policy": true,
+    "require_minimization": true,
+    "require_withdrawal_path": true,
+    "require_security_owner": true,
+    "require_evidence_paths": true,
+    "require_human_oversight_for_feedback": true,
+    "require_preregistration_for_outcome_studies": true,
+    "min_mitigations_per_high_risk_entry": 2
+  },
+  "entries": [
+    {"review_id":"data-source-public-incidents","area":"new_data_source","title":"Public incident corpus","owner":"corpus steward","data_sources":["public incident notes"],"purpose":"Expand public data-change hazard evidence without collecting private source.","risk_score":0.45,"last_reviewed":"2026-02-01T00:00:00Z","reviewer_roles":["ethics reviewer","security reviewer"],"consent_basis":"public-license review and consent check","privacy_review":"approved aggregate-only release","retention_policy":"raw notes expire after 90 days","minimization":"hashes and bucketed counts only","withdrawal_path":"submitter withdrawal before release","security_owner":"security-oncall","mitigations":["license audit","withdrawal audit"],"evidence_paths":["evidence/data-source.md"]},
+    {"review_id":"live-feedback-calibration","area":"live_feedback_loop","title":"Adopter-local calibration","owner":"learning steward","data_sources":["source-free adopter outcomes"],"purpose":"Monitor calibration drift without collecting source code.","risk_score":0.55,"last_reviewed":"2026-02-01T00:00:00Z","reviewer_roles":["ethics reviewer","maintainer"],"consent_basis":"adopter opt-in for aggregate metrics","privacy_review":"k-anonymous cohort export only","retention_policy":"operational feedback expires after 120 days","minimization":"confidence deciles and outcomes only","withdrawal_path":"adopter can pause export immediately","security_owner":"feedback-security-owner","human_oversight":"release council approves blocking policy changes","mitigations":["shadow mode","human approval"],"evidence_paths":["evidence/live-feedback.md"]},
+    {"review_id":"adopter-review-time-study","area":"adopter_outcome_study","title":"Review-time outcome study","owner":"study steward","data_sources":["paired reviewer timing aggregates"],"purpose":"Measure whether generated plans reduce review time without hiding uncertainty.","risk_score":0.65,"last_reviewed":"2026-02-01T00:00:00Z","reviewer_roles":["ethics reviewer","methods reviewer"],"consent_basis":"study participant opt-in and public aggregate release","privacy_review":"no individual reviewer identifiers in release","retention_policy":"raw timing logs expire after analysis close","minimization":"paired deltas and confidence intervals only","withdrawal_path":"participant withdrawal before aggregate lock","security_owner":"study-security-owner","preregistration":"registered-report-2026-02","mitigations":["preregistered analysis","independent methods review"],"evidence_paths":["evidence/outcome-study.md"]}
+  ]
+}`)
+	out := filepath.Join(t.TempDir(), "ethics-review-template")
+	if err := run([]string{"ethics-review-template", "--spec", specPath, "--root", root, "--out", out, "--json"}); err != nil {
+		t.Fatalf("ethics-review-template failed: %v", err)
+	}
+	var report ethicsreview.Report
+	readMainTestJSON(t, filepath.Join(out, "ethics-review-template.json"), &report)
+	if !report.OK || report.Summary.Areas != 3 || report.Summary.Entries != 3 || report.Summary.EvidenceFiles != 3 {
+		t.Fatalf("unexpected ethics review template report: %#v", report)
+	}
+	if len(report.Areas) != 3 || len(report.Areas[0].Evidence) == 0 || report.Areas[0].Evidence[0].SHA256 == "" {
+		t.Fatalf("expected area evidence hashes, got %#v", report.Areas)
+	}
+	if stat, err := os.Stat(filepath.Join(out, "ethics-review-template.md")); err != nil || stat.Size() == 0 {
+		t.Fatalf("expected ethics-review-template.md to be written, stat=%#v err=%v", stat, err)
 	}
 }
 

@@ -143,6 +143,8 @@ Run `change-management-verify --spec <spec>` to prove organizational approvals a
 
 Run `governance-risk-register --spec examples/governance-risk-register.json` to quantify maintainership, funding, infrastructure, and benchmark-control concentration with hash-backed evidence, review cadence, rotation, and mitigation gates; reproduce it with `make governance-risk-register-gate`.
 
+Run `ethics-review-template --spec examples/ethics-review-template.json` to gate new data sources, live feedback loops, and adopter outcome studies on consent, minimization, retention, oversight, preregistration, and hashed evidence; reproduce it with `make ethics-review-template-gate`.
+
 Run `incident-response-drill --spec examples/incident-response-drill.json` to rehearse a public Patchline false-negative incident with disclosure/remediation timelines, evidence hashes, regression-gate closure, and leak-safe public summaries; reproduce it with `make incident-response-drill-gate`.
 
 Run `evidence-marketplace publish --registry <registry>` and `artifact-benchmark import-marketplace --registry <registry>` to publish redacted, certificate-backed hazards with license/consent checks, duplicate-collapsed prevalence, gate reputation, and a checksum/license/withdrawal-aware archive mirror, then import only prevalence representatives into runnable benchmarks without trusting submitter labels; reproduce it with `make evidence-marketplace-gate`.

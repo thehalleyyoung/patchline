@@ -38,6 +38,7 @@ import (
 	"github.com/thehalleyyoung/patchline/internal/demo"
 	"github.com/thehalleyyoung/patchline/internal/diagnostics"
 	"github.com/thehalleyyoung/patchline/internal/effects"
+	"github.com/thehalleyyoung/patchline/internal/ethicsreview"
 	"github.com/thehalleyyoung/patchline/internal/evidence"
 	"github.com/thehalleyyoung/patchline/internal/expandcontract"
 	"github.com/thehalleyyoung/patchline/internal/feedback"
@@ -453,6 +454,8 @@ func run(args []string) error {
 		return changeManagementVerifyCommand(args[1:], hasFlag(args[1:], "--json"))
 	case "governance-risk-register":
 		return governanceRiskRegisterCommand(args[1:], hasFlag(args[1:], "--json"))
+	case "ethics-review-template":
+		return ethicsReviewTemplateCommand(args[1:], hasFlag(args[1:], "--json"))
 	case "feedback":
 		return feedbackCommand(args[1:])
 	case "security":
@@ -609,6 +612,7 @@ Usage:
   patchline reviewer-fairness-audit --spec reviewer-fairness-audit.json --root repo-root --out dir [--json]
   patchline change-management-verify --spec change-management.json --root repo-root --out dir [--json]
   patchline governance-risk-register --spec governance-risk-register.json --root repo-root --out dir [--json]
+  patchline ethics-review-template --spec ethics-review-template.json --root repo-root --out dir [--json]
   patchline feedback counterfactual-log --feedback live-feedback.json --history policy-history.json --out dir [--json]
   patchline feedback online-eval --feedback live-feedback.json --spec online-evaluation.json --out dir [--json]
   patchline feedback active-learning-queue --spec active-learning.json --out dir [--json]
@@ -15187,6 +15191,39 @@ func governanceRiskRegisterCommand(args []string, jsonOut bool) error {
 		return writeJSON(os.Stdout, report)
 	}
 	fmt.Printf("wrote governance-risk register ok=%t domains=%d assets=%d high_risk_domains=%d counterexamples=%d to %s\n", report.OK, report.Summary.Domains, report.Summary.Entries, report.Summary.HighRiskDomains, report.Summary.Counterexamples, outPath)
+	return nil
+}
+
+func ethicsReviewTemplateCommand(args []string, jsonOut bool) error {
+	usage := "patchline ethics-review-template --spec ethics-review-template.json --root repo-root --out <dir> [--json]"
+	specPath, outPath, err := feedbackSpecOut(args, usage)
+	if err != nil {
+		return err
+	}
+	rootPath := "."
+	if value, ok := flagValue(args, "--root"); ok && value != "" {
+		rootPath = value
+	}
+	file, err := os.Open(specPath)
+	if err != nil {
+		return err
+	}
+	defer file.Close()
+	spec, err := ethicsreview.ReadSpec(file)
+	if err != nil {
+		return err
+	}
+	report, err := ethicsreview.BuildReport(spec, rootPath)
+	if err != nil {
+		return err
+	}
+	if err := ethicsreview.WriteArtifacts(outPath, report); err != nil {
+		return err
+	}
+	if jsonOut {
+		return writeJSON(os.Stdout, report)
+	}
+	fmt.Printf("wrote ethics review template ok=%t areas=%d reviews=%d high_risk_reviews=%d counterexamples=%d to %s\n", report.OK, report.Summary.Areas, report.Summary.Entries, report.Summary.HighRiskEntries, report.Summary.Counterexamples, outPath)
 	return nil
 }
 

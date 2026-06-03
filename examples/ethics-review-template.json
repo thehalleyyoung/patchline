@@ -1,0 +1,124 @@
+{
+  "version": "patchline.ethics-review-template/v1",
+  "name": "Patchline ethics review template for evidence expansion and live learning",
+  "as_of_date": "2026-03-01T00:00:00Z",
+  "criteria": {
+    "required_review_areas": [
+      "new_data_source",
+      "live_feedback_loop",
+      "adopter_outcome_study"
+    ],
+    "min_independent_reviewers": 2,
+    "max_risk_score": 0.7,
+    "review_cadence_days": 120,
+    "require_consent_basis": true,
+    "require_privacy_review": true,
+    "require_retention_policy": true,
+    "require_minimization": true,
+    "require_withdrawal_path": true,
+    "require_security_owner": true,
+    "require_evidence_paths": true,
+    "require_human_oversight_for_feedback": true,
+    "require_preregistration_for_outcome_studies": true,
+    "min_mitigations_per_high_risk_entry": 2
+  },
+  "entries": [
+    {
+      "review_id": "data-source-public-incidents",
+      "area": "new_data_source",
+      "title": "Public incident-note corpus expansion",
+      "owner": "corpus ethics steward",
+      "data_sources": [
+        "public incident notes",
+        "public remediation writeups"
+      ],
+      "purpose": "Expand real data-change hazard evidence while excluding private source code and unlicensed artifacts.",
+      "risk_score": 0.45,
+      "last_reviewed": "2026-02-01T00:00:00Z",
+      "reviewer_roles": [
+        "ethics reviewer",
+        "security reviewer"
+      ],
+      "consent_basis": "Public-license and public-interest review before a case enters the evidence marketplace or benchmark.",
+      "privacy_review": "Only already-public remediation facts, evidence hashes, and source-free summaries may be retained.",
+      "retention_policy": "Raw review notes expire after 90 days; normalized hashes and license metadata remain for reproducibility.",
+      "minimization": "Store case identifiers, license class, detector class, and evidence hashes instead of raw incident narratives when possible.",
+      "withdrawal_path": "Submitters and affected maintainers can request quarantine before public release.",
+      "security_owner": "security-reviewer-oncall",
+      "mitigations": [
+        "license audit",
+        "withdrawal audit"
+      ],
+      "evidence_paths": [
+        "docs/ethics-review-template.md",
+        "docs/evidence-marketplace.md"
+      ]
+    },
+    {
+      "review_id": "live-feedback-calibration",
+      "area": "live_feedback_loop",
+      "title": "Adopter-local calibration feedback",
+      "owner": "live learning steward",
+      "data_sources": [
+        "source-free reviewer outcomes",
+        "bucketed confidence deciles"
+      ],
+      "purpose": "Detect calibration drift from adopter feedback without collecting source code, findings, or reviewer identities.",
+      "risk_score": 0.55,
+      "last_reviewed": "2026-02-01T00:00:00Z",
+      "reviewer_roles": [
+        "ethics reviewer",
+        "maintainer representative"
+      ],
+      "consent_basis": "Adopter opt-in and local export control for aggregate outcome metrics.",
+      "privacy_review": "Feedback leaves the adopter only as cohort-bucketed counts above the minimum group size.",
+      "retention_policy": "Operational feedback expires, anonymizes, or aggregates under the live feedback retention lifecycle.",
+      "minimization": "No source snippets, individual reviewer IDs, or raw finding IDs leave the adopter boundary.",
+      "withdrawal_path": "Adopters can pause exports and require deletion before aggregate publication.",
+      "security_owner": "feedback-security-owner",
+      "human_oversight": "Release council approval is required before any calibration change can affect blocking policy.",
+      "mitigations": [
+        "shadow-mode lane",
+        "manual policy gate"
+      ],
+      "evidence_paths": [
+        "docs/ethics-review-template.md",
+        "docs/live-feedback-ingestion.md",
+        "docs/accountable-use-policy.md"
+      ]
+    },
+    {
+      "review_id": "adopter-review-time-study",
+      "area": "adopter_outcome_study",
+      "title": "Maintainer review-time outcome study",
+      "owner": "study steward",
+      "data_sources": [
+        "paired reviewer timing aggregates",
+        "source-free uncertainty flags"
+      ],
+      "purpose": "Measure whether generated remediation plans reduce maintainer review time without hiding uncertainty or increasing over-reliance.",
+      "risk_score": 0.65,
+      "last_reviewed": "2026-02-01T00:00:00Z",
+      "reviewer_roles": [
+        "ethics reviewer",
+        "methods reviewer"
+      ],
+      "consent_basis": "Study participants opt in before paired timing aggregates are collected.",
+      "privacy_review": "Reports publish aggregate deltas, uncertainty recall, and burden intervals without reviewer identifiers.",
+      "retention_policy": "Raw timing logs expire after the preregistered analysis window closes.",
+      "minimization": "Retain only paired deltas, confidence intervals, and hashed study artifacts.",
+      "withdrawal_path": "Participants can withdraw their run before aggregate lock.",
+      "security_owner": "study-security-owner",
+      "preregistration": "registered-report-2026-02-maintainer-acceptance",
+      "mitigations": [
+        "preregistered analysis",
+        "independent methods review"
+      ],
+      "evidence_paths": [
+        "docs/ethics-review-template.md",
+        "docs/maintainer-acceptance-study.md",
+        "docs/reviewer-fairness-audit.md"
+      ]
+    }
+  ]
+}
