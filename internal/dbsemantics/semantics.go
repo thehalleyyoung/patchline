@@ -70,21 +70,22 @@ type Report struct {
 }
 
 type StatementSemantics struct {
-	Index               int                  `json:"index"`
-	Kind                string               `json:"kind"`
-	Table               string               `json:"table,omitempty"`
-	Normalized          string               `json:"normalized_sql"`
-	Risk                string               `json:"risk"`
-	Rules               []RuleFinding        `json:"rules"`
-	Obligations         []string             `json:"obligations,omitempty"`
-	EngineFacts         EngineFactSlice      `json:"engine_facts"`
-	Lock                LockSimulation       `json:"lock_simulation"`
-	OnlineSchemaChange  *OnlineSchemaChange  `json:"online_schema_change,omitempty"`
-	ReplicationLagRisk  *ReplicationLagRisk  `json:"replication_lag_risk,omitempty"`
-	PartitionSharding   *PartitionSharding   `json:"partition_sharding,omitempty"`
-	RollbackFeasibility *RollbackFeasibility `json:"rollback_feasibility,omitempty"`
-	QueryPlanRegression *QueryPlanRegression `json:"query_plan_regression,omitempty"`
-	RuntimeEstimate     *RuntimeEstimate     `json:"runtime_estimate,omitempty"`
+	Index               int                     `json:"index"`
+	Kind                string                  `json:"kind"`
+	Table               string                  `json:"table,omitempty"`
+	Normalized          string                  `json:"normalized_sql"`
+	Risk                string                  `json:"risk"`
+	Rules               []RuleFinding           `json:"rules"`
+	Obligations         []string                `json:"obligations,omitempty"`
+	EngineFacts         EngineFactSlice         `json:"engine_facts"`
+	NegativeControls    []EngineNegativeControl `json:"engine_negative_controls,omitempty"`
+	Lock                LockSimulation          `json:"lock_simulation"`
+	OnlineSchemaChange  *OnlineSchemaChange     `json:"online_schema_change,omitempty"`
+	ReplicationLagRisk  *ReplicationLagRisk     `json:"replication_lag_risk,omitempty"`
+	PartitionSharding   *PartitionSharding      `json:"partition_sharding,omitempty"`
+	RollbackFeasibility *RollbackFeasibility    `json:"rollback_feasibility,omitempty"`
+	QueryPlanRegression *QueryPlanRegression    `json:"query_plan_regression,omitempty"`
+	RuntimeEstimate     *RuntimeEstimate        `json:"runtime_estimate,omitempty"`
 }
 
 type RuleFinding struct {
@@ -107,6 +108,7 @@ type Summary struct {
 	MediumRisk                    int      `json:"medium_risk"`
 	LowRisk                       int      `json:"low_risk"`
 	VersionSpecificRules          int      `json:"version_specific_rules"`
+	EngineNegativeControls        int      `json:"engine_negative_controls,omitempty"`
 	ProofObligations              int      `json:"proof_obligations"`
 	LockSimulations               int      `json:"lock_simulations"`
 	ReaderBlockingLocks           int      `json:"reader_blocking_locks"`
@@ -234,6 +236,22 @@ type QueryPlanRegression struct {
 	Evidence                []Evidence               `json:"evidence"`
 	Obligations             []string                 `json:"obligations"`
 	Handoffs                []string                 `json:"handoffs,omitempty"`
+}
+
+type EngineNegativeControl struct {
+	ID             string `json:"id"`
+	SafetyClaim    string `json:"safety_claim"`
+	CurrentEngine  Engine `json:"current_engine"`
+	CurrentVersion string `json:"current_version"`
+	CurrentRule    string `json:"current_rule"`
+	CurrentRisk    string `json:"current_risk"`
+	ControlEngine  Engine `json:"control_engine"`
+	ControlVersion string `json:"control_version"`
+	ControlRule    string `json:"control_rule"`
+	ControlRisk    string `json:"control_risk"`
+	ControlVerdict string `json:"control_verdict"`
+	Evidence       string `json:"evidence"`
+	Obligation     string `json:"obligation"`
 }
 
 type RepresentativeWorkload struct {
@@ -372,6 +390,7 @@ func EvaluateWithOptions(engine Engine, version, source string, content []byte, 
 				report.Summary.HighRuntimeEstimates++
 			}
 		}
+		report.Summary.EngineNegativeControls += len(statement.NegativeControls)
 		report.Summary.VersionSpecificRules += len(statement.Rules)
 		report.Summary.ProofObligations += len(statement.Obligations)
 	}
@@ -409,7 +428,7 @@ func ResolveProfile(engine Engine, version string) (Profile, error) {
 	switch engine {
 	case EnginePostgres:
 		profile.TransactionalDDL = true
-		profile.ConcurrentIndex = major >= 8
+		profile.ConcurrentIndex = major > 8 || major == 8 && minor >= 2
 		profile.MetadataOnlyDefaults = major >= 11
 		profile.PartitionAwareDDL = major >= 10
 		profile.Evidence = []Evidence{
@@ -561,6 +580,7 @@ func evaluateStatement(index int, sql string, profile Profile, options AnalysisO
 	if err := applyRuntimeEstimate(&statement, sql, tokens, profile, options); err != nil {
 		return StatementSemantics{}, err
 	}
+	applyEngineNegativeControls(&statement, sql, profile)
 	sort.Slice(statement.Rules, func(i, j int) bool { return statement.Rules[i].ID < statement.Rules[j].ID })
 	sort.Strings(statement.Obligations)
 	return statement, nil
@@ -577,8 +597,13 @@ func applyPostgres(statement *StatementSemantics, tokens []string, profile Profi
 	}
 	if statement.Kind == "create" && contains(tokens, "index") {
 		if contains(tokens, "concurrently") {
-			statement.addRule("postgres.concurrent_index_nonblocking", "low", "checked", "CREATE INDEX CONCURRENTLY avoids long ACCESS EXCLUSIVE table locks")
-			statement.Obligations = append(statement.Obligations, "run outside an explicit transaction block")
+			if profile.ConcurrentIndex {
+				statement.addRule("postgres.concurrent_index_nonblocking", "low", "checked", "CREATE INDEX CONCURRENTLY avoids long ACCESS EXCLUSIVE table locks")
+				statement.Obligations = append(statement.Obligations, "run outside an explicit transaction block")
+			} else {
+				statement.addRule("postgres.pre82_concurrent_index_unsupported", "high", "refuted", "PostgreSQL before 8.2 does not support CREATE INDEX CONCURRENTLY")
+				statement.Obligations = append(statement.Obligations, "drop CONCURRENTLY or raise the minimum PostgreSQL version before relying on nonblocking index creation")
+			}
 		} else {
 			statement.addRule("postgres.create_index_write_blocking", "high", "checked", "plain CREATE INDEX can block writes during the build")
 		}
@@ -666,6 +691,118 @@ func applyClickHouse(statement *StatementSemantics, tokens []string, _ Profile) 
 	if contains(tokens, "drop") && contains(tokens, "partition") {
 		statement.addRule("clickhouse.drop_partition_destructive", "high", "checked", "DROP PARTITION removes a data part from the table")
 	}
+}
+
+type engineNegativeControlSpec struct {
+	id             string
+	currentRule    string
+	controlEngine  Engine
+	controlVersion string
+	controlRule    string
+	safetyClaim    string
+	obligation     string
+}
+
+var engineNegativeControlSpecs = []engineNegativeControlSpec{
+	{
+		id:             "postgres_pre11_default_rewrite",
+		currentRule:    "postgres.v11_metadata_only_default",
+		controlEngine:  EnginePostgres,
+		controlVersion: "10",
+		controlRule:    "postgres.pre11_table_rewrite_default",
+		safetyClaim:    "constant DEFAULT add-column is metadata-only on the resolved PostgreSQL profile",
+		obligation:     "pin PostgreSQL 11 or later before treating this migration as metadata-only",
+	},
+	{
+		id:             "postgres_pre82_concurrent_index_unsupported",
+		currentRule:    "postgres.concurrent_index_nonblocking",
+		controlEngine:  EnginePostgres,
+		controlVersion: "8.1",
+		controlRule:    "postgres.pre82_concurrent_index_unsupported",
+		safetyClaim:    "CREATE INDEX CONCURRENTLY is a nonblocking index build on the resolved PostgreSQL profile",
+		obligation:     "pin PostgreSQL 8.2 or later before relying on concurrent index creation",
+	},
+	{
+		id:             "mysql_preinstant_copy_alter",
+		currentRule:    "mysql.v8_instant_add_column",
+		controlEngine:  EngineMySQL,
+		controlVersion: "5.7",
+		controlRule:    "mysql.copy_or_preinstant_alter",
+		safetyClaim:    "eligible ADD COLUMN is instant on the resolved MySQL profile",
+		obligation:     "pin MySQL 8.0.12 or later and prove instant-alter eligibility before skipping copy-duration rollout controls",
+	},
+	{
+		id:             "sqlserver_pre2012_online_index_schema_lock",
+		currentRule:    "sqlserver.online_index_lock_reduced",
+		controlEngine:  EngineSQLServer,
+		controlVersion: "2008",
+		controlRule:    "sqlserver.offline_index_schema_lock",
+		safetyClaim:    "ONLINE=ON reduces the index-build lock profile on the resolved SQL Server profile",
+		obligation:     "pin SQL Server 2012 or later and prove ONLINE=ON support before relying on reduced lock impact",
+	},
+}
+
+func applyEngineNegativeControls(statement *StatementSemantics, sql string, profile Profile) {
+	for _, spec := range engineNegativeControlSpecs {
+		currentRule, ok := statementRule(statement.Rules, spec.currentRule)
+		if !ok {
+			continue
+		}
+		control, ok := evaluateEngineNegativeControl(*statement, sql, profile, currentRule, spec)
+		if !ok {
+			continue
+		}
+		statement.NegativeControls = append(statement.NegativeControls, control)
+	}
+	if len(statement.NegativeControls) == 0 {
+		return
+	}
+	sort.Slice(statement.NegativeControls, func(i, j int) bool {
+		return statement.NegativeControls[i].ID < statement.NegativeControls[j].ID
+	})
+	statement.EngineFacts = append(statement.EngineFacts, EngineFact{"engine_negative_controls", strconv.Itoa(len(statement.NegativeControls))})
+}
+
+func evaluateEngineNegativeControl(current StatementSemantics, sql string, profile Profile, currentRule RuleFinding, spec engineNegativeControlSpec) (EngineNegativeControl, bool) {
+	controlProfile, err := ResolveProfile(spec.controlEngine, spec.controlVersion)
+	if err != nil {
+		return EngineNegativeControl{}, false
+	}
+	controlStatement, err := evaluateStatement(current.Index, sql, controlProfile, AnalysisOptions{})
+	if err != nil {
+		return EngineNegativeControl{}, false
+	}
+	controlRule, ok := statementRule(controlStatement.Rules, spec.controlRule)
+	if !ok {
+		return EngineNegativeControl{}, false
+	}
+	if riskRank(controlRule.Severity) <= riskRank(currentRule.Severity) && controlRule.Verdict != "refuted" {
+		return EngineNegativeControl{}, false
+	}
+	return EngineNegativeControl{
+		ID:             spec.id,
+		SafetyClaim:    spec.safetyClaim,
+		CurrentEngine:  profile.Engine,
+		CurrentVersion: profile.ResolvedVersion,
+		CurrentRule:    currentRule.ID,
+		CurrentRisk:    currentRule.Severity,
+		ControlEngine:  controlProfile.Engine,
+		ControlVersion: controlProfile.ResolvedVersion,
+		ControlRule:    controlRule.ID,
+		ControlRisk:    controlRule.Severity,
+		ControlVerdict: controlRule.Verdict,
+		Evidence:       "counter-profile " + string(controlProfile.Engine) + " " + controlProfile.ResolvedVersion + " emits " + controlRule.ID + ": " + controlRule.Evidence,
+		Obligation:     spec.obligation,
+	}, true
+}
+
+func statementRule(rules []RuleFinding, id string) (RuleFinding, bool) {
+	for _, rule := range rules {
+		if rule.ID == id {
+			return rule, true
+		}
+	}
+	return RuleFinding{}, false
 }
 
 func applyReplicationLagRisk(statement *StatementSemantics, sql string, tokens []string, profile Profile) {
@@ -2020,7 +2157,7 @@ func simulateLock(statement StatementSemantics, tokens []string, profile Profile
 
 func applyPostgresLock(lock *LockSimulation, statement StatementSemantics, tokens []string, profile Profile) {
 	if statement.Kind == "create" && contains(tokens, "index") {
-		if contains(tokens, "concurrently") {
+		if contains(tokens, "concurrently") && profile.ConcurrentIndex {
 			lock.Mode = "SHARE UPDATE EXCLUSIVE"
 			lock.DurationClass = "brief-phase-barrier"
 			lock.BlocksReaders = false
@@ -2410,6 +2547,9 @@ func detectOnlineSchemaChange(sql string, tokens []string, profile Profile, kind
 			},
 		}
 	case profile.Engine == EnginePostgres && kind == "create" && contains(tokens, "index") && contains(tokens, "concurrently"):
+		if !profile.ConcurrentIndex {
+			return nil
+		}
 		return &OnlineSchemaChange{
 			Adapter:   "postgres-native-concurrent-index",
 			Mechanism: "PostgreSQL native concurrent index build with narrower lock phases than plain CREATE INDEX",
@@ -2423,6 +2563,9 @@ func detectOnlineSchemaChange(sql string, tokens []string, profile Profile, kind
 			},
 		}
 	case profile.Engine == EngineSQLServer && kind == "create" && contains(tokens, "index") && contains(tokens, "online") && contains(tokens, "on"):
+		if !profile.OnlineDDL {
+			return nil
+		}
 		return &OnlineSchemaChange{
 			Adapter:   "sqlserver-native-online-index",
 			Mechanism: "SQL Server ONLINE=ON index operation with schema-modification phase barriers",

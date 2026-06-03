@@ -17,13 +17,13 @@
 \contentsline {subsection}{\numberline {5.1}Relational migrations across nine ecosystems}{9}{subsection.5.1}%
 \contentsline {paragraph}{Versioned production database semantics.}{9}{subsection.5.1}%
 \contentsline {subsection}{\numberline {5.2}NoSQL change detection across five engines}{10}{subsection.5.2}%
-\contentsline {subsection}{\numberline {5.3}Data-pipeline repair evidence across four frameworks}{11}{subsection.5.3}%
+\contentsline {subsection}{\numberline {5.3}Data-pipeline repair evidence across four frameworks}{10}{subsection.5.3}%
 \contentsline {subsection}{\numberline {5.4}Schema-registry and protobuf/Avro compatibility}{11}{subsection.5.4}%
 \contentsline {subsection}{\numberline {5.5}Infrastructure/data ordering}{11}{subsection.5.5}%
 \contentsline {subsection}{\numberline {5.6}Monorepo package boundaries}{11}{subsection.5.6}%
 \contentsline {paragraph}{Summary.}{11}{subsection.5.6}%
 \contentsline {section}{\numberline {6}Bounded Interventions and Deterministic Rejection}{11}{section.6}%
-\contentsline {paragraph}{Budgets.}{11}{section.6}%
+\contentsline {paragraph}{Budgets.}{12}{section.6}%
 \contentsline {paragraph}{Quarantine.}{12}{section.6}%
 \contentsline {paragraph}{Deterministic rejection.}{12}{section.6}%
 \contentsline {paragraph}{Generator-agnostic.}{12}{section.6}%
@@ -32,14 +32,14 @@
 \contentsline {paragraph}{Remediation playbooks.}{13}{section.6}%
 \contentsline {paragraph}{Canary-data validation.}{13}{section.6}%
 \contentsline {paragraph}{Repair-risk escrow.}{13}{section.6}%
-\contentsline {paragraph}{Postmortem lessons as detector regressions.}{13}{section.6}%
+\contentsline {paragraph}{Postmortem lessons as detector regressions.}{14}{section.6}%
 \contentsline {paragraph}{Verified multi-service rollback planning.}{14}{section.6}%
 \contentsline {paragraph}{Expected-loss remediation selection.}{14}{section.6}%
 \contentsline {paragraph}{Patch-series invariant preservation.}{14}{section.6}%
 \contentsline {paragraph}{Maintainer acceptance without uncertainty laundering.}{14}{section.6}%
 \contentsline {paragraph}{The accept/reject decision.}{15}{section.6}%
 \contentsline {section}{\numberline {7}Runtime and Observability Evidence}{15}{section.7}%
-\contentsline {subsection}{\numberline {7.1}Performance and scale}{15}{subsection.7.1}%
+\contentsline {subsection}{\numberline {7.1}Performance and scale}{16}{subsection.7.1}%
 \contentsline {section}{\numberline {8}Formal and Decision-Theoretic Guarantees}{16}{section.8}%
 \contentsline {paragraph}{Formal invariant extraction.}{16}{section.8}%
 \contentsline {paragraph}{Bounded symbolic execution and model checking.}{16}{section.8}%
@@ -54,7 +54,7 @@
 \contentsline {paragraph}{Drift protection.}{18}{table.caption.4}%
 \contentsline {paragraph}{Shared evidence without trust erosion.}{18}{table.caption.4}%
 \contentsline {paragraph}{Federated private benchmark aggregates.}{19}{table.caption.4}%
-\contentsline {paragraph}{Paying for minimized missing evidence.}{19}{table.caption.4}%
+\contentsline {paragraph}{Paying for minimized missing evidence.}{20}{table.caption.4}%
 \contentsline {section}{\numberline {10}Evaluation Methodology}{20}{section.10}%
 \contentsline {paragraph}{Blinded false-positive adjudication.}{20}{section.10}%
 \contentsline {paragraph}{Seeded false-negative recall.}{20}{section.10}%
@@ -63,7 +63,7 @@
 \contentsline {paragraph}{Stratification.}{20}{section.10}%
 \contentsline {paragraph}{Baselines.}{20}{section.10}%
 \contentsline {paragraph}{Headline measured results.}{20}{table.caption.5}%
-\contentsline {section}{\numberline {11}From Analyzer to Trustworthy Artifact}{20}{section.11}%
+\contentsline {section}{\numberline {11}From Analyzer to Trustworthy Artifact}{21}{section.11}%
 \contentsline {subsection}{\numberline {11.1}Empirical generalization and external replication}{21}{subsection.11.1}%
 \contentsline {subsection}{\numberline {11.2}Supply-chain trust and provenance}{21}{subsection.11.2}%
 \contentsline {subsection}{\numberline {11.3}Reviewer, developer, and community experience}{22}{subsection.11.3}%
@@ -78,12 +78,12 @@
 \contentsline {section}{\numberline {13}From Field-Defining to Field-Standard: The 501--600 Frontier}{23}{section.13}%
 \contentsline {paragraph}{A deeper formal core.}{23}{section.13}%
 \contentsline {paragraph}{Planet-scale evidence.}{23}{section.13}%
-\contentsline {paragraph}{Causal and field rigor.}{23}{section.13}%
+\contentsline {paragraph}{Causal and field rigor.}{24}{section.13}%
 \contentsline {paragraph}{Trustworthy autonomy.}{24}{section.13}%
 \contentsline {paragraph}{Definitional adoption and a learned-but-checkable frontier.}{24}{section.13}%
 \contentsline {paragraph}{Definitive artifact and lasting impact.}{24}{section.13}%
 \contentsline {paragraph}{From field-defining system to generational artifact (601--700).}{24}{table.caption.8}%
-\contentsline {paragraph}{Standard-scale certificate interchange.}{24}{table.caption.9}%
+\contentsline {paragraph}{Standard-scale certificate interchange.}{25}{table.caption.9}%
 \contentsline {section}{\numberline {14}Developer and Contributor Experience}{26}{section.14}%
 \contentsline {section}{\numberline {15}Case Studies}{26}{section.15}%
 \contentsline {paragraph}{\texttt {lobsters/lobsters} (Rails, \texttt {db/migrate}).}{26}{section.15}%
@@ -91,7 +91,7 @@
 \contentsline {paragraph}{\texttt {helm/charts} (infra/data ordering).}{26}{section.15}%
 \contentsline {paragraph}{\texttt {harrydevforlife/building-lakehouse} (pipelines).}{26}{section.15}%
 \contentsline {paragraph}{\texttt {laaksomavrick/twitter-go} (NoSQL + minimization).}{26}{section.15}%
-\contentsline {section}{\numberline {16}Related Work}{26}{section.16}%
+\contentsline {section}{\numberline {16}Related Work}{27}{section.16}%
 \contentsline {section}{\numberline {17}Threats to Validity}{27}{section.17}%
 \contentsline {paragraph}{Construct validity.}{27}{section.17}%
 \contentsline {paragraph}{Internal validity.}{27}{section.17}%
@@ -109,7 +109,7 @@
 \contentsline {section}{\numberline {A}A Worked End-to-End Example}{29}{appendix.A}%
 \contentsline {section}{\numberline {B}Fact Schema Reference}{30}{appendix.B}%
 \contentsline {section}{\numberline {C}Detector Rule Catalog}{30}{appendix.C}%
-\contentsline {section}{\numberline {D}Infrastructure/Data Ordering Markers}{30}{appendix.D}%
+\contentsline {section}{\numberline {D}Infrastructure/Data Ordering Markers}{31}{appendix.D}%
 \contentsline {section}{\numberline {E}Selected Gate Catalog}{31}{appendix.E}%
 \contentsline {section}{\numberline {F}Security and Privacy Model}{33}{appendix.F}%
 \contentsline {section}{\numberline {G}Reproduction Guide}{33}{appendix.G}%

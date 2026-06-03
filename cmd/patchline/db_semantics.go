@@ -100,6 +100,18 @@ func dbSemanticsCommand(args []string) error {
 				runtime.SourceKind,
 			)
 		}
+		for _, control := range statement.NegativeControls {
+			fmt.Printf("      negative-control %s: %s %s -> %s %s rule=%s risk=%s verdict=%s\n",
+				control.ID,
+				control.CurrentEngine,
+				control.CurrentVersion,
+				control.ControlEngine,
+				control.ControlVersion,
+				control.ControlRule,
+				control.ControlRisk,
+				control.ControlVerdict,
+			)
+		}
 		for _, rule := range statement.Rules {
 			fmt.Printf("      - %s %s: %s\n", rule.Severity, rule.ID, rule.Evidence)
 		}

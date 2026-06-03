@@ -70,6 +70,129 @@ func TestMySQLInstantAddColumnIsVersionSpecific(t *testing.T) {
 	}
 }
 
+func TestEngineNegativeControlsShowUnsafeCounterProfiles(t *testing.T) {
+	cases := []struct {
+		name           string
+		engine         Engine
+		version        string
+		sql            string
+		id             string
+		currentRule    string
+		currentRisk    string
+		controlEngine  Engine
+		controlVersion string
+		controlRule    string
+		controlRisk    string
+		controlVerdict string
+	}{
+		{
+			name:           "postgres-default-rewrite-before-11",
+			engine:         EnginePostgres,
+			version:        "15",
+			sql:            "ALTER TABLE accounts ADD COLUMN status text DEFAULT 'active';",
+			id:             "postgres_pre11_default_rewrite",
+			currentRule:    "postgres.v11_metadata_only_default",
+			currentRisk:    "low",
+			controlEngine:  EnginePostgres,
+			controlVersion: "10",
+			controlRule:    "postgres.pre11_table_rewrite_default",
+			controlRisk:    "high",
+			controlVerdict: "checked",
+		},
+		{
+			name:           "postgres-concurrent-index-before-82",
+			engine:         EnginePostgres,
+			version:        "16",
+			sql:            "CREATE INDEX CONCURRENTLY idx_accounts_status ON accounts(status);",
+			id:             "postgres_pre82_concurrent_index_unsupported",
+			currentRule:    "postgres.concurrent_index_nonblocking",
+			currentRisk:    "low",
+			controlEngine:  EnginePostgres,
+			controlVersion: "8.1",
+			controlRule:    "postgres.pre82_concurrent_index_unsupported",
+			controlRisk:    "high",
+			controlVerdict: "refuted",
+		},
+		{
+			name:           "mysql-add-column-before-instant",
+			engine:         EngineMySQL,
+			version:        "8.0.34",
+			sql:            "ALTER TABLE accounts ADD COLUMN status varchar(20) DEFAULT 'active';",
+			id:             "mysql_preinstant_copy_alter",
+			currentRule:    "mysql.v8_instant_add_column",
+			currentRisk:    "low",
+			controlEngine:  EngineMySQL,
+			controlVersion: "5.7",
+			controlRule:    "mysql.copy_or_preinstant_alter",
+			controlRisk:    "high",
+			controlVerdict: "checked",
+		},
+		{
+			name:           "sqlserver-online-index-before-2012",
+			engine:         EngineSQLServer,
+			version:        "2022",
+			sql:            "CREATE INDEX idx_accounts_status ON accounts(status) WITH (ONLINE=ON);",
+			id:             "sqlserver_pre2012_online_index_schema_lock",
+			currentRule:    "sqlserver.online_index_lock_reduced",
+			currentRisk:    "medium",
+			controlEngine:  EngineSQLServer,
+			controlVersion: "2008",
+			controlRule:    "sqlserver.offline_index_schema_lock",
+			controlRisk:    "high",
+			controlVerdict: "checked",
+		},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			report, err := Evaluate(tc.engine, tc.version, tc.name+".sql", []byte(tc.sql))
+			if err != nil {
+				t.Fatal(err)
+			}
+			if report.Summary.EngineNegativeControls != 1 {
+				t.Fatalf("expected one engine negative control, got summary=%#v statements=%#v", report.Summary, report.Statements)
+			}
+			if !hasRule(report, tc.currentRule) {
+				t.Fatalf("expected current safe/lower-impact rule %s in %#v", tc.currentRule, report.Statements[0].Rules)
+			}
+			controls := report.Statements[0].NegativeControls
+			if len(controls) != 1 {
+				t.Fatalf("expected one statement control, got %#v", controls)
+			}
+			control := controls[0]
+			if control.ID != tc.id || control.CurrentRule != tc.currentRule || control.CurrentRisk != tc.currentRisk {
+				t.Fatalf("unexpected current side of control: %#v", control)
+			}
+			if control.ControlEngine != tc.controlEngine || control.ControlVersion != tc.controlVersion || control.ControlRule != tc.controlRule || control.ControlRisk != tc.controlRisk || control.ControlVerdict != tc.controlVerdict {
+				t.Fatalf("unexpected counter-profile side of control: %#v", control)
+			}
+			if control.SafetyClaim == "" || control.Evidence == "" || control.Obligation == "" {
+				t.Fatalf("control should carry a claim, computed evidence, and obligation: %#v", control)
+			}
+			if !strings.Contains(control.Evidence, tc.controlRule) {
+				t.Fatalf("control evidence should cite computed counter rule %s: %#v", tc.controlRule, control)
+			}
+		})
+	}
+}
+
+func TestEngineNegativeControlsStayDeterministicAndSkipReadOnlySQL(t *testing.T) {
+	sql := []byte("SELECT * FROM accounts WHERE id = 42;")
+	first, err := Evaluate(EnginePostgres, "16", "select.sql", sql)
+	if err != nil {
+		t.Fatal(err)
+	}
+	second, err := Evaluate(EnginePostgres, "16", "select.sql", sql)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if first.Hash != second.Hash {
+		t.Fatalf("expected deterministic engine-negative-control hash, got %s and %s", first.Hash, second.Hash)
+	}
+	if first.Summary.EngineNegativeControls != 0 || len(first.Statements[0].NegativeControls) != 0 {
+		t.Fatalf("read-only SQL should not emit engine negative controls: %#v", first.Statements[0])
+	}
+}
+
 func TestCloudAndAnalyticalEnginesHaveDistinctSemantics(t *testing.T) {
 	cases := []struct {
 		engine Engine

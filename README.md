@@ -147,7 +147,7 @@ Run `artifact-benchmark federated-split`, `federated-run`, and `federated-verify
 
 Run `golden-fixture generate --github owner/repo --ref <sha> --subpath <path> --out <dir>` to turn a real-repo slice into a tiny deterministic Go test without vendoring the full repository; see [docs/golden-fixtures.md](docs/golden-fixtures.md).
 
-Run `db-semantics --engine <engine> --sql <sql-or-path>` to get versioned DDL semantics, lock conflicts, rollback feasibility, and evidence-backed data-volume-aware runtime estimates via `--table-hints`; reproduce with `make lock-mode-simulator-gate`, `make db-rollback-feasibility-gate`, and `make data-volume-runtime-gate`.
+Run `db-semantics --engine <engine> --sql <sql-or-path>` to get versioned DDL semantics, lock conflicts, rollback feasibility, unsafe counter-profile controls, and evidence-backed data-volume-aware runtime estimates via `--table-hints`; reproduce with `make lock-mode-simulator-gate`, `make db-rollback-feasibility-gate`, and `make data-volume-runtime-gate`.
 
 Run `make query-plan-regression-gate` to prove `db-semantics` emits before/after representative workload checks for index and column query-plan regression risk without inventing measured `EXPLAIN` costs.
 
