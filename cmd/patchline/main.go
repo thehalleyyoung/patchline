@@ -456,6 +456,8 @@ func run(args []string) error {
 		return practitionerCertificationCommand(args[1:], hasFlag(args[1:], "--json"))
 	case "classroom-lab-kits":
 		return classroomLabKitsCommand(args[1:], hasFlag(args[1:], "--json"))
+	case "longitudinal-education-study":
+		return longitudinalEducationStudyCommand(args[1:], hasFlag(args[1:], "--json"))
 	case "reviewer-fairness-audit":
 		return reviewerFairnessAuditCommand(args[1:], hasFlag(args[1:], "--json"))
 	case "change-management-verify":
@@ -623,6 +625,7 @@ Usage:
   patchline maintainer-acceptance-study --spec maintainer-acceptance-study.json --root repo-root --out dir [--json]
   patchline practitioner-certification --spec practitioner-certification.json --root repo-root --out dir [--json]
   patchline classroom-lab-kits --spec classroom-lab-kits.json --root repo-root --out dir [--json]
+  patchline longitudinal-education-study --spec longitudinal-education-study.json --root repo-root --out dir [--json]
   patchline reviewer-fairness-audit --spec reviewer-fairness-audit.json --root repo-root --out dir [--json]
   patchline change-management-verify --spec change-management.json --root repo-root --out dir [--json]
   patchline governance-risk-register --spec governance-risk-register.json --root repo-root --out dir [--json]
@@ -15174,6 +15177,39 @@ func classroomLabKitsCommand(args []string, jsonOut bool) error {
 		return writeJSON(os.Stdout, report)
 	}
 	fmt.Printf("wrote classroom lab kits ok=%t courses=%d labs=%d gate_backed=%d audiences=%d counterexamples=%d to %s\n", report.OK, report.Summary.Courses, report.Summary.Labs, report.Summary.GateBackedLabs, report.Summary.AudiencesCovered, report.Summary.Counterexamples, outPath)
+	return nil
+}
+
+func longitudinalEducationStudyCommand(args []string, jsonOut bool) error {
+	usage := "patchline longitudinal-education-study --spec longitudinal-education-study.json --root repo-root --out <dir> [--json]"
+	specPath, outPath, err := feedbackSpecOut(args, usage)
+	if err != nil {
+		return err
+	}
+	rootPath := "."
+	if value, ok := flagValue(args, "--root"); ok && value != "" {
+		rootPath = value
+	}
+	file, err := os.Open(specPath)
+	if err != nil {
+		return err
+	}
+	defer file.Close()
+	spec, err := education.ReadLongitudinalStudySpec(file)
+	if err != nil {
+		return err
+	}
+	report, err := education.BuildLongitudinalStudyReport(spec, rootPath)
+	if err != nil {
+		return err
+	}
+	if err := education.WriteLongitudinalStudyArtifacts(outPath, report); err != nil {
+		return err
+	}
+	if jsonOut {
+		return writeJSON(os.Stdout, report)
+	}
+	fmt.Printf("wrote longitudinal education study ok=%t cohorts=%d real_hazards=%d followup_month=%d lift=%.2f counterexamples=%d to %s\n", report.OK, report.Summary.Cohorts, report.Summary.RealHazards, report.Summary.DelayedFollowupMonth, report.Summary.RetentionLiftPoints, report.Summary.Counterexamples, outPath)
 	return nil
 }
 

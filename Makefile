@@ -6,6 +6,7 @@
 .PHONY: adversarial-challenge-gate evidence-governance-board-gate evidence-appeal-workflow-gate partition-sharding-semantics-gate
 .PHONY: practitioner-certification-exam-gate
 .PHONY: classroom-lab-kits-gate
+.PHONY: longitudinal-education-study-gate
 
 build:
 	go build -o bin/patchline ./cmd/patchline
@@ -1394,6 +1395,9 @@ patch-series-verifier-gate:
 
 maintainer-acceptance-study-gate:
 	bash scripts/maintainer-acceptance-study-gate.sh
+
+longitudinal-education-study-gate:
+	bash scripts/longitudinal-education-study-gate.sh
 
 evidence-marketplace-gate:
 	bash scripts/evidence-marketplace-gate.sh

@@ -1035,6 +1035,79 @@ func TestClassroomLabKitsCommandWritesReports(t *testing.T) {
 	}
 }
 
+func TestLongitudinalEducationStudyCommandWritesReports(t *testing.T) {
+	root := t.TempDir()
+	writeMainTestFile(t, root, "Makefile", "staged-backfill-planner-gate:\n\tbash scripts/staged-backfill-planner-gate.sh\n\npatch-series-verifier-gate:\n\tbash scripts/patch-series-verifier-gate.sh\n\ncanary-validation-gate:\n\tbash scripts/canary-validation-gate.sh\n")
+	for _, gate := range []string{"staged-backfill-planner-gate", "patch-series-verifier-gate", "canary-validation-gate"} {
+		writeMainTestFile(t, root, "scripts/"+gate+".sh", "#!/usr/bin/env bash\nset -euo pipefail\n")
+	}
+	writeMainTestFile(t, root, "docs/staged-backfill-planner.md", "Backfill planner proof.\n")
+	writeMainTestFile(t, root, "examples/staged-backfill-plan.json", `{"version":"patchline.backfill-plan/v1"}`)
+	writeMainTestFile(t, root, "docs/patch-series-verifier.md", "Patch-series verifier proof.\n")
+	writeMainTestFile(t, root, "examples/patch-series-verifier.json", `{"version":"patchline.patch-series/v1"}`)
+	writeMainTestFile(t, root, "docs/canary-validation.md", "Canary validation proof.\n")
+	writeMainTestFile(t, root, "examples/canary-validation-gate.json", `{"version":"patchline.canary-validation/v1"}`)
+	specPath := filepath.Join(root, "longitudinal-education-study.json")
+	hazards := []education.LongitudinalHazard{{
+		ID: "backfill", Title: "Backfill proof", Repo: "example/repo", HazardClass: "partial-backfill", RealHazard: true, HeldOut: true, Gate: "staged-backfill-planner-gate", ReproduceCommands: []string{"make staged-backfill-planner-gate"}, ExpectedDecision: "request_changes_until_validation_proof", EvidencePaths: []string{"docs/staged-backfill-planner.md", "examples/staged-backfill-plan.json"},
+	}, {
+		ID: "series", Title: "Patch series proof", Repo: "example/repo", HazardClass: "intermediate-state", RealHazard: true, HeldOut: true, Gate: "patch-series-verifier-gate", ReproduceCommands: []string{"make patch-series-verifier-gate"}, ExpectedDecision: "escalate_until_intermediate_invariants_pass", EvidencePaths: []string{"docs/patch-series-verifier.md", "examples/patch-series-verifier.json"},
+	}, {
+		ID: "canary", Title: "Canary proof", Repo: "example/repo", HazardClass: "canary-regression", RealHazard: true, HeldOut: true, Gate: "canary-validation-gate", ReproduceCommands: []string{"make canary-validation-gate"}, ExpectedDecision: "approve_with_hash_only_counterexample_review", EvidencePaths: []string{"docs/canary-validation.md", "examples/canary-validation-gate.json"},
+	}}
+	observations := []education.LongitudinalObservation{}
+	for _, hazard := range hazards {
+		observations = append(observations,
+			mainLongitudinalObservation("trained", "trained-a", 0, hazard, true),
+			mainLongitudinalObservation("trained", "trained-b", 6, hazard, true),
+			mainLongitudinalObservation("control", "control-a", 0, hazard, hazard.ID == "backfill"),
+			mainLongitudinalObservation("control", "control-b", 6, hazard, hazard.ID == "backfill"),
+		)
+	}
+	writeMainTestJSONFile(t, specPath, education.LongitudinalStudySpec{
+		Version: education.LongitudinalStudySpecVersion,
+		Name:    "main test longitudinal education study",
+		Claim:   "Patchline compares Patchline-trained reviewers against a control cohort months later on real gate-backed hazards, counting only evidence-cited and command-reproduced detections.",
+		Criteria: education.LongitudinalCriteria{
+			MinCohorts: 2, MinRealHazards: 3, MinHeldOutHazards: 3, MinFollowupMonths: 6, MinObservationsPerCohortTimepoint: 3, MinRetentionLiftPoints: 20,
+			RequireControlCohort: true, RequireTrainedCohort: true, RequireBlindReview: true, RequireGateBackedHazards: true, RequireReproducibleCommands: true, RequireEvidenceCitations: true, RequireGateCommandUseForDetections: true, RequireBaseline: true,
+		},
+		Protocol: education.LongitudinalProtocol{RandomizationUnit: "reviewer", OutcomeDefinition: "qualified detections", BlindReview: true, FollowupMonths: []int{0, 6}},
+		Hazards:  hazards,
+		Cohorts: []education.LongitudinalCohort{{
+			ID: "trained", Kind: "trained", Description: "Patchline-trained reviewers", Participants: []string{"trained-a", "trained-b"},
+		}, {
+			ID: "control", Kind: "control", Description: "ordinary onboarding reviewers", Participants: []string{"control-a", "control-b"},
+		}},
+		Observations: observations,
+	})
+	out := filepath.Join(t.TempDir(), "longitudinal-education-study")
+	if err := run([]string{"longitudinal-education-study", "--spec", specPath, "--root", root, "--out", out, "--json"}); err != nil {
+		t.Fatalf("longitudinal-education-study failed: %v", err)
+	}
+	var report education.LongitudinalStudyReport
+	readMainTestJSON(t, filepath.Join(out, "longitudinal-education-study.json"), &report)
+	if !report.OK || report.Summary.Cohorts != 2 || report.Summary.RealHazards != 3 || report.Summary.RetentionLiftPoints != 66.67 {
+		t.Fatalf("unexpected longitudinal education report: %#v", report)
+	}
+	if len(report.Hazards[0].Evidence) == 0 || report.Hazards[0].Evidence[0].SHA256 == "" {
+		t.Fatalf("expected evidence hashes, got %#v", report.Hazards)
+	}
+	if stat, err := os.Stat(filepath.Join(out, "longitudinal-education-study.md")); err != nil || stat.Size() == 0 {
+		t.Fatalf("expected longitudinal-education-study.md to be written, stat=%#v err=%v", stat, err)
+	}
+}
+
+func mainLongitudinalObservation(cohort, reviewer string, month int, hazard education.LongitudinalHazard, detected bool) education.LongitudinalObservation {
+	obs := education.LongitudinalObservation{CohortID: cohort, ReviewerID: reviewer, TimepointMonth: month, HazardID: hazard.ID, Detected: detected}
+	if detected {
+		obs.Decision = hazard.ExpectedDecision
+		obs.EvidenceCitations = []string{hazard.EvidencePaths[0]}
+		obs.Commands = []string{"make " + hazard.Gate}
+	}
+	return obs
+}
+
 func TestReviewerFairnessAuditCommandWritesReports(t *testing.T) {
 	root := t.TempDir()
 	writeMainTestFile(t, root, "docs/acceptance-study.md", "paired reviews with adjudicated false positives\n")

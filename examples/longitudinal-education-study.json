@@ -1,0 +1,214 @@
+{
+  "version": "patchline.longitudinal-education-study/v1",
+  "name": "Patchline longitudinal reviewer education study",
+  "claim": "Patchline measures whether trained reviewers still catch real, held-out migration hazards months later by comparing Patchline-trained reviewers with a control cohort. A detection counts only when the reviewer chooses the expected safety decision, cites a real Patchline evidence artifact, and records the reproducing gate command, so the headline lift cannot be inflated by prose-only self reports.",
+  "criteria": {
+    "min_cohorts": 2,
+    "min_real_hazards": 3,
+    "min_held_out_hazards": 3,
+    "min_followup_months": 6,
+    "min_observations_per_cohort_timepoint": 3,
+    "min_retention_lift_points": 20,
+    "require_control_cohort": true,
+    "require_trained_cohort": true,
+    "require_blind_review": true,
+    "require_gate_backed_hazards": true,
+    "require_reproducible_commands": true,
+    "require_evidence_citations": true,
+    "require_gate_command_use_for_detections": true,
+    "require_baseline": true
+  },
+  "protocol": {
+    "randomization_unit": "reviewer",
+    "outcome_definition": "A qualified detection requires the expected safety decision plus a cited evidence path and reproducing make gate for the hidden real hazard.",
+    "blind_review": true,
+    "followup_months": [0, 6],
+    "training_artifacts": [
+      "docs/practitioner-certification-exam.md",
+      "docs/classroom-lab-kits.md"
+    ]
+  },
+  "hazards": [
+    {
+      "id": "staged-backfill-contract",
+      "title": "Staged invoice backfill before a NOT NULL contract",
+      "repo": "thehalleyyoung/patchline",
+      "hazard_class": "partial-backfill",
+      "real_hazard": true,
+      "held_out": true,
+      "gate": "staged-backfill-planner-gate",
+      "reproduce_commands": ["make staged-backfill-planner-gate"],
+      "expected_decision": "request_changes_until_validation_proof",
+      "evidence_paths": [
+        "docs/staged-backfill-planner.md",
+        "examples/staged-backfill-plan.json"
+      ]
+    },
+    {
+      "id": "patch-series-intermediate-state",
+      "title": "Migration patch series with unsafe intermediate states",
+      "repo": "thehalleyyoung/patchline",
+      "hazard_class": "migration-pr-intermediate-state",
+      "real_hazard": true,
+      "held_out": true,
+      "gate": "patch-series-verifier-gate",
+      "reproduce_commands": ["make patch-series-verifier-gate"],
+      "expected_decision": "escalate_until_intermediate_invariants_pass",
+      "evidence_paths": [
+        "docs/patch-series-verifier.md",
+        "examples/patch-series-verifier.json"
+      ]
+    },
+    {
+      "id": "canary-validation-review",
+      "title": "Canary validation over redacted production-like snapshots",
+      "repo": "thehalleyyoung/patchline",
+      "hazard_class": "production-like-canary-regression",
+      "real_hazard": true,
+      "held_out": true,
+      "gate": "canary-validation-gate",
+      "reproduce_commands": ["make canary-validation-gate"],
+      "expected_decision": "approve_with_hash_only_counterexample_review",
+      "evidence_paths": [
+        "docs/canary-validation.md",
+        "examples/canary-validation-gate.json"
+      ]
+    }
+  ],
+  "cohorts": [
+    {
+      "id": "patchline-trained-reviewers",
+      "kind": "trained",
+      "description": "Reviewers who completed the Patchline practitioner certification and classroom lab sequence.",
+      "participants": ["reviewer-trained-a", "reviewer-trained-b"]
+    },
+    {
+      "id": "ordinary-onboarding-control",
+      "kind": "control",
+      "description": "Reviewers who received ordinary migration-review onboarding but no Patchline training sequence.",
+      "participants": ["reviewer-control-a", "reviewer-control-b"]
+    }
+  ],
+  "observations": [
+    {
+      "cohort_id": "patchline-trained-reviewers",
+      "reviewer_id": "reviewer-trained-a",
+      "timepoint_month": 0,
+      "hazard_id": "staged-backfill-contract",
+      "detected": true,
+      "decision": "request_changes_until_validation_proof",
+      "evidence_citations": ["docs/staged-backfill-planner.md"],
+      "commands": ["make staged-backfill-planner-gate"]
+    },
+    {
+      "cohort_id": "patchline-trained-reviewers",
+      "reviewer_id": "reviewer-trained-a",
+      "timepoint_month": 0,
+      "hazard_id": "patch-series-intermediate-state",
+      "detected": false,
+      "decision": "",
+      "evidence_citations": [],
+      "commands": []
+    },
+    {
+      "cohort_id": "patchline-trained-reviewers",
+      "reviewer_id": "reviewer-trained-a",
+      "timepoint_month": 0,
+      "hazard_id": "canary-validation-review",
+      "detected": true,
+      "decision": "approve_with_hash_only_counterexample_review",
+      "evidence_citations": ["docs/canary-validation.md"],
+      "commands": ["make canary-validation-gate"]
+    },
+    {
+      "cohort_id": "patchline-trained-reviewers",
+      "reviewer_id": "reviewer-trained-b",
+      "timepoint_month": 6,
+      "hazard_id": "staged-backfill-contract",
+      "detected": true,
+      "decision": "request_changes_until_validation_proof",
+      "evidence_citations": ["examples/staged-backfill-plan.json"],
+      "commands": ["make staged-backfill-planner-gate"]
+    },
+    {
+      "cohort_id": "patchline-trained-reviewers",
+      "reviewer_id": "reviewer-trained-b",
+      "timepoint_month": 6,
+      "hazard_id": "patch-series-intermediate-state",
+      "detected": true,
+      "decision": "escalate_until_intermediate_invariants_pass",
+      "evidence_citations": ["docs/patch-series-verifier.md"],
+      "commands": ["make patch-series-verifier-gate"]
+    },
+    {
+      "cohort_id": "patchline-trained-reviewers",
+      "reviewer_id": "reviewer-trained-b",
+      "timepoint_month": 6,
+      "hazard_id": "canary-validation-review",
+      "detected": true,
+      "decision": "approve_with_hash_only_counterexample_review",
+      "evidence_citations": ["examples/canary-validation-gate.json"],
+      "commands": ["make canary-validation-gate"]
+    },
+    {
+      "cohort_id": "ordinary-onboarding-control",
+      "reviewer_id": "reviewer-control-a",
+      "timepoint_month": 0,
+      "hazard_id": "staged-backfill-contract",
+      "detected": true,
+      "decision": "request_changes_until_validation_proof",
+      "evidence_citations": ["docs/staged-backfill-planner.md"],
+      "commands": ["make staged-backfill-planner-gate"]
+    },
+    {
+      "cohort_id": "ordinary-onboarding-control",
+      "reviewer_id": "reviewer-control-a",
+      "timepoint_month": 0,
+      "hazard_id": "patch-series-intermediate-state",
+      "detected": false,
+      "decision": "",
+      "evidence_citations": [],
+      "commands": []
+    },
+    {
+      "cohort_id": "ordinary-onboarding-control",
+      "reviewer_id": "reviewer-control-a",
+      "timepoint_month": 0,
+      "hazard_id": "canary-validation-review",
+      "detected": false,
+      "decision": "",
+      "evidence_citations": [],
+      "commands": []
+    },
+    {
+      "cohort_id": "ordinary-onboarding-control",
+      "reviewer_id": "reviewer-control-b",
+      "timepoint_month": 6,
+      "hazard_id": "staged-backfill-contract",
+      "detected": true,
+      "decision": "request_changes_until_validation_proof",
+      "evidence_citations": ["examples/staged-backfill-plan.json"],
+      "commands": ["make staged-backfill-planner-gate"]
+    },
+    {
+      "cohort_id": "ordinary-onboarding-control",
+      "reviewer_id": "reviewer-control-b",
+      "timepoint_month": 6,
+      "hazard_id": "patch-series-intermediate-state",
+      "detected": false,
+      "decision": "",
+      "evidence_citations": [],
+      "commands": []
+    },
+    {
+      "cohort_id": "ordinary-onboarding-control",
+      "reviewer_id": "reviewer-control-b",
+      "timepoint_month": 6,
+      "hazard_id": "canary-validation-review",
+      "detected": false,
+      "decision": "",
+      "evidence_citations": [],
+      "commands": []
+    }
+  ]
+}
