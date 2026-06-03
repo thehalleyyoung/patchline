@@ -1,0 +1,18 @@
+{
+  "version": "patchline.federated-benchmark-split-gate/v1",
+  "claim": "Patchline supports a federated benchmark split for private adopters: local benchmark cases are evaluated with the normal artifact runner, the public result contains only signed aggregate metrics with k-anonymous buckets, and verification rejects both metric tampering and accidental case-level metadata leakage. The gate builds a real temporary benchmark, runs the artifact-benchmark federated-split, federated-run, and federated-verify commands, proves the aggregate is signed, confirms private case identifiers, fixtures, and ground-truth paths are absent from the public JSON, and checks that malformed public aggregates fail, so the workflow is reproducible via `make federated-benchmark-split-gate`.",
+  "adopter_id": "patchline-private-adopter-fixture",
+  "min_private_cases": 3,
+  "partition_salt": "0d0d0d0d0d0d0d0d0d0d0d0d0d0d0d0d",
+  "seed_hex": "0101010101010101010101010101010101010101010101010101010101010101",
+  "private_cases": [
+    "private-broad-update-1",
+    "private-broad-update-2",
+    "private-broad-update-3"
+  ],
+  "bad": {
+    "tamper_metric": true,
+    "leak_case_id": "private-broad-update-1"
+  }
+}
+

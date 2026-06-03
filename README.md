@@ -139,6 +139,8 @@ Run `maintainer-acceptance-study --spec <spec>` to measure paired maintainer rev
 
 Run `evidence-marketplace publish --registry <registry>` and `artifact-benchmark import-marketplace --registry <registry>` to publish redacted, certificate-backed hazard examples with automated license/consent release checks and reproducibility/longevity/independent-confirmation reputation, then import them into runnable benchmarks without trusting submitter labels; reproduce it with `make evidence-marketplace-gate`.
 
+Run `artifact-benchmark federated-split`, `federated-run`, and `federated-verify` so private adopters evaluate local benchmark cases while publishing only signed aggregate metrics; reproduce it with `make federated-benchmark-split-gate`.
+
 Run `golden-fixture generate --github owner/repo --ref <sha> --subpath <path> --out <dir>` to turn a real-repo slice into a tiny deterministic Go test without vendoring the full repository; see [docs/golden-fixtures.md](docs/golden-fixtures.md).
 
 <details>

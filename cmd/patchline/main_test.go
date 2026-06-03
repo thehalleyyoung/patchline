@@ -138,6 +138,72 @@ func TestArtifactBenchmarkImportMarketplaceCommandWritesRunnableBenchmark(t *tes
 	}
 }
 
+func TestArtifactBenchmarkFederatedCommandsPublishSignedAggregateOnly(t *testing.T) {
+	root := t.TempDir()
+	writeMainTestFile(t, root, "fixtures/private-1.sql", "UPDATE accounts SET repaired = true;\n")
+	writeMainTestFile(t, root, "fixtures/private-2.sql", "UPDATE users SET repaired = true;\n")
+	writeMainTestFile(t, root, "fixtures/private-3.sql", "UPDATE invoices SET repaired = true;\n")
+	for _, id := range []string{"private-1", "private-2", "private-3"} {
+		writeMainTestFile(t, root, "ground_truth/"+id+".json", `{
+  "case_id": "`+id+`",
+  "case_type": "migration",
+  "phase": "pre_deploy",
+  "labels": {"expected_result": "flag", "risk": "high"},
+  "evidence": [{"kind": "fixture", "locator": "fixtures/`+id+`.sql", "rationale": "unscoped update should be flagged"}],
+  "allowed_inputs": ["migration_text"],
+  "excluded_inputs": ["postmortem_text"]
+}`)
+	}
+	writeMainTestFile(t, root, "manifests/federated.json", `{
+  "version": "patchline.artifact-benchmark/v1",
+  "dataset_id": "federated-cli-test",
+  "description": "federated CLI test",
+  "cases": [
+    {"case_id": "private-1", "case_type": "migration", "available_at": "pre_deploy", "fixture": "../fixtures/private-1.sql", "ground_truth": "../ground_truth/private-1.json"},
+    {"case_id": "private-2", "case_type": "migration", "available_at": "pre_deploy", "fixture": "../fixtures/private-2.sql", "ground_truth": "../ground_truth/private-2.json"},
+    {"case_id": "private-3", "case_type": "migration", "available_at": "pre_deploy", "fixture": "../fixtures/private-3.sql", "ground_truth": "../ground_truth/private-3.json"}
+  ]
+}`)
+	out := t.TempDir()
+	splitPath := filepath.Join(out, "split.json")
+	if err := run([]string{
+		"artifact-benchmark", "federated-split",
+		"--manifest", filepath.Join(root, "manifests", "federated.json"),
+		"--out", splitPath,
+		"--adopter-id", "cli-adopter",
+		"--min-private-cases", "3",
+		"--partition-salt", strings.Repeat("0c", 16),
+		"--json",
+	}); err != nil {
+		t.Fatalf("federated split failed: %v", err)
+	}
+	aggregatePath := filepath.Join(out, "aggregate.json")
+	if err := run([]string{
+		"artifact-benchmark", "federated-run",
+		"--split", splitPath,
+		"--seed-hex", strings.Repeat("01", 32),
+		"--out", aggregatePath,
+		"--json",
+	}); err != nil {
+		t.Fatalf("federated run failed: %v", err)
+	}
+	var aggregate artifact.FederatedBenchmarkAggregate
+	readMainTestJSON(t, aggregatePath, &aggregate)
+	if aggregate.Metrics.Buckets["matched"] != 3 || aggregate.Metrics.Buckets["actual:flag"] != 3 {
+		t.Fatalf("unexpected aggregate metrics: %#v", aggregate.Metrics)
+	}
+	raw, err := os.ReadFile(aggregatePath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if strings.Contains(string(raw), "private-1") || strings.Contains(string(raw), "fixture") || strings.Contains(string(raw), "ground_truth") {
+		t.Fatalf("aggregate leaked private case details:\n%s", string(raw))
+	}
+	if err := run([]string{"artifact-benchmark", "federated-verify", "--report", aggregatePath, "--json"}); err != nil {
+		t.Fatalf("federated verify failed: %v", err)
+	}
+}
+
 func TestExpandContractTemplateCommandWritesReports(t *testing.T) {
 	root := t.TempDir()
 	writeMainTestFile(t, root, "rails/app/models/invoice.rb", `class Invoice < ApplicationRecord

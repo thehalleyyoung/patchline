@@ -571,6 +571,9 @@ Usage:
   patchline artifact-benchmark run <manifest.json> [--out report.json] [--json]
   patchline artifact-benchmark compare <actual.json> <expected.json> [--json]
   patchline artifact-benchmark import-marketplace --registry registry.json --out benchmark-dir [--dataset-id id] [--json]
+  patchline artifact-benchmark federated-split --manifest manifest.json --out split.json --adopter-id id [--private-case case_id] [--min-private-cases n] [--partition-salt hex] [--json]
+  patchline artifact-benchmark federated-run --split split.json --seed-hex seed --out aggregate.json [--json]
+  patchline artifact-benchmark federated-verify --report aggregate.json [--json]
   patchline ingest-evidence <events.jsonl> [--json] [--out graph.json]
   patchline adapt-evidence <otlp|datadog|postgres|github|migration-runner|jira|linear> <input.json> [--json] [--out events.jsonl]
   patchline evidence-marketplace publish --registry registry.json --out dir [--json]
@@ -14275,6 +14278,103 @@ func artifactBenchmark(args []string) error {
 			return errors.New("marketplace benchmark import failed")
 		}
 		return nil
+	case "federated-split":
+		manifestPath, ok := flagValue(args[1:], "--manifest")
+		if !ok || manifestPath == "" {
+			return errors.New("usage: patchline artifact-benchmark federated-split --manifest manifest.json --out split.json --adopter-id id [--private-case case_id] [--min-private-cases n] [--partition-salt hex] [--json]")
+		}
+		outPath, ok := flagValue(args[1:], "--out")
+		if !ok || outPath == "" {
+			return errors.New("usage: patchline artifact-benchmark federated-split --manifest manifest.json --out split.json --adopter-id id [--private-case case_id] [--min-private-cases n] [--partition-salt hex] [--json]")
+		}
+		adopterID, ok := flagValue(args[1:], "--adopter-id")
+		if !ok || adopterID == "" {
+			return errors.New("usage: patchline artifact-benchmark federated-split --manifest manifest.json --out split.json --adopter-id id [--private-case case_id] [--min-private-cases n] [--partition-salt hex] [--json]")
+		}
+		minPrivateCases := artifact.DefaultFederatedMinPrivateCases
+		if value, ok := flagValue(args[1:], "--min-private-cases"); ok && value != "" {
+			parsed, err := strconv.Atoi(value)
+			if err != nil {
+				return err
+			}
+			minPrivateCases = parsed
+		}
+		partitionSalt, _ := flagValue(args[1:], "--partition-salt")
+		split, err := artifact.CreateFederatedBenchmarkSplit(artifact.FederatedBenchmarkSplitOptions{
+			ManifestPath:    manifestPath,
+			AdopterID:       adopterID,
+			PrivateCases:    flagValues(args[1:], "--private-case"),
+			MinPrivateCases: minPrivateCases,
+			PartitionSalt:   partitionSalt,
+		})
+		if err != nil {
+			return err
+		}
+		if err := artifact.WriteFederatedBenchmarkSplit(outPath, split); err != nil {
+			return err
+		}
+		if hasFlag(args[1:], "--json") {
+			if err := writeJSON(os.Stdout, split); err != nil {
+				return err
+			}
+		} else {
+			fmt.Printf("federated benchmark split dataset=%s private=%d public=%d hash=%s out=%s\n", split.DatasetID, split.PrivateCaseCount, split.PublicCaseCount, split.Hash, outPath)
+		}
+		return nil
+	case "federated-run":
+		splitPath, ok := flagValue(args[1:], "--split")
+		if !ok || splitPath == "" {
+			return errors.New("usage: patchline artifact-benchmark federated-run --split split.json --seed-hex seed --out aggregate.json [--json]")
+		}
+		seedHex, ok := flagValue(args[1:], "--seed-hex")
+		if !ok || seedHex == "" {
+			return errors.New("usage: patchline artifact-benchmark federated-run --split split.json --seed-hex seed --out aggregate.json [--json]")
+		}
+		outPath, ok := flagValue(args[1:], "--out")
+		if !ok || outPath == "" {
+			return errors.New("usage: patchline artifact-benchmark federated-run --split split.json --seed-hex seed --out aggregate.json [--json]")
+		}
+		aggregate, err := artifact.RunFederatedBenchmarkAggregate(artifact.FederatedBenchmarkRunOptions{
+			SplitPath: splitPath,
+			SeedHex:   seedHex,
+		})
+		if err != nil {
+			return err
+		}
+		if err := artifact.WriteFederatedBenchmarkAggregate(outPath, aggregate); err != nil {
+			return err
+		}
+		if hasFlag(args[1:], "--json") {
+			if err := writeJSON(os.Stdout, aggregate); err != nil {
+				return err
+			}
+		} else {
+			fmt.Printf("federated benchmark aggregate dataset=%s private=%d suppressed_buckets=%d hash=%s out=%s\n", aggregate.DatasetID, aggregate.PrivateCaseCount, aggregate.Metrics.SuppressedBuckets, aggregate.Hash, outPath)
+		}
+		return nil
+	case "federated-verify":
+		reportPath, ok := flagValue(args[1:], "--report")
+		if !ok || reportPath == "" {
+			return errors.New("usage: patchline artifact-benchmark federated-verify --report aggregate.json [--json]")
+		}
+		report, err := artifact.VerifyFederatedBenchmarkAggregateFile(reportPath)
+		if err != nil {
+			return err
+		}
+		if hasFlag(args[1:], "--json") {
+			if err := writeJSON(os.Stdout, report); err != nil {
+				return err
+			}
+		} else {
+			fmt.Printf("federated benchmark aggregate verify ok=%t hash=%s subject=%s\n", report.OK, report.AggregateHash, report.Subject)
+			for _, err := range report.Errors {
+				fmt.Printf("  error=%s\n", err)
+			}
+		}
+		if !report.OK {
+			return errors.New("federated benchmark aggregate verification failed")
+		}
+		return nil
 	default:
 		return fmt.Errorf("unknown artifact-benchmark subcommand %q", args[0])
 	}
@@ -16144,6 +16244,16 @@ func flagValue(args []string, flag string) (string, bool) {
 		}
 	}
 	return "", false
+}
+
+func flagValues(args []string, flag string) []string {
+	var values []string
+	for i, arg := range args {
+		if arg == flag && i+1 < len(args) {
+			values = append(values, args[i+1])
+		}
+	}
+	return values
 }
 
 func positionalArgs(args []string) []string {

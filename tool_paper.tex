@@ -63,7 +63,9 @@ fails generated remediation plans that hide uncertainty or inflate confidence, a
 marketplace admits only redacted, certificate-backed hazard examples after automated license/consent
 release checks, scores community-gate reputation solely from reproducible runs, elapsed verification
 windows, and independent confirmations, and imports examples into runnable benchmarks while recording
-submitter labels as untrusted and deriving cases from independent redacted evidence cues.
+submitter labels as untrusted and deriving cases from independent redacted evidence cues; private
+adopters can then run federated benchmark splits locally and publish only signed, k-thresholded
+aggregate metrics.
 Critically,
 every capability in \tool{} is backed by a reproducible \emph{gate}: a script that proves the
 capability against real, pinned public code and fails loudly on drift. \tool{} currently ships more
@@ -133,7 +135,8 @@ ranks the risks, and prints the next commands that can run immediately.
   exports (Section~\ref{sec:runtime}).
   \item A \textbf{gate-backed reproducibility and evaluation methodology}---over 610 gates, blinded
   false-positive adjudication, seeded false-negative recall, ablations, standardized effect sizes,
-  severity calibration, and a certificate-backed public evidence marketplace---designed for artifact
+  severity calibration, a certificate-backed public evidence marketplace, and signed federated
+  benchmark aggregates for private adopters---designed for artifact
   evaluation and best-paper-grade rigor
   (Sections~\ref{sec:repro}--\ref{sec:eval}).
 \end{enumerate}
@@ -236,6 +239,10 @@ certificate-obligation, public-data reproduction, and deterministic reputation c
 published examples into runnable benchmark cases without trusting registry or artifact hazard labels. &
 \code{marketplace.json},
 \code{marketplace-import.json}, generated manifest/ground truth \\
+\code{artifact-benchmark federated-split/run/verify} & Validate an adopter-local private benchmark
+partition, execute it locally, suppress below-threshold metric buckets, and publish only a signed
+aggregate bound to the manifest and salted split commitments. & local \code{split.json}, public
+\code{aggregate.json} \\
 \code{propose} & Generate bounded interventions (guards, tests) within an explicit budget; quarantine
 them as untrusted artifacts. & \code{proposal.patch}, \code{patchline-proposals/} \\
 \code{compare} & Deterministically re-analyze proposed changes; accept or reject by evidence delta. &
@@ -764,6 +771,19 @@ gate reputation, imports both into a runnable benchmark manifest, validates and 
 then corrupts a copied certificate hash; the bad marketplace must be rejected while the tracked fixture
 remains untouched.
 
+\paragraph{Federated private benchmark aggregates.} A public benchmark alone cannot measure private
+adopter failure modes without either collecting source code or leaking case-level outcomes. The
+\code{artifact-benchmark federated-split}, \code{federated-run}, and \code{federated-verify} commands
+therefore separate the local partition from the public report. The split file records private case IDs,
+a random or supplied salt, a manifest hash, and a salted partition commitment; it refuses partitions
+below the configured k-anonymity threshold. The run command executes the ordinary benchmark runner
+locally, projects only the private partition into aggregate buckets, suppresses buckets below the
+threshold, and signs the aggregate with \tool's Ed25519 attestation envelope. The public aggregate has
+no \code{case\_id}, \code{fixture}, \code{ground\_truth}, signal, or per-case hash fields. The
+\gate{federated-benchmark-split-gate} builds a four-case benchmark fixture, publishes a three-case
+private aggregate, verifies the signature, then proves both metric tampering and accidental case-field
+leakage are rejected.
+
 \paragraph{Paying for minimized missing evidence.} \tool{} also treats community incentives as a
 reproducible artifact. The \gate{open-problem-bounty-board-gate} checks a frozen bounty spec in which
 paid submissions count only if they are categorized as false negatives or ecosystem gaps, point to a
@@ -858,6 +878,7 @@ owner-routed rollback playbooks for broad writes & \gate{remediation-playbook-ga
 5 migration-PR states preserve invariants; unsafe drop refuted & \gate{patch-series-verifier-gate} \\
 9 paired maintainer reviews; 38.55\% faster with full uncertainty recall; hidden-control refuted & \gate{maintainer-acceptance-study-gate} \\
 2 public-release-eligible examples with reviewable gate reputation imported into runnable benchmarks; corrupted certificate rejected & \gate{evidence-marketplace-gate} \\
+3 private benchmark cases published as signed aggregate-only metrics; tampering/leakage rejected & \gate{federated-benchmark-split-gate} \\
 3 payout-approved minimized false-negative/ecosystem-gap bounty reproductions; unsupported bounty rejected & \gate{open-problem-bounty-board-gate} \\
 9 Cassandra changes incl.\ destructive drops & \code{laaksomavrick/twitter-go} \\
 17 $\rightarrow$ 1 line, 1-minimal reproduction & delta-debugging oracle \\
