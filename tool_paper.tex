@@ -75,7 +75,7 @@ k-thresholded aggregate metrics.
 Critically,
 every capability in \tool{} is backed by a reproducible \emph{gate}: a script that proves the
 capability against real, pinned public code and fails loudly on drift. \tool{} currently ships more
-than 600 such gates over 560 documented capabilities, spanning relational migrations across nine
+than 610 such gates over 560 documented capabilities, spanning relational migrations across nine
 ecosystems, versioned database semantics with pinned reproducibility reports, computed unsafe counter-profile controls, lock-mode simulations, online-schema-change adapters,
 conditional replication-lag analysis, query-plan regression preflight, data-volume-aware runtime estimates, partition/shard routing semantics, and rollback-feasibility verdicts
 across eight production engines, five NoSQL engines,
@@ -144,11 +144,12 @@ ranks the risks, and prints the next commands that can run immediately.
   \item A \textbf{runtime and observability evidence} layer that scores findings on independent
   static-risk and observed-runtime axes using OpenTelemetry, Datadog-style, and Prometheus/Grafana
   exports (Section~\ref{sec:runtime}).
-  \item A \textbf{gate-backed reproducibility and evaluation methodology}---over 610 gates, blinded
+  \item A \textbf{gate-backed reproducibility and evaluation methodology}---over 611 gates, blinded
   false-positive adjudication, seeded false-negative recall, ablations, standardized effect sizes,
   severity calibration, a duplicate-safe certificate-backed public evidence marketplace, deterministic
-  governance-board lifecycle decisions, adversarial-challenge scoring, and signed federated benchmark
-  aggregates for private adopters---designed for artifact
+  governance-board lifecycle decisions, adversarial-challenge scoring, signed federated benchmark
+  aggregates for private adopters, and accountable-use mappings from autonomous or blocking capabilities
+  to required human oversight---designed for artifact
   evaluation and best-paper-grade rigor
   (Sections~\ref{sec:repro}--\ref{sec:eval}).
 \end{enumerate}
@@ -1172,7 +1173,10 @@ merges without a passing certificate, the agent runs in a capability-scoped sand
 no-side-effect-outside-scope property, every action is reversible and logged, sessions replay
 deterministically, and a provable kill-switch halts all autonomy in a safe state. Red-team gates probe
 prompt-injection in migration descriptions, and an abstention policy escalates under bounded
-uncertainty. The autonomy story is thus a \emph{safety case}, not a capability boast.
+uncertainty. The newest accountability gate maps every autonomous or blocking capability to a named
+human role, a decision point, a preserved review artifact, and gate-backed evidence; a blocking rule
+without that oversight mapping is rejected. The autonomy story is thus a \emph{safety case}, not a
+capability boast.
 
 \paragraph{Definitional adoption and a learned-but-checkable frontier.}
 Adoption and research surfaces are gated together: a reference enterprise deployment with published
@@ -1200,7 +1204,7 @@ cross-links novelty, rigor, autonomy, adoption, and reproducibility into a singl
 Deeper formal core & \gate{certificate-lattice-proof-gate} & a non-lattice certificate composition \\
 Planet-scale evidence & \gate{ten-million-migration-mining-gate} & a non-content-addressed index \\
 Causal/field rigor & \gate{multi-site-rct-gate} & an unregistered, post-hoc effect \\
-Trustworthy autonomy & \gate{verifier-in-the-loop-gate} & a merge without a passing certificate \\
+Trustworthy autonomy & \gate{accountable-use-policy-gate} & an unmapped blocking capability \\
 Definitional adoption & \gate{certificate-rfc-standards-track-gate} & a single, non-interoperable impl. \\
 Learned frontier & \gate{abstraction-selection-policy-gate} & an abstraction that weakens soundness \\
 Definitive artifact & \gate{grand-unified-one-command-index-gate} & an unbacked novelty/rigor pillar \\
@@ -1481,7 +1485,8 @@ production-grade remediation loops for rollback, repair escrow, and patch-series
 federated, checksum-mirrored, withdrawal-aware, challenge-ready public evidence marketplace with
 externally adopted governance; deeper rollback, query-plan, data-volume, and engine-negative-control semantics
 on top of the new versioned production-database profiles;
-socio-technical accountability for appeals, fairness, ethics, and detector deprecation; education and
+socio-technical accountability beyond the new accountable-use mapping, including appeals, fairness,
+ethics, and detector deprecation; education and
 certification materials that make migration safety teachable; resilient offline, edge, confidential,
 and disaster-recovery deployments; and an award-to-standard transition that externalizes benchmarks,
 errata, conformance labels, and long-term stewardship. These items are intentionally recorded as future
@@ -1497,7 +1502,7 @@ documentation that fails if it overstates the evidence.
 data changes---can be analyzed \emph{deterministically}, with full provenance, across relational,
 NoSQL, pipeline, schema, and infrastructure surfaces, and that generation can be made safe by bounding
 it, quarantining it, and deterministically rejecting it. Just as important, \tool{} shows that
-\emph{every} such claim can be made reproducible: over 600 gates prove the system against real, pinned
+\emph{every} such claim can be made reproducible: over 610 gates prove the system against real, pinned
 public code and fail loudly on drift, and a research-grade evaluation methodology---blinded
 adjudication, seeded recall, ablations, effect sizes, and severity calibration---turns the artifact
 into evidence. We believe this combination of breadth, safety, and gate-backed reproducibility is a

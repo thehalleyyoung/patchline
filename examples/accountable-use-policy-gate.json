@@ -1,0 +1,52 @@
+{
+  "version": "patchline.accountable-use-policy-gate/v1",
+  "claim": "Patchline ships an accountable-use policy that maps every autonomous or blocking capability to required human oversight before the capability can be treated as safe. The worker loads a frozen self-repo spec, checks that each autonomous or blocking capability names a human role, a decision point, a review artifact, and gate-backed evidence, and then rejects a negative control whose blocking capability has no required oversight, so the accountable-use claim is reproducible via `make accountable-use-policy-gate`.",
+  "real_repo": "patchline (self): accountable-use-policy",
+  "capabilities": [
+    {
+      "id": "generated-repair-release",
+      "kind": "autonomous",
+      "description": "Escrow can release a generated repair candidate only after independent evidence clears thresholds.",
+      "human_role": "maintainer-reviewer",
+      "decision_point": "before release badge or merge recommendation",
+      "review_artifact": "repair-escrow manifest with reviewer and certificate thresholds",
+      "evidence": "repair-risk-escrow-gate"
+    },
+    {
+      "id": "pr-blocking-data-risk",
+      "kind": "blocking",
+      "description": "Pull-request checks may block when deterministic data-risk findings violate policy.",
+      "human_role": "service-owner",
+      "decision_point": "before merge block is overridden or accepted",
+      "review_artifact": "finding explanation with evidence paths, policy obligation, and override rationale",
+      "evidence": "verifier-in-the-loop-gate"
+    },
+    {
+      "id": "live-threshold-update",
+      "kind": "blocking",
+      "description": "Live calibration can suggest but not apply threshold changes to blocking policy.",
+      "human_role": "risk-governance-reviewer",
+      "decision_point": "before any high-stakes threshold becomes active",
+      "review_artifact": "policy-freeze decision record plus calibration drift report",
+      "evidence": "policy-freeze-gate"
+    },
+    {
+      "id": "shadow-detector-evaluation",
+      "kind": "advisory",
+      "description": "New detectors run in shadow mode until burden and precision gates pass.",
+      "human_role": "",
+      "decision_point": "none: advisory-only until promoted",
+      "review_artifact": "safe online-evaluation report",
+      "evidence": "safe-online-evaluation-gate"
+    }
+  ],
+  "bad": {
+    "id": "silent-blocking-rule",
+    "kind": "blocking",
+    "description": "A blocking rule with no human oversight mapping.",
+    "human_role": "",
+    "decision_point": "",
+    "review_artifact": "missing",
+    "evidence": "policy-freeze-gate"
+  }
+}

@@ -1405,6 +1405,9 @@ data-volume-runtime-gate:
 federated-benchmark-split-gate:
 	bash scripts/federated-benchmark-split-gate.sh
 
+.PHONY: accountable-use-policy-gate
+accountable-use-policy-gate:
+	bash scripts/accountable-use-policy-gate.sh
 
 
 acm-reproduced-badge-gate:

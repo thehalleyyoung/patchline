@@ -1,6 +1,6 @@
 \contentsline {section}{\numberline {1}Introduction}{3}{section.1}%
 \contentsline {paragraph}{Contributions.}{4}{Item.3}%
-\contentsline {paragraph}{A motivating scenario.}{4}{Item.8}%
+\contentsline {paragraph}{A motivating scenario.}{5}{Item.8}%
 \contentsline {paragraph}{Why determinism, now.}{5}{Item.8}%
 \contentsline {section}{\numberline {2}Design Principles}{5}{section.2}%
 \contentsline {paragraph}{P1: Determinism over cleverness.}{5}{section.2}%

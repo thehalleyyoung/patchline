@@ -159,6 +159,8 @@ Run `make partition-sharding-semantics-gate` to prove `db-semantics` models part
 
 Run `make db-rollback-feasibility-gate` to prove `db-semantics` distinguishes native transactional rollback, implicit-commit compensation, time-travel recovery, async mutation cleanup, before-image DML compensation, and snapshot-required bulk changes.
 
+Run `make accountable-use-policy-gate` to prove autonomous or blocking capabilities map to required **human oversight**, while an unmapped blocking rule is rejected; see [docs/accountable-use-policy.md](docs/accountable-use-policy.md).
+
 <details>
 <summary><strong>Full verification catalog</strong> — 600+ reproducible <code>make &lt;name&gt;-gate</code> checks, each with a positive proof and a negative control on real public-repo data (click to expand)</summary>
 
