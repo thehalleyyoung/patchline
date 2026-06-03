@@ -469,6 +469,8 @@ func run(args []string) error {
 		return skillsTaxonomyCommand(args[1:], hasFlag(args[1:], "--json"))
 	case "localized-teaching-examples":
 		return localizedTeachingExamplesCommand(args[1:], hasFlag(args[1:], "--json"))
+	case "open-textbook-companion":
+		return openTextbookCompanionCommand(args[1:], hasFlag(args[1:], "--json"))
 	case "reviewer-fairness-audit":
 		return reviewerFairnessAuditCommand(args[1:], hasFlag(args[1:], "--json"))
 	case "change-management-verify":
@@ -15391,6 +15393,39 @@ func localizedTeachingExamplesCommand(args []string, jsonOut bool) error {
 		return writeJSON(os.Stdout, report)
 	}
 	fmt.Printf("wrote localized teaching examples ok=%t examples=%d translations=%d locales=%d audiences=%d terms=%d accessibility=%d counterexamples=%d to %s\n", report.OK, report.Summary.Examples, report.Summary.Translations, report.Summary.LocalesCovered, report.Summary.AudiencesCovered, report.Summary.TechnicalTerms, report.Summary.AccessibilityChecks, report.Summary.Counterexamples, outPath)
+	return nil
+}
+
+func openTextbookCompanionCommand(args []string, jsonOut bool) error {
+	usage := "patchline open-textbook-companion --spec open-textbook-companion.json --root repo-root --out <dir> [--json]"
+	specPath, outPath, err := feedbackSpecOut(args, usage)
+	if err != nil {
+		return err
+	}
+	rootPath := "."
+	if value, ok := flagValue(args, "--root"); ok && value != "" {
+		rootPath = value
+	}
+	file, err := os.Open(specPath)
+	if err != nil {
+		return err
+	}
+	defer file.Close()
+	spec, err := education.ReadTextbookCompanionSpec(file)
+	if err != nil {
+		return err
+	}
+	report, err := education.BuildTextbookCompanionReport(spec, rootPath)
+	if err != nil {
+		return err
+	}
+	if err := education.WriteTextbookCompanionArtifacts(outPath, report); err != nil {
+		return err
+	}
+	if jsonOut {
+		return writeJSON(os.Stdout, report)
+	}
+	fmt.Printf("wrote open textbook companion ok=%t chapters=%d notebooks=%d executable=%d examples=%d generated=%d counterexamples=%d to %s\n", report.OK, report.Summary.Chapters, report.Summary.Notebooks, report.Summary.ExecutableNotebooks, report.Summary.TeachingExamples, report.Summary.GeneratedArtifacts, report.Summary.Counterexamples, outPath)
 	return nil
 }
 

@@ -155,6 +155,8 @@ Reviewer skills taxonomy (`make skills-taxonomy-gate`) maps each hazard class to
 
 Localized teaching examples (`make localized-teaching-examples-gate`) prove translated lessons preserve byte-identical technical tokens, cite evidence, cover accessibility checks, and fail negative controls.
 
+Open textbook companion (`make open-textbook-companion-gate`) proves executable notebooks regenerate classroom, skills-taxonomy, and localized-teaching examples with hashed outputs.
+
 Run `explainability-audit --spec examples/explainability-audit.json` to verify independent reviewers agree evidence trails support stated verdicts, with hash-mismatch and disagreement negative controls; reproduce it with `make explainability-audit-gate`.
 
 Run `change-management-verify --spec <spec>` to prove organizational approvals are bound to passed Patchline gates, hash-pinned reports, rollback evidence, and emergency expiry; reproduce it with `make change-management-integration-gate`.

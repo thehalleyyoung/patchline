@@ -1628,6 +1628,110 @@ func mainLocalizedTranslation(locale, command, firstIdentifier, secondIdentifier
 	}
 }
 
+func TestOpenTextbookCompanionCommandWritesReports(t *testing.T) {
+	root := t.TempDir()
+	spec := education.TextbookCompanionSpec{
+		Version: education.TextbookCompanionSpecVersion,
+		Name:    "main test open textbook companion",
+		Claim:   "Patchline validates an open textbook companion by checking executable notebooks with exact regeneration commands, hashed source evidence, generated report artifacts, teaching objectives, and negative controls for every teaching example.",
+		Criteria: education.TextbookCompanionCriteria{
+			RequiredChapters:                 []string{"classroom-labs", "reviewer-skills", "localized-lessons"},
+			MinChapters:                      3,
+			MinNotebooksPerChapter:           1,
+			MinExamplesPerNotebook:           1,
+			MinCommandsPerNotebook:           1,
+			MinLearningObjectivesPerExample:  2,
+			MinEvidenceArtifactsPerNotebook:  3,
+			MinGeneratedArtifactsPerNotebook: 2,
+			RequireExecutableNotebook:        true,
+			RequireReproducibleCommands:      true,
+			RequireGeneratedArtifacts:        true,
+			RequireNegativeControl:           true,
+		},
+		Chapters: []education.TextbookChapter{
+			mainTextbookChapter("classroom-labs", "Classroom labs", "educator", "examples/textbook-companion/01-classroom-lab-kits.ipynb", "go run ./cmd/patchline classroom-lab-kits --spec examples/classroom-lab-kits.json --root . --out results/generated/textbook-companion/classroom-lab-kits --json", "docs/classroom-lab-kits.md", "examples/classroom-lab-kits.json", "results/generated/textbook-companion/classroom-lab-kits/classroom-lab-kits.json", "results/generated/textbook-companion/classroom-lab-kits/classroom-lab-kits.md"),
+			mainTextbookChapter("reviewer-skills", "Reviewer skills", "reviewer", "examples/textbook-companion/02-skills-taxonomy.ipynb", "go run ./cmd/patchline skills-taxonomy --spec examples/skills-taxonomy.json --root . --out results/generated/textbook-companion/skills-taxonomy --json", "docs/skills-taxonomy.md", "examples/skills-taxonomy.json", "results/generated/textbook-companion/skills-taxonomy/skills-taxonomy.json", "results/generated/textbook-companion/skills-taxonomy/skills-taxonomy.md"),
+			mainTextbookChapter("localized-lessons", "Localized lessons", "translator", "examples/textbook-companion/03-localized-teaching-examples.ipynb", "go run ./cmd/patchline localized-teaching-examples --spec examples/localized-teaching-examples.json --root . --out results/generated/textbook-companion/localized-teaching-examples --json", "docs/localized-teaching-examples.md", "examples/localized-teaching-examples.json", "results/generated/textbook-companion/localized-teaching-examples/localized-teaching-examples.json", "results/generated/textbook-companion/localized-teaching-examples/localized-teaching-examples.md"),
+		},
+	}
+	for _, chapter := range spec.Chapters {
+		notebook := chapter.Notebooks[0]
+		writeMainTestFile(t, root, notebook.Path, mainTextbookNotebookJSON(notebook.ExecuteCommands[0]))
+		for _, path := range notebook.EvidencePaths {
+			writeMainTestFile(t, root, path, "Evidence for "+path+".\n")
+		}
+		for _, path := range notebook.ExpectedArtifacts {
+			writeMainTestFile(t, root, path, "Generated artifact for "+path+".\n")
+		}
+	}
+	specPath := filepath.Join(root, "open-textbook-companion.json")
+	writeMainTestJSONFile(t, specPath, spec)
+	out := filepath.Join(t.TempDir(), "open-textbook-companion")
+	if err := run([]string{"open-textbook-companion", "--spec", specPath, "--root", root, "--out", out, "--json"}); err != nil {
+		t.Fatalf("open-textbook-companion failed: %v", err)
+	}
+	var report education.TextbookCompanionReport
+	readMainTestJSON(t, filepath.Join(out, "open-textbook-companion.json"), &report)
+	if !report.OK || report.Summary.Chapters != 3 || report.Summary.ExecutableNotebooks != 3 || report.Summary.GeneratedArtifacts != 6 {
+		t.Fatalf("unexpected textbook companion report: %#v", report)
+	}
+	if len(report.Chapters[0].NotebookReports[0].GeneratedArtifacts[0].SHA256) != 64 {
+		t.Fatalf("expected generated artifact hashes, got %#v", report.Chapters[0].NotebookReports[0].GeneratedArtifacts)
+	}
+	if stat, err := os.Stat(filepath.Join(out, "open-textbook-companion.md")); err != nil || stat.Size() == 0 {
+		t.Fatalf("expected open-textbook-companion.md to be written, stat=%#v err=%v", stat, err)
+	}
+}
+
+func mainTextbookChapter(id, title, audience, notebookPath, command, docPath, specPath, jsonOut, mdOut string) education.TextbookChapter {
+	return education.TextbookChapter{
+		ID:       id,
+		Title:    title,
+		Audience: audience,
+		Summary:  "Executable notebook chapter for " + title + ".",
+		Concepts: []string{"regeneration", "evidence hashing"},
+		Notebooks: []education.TextbookNotebook{{
+			ID:              id + "-notebook",
+			Title:           title + " notebook",
+			Path:            notebookPath,
+			Runtime:         "python3",
+			ExecuteCommands: []string{command},
+			TeachingExamples: []education.TextbookTeachingExample{{
+				ID:                 id + "-example",
+				Title:              title + " example",
+				SourceCommand:      command,
+				LearningObjectives: []string{"run the exact regeneration command", "inspect the generated evidence hashes"},
+				EvidencePaths:      []string{docPath, specPath},
+				ExpectedArtifacts:  []string{jsonOut, mdOut},
+			}},
+			EvidencePaths:     []string{docPath, specPath},
+			ExpectedArtifacts: []string{jsonOut, mdOut},
+			NegativeControls: []education.TextbookNegativeControl{{
+				ID:                     "remove-command",
+				Mutation:               "delete the regeneration command from the notebook",
+				ExpectedCounterexample: "missing_executable_cell",
+			}},
+		}},
+	}
+}
+
+func mainTextbookNotebookJSON(command string) string {
+	return `{
+  "cells": [
+    {
+      "cell_type": "code",
+      "execution_count": null,
+      "metadata": {},
+      "outputs": [],
+      "source": ["import subprocess\n", "subprocess.run(\"` + command + `\", shell=True, check=True)\n"]
+    }
+  ],
+  "metadata": {"kernelspec": {"display_name": "Python 3", "language": "python", "name": "python3"}},
+  "nbformat": 4,
+  "nbformat_minor": 5
+}`
+}
+
 func TestReviewerFairnessAuditCommandWritesReports(t *testing.T) {
 	root := t.TempDir()
 	writeMainTestFile(t, root, "docs/acceptance-study.md", "paired reviews with adjudicated false positives\n")

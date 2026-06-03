@@ -12,6 +12,7 @@
 .PHONY: skills-taxonomy-gate
 .PHONY: localized-teaching-examples-gate
 .PHONY: workforce-impact-study-gate
+.PHONY: open-textbook-companion-gate
 
 build:
 	go build -o bin/patchline ./cmd/patchline
@@ -1207,6 +1208,9 @@ certification-renewal-gate:
 
 classroom-lab-kits-gate:
 	bash scripts/classroom-lab-kits-gate.sh
+
+open-textbook-companion-gate:
+	bash scripts/open-textbook-companion-gate.sh
 
 industry-working-group-gate:
 	bash scripts/industry-working-group-gate.sh

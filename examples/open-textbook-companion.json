@@ -1,0 +1,193 @@
+{
+  "version": "patchline.open-textbook-companion/v1",
+  "name": "Patchline open textbook companion",
+  "claim": "Patchline ships an open textbook companion whose notebooks are executable regeneration artifacts rather than static lecture notes. Each notebook contains the exact command that rebuilds a teaching example, cites the source documentation and spec, expects concrete generated JSON and Markdown reports, and includes a negative control so missing commands, missing evidence, stale generated outputs, or broken learning objectives fail deterministically.",
+  "criteria": {
+    "required_chapters": [
+      "classroom-labs",
+      "reviewer-skills",
+      "localized-lessons"
+    ],
+    "min_chapters": 3,
+    "min_notebooks_per_chapter": 1,
+    "min_examples_per_notebook": 1,
+    "min_commands_per_notebook": 1,
+    "min_learning_objectives_per_example": 2,
+    "min_evidence_artifacts_per_notebook": 3,
+    "min_generated_artifacts_per_notebook": 2,
+    "require_executable_notebook": true,
+    "require_reproducible_commands": true,
+    "require_generated_artifacts": true,
+    "require_negative_control": true
+  },
+  "chapters": [
+    {
+      "id": "classroom-labs",
+      "title": "Gate-backed classroom labs",
+      "audience": "educator",
+      "summary": "Regenerate the classroom lab-kit report and inspect how instructor gates, expected artifacts, and negative controls become teachable evidence.",
+      "concepts": [
+        "instructor solution gates",
+        "evidence-hash traceability",
+        "negative-control grading"
+      ],
+      "notebooks": [
+        {
+          "id": "classroom-lab-kits-notebook",
+          "title": "Regenerate classroom lab kits",
+          "path": "examples/textbook-companion/01-classroom-lab-kits.ipynb",
+          "runtime": "python3",
+          "execute_commands": [
+            "go run ./cmd/patchline classroom-lab-kits --spec examples/classroom-lab-kits.json --root . --out results/generated/textbook-companion/classroom-lab-kits --json"
+          ],
+          "teaching_examples": [
+            {
+              "id": "classroom-lab-kits-example",
+              "title": "Rebuild classroom lab-kit evidence",
+              "source_command": "go run ./cmd/patchline classroom-lab-kits --spec examples/classroom-lab-kits.json --root . --out results/generated/textbook-companion/classroom-lab-kits --json",
+              "learning_objectives": [
+                "Run the exact regeneration command and find the JSON/Markdown reports it writes",
+                "Explain why missing instructor gates and missing negative controls must fail the lab-kit report"
+              ],
+              "evidence_paths": [
+                "docs/classroom-lab-kits.md",
+                "examples/classroom-lab-kits.json"
+              ],
+              "expected_artifacts": [
+                "results/generated/textbook-companion/classroom-lab-kits/classroom-lab-kits.json",
+                "results/generated/textbook-companion/classroom-lab-kits/classroom-lab-kits.md"
+              ]
+            }
+          ],
+          "evidence_paths": [
+            "docs/classroom-lab-kits.md",
+            "examples/classroom-lab-kits.json"
+          ],
+          "expected_artifacts": [
+            "results/generated/textbook-companion/classroom-lab-kits/classroom-lab-kits.json",
+            "results/generated/textbook-companion/classroom-lab-kits/classroom-lab-kits.md"
+          ],
+          "negative_controls": [
+            {
+              "id": "remove-classroom-command",
+              "mutation": "Delete the classroom-lab-kits regeneration command from the notebook code cell.",
+              "expected_counterexample": "missing_executable_cell"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "reviewer-skills",
+      "title": "Reviewer skills taxonomy",
+      "audience": "reviewer",
+      "summary": "Regenerate the reviewer skills taxonomy and connect hazard classes to prerequisite concepts, assessment prompts, gates, and certification crosswalks.",
+      "concepts": [
+        "hazard-to-skill mapping",
+        "assessment prompts",
+        "certification crosswalks"
+      ],
+      "notebooks": [
+        {
+          "id": "skills-taxonomy-notebook",
+          "title": "Regenerate reviewer skills taxonomy",
+          "path": "examples/textbook-companion/02-skills-taxonomy.ipynb",
+          "runtime": "python3",
+          "execute_commands": [
+            "go run ./cmd/patchline skills-taxonomy --spec examples/skills-taxonomy.json --root . --out results/generated/textbook-companion/skills-taxonomy --json"
+          ],
+          "teaching_examples": [
+            {
+              "id": "skills-taxonomy-example",
+              "title": "Rebuild the skills taxonomy report",
+              "source_command": "go run ./cmd/patchline skills-taxonomy --spec examples/skills-taxonomy.json --root . --out results/generated/textbook-companion/skills-taxonomy --json",
+              "learning_objectives": [
+                "Run the taxonomy regeneration command and inspect the hazard-to-skill map",
+                "Explain how negative controls prove missing prerequisites, evidence, gates, and crosswalks are rejected"
+              ],
+              "evidence_paths": [
+                "docs/skills-taxonomy.md",
+                "examples/skills-taxonomy.json"
+              ],
+              "expected_artifacts": [
+                "results/generated/textbook-companion/skills-taxonomy/skills-taxonomy.json",
+                "results/generated/textbook-companion/skills-taxonomy/skills-taxonomy.md"
+              ]
+            }
+          ],
+          "evidence_paths": [
+            "docs/skills-taxonomy.md",
+            "examples/skills-taxonomy.json"
+          ],
+          "expected_artifacts": [
+            "results/generated/textbook-companion/skills-taxonomy/skills-taxonomy.json",
+            "results/generated/textbook-companion/skills-taxonomy/skills-taxonomy.md"
+          ],
+          "negative_controls": [
+            {
+              "id": "remove-taxonomy-command",
+              "mutation": "Delete the skills-taxonomy regeneration command from the notebook code cell.",
+              "expected_counterexample": "missing_executable_cell"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "localized-lessons",
+      "title": "Localized teaching examples",
+      "audience": "translator",
+      "summary": "Regenerate localized teaching-example reports and inspect how byte-identical technical tokens, accessibility checks, and translated negative controls are preserved.",
+      "concepts": [
+        "technical-token preservation",
+        "accessibility equivalence",
+        "localized negative controls"
+      ],
+      "notebooks": [
+        {
+          "id": "localized-teaching-notebook",
+          "title": "Regenerate localized teaching examples",
+          "path": "examples/textbook-companion/03-localized-teaching-examples.ipynb",
+          "runtime": "python3",
+          "execute_commands": [
+            "go run ./cmd/patchline localized-teaching-examples --spec examples/localized-teaching-examples.json --root . --out results/generated/textbook-companion/localized-teaching-examples --json"
+          ],
+          "teaching_examples": [
+            {
+              "id": "localized-teaching-example",
+              "title": "Rebuild localized teaching reports",
+              "source_command": "go run ./cmd/patchline localized-teaching-examples --spec examples/localized-teaching-examples.json --root . --out results/generated/textbook-companion/localized-teaching-examples --json",
+              "learning_objectives": [
+                "Run the localized teaching regeneration command and inspect language coverage",
+                "Explain why translated command names, identifiers, or missing accessibility checks fail deterministically"
+              ],
+              "evidence_paths": [
+                "docs/localized-teaching-examples.md",
+                "examples/localized-teaching-examples.json"
+              ],
+              "expected_artifacts": [
+                "results/generated/textbook-companion/localized-teaching-examples/localized-teaching-examples.json",
+                "results/generated/textbook-companion/localized-teaching-examples/localized-teaching-examples.md"
+              ]
+            }
+          ],
+          "evidence_paths": [
+            "docs/localized-teaching-examples.md",
+            "examples/localized-teaching-examples.json"
+          ],
+          "expected_artifacts": [
+            "results/generated/textbook-companion/localized-teaching-examples/localized-teaching-examples.json",
+            "results/generated/textbook-companion/localized-teaching-examples/localized-teaching-examples.md"
+          ],
+          "negative_controls": [
+            {
+              "id": "remove-localized-command",
+              "mutation": "Delete the localized-teaching-examples regeneration command from the notebook code cell.",
+              "expected_counterexample": "missing_executable_cell"
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}
