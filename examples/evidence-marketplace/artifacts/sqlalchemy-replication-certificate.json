@@ -1,0 +1,10 @@
+{
+  "version": "patchline.redacted-certificate-witness/v1",
+  "checks": [
+    "redaction-reviewed",
+    "license-cleared",
+    "artifact-hashes-verified",
+    "reproducible-without-private-data"
+  ],
+  "review_note": "Governance-board fixture certificate witness for the redacted SQLAlchemy replica-lag evidence."
+}

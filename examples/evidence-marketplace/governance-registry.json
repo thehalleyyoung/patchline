@@ -1,0 +1,210 @@
+{
+  "version": "patchline.evidence-marketplace/v1",
+  "claim": "Patchline's governance-board evidence marketplace fixture admits three redacted, certificate-backed hazard examples so shared evidence can be accepted, deprecated, or quarantined through a quorum-backed lifecycle process without deleting archive proofs.",
+  "marketplace": {
+    "name": "Patchline public evidence marketplace",
+    "maintainer": "Patchline maintainers",
+    "policy_url": "docs/evidence-marketplace.md"
+  },
+  "examples": [
+    {
+      "id": "redacted-rails-backfill-guard",
+      "title": "Redacted Rails backfill missing a bounded guard",
+      "organization": "Patchline Public Corpus",
+      "ecosystem": "rails",
+      "hazard_class": "broad-backfill-without-guard",
+      "source": {
+        "host": "github",
+        "repo": "lobsters/lobsters",
+        "ref": "3b80b47aa5aaba37ec44413e7d1dc96fcf1585b6",
+        "commit": "3b80b47aa5aaba37ec44413e7d1dc96fcf1585b6",
+        "subpath": "db/migrate",
+        "url": "https://github.com/lobsters/lobsters/tree/3b80b47aa5aaba37ec44413e7d1dc96fcf1585b6/db/migrate"
+      },
+      "license_spdx": "CC-BY-4.0",
+      "consent": "Patchline Public Corpus approved publication of this redacted hazard example and certificate under the declared public license.",
+      "redaction": {
+        "redaction_reviewed": true,
+        "raw_data_shared": false,
+        "method": "identifiers, owners, literal values, and row data replaced with stable placeholders while preserving hazard structure",
+        "fields": ["identifiers", "literals", "owners", "row values"],
+        "reviewer": "artifact-review"
+      },
+      "artifacts": [
+        {
+          "path": "artifacts/rails-backfill-hazard.json",
+          "role": "redacted-hazard-example",
+          "sha256": "sha256:8f73b4b1e2f67a038343b53f43cee512266c5ef3d19b407753d0787e319341ba",
+          "redacted": true
+        },
+        {
+          "path": "artifacts/rails-backfill-certificate.json",
+          "role": "certificate-witness",
+          "sha256": "sha256:0895d03a2b4490a6b6137899138258e1a31794862c8b389c38040812fffe147d",
+          "redacted": true
+        }
+      ],
+      "certificate": {
+        "id": "cert-redacted-rails-backfill",
+        "issuer": "patchline-public-evidence-marketplace",
+        "issued_at": "2026-06-02T21:22:11Z",
+        "subject_hash": "sha256:c791b7e2986a194402b75023aaff4658ced7416c82f00be1aa0ed7738e57145f",
+        "obligations": [
+          "redaction-reviewed",
+          "license-cleared",
+          "artifact-hashes-verified",
+          "reproducible-without-private-data"
+        ]
+      },
+      "reproduction": [
+        "go run ./cmd/patchline evidence-marketplace govern --spec examples/evidence-marketplace/governance-board.json --out results/generated/evidence-governance-board --json",
+        "jq -e '.ok == true and .summary.accepted == 1 and .summary.deprecated == 1 and .summary.quarantined == 1' results/generated/evidence-governance-board/governance-board.json"
+      ],
+      "gate_reputation": {
+        "reproducible_runs": 14,
+        "first_verified_at": "2025-01-01T00:00:00Z",
+        "last_verified_at": "2025-09-01T00:00:00Z",
+        "independent_confirmations": [
+          "Database Reliability Guild",
+          "Independent Artifact Review Lab",
+          "Migration Safety Working Group"
+        ]
+      },
+      "limitations": [
+        "The artifact preserves hazard shape and provenance but intentionally omits raw table names, owners, literals, and row values."
+      ]
+    },
+    {
+      "id": "redacted-django-nullability-backfill",
+      "title": "Redacted Django nullability tightening before complete backfill proof",
+      "organization": "Patchline Public Corpus",
+      "ecosystem": "django",
+      "hazard_class": "constraint-tightening-before-complete-backfill",
+      "source": {
+        "host": "github",
+        "repo": "django/django",
+        "ref": "5b8d2f4a5a2d9e6f6c5d4b3a2a19081716151413",
+        "commit": "5b8d2f4a5a2d9e6f6c5d4b3a2a19081716151413",
+        "subpath": "django/contrib/auth/migrations",
+        "url": "https://github.com/django/django/tree/5b8d2f4a5a2d9e6f6c5d4b3a2a19081716151413/django/contrib/auth/migrations"
+      },
+      "license_spdx": "CC0-1.0",
+      "consent": "Patchline Public Corpus approved publication of this redacted certificate-backed hazard example under the declared public license.",
+      "redaction": {
+        "redaction_reviewed": true,
+        "raw_data_shared": false,
+        "method": "project identifiers, literal values, owners, and row data replaced with stable placeholders while preserving migration ordering",
+        "fields": ["identifiers", "literals", "owners", "row values"],
+        "reviewer": "artifact-review"
+      },
+      "artifacts": [
+        {
+          "path": "artifacts/django-nullability-hazard.json",
+          "role": "redacted-hazard-example",
+          "sha256": "sha256:05a0a800053837c44d8a09757c1087e3c3e3bc9884e64aca25277d40387b0ad1",
+          "redacted": true
+        },
+        {
+          "path": "artifacts/django-nullability-certificate.json",
+          "role": "certificate-witness",
+          "sha256": "sha256:8cd73b67f6e679f640e273675ad5f60159a24e1af36691114dcb9ac711fb911f",
+          "redacted": true
+        }
+      ],
+      "certificate": {
+        "id": "cert-redacted-django-nullability",
+        "issuer": "patchline-public-evidence-marketplace",
+        "issued_at": "2026-06-02T21:22:11Z",
+        "subject_hash": "sha256:7dfb658cddbbb31b27a4cb837be53746c79e2ea4f5766a5bbc41b6bb9b01421e",
+        "obligations": [
+          "redaction-reviewed",
+          "license-cleared",
+          "artifact-hashes-verified",
+          "reproducible-without-private-data"
+        ]
+      },
+      "reproduction": [
+        "go run ./cmd/patchline evidence-marketplace govern --spec examples/evidence-marketplace/governance-board.json --out results/generated/evidence-governance-board --json",
+        "jq -e '.ok == true and .summary.preserved_archive_artifacts >= 4' results/generated/evidence-governance-board/governance-board.json"
+      ],
+      "gate_reputation": {
+        "reproducible_runs": 7,
+        "first_verified_at": "2025-02-01T00:00:00Z",
+        "last_verified_at": "2025-05-15T00:00:00Z",
+        "independent_confirmations": [
+          "Independent Artifact Review Lab",
+          "Migration Safety Working Group"
+        ]
+      },
+      "limitations": [
+        "The redacted artifact demonstrates certificate-backed publication, not a claim about the upstream project's current safety posture."
+      ]
+    },
+    {
+      "id": "redacted-sqlalchemy-replication-lag",
+      "title": "Redacted SQLAlchemy online backfill with replica-lag risk",
+      "organization": "Patchline Public Corpus",
+      "ecosystem": "sqlalchemy",
+      "hazard_class": "replication-lag-during-online-backfill",
+      "source": {
+        "host": "github",
+        "repo": "public/sqlalchemy-service",
+        "ref": "a6c4f8e9d1b203948576aabbccddeeff00112233",
+        "commit": "a6c4f8e9d1b203948576aabbccddeeff00112233",
+        "subpath": "migrations",
+        "url": "https://github.com/public/sqlalchemy-service/tree/a6c4f8e9d1b203948576aabbccddeeff00112233/migrations"
+      },
+      "license_spdx": "Apache-2.0",
+      "consent": "Patchline Public Corpus approved publication of this redacted replica-lag hazard example and certificate under the declared public license.",
+      "redaction": {
+        "redaction_reviewed": true,
+        "raw_data_shared": false,
+        "method": "service identifiers, owners, literal values, thresholds, and row data replaced with stable placeholders while preserving replica-lag hazard structure",
+        "fields": ["identifiers", "literals", "owners", "thresholds", "row values"],
+        "reviewer": "artifact-review"
+      },
+      "artifacts": [
+        {
+          "path": "artifacts/sqlalchemy-replication-hazard.json",
+          "role": "redacted-hazard-example",
+          "sha256": "sha256:634803700a123ca81ad866cbcedea25dc0b6bf6bee68fc4cdd1bc71bd5936fea",
+          "redacted": true
+        },
+        {
+          "path": "artifacts/sqlalchemy-replication-certificate.json",
+          "role": "certificate-witness",
+          "sha256": "sha256:6bf743a7b41a2f7f0259e92fbad6caefda5206bfa99505f7d725ea6ed1d5e755",
+          "redacted": true
+        }
+      ],
+      "certificate": {
+        "id": "cert-redacted-sqlalchemy-replication-lag",
+        "issuer": "patchline-public-evidence-marketplace",
+        "issued_at": "2026-06-02T23:10:16Z",
+        "subject_hash": "sha256:ea28e00ecf69d7856a4ad52f515f94e172f380d44cb85726f005e2cf2b4195e3",
+        "obligations": [
+          "redaction-reviewed",
+          "license-cleared",
+          "artifact-hashes-verified",
+          "reproducible-without-private-data"
+        ]
+      },
+      "reproduction": [
+        "go run ./cmd/patchline evidence-marketplace govern --spec examples/evidence-marketplace/governance-board.json --out results/generated/evidence-governance-board --json",
+        "jq -e '.summary.quarantined == 1 and .summary.tombstones_required >= 2' results/generated/evidence-governance-board/governance-board.json"
+      ],
+      "gate_reputation": {
+        "reproducible_runs": 5,
+        "first_verified_at": "2025-03-01T00:00:00Z",
+        "last_verified_at": "2025-06-01T00:00:00Z",
+        "independent_confirmations": [
+          "Independent Artifact Review Lab",
+          "Migration Safety Working Group"
+        ]
+      },
+      "limitations": [
+        "The artifact is redacted and intended to exercise evidence governance lifecycle checks, not to disclose an upstream service incident."
+      ]
+    }
+  ]
+}

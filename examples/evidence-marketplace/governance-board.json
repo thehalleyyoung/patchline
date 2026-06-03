@@ -1,0 +1,116 @@
+{
+  "version": "patchline.evidence-governance-board/v1",
+  "claim": "Patchline's shared-evidence governance board accepts, deprecates, or quarantines marketplace evidence only after quorum, independent approvals, conflict checks, hash binding, and archive-preserving tombstones make the lifecycle decision auditable.",
+  "registry_path": "governance-registry.json",
+  "board": {
+    "id": "patchline-shared-evidence-board",
+    "name": "Patchline shared evidence governance board",
+    "charter_url": "docs/evidence-governance-board.md",
+    "conflict_policy": "Approvers affiliated with the submitting organization must abstain and cannot count toward independent approval quorum.",
+    "quorum": 3,
+    "min_independent_approvers": 2
+  },
+  "decisions": [
+    {
+      "evidence_id": "redacted-rails-backfill-guard",
+      "requested_status": "accept",
+      "rationale": "The board verified the redacted artifact checksums, certificate subject hash, public-release obligations, and reviewer votes before recording this shared-evidence lifecycle decision.",
+      "evidence_hash": "sha256:417a072130fcd660a5f99e309a8825eb88e8e0d593ccd4835a10c8c849fe4fcb",
+      "certificate_subject_hash": "sha256:c791b7e2986a194402b75023aaff4658ced7416c82f00be1aa0ed7738e57145f",
+      "reviewers": [
+        {
+          "name": "Database Reliability Guild",
+          "role": "dba-reviewer",
+          "affiliation": "Database Reliability Guild",
+          "conflict_disclosed": false,
+          "vote": "approve"
+        },
+        {
+          "name": "Independent Artifact Review Lab",
+          "role": "artifact-reviewer",
+          "affiliation": "Independent Artifact Review Lab",
+          "conflict_disclosed": false,
+          "vote": "approve"
+        },
+        {
+          "name": "Patchline Maintainer Chair",
+          "role": "chair",
+          "affiliation": "Patchline Maintainers",
+          "conflict_disclosed": false,
+          "vote": "abstain"
+        }
+      ]
+    },
+    {
+      "evidence_id": "redacted-django-nullability-backfill",
+      "requested_status": "deprecate",
+      "rationale": "The board verified the redacted artifact checksums, certificate subject hash, public-release obligations, and reviewer votes before recording this shared-evidence lifecycle decision.",
+      "evidence_hash": "sha256:4b8a7c7a578da1f1f4426aa4fd8f8ed08863ba083510ff4ed8b15f38e749322f",
+      "certificate_subject_hash": "sha256:7dfb658cddbbb31b27a4cb837be53746c79e2ea4f5766a5bbc41b6bb9b01421e",
+      "reviewers": [
+        {
+          "name": "Database Reliability Guild",
+          "role": "dba-reviewer",
+          "affiliation": "Database Reliability Guild",
+          "conflict_disclosed": false,
+          "vote": "approve"
+        },
+        {
+          "name": "Independent Artifact Review Lab",
+          "role": "artifact-reviewer",
+          "affiliation": "Independent Artifact Review Lab",
+          "conflict_disclosed": false,
+          "vote": "approve"
+        },
+        {
+          "name": "Patchline Maintainer Chair",
+          "role": "chair",
+          "affiliation": "Patchline Maintainers",
+          "conflict_disclosed": false,
+          "vote": "abstain"
+        }
+      ],
+      "deprecation": {
+        "effective_date": "2026-07-01",
+        "replacement_evidence_id": "redacted-rails-backfill-guard",
+        "continuing_validity": "The evidence remains preserved for historical prevalence studies, but the accepted replacement should be preferred for current active-release claims."
+      }
+    },
+    {
+      "evidence_id": "redacted-sqlalchemy-replication-lag",
+      "requested_status": "quarantine",
+      "rationale": "The board verified the redacted artifact checksums, certificate subject hash, public-release obligations, and reviewer votes before recording this shared-evidence lifecycle decision.",
+      "evidence_hash": "sha256:fd5add86bb7acde219ff9584fc6acc6ada65a5b278e4d434403912671b87e5aa",
+      "certificate_subject_hash": "sha256:ea28e00ecf69d7856a4ad52f515f94e172f380d44cb85726f005e2cf2b4195e3",
+      "reviewers": [
+        {
+          "name": "Database Reliability Guild",
+          "role": "dba-reviewer",
+          "affiliation": "Database Reliability Guild",
+          "conflict_disclosed": false,
+          "vote": "approve"
+        },
+        {
+          "name": "Independent Artifact Review Lab",
+          "role": "artifact-reviewer",
+          "affiliation": "Independent Artifact Review Lab",
+          "conflict_disclosed": false,
+          "vote": "approve"
+        },
+        {
+          "name": "Patchline Maintainer Chair",
+          "role": "chair",
+          "affiliation": "Patchline Maintainers",
+          "conflict_disclosed": false,
+          "vote": "abstain"
+        }
+      ],
+      "quarantine": {
+        "trigger": "independent reproducibility challenge",
+        "reason": "Active release is paused while maintainers investigate a disputed source-host provenance cue, but the redacted archive artifact must remain checksum-preserved and tombstoned.",
+        "revocation_or_supersession_url": "docs/evidence-governance-board.md#quarantine",
+        "preserve_tombstone": true
+      }
+    }
+  ]
+}

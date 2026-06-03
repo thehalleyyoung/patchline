@@ -1,0 +1,27 @@
+{
+  "version": "patchline.redacted-hazard-example/v1",
+  "summary": "Redacted SQLAlchemy online backfill can increase read-replica lag without a staged throttle proof.",
+  "hazard_class": "replication-lag-during-online-backfill",
+  "source": {
+    "repo": "public/sqlalchemy-service",
+    "commit": "a6c4f8e9d1b203948576aabbccddeeff00112233",
+    "subpath": "migrations"
+  },
+  "evidence": [
+    {
+      "path": "migrations/versions/<redacted_revision>_online_backfill_<redacted_table>.py",
+      "line_range": "44-71",
+      "snippet": "session.execute(update(<table>).values(<column>=<redacted>).where(<guard>))"
+    },
+    {
+      "path": "runbooks/<redacted_service>_replica_lag.md",
+      "line_range": "12-23",
+      "snippet": "pause rollout if replica lag exceeds <redacted_threshold>"
+    }
+  ],
+  "redaction": {
+    "identifiers": "stable placeholders",
+    "literals": "stable placeholders",
+    "owners": "omitted"
+  }
+}

@@ -3,7 +3,7 @@
 
 .PHONY: safe-online-evaluation-gate adopter-active-learning-gate policy-freeze-gate live-calibration-monitor-gate feedback-retention-lifecycle-gate human-trust-regression-gate live-learning-methodology-gate
 .PHONY: expand-contract-templates-gate staged-backfill-planner-gate remediation-playbook-gate canary-validation-gate repair-risk-escrow-gate incident-postmortem-importer-gate verified-rollback-planner-gate remediation-cost-optimizer-gate maintainer-acceptance-study-gate evidence-marketplace-gate federated-benchmark-split-gate
-.PHONY: adversarial-challenge-gate
+.PHONY: adversarial-challenge-gate evidence-governance-board-gate
 
 build:
 	go build -o bin/patchline ./cmd/patchline
@@ -1367,6 +1367,9 @@ evidence-marketplace-gate:
 
 adversarial-challenge-gate:
 	bash scripts/adversarial-challenge-gate.sh
+
+evidence-governance-board-gate:
+	bash scripts/evidence-governance-board-gate.sh
 
 federated-benchmark-split-gate:
 	bash scripts/federated-benchmark-split-gate.sh

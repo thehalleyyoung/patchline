@@ -4,6 +4,7 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
+	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
@@ -232,6 +233,91 @@ func TestPublishChallengeTrackRejectsEmbargoedPublicSubmissions(t *testing.T) {
 	joinedReasons := strings.Join(reasons, "\n")
 	if !strings.Contains(joinedReasons, "disclosure.status must be public-safe") || !strings.Contains(joinedReasons, "public_release_allowed must be true") {
 		t.Fatalf("expected responsible-disclosure rejection, got %#v", report.Rejected)
+	}
+}
+
+func TestEvaluateBoardReviewAcceptsDeprecatesAndQuarantinesPublishedEvidence(t *testing.T) {
+	registry, root := validGovernanceRegistry(t)
+	spec := validBoardReviewSpec(registry)
+	report, err := EvaluateBoardReview(spec, registry, root)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !report.OK || report.Summary.Accepted != 1 || report.Summary.Deprecated != 1 || report.Summary.Quarantined != 1 {
+		t.Fatalf("unexpected board summary: %#v", report.Summary)
+	}
+	if report.Summary.ActiveEvidence != 1 || len(report.ActiveEvidenceIDs) != 1 || report.ActiveEvidenceIDs[0] != registry.Examples[0].ID {
+		t.Fatalf("deprecated/quarantined evidence should leave only accepted evidence active: %#v", report.ActiveEvidenceIDs)
+	}
+	if report.Summary.PreservedArchiveArtifacts != 4 || report.Summary.TombstonesRequired != 4 {
+		t.Fatalf("deprecated and quarantined evidence should preserve all archive artifacts: %#v", report.Summary)
+	}
+	for _, preserved := range report.PreservedArchiveEntries {
+		if !preserved.TombstoneRequired || !preserved.PreserveChecksumAfterWithdrawal || preserved.WithdrawalID == "" || !strings.HasPrefix(preserved.Checksum, "sha256:") {
+			t.Fatalf("preservation entry lost archive/tombstone metadata: %#v", preserved)
+		}
+	}
+	next, err := EvaluateBoardReview(spec, registry, root)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if next.Hash != report.Hash {
+		t.Fatalf("board report hash changed: got %s want %s", next.Hash, report.Hash)
+	}
+}
+
+func TestEvaluateBoardReviewRejectsWeakOrUnsafeDecisions(t *testing.T) {
+	tests := []struct {
+		name string
+		edit func(*BoardReviewSpec, Registry)
+		want string
+	}{
+		{
+			name: "insufficient independent approvers",
+			edit: func(spec *BoardReviewSpec, registry Registry) {
+				spec.Decisions[0].Reviewers = spec.Decisions[0].Reviewers[:1]
+			},
+			want: "independent approvals must meet",
+		},
+		{
+			name: "conflicted approval",
+			edit: func(spec *BoardReviewSpec, registry Registry) {
+				spec.Decisions[0].Reviewers[0].Affiliation = registry.Examples[0].Organization
+			},
+			want: "conflicted reviewers may not approve",
+		},
+		{
+			name: "hash mismatch",
+			edit: func(spec *BoardReviewSpec, registry Registry) {
+				spec.Decisions[0].EvidenceHash = "sha256:0000000000000000000000000000000000000000000000000000000000000000"
+			},
+			want: "evidence_hash must match",
+		},
+		{
+			name: "quarantine without tombstone",
+			edit: func(spec *BoardReviewSpec, registry Registry) {
+				spec.Decisions[2].Quarantine.PreserveTombstone = false
+			},
+			want: "quarantine.preserve_tombstone must be true",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			registry, root := validGovernanceRegistry(t)
+			spec := validBoardReviewSpec(registry)
+			tt.edit(&spec, registry)
+			report, err := EvaluateBoardReview(spec, registry, root)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if report.OK {
+				t.Fatalf("expected board review to fail: %#v", report)
+			}
+			if !strings.Contains(strings.Join(boardRejectionReasons(report), "\n"), tt.want) {
+				t.Fatalf("expected rejection containing %q, got %#v", tt.want, report.Rejected)
+			}
+		})
 	}
 }
 
@@ -709,6 +795,107 @@ func validChallengeRegistry(t *testing.T) (Registry, string) {
 	return registry, root
 }
 
+func validGovernanceRegistry(t *testing.T) (Registry, string) {
+	t.Helper()
+	registry, root := validRegistry(t)
+	registry.Claim = "The governance-specific evidence marketplace fixture publishes three redacted, certificate-backed examples so a board can accept, deprecate, and quarantine real shared evidence while preserving archive checksums."
+	registry.Examples[0].ID = "redacted-governance-accepted-backfill"
+	registry.Examples[0].Title = "Redacted governance accepted backfill guard"
+	registry.Examples[0].Certificate.ID = "cert-redacted-governance-accepted-backfill"
+	registry.Examples[0].Reproduction = []string{
+		"go run ./cmd/patchline evidence-marketplace govern --spec examples/evidence-marketplace/governance-board.json --out results/generated/evidence-governance-board --json",
+		"jq -e '.ok == true' results/generated/evidence-governance-board/governance-board.json",
+	}
+	registry.Examples[0].Certificate.SubjectHash = ExpectedSubjectHash(registry.Examples[0])
+
+	deprecated := governanceExampleVariant(t, root, registry.Examples[0], "redacted-governance-deprecated-nullability", "Redacted governance deprecated nullability proof", "django", "constraint-tightening-before-complete-backfill", "artifacts/deprecated-hazard.json", "artifacts/deprecated-certificate.json")
+	quarantined := governanceExampleVariant(t, root, registry.Examples[0], "redacted-governance-quarantined-replica-lag", "Redacted governance quarantined replica-lag proof", "sqlalchemy", "replication-lag-during-online-backfill", "artifacts/quarantined-hazard.json", "artifacts/quarantined-certificate.json")
+	registry.Examples = []Example{registry.Examples[0], deprecated, quarantined}
+	return registry, root
+}
+
+func governanceExampleVariant(t *testing.T, root string, base Example, id, title, ecosystem, hazardClass, hazardPath, certificatePath string) Example {
+	t.Helper()
+	writeFile(t, root, hazardPath, fmt.Sprintf(`{
+  "version": "patchline.redacted-hazard-example/v1",
+  "finding": "redacted governance fixture for %s",
+  "hazard_class": %q,
+  "evidence": [{"path": "db/migrate/<redacted>_%s.sql", "line": 12, "snippet": "UPDATE <table> SET <column> = <redacted> WHERE <guard> IS NULL"}]
+}
+`, id, hazardClass, id))
+	writeFile(t, root, certificatePath, `{
+  "version": "patchline.redacted-certificate-witness/v1",
+  "obligations": ["redaction-reviewed", "license-cleared", "artifact-hashes-verified", "reproducible-without-private-data"]
+}
+`)
+	example := base
+	example.ID = id
+	example.Title = title
+	example.Ecosystem = ecosystem
+	example.HazardClass = hazardClass
+	example.Source.Repo = "public/" + ecosystem + "-governance-fixture"
+	example.Source.Subpath = "db/migrate"
+	example.Certificate.ID = "cert-" + id
+	example.Artifacts = []Artifact{
+		{Path: hazardPath, Role: "redacted-hazard-example", SHA256: fileHash(t, filepath.Join(root, filepath.FromSlash(hazardPath))), Redacted: true},
+		{Path: certificatePath, Role: "certificate-witness", SHA256: fileHash(t, filepath.Join(root, filepath.FromSlash(certificatePath))), Redacted: true},
+	}
+	example.Certificate.SubjectHash = ExpectedSubjectHash(example)
+	return example
+}
+
+func validBoardReviewSpec(registry Registry) BoardReviewSpec {
+	return BoardReviewSpec{
+		Version:      BoardReviewSpecVersion,
+		Claim:        "The Patchline shared-evidence governance board accepts, deprecates, or quarantines marketplace evidence only after quorum, independent approvals, conflict checks, hash binding, and archive-preserving tombstones prove the lifecycle decision is auditable.",
+		RegistryPath: "governance-registry.json",
+		Board: BoardPolicy{
+			ID:                      "patchline-shared-evidence-board",
+			Name:                    "Patchline shared evidence governance board",
+			CharterURL:              "docs/evidence-governance-board.md",
+			ConflictPolicy:          "Approvers affiliated with the submitting organization must abstain and cannot count toward independent approval quorum.",
+			Quorum:                  3,
+			MinIndependentApprovers: 2,
+		},
+		Decisions: []BoardDecisionInput{
+			boardDecisionFor(registry.Examples[0], "accept"),
+			boardDecisionFor(registry.Examples[1], "deprecate"),
+			boardDecisionFor(registry.Examples[2], "quarantine"),
+		},
+	}
+}
+
+func boardDecisionFor(example Example, status string) BoardDecisionInput {
+	decision := BoardDecisionInput{
+		EvidenceID:             example.ID,
+		RequestedStatus:        status,
+		Rationale:              "The board reviewed the redacted certificate-backed evidence, verified the current artifact hashes, and recorded a lifecycle decision with explicit reviewer accountability.",
+		EvidenceHash:           EvidenceHash(example),
+		CertificateSubjectHash: ExpectedSubjectHash(example),
+		Reviewers: []BoardReviewer{
+			{Name: "Database Reliability Guild", Role: "dba-reviewer", Affiliation: "Database Reliability Guild", Vote: "approve"},
+			{Name: "Independent Artifact Review Lab", Role: "artifact-reviewer", Affiliation: "Independent Artifact Review Lab", Vote: "approve"},
+			{Name: "Patchline Maintainer Chair", Role: "chair", Affiliation: "Patchline Maintainers", Vote: "abstain"},
+		},
+	}
+	switch status {
+	case "deprecate":
+		decision.Deprecation = &DeprecationPlan{
+			EffectiveDate:         "2026-07-01",
+			ReplacementEvidenceID: "redacted-governance-accepted-backfill",
+			ContinuingValidity:    "Historical prevalence counts keep this evidence visible, but new users should prefer the replacement example with stronger redaction notes.",
+		}
+	case "quarantine":
+		decision.Quarantine = &QuarantinePlan{
+			Trigger:                     "independent reproducibility challenge",
+			Reason:                      "The certificate-backed artifact remains preserved, but active release is paused while maintainers verify a disputed source-host provenance cue.",
+			RevocationOrSupersessionURL: "docs/evidence-governance-board.md#quarantine",
+			PreserveTombstone:           true,
+		}
+	}
+	return decision
+}
+
 func writeFile(t *testing.T, root, rel, content string) {
 	t.Helper()
 	path := filepath.Join(root, filepath.FromSlash(rel))
@@ -731,6 +918,14 @@ func fileHash(t *testing.T, path string) string {
 }
 
 func rejectionReasons(report Report) []string {
+	var out []string
+	for _, rejected := range report.Rejected {
+		out = append(out, rejected.Reasons...)
+	}
+	return out
+}
+
+func boardRejectionReasons(report BoardReviewReport) []string {
 	var out []string
 	for _, rejected := range report.Rejected {
 		out = append(out, rejected.Reasons...)

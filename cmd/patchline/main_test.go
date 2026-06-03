@@ -156,6 +156,45 @@ func TestEvidenceMarketplaceChallengeCommandWritesScoreboard(t *testing.T) {
 	}
 }
 
+func TestEvidenceMarketplaceGovernCommandWritesBoardReview(t *testing.T) {
+	root := t.TempDir()
+	registry := mainTestGovernanceRegistry(t, root)
+	registryPath := filepath.Join(root, "governance-registry.json")
+	writeMainTestJSONFile(t, registryPath, registry)
+	spec := mainTestBoardReviewSpec(registry)
+	specPath := filepath.Join(root, "governance-board.json")
+	writeMainTestJSONFile(t, specPath, spec)
+
+	out := filepath.Join(t.TempDir(), "governance")
+	if err := run([]string{"evidence-marketplace", "govern", "--spec", specPath, "--out", out, "--json"}); err != nil {
+		t.Fatalf("evidence marketplace govern failed: %v", err)
+	}
+	var report evidencemarketplace.BoardReviewReport
+	readMainTestJSON(t, filepath.Join(out, "governance-board.json"), &report)
+	if !report.OK || report.Summary.Accepted != 1 || report.Summary.Deprecated != 1 || report.Summary.Quarantined != 1 || report.Summary.PreservedArchiveArtifacts != 4 {
+		t.Fatalf("unexpected governance board report: %#v", report.Summary)
+	}
+	for _, rel := range []string{"governance-board.json", "governance-board.md", "index.html"} {
+		if stat, err := os.Stat(filepath.Join(out, rel)); err != nil || stat.Size() == 0 {
+			t.Fatalf("expected %s to be written, stat=%#v err=%v", rel, stat, err)
+		}
+	}
+
+	bad := spec
+	bad.Decisions[0].Reviewers = bad.Decisions[0].Reviewers[:1]
+	badPath := filepath.Join(root, "governance-board.bad.json")
+	writeMainTestJSONFile(t, badPath, bad)
+	badOut := filepath.Join(t.TempDir(), "bad-governance")
+	if err := run([]string{"evidence-marketplace", "govern", "--spec", badPath, "--out", badOut, "--json"}); err == nil || exitCode(err) != 2 {
+		t.Fatalf("expected rejected governance board with exit code 2, got %v", err)
+	}
+	var rejected evidencemarketplace.BoardReviewReport
+	readMainTestJSON(t, filepath.Join(badOut, "governance-board.json"), &rejected)
+	if rejected.OK || len(rejected.Rejected) == 0 {
+		t.Fatalf("expected rejected governance report, got %#v", rejected)
+	}
+}
+
 func TestArtifactBenchmarkImportMarketplaceCommandWritesRunnableBenchmark(t *testing.T) {
 	root := t.TempDir()
 	registry := mainTestEvidenceMarketplaceRegistry(t, root)
@@ -2787,6 +2826,105 @@ func mainTestChallengeRegistry(t *testing.T, root string) evidencemarketplace.Re
 	}
 	registry.Examples = []evidencemarketplace.Example{example}
 	return registry
+}
+
+func mainTestGovernanceRegistry(t *testing.T, root string) evidencemarketplace.Registry {
+	t.Helper()
+	registry := mainTestEvidenceMarketplaceRegistry(t, root)
+	registry.Claim = "The CLI governance fixture publishes three redacted, certificate-backed examples so board decisions can accept, deprecate, and quarantine shared evidence with archive preservation."
+	registry.Examples[0].ID = "redacted-cli-governance-accepted"
+	registry.Examples[0].Title = "Redacted CLI governance accepted evidence"
+	registry.Examples[0].Certificate.ID = "cert-redacted-cli-governance-accepted"
+	registry.Examples[0].Reproduction = []string{
+		"go run ./cmd/patchline evidence-marketplace govern --spec examples/evidence-marketplace/governance-board.json --out results/generated/evidence-governance-board --json",
+		"jq -e '.ok == true' results/generated/evidence-governance-board/governance-board.json",
+	}
+	registry.Examples[0].Certificate.SubjectHash = evidencemarketplace.ExpectedSubjectHash(registry.Examples[0])
+	deprecated := mainTestGovernanceExampleVariant(t, root, registry.Examples[0], "redacted-cli-governance-deprecated", "django", "constraint-tightening-before-complete-backfill", "artifacts/deprecated-hazard.json", "artifacts/deprecated-certificate.json")
+	quarantined := mainTestGovernanceExampleVariant(t, root, registry.Examples[0], "redacted-cli-governance-quarantined", "sqlalchemy", "replication-lag-during-online-backfill", "artifacts/quarantined-hazard.json", "artifacts/quarantined-certificate.json")
+	registry.Examples = []evidencemarketplace.Example{registry.Examples[0], deprecated, quarantined}
+	return registry
+}
+
+func mainTestGovernanceExampleVariant(t *testing.T, root string, base evidencemarketplace.Example, id, ecosystem, hazardClass, hazardPath, certificatePath string) evidencemarketplace.Example {
+	t.Helper()
+	writeMainTestFile(t, root, hazardPath, fmt.Sprintf(`{
+  "version": "patchline.redacted-hazard-example/v1",
+  "finding": "redacted CLI governance fixture for %s",
+  "hazard_class": %q,
+  "evidence": [{"path": "db/migrate/<redacted>_%s.sql", "snippet": "UPDATE <table> SET <column> = <redacted> WHERE <guard> IS NULL"}]
+}
+`, id, hazardClass, id))
+	writeMainTestFile(t, root, certificatePath, `{
+  "version": "patchline.redacted-certificate-witness/v1",
+  "checks": ["redaction-reviewed", "license-cleared", "artifact-hashes-verified", "reproducible-without-private-data"]
+}
+`)
+	example := base
+	example.ID = id
+	example.Title = "Redacted CLI governance evidence " + id
+	example.Ecosystem = ecosystem
+	example.HazardClass = hazardClass
+	example.Source.Repo = "public/" + ecosystem + "-governance-cli"
+	example.Artifacts = []evidencemarketplace.Artifact{
+		{Path: hazardPath, Role: "redacted-hazard-example", SHA256: mainTestFileHash(t, filepath.Join(root, filepath.FromSlash(hazardPath))), Redacted: true},
+		{Path: certificatePath, Role: "certificate-witness", SHA256: mainTestFileHash(t, filepath.Join(root, filepath.FromSlash(certificatePath))), Redacted: true},
+	}
+	example.Certificate.ID = "cert-" + id
+	example.Certificate.SubjectHash = evidencemarketplace.ExpectedSubjectHash(example)
+	return example
+}
+
+func mainTestBoardReviewSpec(registry evidencemarketplace.Registry) evidencemarketplace.BoardReviewSpec {
+	return evidencemarketplace.BoardReviewSpec{
+		Version:      evidencemarketplace.BoardReviewSpecVersion,
+		Claim:        "The Patchline CLI governance board fixture accepts, deprecates, and quarantines shared evidence only after quorum, independent approvals, conflict checks, hash binding, and archive-preserving tombstones are verified.",
+		RegistryPath: "governance-registry.json",
+		Board: evidencemarketplace.BoardPolicy{
+			ID:                      "patchline-cli-shared-evidence-board",
+			Name:                    "Patchline CLI shared evidence governance board",
+			CharterURL:              "docs/evidence-governance-board.md",
+			ConflictPolicy:          "Approvers affiliated with the submitting organization abstain and cannot count toward independent approval quorum.",
+			Quorum:                  3,
+			MinIndependentApprovers: 2,
+		},
+		Decisions: []evidencemarketplace.BoardDecisionInput{
+			mainTestBoardDecision(registry.Examples[0], "accept"),
+			mainTestBoardDecision(registry.Examples[1], "deprecate"),
+			mainTestBoardDecision(registry.Examples[2], "quarantine"),
+		},
+	}
+}
+
+func mainTestBoardDecision(example evidencemarketplace.Example, status string) evidencemarketplace.BoardDecisionInput {
+	decision := evidencemarketplace.BoardDecisionInput{
+		EvidenceID:             example.ID,
+		RequestedStatus:        status,
+		Rationale:              "The board verified the redacted artifact hashes, certificate subject hash, and reviewer votes before recording this shared-evidence lifecycle decision.",
+		EvidenceHash:           evidencemarketplace.EvidenceHash(example),
+		CertificateSubjectHash: evidencemarketplace.ExpectedSubjectHash(example),
+		Reviewers: []evidencemarketplace.BoardReviewer{
+			{Name: "Database Reliability Guild", Role: "dba-reviewer", Affiliation: "Database Reliability Guild", Vote: "approve"},
+			{Name: "Independent Artifact Review Lab", Role: "artifact-reviewer", Affiliation: "Independent Artifact Review Lab", Vote: "approve"},
+			{Name: "Patchline Maintainer Chair", Role: "chair", Affiliation: "Patchline Maintainers", Vote: "abstain"},
+		},
+	}
+	switch status {
+	case "deprecate":
+		decision.Deprecation = &evidencemarketplace.DeprecationPlan{
+			EffectiveDate:         "2026-07-01",
+			ReplacementEvidenceID: "redacted-cli-governance-accepted",
+			ContinuingValidity:    "The deprecated evidence remains useful for historical prevalence but should no longer be selected for active release claims.",
+		}
+	case "quarantine":
+		decision.Quarantine = &evidencemarketplace.QuarantinePlan{
+			Trigger:                     "independent reproducibility challenge",
+			Reason:                      "Active release is paused while maintainers investigate a disputed source-host provenance cue, but checksum-preserving archive evidence remains auditable.",
+			RevocationOrSupersessionURL: "docs/evidence-governance-board.md#quarantine",
+			PreserveTombstone:           true,
+		}
+	}
+	return decision
 }
 
 func mainTestFileHash(t *testing.T, path string) string {

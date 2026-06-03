@@ -141,6 +141,8 @@ Run `evidence-marketplace publish --registry <registry>` and `artifact-benchmark
 
 Run `evidence-marketplace challenge --registry examples/evidence-marketplace/challenge-registry.json` for a deterministic public adversarial migration challenge with analyzer-backed scoring and responsible-disclosure rules; reproduce it with `make adversarial-challenge-gate`.
 
+Run `evidence-marketplace govern --spec examples/evidence-marketplace/governance-board.json` to accept, deprecate, or quarantine shared evidence with quorum, conflict checks, and archive-preserving tombstones; reproduce it with `make evidence-governance-board-gate`.
+
 Run `artifact-benchmark federated-split`, `federated-run`, and `federated-verify` so private adopters evaluate local benchmark cases while publishing only signed aggregate metrics; reproduce it with `make federated-benchmark-split-gate`.
 
 Run `golden-fixture generate --github owner/repo --ref <sha> --subpath <path> --out <dir>` to turn a real-repo slice into a tiny deterministic Go test without vendoring the full repository; see [docs/golden-fixtures.md](docs/golden-fixtures.md).

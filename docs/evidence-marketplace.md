@@ -35,6 +35,11 @@ certificate subject hash because reputation is expected to evolve as gates are
 rerun and independently confirmed; the publication report hash still makes the
 current reputation snapshot tamper-evident.
 
+Published evidence can then enter the
+[shared evidence governance board](evidence-governance-board.md), where quorum
+and conflict-checked reviewers accept, deprecate, or quarantine records without
+deleting archive mirror proofs.
+
 ## Long-term archive mirror
 
 The archive mirror persists every accepted, already-redacted marketplace artifact
