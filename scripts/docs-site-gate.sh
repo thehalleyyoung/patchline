@@ -109,6 +109,11 @@ if grep -F "Empirical baseline for this manual" "$SITE/api/index.html" > /dev/nu
   echo "api/index.html still contains removed empirical baseline section" >&2
   exit 1
 fi
+grep -F "Five Lobsters ranked risks worth review" "$SITE/api/index.html" > /dev/null
+for risk in risk:970ac4cfcd161507 risk:2ded136b72a75f38 risk:4bf8b05aa283adf3 risk:93bcbce17738750e risk:a2044c7b196a722c; do
+  grep -F "$risk" "$SITE/api/index.html" > /dev/null
+  grep -F "$risk" "$OUT/analysis/baseline/baseline.json" > /dev/null
+done
 grep -F "repo analyze" "$SITE/api/analyze.html" > /dev/null
 grep -F "repo fetch" "$SITE/api/fetch.html" > /dev/null
 grep -F "repo offline" "$SITE/api/offline-redaction-ci.html" > /dev/null
