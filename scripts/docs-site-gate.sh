@@ -105,6 +105,10 @@ grep -F "make theory-risk-paper-gate" "$SITE/theory.html" > /dev/null
 grep -F "Forem, Bytebase, Mastodon, and Lobsters" "$SITE/scenarios/public-repositories.html" > /dev/null
 grep -F "Public repo API manual" "$SITE/api/index.html" > /dev/null
 grep -F "Intended to work with any GitHub repo; tested on many." "$SITE/api/index.html" > /dev/null
+if grep -F "Empirical baseline for this manual" "$SITE/api/index.html" > /dev/null; then
+  echo "api/index.html still contains removed empirical baseline section" >&2
+  exit 1
+fi
 grep -F "repo analyze" "$SITE/api/analyze.html" > /dev/null
 grep -F "repo fetch" "$SITE/api/fetch.html" > /dev/null
 grep -F "repo offline" "$SITE/api/offline-redaction-ci.html" > /dev/null
