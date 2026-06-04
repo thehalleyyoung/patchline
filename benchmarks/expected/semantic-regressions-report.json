@@ -35,7 +35,7 @@
         "semantic-relations=damaged_derived_report_recurrence:1,same_semantic_shape:1,shared_high_risk_table:1"
       ],
       "hashes": {
-        "archive": "4b087876749a4886fc2426ddd0c4724fbd22ce7c73be7d780f71a96213d33862"
+        "archive": "9c91d6f5fa2ee6a3b712f2c4bf93b774ee10cd25f5aad67ef101a046dd5600e4"
       }
     },
     {
@@ -53,10 +53,10 @@
         "high-risk-statements=0"
       ],
       "hashes": {
-        "migration_report": "18a77ee5fc7f015c299f1d949e2d5edcc849e976d13f2d4d61ed2e24c168a640"
+        "migration_report": "487122ea0093389096448f1bac98401fd2c65e44714c9625d0fc8ba7a8c92ff3"
       }
     }
   ],
-  "hash": "cd5692e2e4441a4528755f1614cebc1d3c91720ff86529c87a8ceaee2c9ef306",
-  "markdown": "# Artifact benchmark report\n\n- dataset_id: `patchline-semantic-regressions-v1`\n- ok: `true`\n- hash: `cd5692e2e4441a4528755f1614cebc1d3c91720ff86529c87a8ceaee2c9ef306`\n- total: `2`\n- passed: `2`\n- failed: `0`\n\n| case | type | phase | expected | actual | ok |\n| --- | --- | --- | --- | --- | ---: |\n| billing-semantic-regression | regression | archive_only | flag | flag | true |\n| billing-corrective-repair-nonrecurrence | regression | archive_only | pass | pass | true |\n"
+  "hash": "43fb7a4d0bba4b55f0676155f5047bddb38c02ecdfb9a255e59ecd1d88c5a428",
+  "markdown": "# Artifact benchmark report\n\n- dataset_id: `patchline-semantic-regressions-v1`\n- ok: `true`\n- hash: `43fb7a4d0bba4b55f0676155f5047bddb38c02ecdfb9a255e59ecd1d88c5a428`\n- total: `2`\n- passed: `2`\n- failed: `0`\n\n| case | type | phase | expected | actual | ok |\n| --- | --- | --- | --- | --- | ---: |\n| billing-semantic-regression | regression | archive_only | flag | flag | true |\n| billing-corrective-repair-nonrecurrence | regression | archive_only | pass | pass | true |\n"
 }

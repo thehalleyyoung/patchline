@@ -47,7 +47,7 @@ func TestRejectsTamperedReferenceSignature(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	data = []byte(strings.Replace(string(data), `"value": "7413`, `"value": "0413`, 1))
+	data = []byte(strings.Replace(string(data), `"value": "`, `"value": "0`, 1))
 	if err := os.WriteFile(referencePath, data, 0o644); err != nil {
 		t.Fatal(err)
 	}

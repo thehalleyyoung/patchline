@@ -3,12 +3,12 @@ certificate-id: plci.safe.cli.dispatch.v1.negative
 subject-repo: thehalleyyoung/patchline
 subject-ref: 8e6e3fe
 subject-path: cmd/patchline/main.go
-subject-sha256: 9fd059ba3a280e31ebaba3c8fe63c6fb782d294af7776ae216b267dc00f68931
+subject-sha256: 719344e6d911501929c093e9dd52e7b7e5e9158e187c854cefdcce37b8657e1e
 issued-at: 2026-06-02T00:00:00Z
 producer: patchline-standards-body/1
 verdict: safe
 risk-bps: 40
-evidence: ev.cli type=source uri=file:cmd/patchline/main.go sha256=9fd059ba3a280e31ebaba3c8fe63c6fb782d294af7776ae216b267dc00f68931
+evidence: ev.cli type=source uri=file:cmd/patchline/main.go sha256=719344e6d911501929c093e9dd52e7b7e5e9158e187c854cefdcce37b8657e1e
 obligation: obl.dispatch kind=interchange status=assumed evidence=ev.cli formula="command dispatch preserves explicit proof and certificate entry points"
-canonical-sha256: c3ac3f9993e752344feacad59402b7db1c2fa369e80b9e082b93adace7ebaf30
+canonical-sha256: 5d27a84528121de3a3c7570dbef725debf09f367e27bb597ab8a275b367e731c
 END

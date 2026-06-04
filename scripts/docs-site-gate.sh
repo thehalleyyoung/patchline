@@ -45,14 +45,65 @@ jq -e '
   (.roles | length) == 4 and
   (.pages | index("index.html")) != null and
   (.pages | index("sitemap.xml")) != null and
-  (.public_demo.summary.ranked_risks > 0)
+  (.public_demo.summary.ranked_risks > 0) and
+  (.command_results.failed == 0) and
+  (.command_results.succeeded >= 10)
 ' "$SITE/site-manifest.json" > /dev/null
 
+jq -e --slurpfile spec "$SPEC" '
+  .version == "patchline.docs-command-results/v1" and
+  .summary.failed == 0 and
+  .summary.succeeded == .summary.total and
+  (.commands | length) >= ($spec[0].command_samples | length) and
+  (.commands as $commands | all($spec[0].command_samples[]; . as $id | any($commands[]; .id == $id and .success == true)))
+' "$SITE/artifacts/command-results.json" > /dev/null
+
+python3 - "$SITE" <<'PY'
+import html.parser
+import pathlib
+import sys
+import urllib.parse
+
+site = pathlib.Path(sys.argv[1]).resolve()
+missing = []
+
+class LinkParser(html.parser.HTMLParser):
+    def __init__(self):
+        super().__init__()
+        self.links = []
+
+    def handle_starttag(self, tag, attrs):
+        for key, value in attrs:
+            if key in {"href", "src"} and value:
+                self.links.append(value)
+
+for html_file in site.rglob("*.html"):
+    parser = LinkParser()
+    parser.feed(html_file.read_text(encoding="utf-8"))
+    for link in parser.links:
+        parsed = urllib.parse.urlparse(link)
+        if parsed.scheme or link.startswith("#") or link.startswith("mailto:"):
+            continue
+        target = (html_file.parent / parsed.path).resolve()
+        if site not in target.parents and target != site:
+            missing.append(f"{html_file.relative_to(site)} escapes site with {link}")
+        elif not target.exists():
+            missing.append(f"{html_file.relative_to(site)} -> {link}")
+
+if missing:
+    print("broken docs links:", file=sys.stderr)
+    for item in missing:
+        print(f"  {item}", file=sys.stderr)
+    sys.exit(1)
+PY
+
 grep -F "Real public-repo output" "$SITE/index.html" > /dev/null
+grep -F "Local command proof" "$SITE/index.html" > /dev/null
 grep -F "Maintainer tutorial" "$SITE/tutorials/maintainers.html" > /dev/null
 grep -F "Researcher tutorial" "$SITE/tutorials/researchers.html" > /dev/null
 grep -F "Security reviewer tutorial" "$SITE/tutorials/security-reviewers.html" > /dev/null
 grep -F "Contributor tutorial" "$SITE/tutorials/contributors.html" > /dev/null
+grep -F "Every command on this page is generated from a successful local run" "$SITE/reference/commands.html" > /dev/null
 grep -F "$(jq -r '.site_url' "$SPEC")" "$SITE/sitemap.xml" > /dev/null
 
 jq -n \
@@ -62,6 +113,7 @@ jq -n \
     version:"patchline.docs-site-gate-results/v1",
     pages:($manifest[0].pages | length),
     roles:($manifest[0].roles | length),
+    commands:$manifest[0].command_results.succeeded,
     files_scanned:$demo[0].files_scanned,
     ranked_risks:$demo[0].ranked_risks,
     generated_files:$demo[0].generated_files,

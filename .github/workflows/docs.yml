@@ -23,6 +23,7 @@ jobs:
       - uses: actions/setup-go@v5
         with:
           go-version-file: go.mod
+      - uses: actions/configure-pages@v5
       - name: Build docs site
         run: bash scripts/build-docs-site.sh examples/docs-site-gate.json results/generated/docs-site
       - uses: actions/upload-pages-artifact@v3

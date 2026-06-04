@@ -3,12 +3,12 @@ certificate-id: patchline.bad.risk.v1
 subject-repo: thehalleyyoung/patchline
 subject-ref: 8e6e3fe
 subject-path: cmd/patchline/main.go
-subject-sha256: 9fd059ba3a280e31ebaba3c8fe63c6fb782d294af7776ae216b267dc00f68931
+subject-sha256: 719344e6d911501929c093e9dd52e7b7e5e9158e187c854cefdcce37b8657e1e
 issued-at: 2026-06-02T00:00:00Z
 producer: patchline-certlang/1
 verdict: safe
 risk-bps: 10001
-evidence: ev.cli type=source uri=file:cmd/patchline/main.go sha256=9fd059ba3a280e31ebaba3c8fe63c6fb782d294af7776ae216b267dc00f68931
+evidence: ev.cli type=source uri=file:cmd/patchline/main.go sha256=719344e6d911501929c093e9dd52e7b7e5e9158e187c854cefdcce37b8657e1e
 obligation: obl.dispatch kind=interchange status=checked evidence=ev.cli formula="risk basis points must remain within the formal 0 to 10000 range"
-canonical-sha256: 9197382c09c06aff045a4956fd9c463fa5cf31f1c6b3051748df14144c9cb480
+canonical-sha256: 33fc618add252819e1a1f9deaba3413f7a2c76c91cd944b80cc65de7238120a3
 END

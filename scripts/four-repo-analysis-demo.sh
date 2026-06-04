@@ -81,9 +81,9 @@ while IFS=$'\t|' read -r label repo ref subpath ecosystem migration_framework re
     PATCHLINE_REPO_DEMO_REF="$ref" \
     PATCHLINE_REPO_DEMO_SUBPATH="$subpath" \
     bash scripts/repo-analysis-demo.sh "$case_out"
-  go run ./cmd/patchline repo propose --from-report "$case_out/baseline" --proposal-kind tests --budget files=1,lines=120,tokens=4000,changes=3 --llm-command cat --out "$case_out/llm-proposal" --json > "$case_out/llm-proposal.json"
+  go run ./cmd/patchline repo propose --from-report "$case_out/baseline" --proposal-kind tests --budget files=1,lines=120,tokens=4000,changes=3 --llm-command "bash scripts/llm-command-smoke.sh" --out "$case_out/llm-proposal" --json > "$case_out/llm-proposal.json"
   go run ./cmd/patchline repo compare --before "$case_out/baseline" --after "$case_out/llm-proposal" --out "$case_out/llm-compare" --json > "$case_out/llm-compare.json"
-  go run ./cmd/patchline repo propose --from-report "$case_out/baseline" --proposal-kind tests --budget files=1,lines=120,tokens=4000,changes=3 --llm-command cat --prompt-without-facts --out "$case_out/no-facts-proposal" --json > "$case_out/no-facts-proposal.json"
+  go run ./cmd/patchline repo propose --from-report "$case_out/baseline" --proposal-kind tests --budget files=1,lines=120,tokens=4000,changes=3 --llm-command "bash scripts/llm-command-smoke.sh" --prompt-without-facts --out "$case_out/no-facts-proposal" --json > "$case_out/no-facts-proposal.json"
   go run ./cmd/patchline repo compare --before "$case_out/baseline" --after "$case_out/no-facts-proposal" --out "$case_out/no-facts-compare" --json > "$case_out/no-facts-compare.json"
   go run ./cmd/patchline repo fetch "$repo" --ref "$ref" --subpath "$subpath" --out "$case_out/cache-proof" --json > "$case_out/cache-proof.json"
   archive_size_bytes="$(file_size_bytes "$(jq -r '.source.cache_path // ""' "$case_out/cache-proof.json")")"

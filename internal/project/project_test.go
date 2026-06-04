@@ -2318,8 +2318,11 @@ DELETE FROM accounts;
 		}},
 	}
 	compare := Compare(baseline, proposal)
-	if compare.Summary.PatchlineChecksFailed != 0 || !compare.Summary.RiskBudgetRejected || compare.Summary.RiskBudgetAdded <= compare.Summary.RiskBudgetCovered {
-		t.Fatalf("expected generated risk budget overrun without shape-check failure: %#v", compare.Summary)
+	if compare.Summary.PatchlineChecksFailed != 1 || !compare.Summary.RiskBudgetRejected || compare.Summary.RiskBudgetAdded <= compare.Summary.RiskBudgetCovered {
+		t.Fatalf("expected generated risk budget overrun with deterministic rejection: %#v", compare.Summary)
+	}
+	if compare.Summary.Rejected != 2 {
+		t.Fatalf("expected budget and shape rejections to both be counted: %#v", compare.Summary)
 	}
 	if compare.Intervention.Status != "rejected-by-deterministic-checks" {
 		t.Fatalf("expected rejected intervention loop, got %#v", compare.Intervention)
@@ -2414,7 +2417,7 @@ func TestNative(t *testing.T) {
 		NativeChecks:  []Command{{Command: "go test ./...", Reason: "Go module test command"}},
 	}
 	baseline.Hash = baselineHash(baseline)
-	compare := CompareWithOptions(baseline, ProposalReport{OutputHash: "proposal-hash"}, CompareOptions{RunNativeTests: true})
+	compare := CompareWithOptions(baseline, ProposalReport{OutputHash: "proposal-hash"}, CompareOptions{RunNativeTests: true, NativeTestTimeout: 2 * time.Minute})
 	if compare.Summary.NativeChecksRun != 1 || compare.Summary.NativeChecksPassed != 1 || compare.Summary.NativeChecksFailed != 0 {
 		t.Fatalf("unexpected native check summary: %#v", compare.Summary)
 	}

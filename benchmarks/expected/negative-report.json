@@ -112,10 +112,10 @@
         "high-risk-statements=0"
       ],
       "hashes": {
-        "migration_report": "18a77ee5fc7f015c299f1d949e2d5edcc849e976d13f2d4d61ed2e24c168a640"
+        "migration_report": "487122ea0093389096448f1bac98401fd2c65e44714c9625d0fc8ba7a8c92ff3"
       }
     }
   ],
-  "hash": "807a45b284870ccb0fc93a215c3b3adb644a174e0d23bb1b66a56113f9f37d36",
-  "markdown": "# Artifact benchmark report\n\n- dataset_id: `patchline-negative-v1`\n- ok: `true`\n- hash: `807a45b284870ccb0fc93a215c3b3adb644a174e0d23bb1b66a56113f9f37d36`\n- total: `5`\n- passed: `5`\n- failed: `0`\n\n| case | type | phase | expected | actual | ok |\n| --- | --- | --- | --- | --- | ---: |\n| unsupported-procedural-sql | migration | pre_deploy | unsupported_fragment | unsupported_fragment | true |\n| insufficient-public-incident-evidence | incident | postmortem | insufficient_evidence | insufficient_evidence | true |\n| predeploy-postmortem-leakage | incident | pre_deploy | cannot_prove | cannot_prove | true |\n| non-replayable-missing-backup | repair | during_repair | cannot_prove | cannot_prove | true |\n| safe-scoped-nonrecurrence | regression | archive_only | pass | pass | true |\n"
+  "hash": "aa376022b6165d9eaf4da87af9a0f8a0d0b8a58b0c0804fcf3eadc67703c8ae8",
+  "markdown": "# Artifact benchmark report\n\n- dataset_id: `patchline-negative-v1`\n- ok: `true`\n- hash: `aa376022b6165d9eaf4da87af9a0f8a0d0b8a58b0c0804fcf3eadc67703c8ae8`\n- total: `5`\n- passed: `5`\n- failed: `0`\n\n| case | type | phase | expected | actual | ok |\n| --- | --- | --- | --- | --- | ---: |\n| unsupported-procedural-sql | migration | pre_deploy | unsupported_fragment | unsupported_fragment | true |\n| insufficient-public-incident-evidence | incident | postmortem | insufficient_evidence | insufficient_evidence | true |\n| predeploy-postmortem-leakage | incident | pre_deploy | cannot_prove | cannot_prove | true |\n| non-replayable-missing-backup | repair | during_repair | cannot_prove | cannot_prove | true |\n| safe-scoped-nonrecurrence | regression | archive_only | pass | pass | true |\n"
 }

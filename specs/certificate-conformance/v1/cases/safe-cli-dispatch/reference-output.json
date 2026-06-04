@@ -12,14 +12,14 @@
     "certificate_id": "plci.safe.cli.dispatch.v1",
     "verdict": "safe",
     "risk_bps": 40,
-    "canonical_sha256": "c8f4cc88d44c21543b601c24c20ed8d17b53ad099973e090831ea4ff9d5d3fbe",
-    "positive_sha256": "62813ee5000c87e847f26d810c0e575ec85060e75821eeb42efe4ce6eaa09790",
-    "negative_sha256": "2c869c34b7d47309f864d86b5811e435eeac1957291f066e1e0cfdf5bbdeca0a",
+    "canonical_sha256": "fdd08bb7425ed33873b7e365082a7b51d496bdced0e97c921b460e0b515e1b05",
+    "positive_sha256": "7604bb56bf75745ce7eb0b714843bbe1e72897928fe24b390a9326f07fcb855f",
+    "negative_sha256": "fab814b958a12b7c14cbd61520f97aba5279b99d189c9d819e70bd739f21a79d",
     "negative_error_contains": "safe verdict cannot carry assumed, refuted, or unsupported obligations"
   },
   "signature": {
     "algorithm": "ed25519",
-    "public_key": "8a875fff1eb38451577acd5afee405456568dd7c89e090863a0557bc7af49f17",
-    "value": "75793e3f2946d82cbb831ad9ca8656197c72f2a7dfa28b7920aa701b9df7305d6b1948d5734e7ea78deb2fb62b6d12077ce61e9c2785b82aaed91e10c15b0805"
+    "public_key": "8a88e3dd7409f195fd52db2d3cba5d72ca6709bf1d94121bf3748801b40f6f5c",
+    "value": "6c3f5dca757b040f405ff702704876aef0b80006d89371e2e76c4c8e4ff7aa1718062dd54d6acf6d75c25891e8bc725567140a6e73aa2e49e9eb72e010421009"
   }
 }

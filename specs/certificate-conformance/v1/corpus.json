@@ -3,10 +3,10 @@
   "standard": "PLCI/1",
   "standards_body": {
     "name": "Patchline Certificate Interchange Working Group",
-    "track": "standards-body conformance corpus",
-    "ratification": "PLCI-WG-2026-06-02"
+    "ratification": "PLCI-WG-2026-06-02",
+    "track": "standards-body conformance corpus"
   },
-  "public_key": "8a875fff1eb38451577acd5afee405456568dd7c89e090863a0557bc7af49f17",
+  "public_key": "8a88e3dd7409f195fd52db2d3cba5d72ca6709bf1d94121bf3748801b40f6f5c",
   "cases": [
     {
       "id": "safe-cli-dispatch",

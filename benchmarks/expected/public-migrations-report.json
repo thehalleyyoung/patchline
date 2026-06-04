@@ -33,7 +33,7 @@
         "tables=if,sheet,sheet_blob"
       ],
       "hashes": {
-        "migration_report": "2368aff7cd31b7a849a9325024ddc72b442ba1b66d690376ab044b412fede8eb"
+        "migration_report": "c8a869dcb619f3b1436eaf02c4961199fbac109c9d106c9363e757f2cd2ded43"
       }
     },
     {
@@ -52,7 +52,7 @@
         "tables=replica_heartbeat,task_run"
       ],
       "hashes": {
-        "migration_report": "544e0961d0cf9f577830b904f457f1288a6ed6eafda69d2a5f1438b4b029037b"
+        "migration_report": "49b20c02760d6374f7b2f6d1c6b5de7b700f97b362f40fdcbf716db1e0ab8e78"
       }
     },
     {
@@ -71,7 +71,7 @@
         "tables=if,server_config,workspace"
       ],
       "hashes": {
-        "migration_report": "c22cb691a15350239fe7d07b67edf120247c975f3338ca58d6abd7d17592edd2"
+        "migration_report": "89db81b1d80c2e98385baca0df25af65c3dec7ac913add95624d018d3f3c2eae"
       }
     },
     {
@@ -90,7 +90,7 @@
         "tables=sheet"
       ],
       "hashes": {
-        "migration_report": "5cfbd473224cbaf4059997a9d4b457f79f1fe3592aac6d9cc96930355f4945c7"
+        "migration_report": "86c2d1876b95ff4a71260d92925680c5259360243190ec75055573655198a143"
       }
     },
     {
@@ -109,10 +109,10 @@
         "tables=db,db_group,db_schema,idp,instance,policy,project,release,role,setting,task_run_log"
       ],
       "hashes": {
-        "migration_report": "6d4c9549c477cb3cd0a08242bc33354c6a6884bfe5ed45e4051f8284bbef21f2"
+        "migration_report": "8cda2db6575016d8dcbb7973809d340cba430e945b0d6435b84590d96dc26be1"
       }
     }
   ],
-  "hash": "2ab0dae25d6135703dacd624105ad823a64ce3317a569775811759b534dd3fec",
-  "markdown": "# Artifact benchmark report\n\n- dataset_id: `patchline-public-migrations-v1`\n- ok: `true`\n- hash: `2ab0dae25d6135703dacd624105ad823a64ce3317a569775811759b534dd3fec`\n- total: `5`\n- passed: `5`\n- failed: `0`\n\n| case | type | phase | expected | actual | ok |\n| --- | --- | --- | --- | --- | ---: |\n| bytebase-sheet-blob | migration | pre_deploy | flag | flag | true |\n| bytebase-replica-heartbeat | migration | pre_deploy | flag | flag | true |\n| bytebase-workspace | migration | pre_deploy | flag | flag | true |\n| bytebase-drop-sheet-table | migration | pre_deploy | flag | flag | true |\n| bytebase-drop-unused-id-columns | migration | pre_deploy | pass | pass | true |\n"
+  "hash": "ffd4ff2027aacc6f46cb0c8c18a00278bc84763d4d56d3bf630887bb40cca78e",
+  "markdown": "# Artifact benchmark report\n\n- dataset_id: `patchline-public-migrations-v1`\n- ok: `true`\n- hash: `ffd4ff2027aacc6f46cb0c8c18a00278bc84763d4d56d3bf630887bb40cca78e`\n- total: `5`\n- passed: `5`\n- failed: `0`\n\n| case | type | phase | expected | actual | ok |\n| --- | --- | --- | --- | --- | ---: |\n| bytebase-sheet-blob | migration | pre_deploy | flag | flag | true |\n| bytebase-replica-heartbeat | migration | pre_deploy | flag | flag | true |\n| bytebase-workspace | migration | pre_deploy | flag | flag | true |\n| bytebase-drop-sheet-table | migration | pre_deploy | flag | flag | true |\n| bytebase-drop-unused-id-columns | migration | pre_deploy | pass | pass | true |\n"
 }

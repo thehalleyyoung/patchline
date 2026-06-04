@@ -3,12 +3,12 @@ certificate-id: patchline.cli.risk.badlegacy
 subject-repo: thehalleyyoung/patchline
 subject-ref: 8e6e3fe
 subject-path: cmd/patchline/main.go
-subject-sha256: 9fd059ba3a280e31ebaba3c8fe63c6fb782d294af7776ae216b267dc00f68931
+subject-sha256: 719344e6d911501929c093e9dd52e7b7e5e9158e187c854cefdcce37b8657e1e
 issued-at: 2026-06-02T00:00:00Z
 producer: patchline-certlang/0
 verdict: guarded
 risk-class: critical
-evidence: ev.cli type=source uri=file:cmd/patchline/main.go sha256=9fd059ba3a280e31ebaba3c8fe63c6fb782d294af7776ae216b267dc00f68931
+evidence: ev.cli type=source uri=file:cmd/patchline/main.go sha256=719344e6d911501929c093e9dd52e7b7e5e9158e187c854cefdcce37b8657e1e
 obligation: obl.dispatch kind=interchange status=assumed evidence=ev.cli formula="legacy risk classes must migrate through a registered compatibility table"
-canonical-sha256: a9cd90b2d4006954fa746c96bc9bef46a700db9f51cc00964ef097c116ec8f4c
+canonical-sha256: ce046297957d90df471541f8bff65457012a7bd4462e447d544be7b7eab509b4
 END
