@@ -98,12 +98,27 @@ if missing:
 PY
 
 grep -F "Real public-repo output" "$SITE/index.html" > /dev/null
-grep -F "Local command proof" "$SITE/index.html" > /dev/null
+grep -F "Empirically shown in this repo" "$SITE/index.html" > /dev/null
+grep -F "Forem, Bytebase, Mastodon, and Lobsters" "$SITE/scenarios/public-repositories.html" > /dev/null
 grep -F "Maintainer tutorial" "$SITE/tutorials/maintainers.html" > /dev/null
 grep -F "Researcher tutorial" "$SITE/tutorials/researchers.html" > /dev/null
 grep -F "Security reviewer tutorial" "$SITE/tutorials/security-reviewers.html" > /dev/null
+grep -F "Security review workflow" "$SITE/tutorials/security-reviewers.html" > /dev/null
+grep -F "What to approve, reject, or ask for" "$SITE/tutorials/security-reviewers.html" > /dev/null
 grep -F "Contributor tutorial" "$SITE/tutorials/contributors.html" > /dev/null
-grep -F "Every command on this page is generated from a successful local run" "$SITE/reference/commands.html" > /dev/null
+test -s "$SITE/artifacts/public-evidence.json"
+jq -e '
+  .version == "patchline.docs-public-evidence/v1" and
+  .slice_summary.repos >= 4 and
+  .slice_summary.slices >= 4 and
+  .benchmark_summary.public_migration_cases >= 5 and
+  .benchmark_summary.public_incident_cases >= 3 and
+  .benchmark_summary.all_expected_ok == true and
+  (.confirmed_public_incident_ground_truth | length) >= 2
+' "$SITE/artifacts/public-evidence.json" > /dev/null
+grep -F "What Patchline can find" "$SITE/reference/findings.html" > /dev/null
+grep -F "Confirmed bug and incident classes" "$SITE/reference/findings.html" > /dev/null
+grep -F "Confirmed bugs and real-repo risk findings" "$SITE/index.html" > /dev/null
 grep -F "$(jq -r '.site_url' "$SPEC")" "$SITE/sitemap.xml" > /dev/null
 
 jq -n \
