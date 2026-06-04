@@ -354,6 +354,9 @@ release-distribution-gate:
 docs-site-gate:
 	bash scripts/docs-site-gate.sh
 
+public-repo-many-matrix-gate:
+	bash scripts/public-repo-many-matrix-gate.sh
+
 theory-risk-paper-gate:
 	bash scripts/theory-risk-paper-gate.sh
 

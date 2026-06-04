@@ -103,6 +103,8 @@ grep -F "How Patchline decides what to call a risk" "$SITE/theory.html" > /dev/n
 grep -F "finite effect lattice" "$SITE/theory.html" > /dev/null
 grep -F "make theory-risk-paper-gate" "$SITE/theory.html" > /dev/null
 grep -F "Forem, Bytebase, Mastodon, and Lobsters" "$SITE/scenarios/public-repositories.html" > /dev/null
+grep -F "This is not just four repos" "$SITE/scenarios/public-repositories.html" > /dev/null
+grep -F "Tested on many public repos" "$SITE/api/index.html" > /dev/null
 grep -F "Public repo API manual" "$SITE/api/index.html" > /dev/null
 grep -F "Intended to work with any GitHub repo; tested on many." "$SITE/api/index.html" > /dev/null
 if grep -F "Empirical baseline for this manual" "$SITE/api/index.html" > /dev/null; then
@@ -125,15 +127,29 @@ grep -F "Security review workflow" "$SITE/tutorials/security-reviewers.html" > /
 grep -F "What to approve, reject, or ask for" "$SITE/tutorials/security-reviewers.html" > /dev/null
 grep -F "Contributor tutorial" "$SITE/tutorials/contributors.html" > /dev/null
 test -s "$SITE/artifacts/public-evidence.json"
+test -s "$SITE/artifacts/public-repo-many-matrix-results.json"
 jq -e '
   .version == "patchline.docs-public-evidence/v1" and
   .slice_summary.repos >= 4 and
   .slice_summary.slices >= 4 and
+  .many_repo_matrix.summary.slices >= 11 and
+  .many_repo_matrix.summary.unique_repos >= 10 and
+  .many_repo_matrix.summary.ecosystems >= 10 and
+  .many_repo_matrix.summary.offline_passed == .many_repo_matrix.summary.slices and
+  .many_repo_matrix.summary.all_compare_checks_passed == true and
   .benchmark_summary.public_migration_cases >= 5 and
   .benchmark_summary.public_incident_cases >= 3 and
   .benchmark_summary.all_expected_ok == true and
   (.confirmed_public_incident_ground_truth | length) >= 2
 ' "$SITE/artifacts/public-evidence.json" > /dev/null
+jq -e '
+  .version == "patchline.public-repo-many-matrix-results/v1" and
+  .summary.slices >= 11 and
+  .summary.unique_repos >= 10 and
+  .summary.total_ranked_risks >= 1 and
+  .summary.offline_passed == .summary.slices and
+  all(.cases[]; .offline_ok == true and .compare_checks_failed == 0)
+' "$SITE/artifacts/public-repo-many-matrix-results.json" > /dev/null
 grep -F "What Patchline can find" "$SITE/reference/findings.html" > /dev/null
 grep -F "Confirmed bug and incident classes" "$SITE/reference/findings.html" > /dev/null
 grep -F "Confirmed bugs and real-repo risk findings" "$SITE/index.html" > /dev/null

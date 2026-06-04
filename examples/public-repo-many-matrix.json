@@ -1,0 +1,83 @@
+{
+  "version": "patchline.public-repo-many-matrix/v1",
+  "claim": "Patchline has been tested beyond the four-slice catalog on a larger public GitHub matrix covering many repository shapes and data-change ecosystems.",
+  "cases": [
+    {
+      "id": "flask-tutorial",
+      "repo": "pallets/flask",
+      "subpath": "examples/tutorial",
+      "ecosystem": "Python Flask",
+      "evidence": "SQLite schema and source SQL"
+    },
+    {
+      "id": "bytebase-migrator",
+      "repo": "bytebase/bytebase",
+      "subpath": "backend/migrator/migration",
+      "ecosystem": "Go SQL migrator",
+      "evidence": "raw SQL migrations"
+    },
+    {
+      "id": "django-auth-migrations",
+      "repo": "django/django",
+      "subpath": "django/contrib/auth/migrations",
+      "ecosystem": "Python Django",
+      "evidence": "Django migrations"
+    },
+    {
+      "id": "airflow-alembic",
+      "repo": "apache/airflow",
+      "subpath": "airflow-core/src/airflow/migrations/versions",
+      "ecosystem": "Python Airflow",
+      "evidence": "Alembic migrations"
+    },
+    {
+      "id": "lobsters-rails",
+      "repo": "lobsters/lobsters",
+      "subpath": "db/migrate",
+      "ecosystem": "Ruby Rails",
+      "evidence": "Active Record migrations"
+    },
+    {
+      "id": "prisma-express",
+      "repo": "prisma/prisma-examples",
+      "subpath": "orm/express/prisma",
+      "ecosystem": "TypeScript Prisma",
+      "evidence": "Prisma schema and migrations"
+    },
+    {
+      "id": "typeorm-functional",
+      "repo": "typeorm/typeorm",
+      "subpath": "test/functional/migrations",
+      "ecosystem": "TypeScript TypeORM",
+      "evidence": "TypeORM migration fixtures"
+    },
+    {
+      "id": "dbt-jaffle-shop",
+      "repo": "dbt-labs/jaffle-shop",
+      "subpath": "models",
+      "ecosystem": "dbt SQL",
+      "evidence": "dbt models"
+    },
+    {
+      "id": "kubernetes-databases",
+      "repo": "kubernetes/examples",
+      "subpath": "databases",
+      "ecosystem": "Kubernetes",
+      "evidence": "data-service manifests"
+    },
+    {
+      "id": "protobuf-examples",
+      "repo": "protocolbuffers/protobuf",
+      "subpath": "examples",
+      "ecosystem": "Protobuf",
+      "evidence": "schema files"
+    },
+    {
+      "id": "prisma-mongodb",
+      "repo": "prisma/prisma-examples",
+      "subpath": "databases/mongodb/prisma",
+      "ecosystem": "MongoDB Prisma",
+      "evidence": "MongoDB Prisma schema"
+    }
+  ]
+}

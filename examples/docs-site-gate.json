@@ -35,6 +35,7 @@
     "reference/validation.html",
     "artifacts/public-demo.json",
     "artifacts/public-evidence.json",
+    "artifacts/public-repo-many-matrix-results.json",
     "artifacts/command-results.json",
     "site-manifest.json",
     "sitemap.xml",
