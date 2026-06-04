@@ -293,6 +293,15 @@ For the Go test suite:
 go test ./...
 ```
 
+For the theoretical account of how baseline risks are classified and ranked:
+
+```bash
+make theory-risk-paper-gate
+```
+
+That gate validates `docs/theory-risk-paper.md` against the current scoring
+implementation and a demo baseline run.
+
 ## Generate a public-repo quickstart
 
 `quickstart` does not download the repo. It writes a small plan with exactly three copy/paste commands and expected artifacts for the selected public slice.
@@ -327,6 +336,7 @@ Patchline favors explicit uncertainty over success-shaped defaults. If a repo la
 - `ARTIFACT.md` — reviewer setup, artifact targets, expected outputs, and offline/public-corpus details.
 - `100_STEPS.md` — the full roadmap and coverage checklist behind the scenario organization.
 - `docs/architecture.md` — fetch, inventory, intake, baseline, proposal, compare, deep-analysis, and gate layers.
+- `docs/theory-risk-paper.md` — theoretical and computational account of how Patchline decides what to call a risk.
 - `docs/plugin-interfaces.md` — parser/fact/link/rank/proposal/compare/report interfaces.
 - `docs/threat-model.md` — untrusted repos, archives, generated code, native tests, and adapter inputs.
 - `docs/generated-code-quarantine.md` — generated artifact handling and native-test safeguards.

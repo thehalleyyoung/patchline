@@ -354,6 +354,9 @@ release-distribution-gate:
 docs-site-gate:
 	bash scripts/docs-site-gate.sh
 
+theory-risk-paper-gate:
+	bash scripts/theory-risk-paper-gate.sh
+
 screencast-gate:
 	bash scripts/screencast-gate.sh
 

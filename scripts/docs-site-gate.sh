@@ -99,6 +99,9 @@ PY
 
 grep -F "Real public-repo output" "$SITE/index.html" > /dev/null
 grep -F "Empirically shown in this repo" "$SITE/index.html" > /dev/null
+grep -F "How Patchline decides what to call a risk" "$SITE/theory.html" > /dev/null
+grep -F "finite effect lattice" "$SITE/theory.html" > /dev/null
+grep -F "make theory-risk-paper-gate" "$SITE/theory.html" > /dev/null
 grep -F "Forem, Bytebase, Mastodon, and Lobsters" "$SITE/scenarios/public-repositories.html" > /dev/null
 grep -F "Public repo API manual" "$SITE/api/index.html" > /dev/null
 grep -F "repo analyze" "$SITE/api/analyze.html" > /dev/null
