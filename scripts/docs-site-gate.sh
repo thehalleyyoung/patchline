@@ -100,6 +100,11 @@ PY
 grep -F "Real public-repo output" "$SITE/index.html" > /dev/null
 grep -F "Empirically shown in this repo" "$SITE/index.html" > /dev/null
 grep -F "Forem, Bytebase, Mastodon, and Lobsters" "$SITE/scenarios/public-repositories.html" > /dev/null
+grep -F "Public repo API manual" "$SITE/api/index.html" > /dev/null
+grep -F "repo analyze" "$SITE/api/analyze.html" > /dev/null
+grep -F "repo fetch" "$SITE/api/fetch.html" > /dev/null
+grep -F "repo offline" "$SITE/api/offline-redaction-ci.html" > /dev/null
+grep -F "proposal.json" "$SITE/api/outputs.html" > /dev/null
 grep -F "Maintainer tutorial" "$SITE/tutorials/maintainers.html" > /dev/null
 grep -F "Researcher tutorial" "$SITE/tutorials/researchers.html" > /dev/null
 grep -F "Security reviewer tutorial" "$SITE/tutorials/security-reviewers.html" > /dev/null

@@ -9,7 +9,7 @@ OUT="${2:-results/generated/docs-site}"
 SITE="$OUT/site"
 LOCAL="$OUT/local-checks"
 rm -rf "$OUT"
-mkdir -p "$SITE/tutorials" "$SITE/scenarios" "$SITE/reference" "$SITE/artifacts" "$OUT/cache" "$OUT/commands" "$LOCAL"
+mkdir -p "$SITE/tutorials" "$SITE/scenarios" "$SITE/reference" "$SITE/api" "$SITE/artifacts" "$OUT/cache" "$OUT/commands" "$LOCAL"
 
 jq -e '
   .version == "patchline.docs-site-gate/v1" and
@@ -221,10 +221,11 @@ th, td { border-bottom: 1px solid #e5e7eb; text-align: left; padding: 10px; vert
 footer { color: var(--muted); padding: 32px; text-align: center; }
 CSS
 
-root_nav='<nav><a href="index.html">Home</a><a href="quickstart.html">Quickstart</a><a href="architecture.html">Architecture</a><a href="scenarios/local-analysis.html">Scenarios</a><a href="reference/findings.html">What it finds</a></nav>'
+root_nav='<nav><a href="index.html">Home</a><a href="quickstart.html">Quickstart</a><a href="architecture.html">Architecture</a><a href="api/index.html">Public repo API</a><a href="reference/findings.html">What it finds</a></nav>'
 tutorial_nav='<nav><a href="../index.html">Home</a><a href="../quickstart.html">Quickstart</a><a href="maintainers.html">Maintainers</a><a href="researchers.html">Researchers</a><a href="security-reviewers.html">Security reviewers</a><a href="contributors.html">Contributors</a></nav>'
 scenario_nav='<nav><a href="../index.html">Home</a><a href="../quickstart.html">Quickstart</a><a href="local-analysis.html">Local</a><a href="public-repositories.html">Public repos</a><a href="generated-interventions.html">Generated review</a><a href="database-semantics.html">DB semantics</a><a href="ci-offline.html">CI/offline</a></nav>'
 reference_nav='<nav><a href="../index.html">Home</a><a href="../architecture.html">Architecture</a><a href="findings.html">Findings</a><a href="artifacts.html">Artifacts</a><a href="validation.html">Validation</a></nav>'
+api_nav='<nav><a href="../index.html">Home</a><a href="index.html">API overview</a><a href="public-repo-lifecycle.html">Lifecycle</a><a href="fetch.html">Fetch</a><a href="analyze.html">Analyze</a><a href="staged-workflow.html">Staged</a><a href="interventions.html">Interventions</a><a href="offline-redaction-ci.html">Offline/CI</a><a href="outputs.html">Outputs</a></nav>'
 
 cat > "$SITE/index.html" <<EOF
 <!doctype html>
@@ -236,7 +237,7 @@ cat > "$SITE/index.html" <<EOF
 <section class="card"><h2>Real public-repo output</h2><p>This site build regenerated <code>$repo</code> <code>$subpath</code> at pinned commit <code>$ref</code>. The public evidence catalog also tracks <strong>$slice_count</strong> pinned public repo slices across <strong>$slice_repos</strong> repositories, plus public migration and incident benchmark cases.</p><div class="grid"><div><div class="metric">$files</div><p>public files scanned in the live demo</p></div><div><div class="metric">$risks</div><p>ranked risks in the live demo</p></div><div><div class="metric">$public_migration_cases</div><p>public migration benchmark cases</p></div><div><div class="metric">$confirmed_public_incidents</div><p>confirmed public incident bug cases</p></div><div><div class="metric">$failed</div><p>deterministic checks failed</p></div></div><p><a href="artifacts/public-demo.json">Download public-demo.json</a> and <a href="artifacts/public-evidence.json">public-evidence.json</a>.</p></section>
 <section class="card"><h2>Empirically shown in this repo</h2><p>The repository evidence currently demonstrates four concrete things: Patchline ran end-to-end on a pinned public Lobsters migration slice; the public slice catalog covers Forem, Bytebase, Mastodon, and Lobsters; benchmark reports contain confirmed public incident cases for GitLab 2017 primary data loss and GitHub 2018 split-brain write divergence; and the analyzer emits specific review surfaces such as broad writes, transaction/idempotency gaps, lock hazards, privacy hazards, provenance slices, symbolic checks, policy failures, and generated-artifact compare checks.</p></section>
 <section class="card"><h2>Confirmed bugs and real-repo risk findings</h2><p>Patchline has two evidence levels. Public repo sweeps find review risks across real migration ecosystems. Confirmed bug claims are limited to labeled ground-truth cases, including public GitLab 2017 primary data loss observations, GitHub 2018 split-brain write divergence observations, committed unsafe backfill fixtures, and pinned public Bytebase migration-risk labels. The site does not claim every public-repo warning is a confirmed production bug.</p></section>
-<section class="card"><h2>Choose your path</h2><div class="grid"><div><h3>Run it</h3><p><a href="quickstart.html">Build and run the verified quickstart</a>, then inspect the artifact bundle.</p></div><div><h3>Understand it</h3><p><a href="architecture.html">Follow the fetch to compare pipeline</a> and the evidence each layer emits.</p></div><div><h3>Use it</h3><p><a href="reference/findings.html">See what Patchline finds</a>, <a href="scenarios/public-repositories.html">validate public repos</a>, and <a href="scenarios/ci-offline.html">wire CI/offline checks</a>.</p></div><div><h3>Audit it</h3><p><a href="reference/validation.html">Re-run the gates</a> that back the site claims.</p></div></div></section>
+<section class="card"><h2>Choose your path</h2><div class="grid"><div><h3>Run it</h3><p><a href="quickstart.html">Build and run the verified quickstart</a>, then inspect the artifact bundle.</p></div><div><h3>Understand it</h3><p><a href="architecture.html">Follow the fetch to compare pipeline</a> and the evidence each layer emits.</p></div><div><h3>Use it on public repos</h3><p><a href="api/index.html">Read the public-repo API manual</a>: fetch, analyze, staged workflows, intervention generation, offline validation, redaction, CI, and output files.</p></div><div><h3>Audit it</h3><p><a href="reference/validation.html">Re-run the gates</a> that back the site claims.</p></div></div></section>
 <section class="card"><h2>Start by role</h2><ul><li><a href="tutorials/maintainers.html">Maintainers: first run, triage, generated review artifacts, and reviewer handoff.</a></li><li><a href="tutorials/researchers.html">Researchers: claims-to-evidence maps, public corpora, limitations, and reproducible artifacts.</a></li><li><a href="tutorials/security-reviewers.html">Security reviewers: threat model, generated-code quarantine, release checksums, and offline mode.</a></li><li><a href="tutorials/contributors.html">Contributors: local checks, fixtures, plugins, and focused gates.</a></li></ul></section>
 </main><footer>Generated by <code>scripts/build-docs-site.sh</code>.</footer></body></html>
 EOF
@@ -260,6 +261,97 @@ cat > "$SITE/architecture.html" <<EOF
   -> propose
   -> compare
   -> CI gate / offline replay</pre></section><section class="card"><h2>Layer outputs</h2><table><tr><th>Layer</th><th>What it proves locally</th></tr><tr><td>Inventory</td><td>Files, languages, migration roots, native commands, CODEOWNERS hints, and <code>facts.jsonl</code>.</td></tr><tr><td>Intake</td><td>Problem/cause/repair candidates, SARIF, evidence links, and time signals.</td></tr><tr><td>Baseline</td><td>Ranked risks, provenance slices, policy checks, symbolic obligations, recurrence, and proof holes.</td></tr><tr><td>Proposal</td><td>Bounded, quarantined generated artifacts plus prompt/context/output hashes.</td></tr><tr><td>Compare</td><td>Deterministic re-analysis of generated artifacts and optional native test results.</td></tr></table></section><section class="card"><h2>Design constraints</h2><p><span class="pill">deterministic by default</span><span class="pill">generated code quarantined</span><span class="pill">public repos pinned by commit</span><span class="pill">offline cache validation</span><span class="pill">claims tied to artifacts</span></p></section></main></body></html>
+EOF
+
+cat > "$SITE/api/index.html" <<EOF
+  <!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>Public repo API manual - Patchline</title><link rel="stylesheet" href="../styles.css"></head><body><header><div class="hero"><div class="eyebrow">Public repo API manual</div><h1>Run Patchline on public repositories, inspect every stage, and know what happens next.</h1><p>This API manual is written for public GitHub repository slices. It is backed by the docs build's pinned Lobsters analysis and the repository's four-slice public catalog.</p>$api_nav</div></header><main><section class="card"><h2>Empirical baseline for this manual</h2><p>The live docs build ran <code>repo analyze</code> on <code>$repo:$subpath</code> at <code>$ref</code>. It scanned <strong>$files</strong> files, ranked <strong>$risks</strong> risks, produced <strong>$generated</strong> generated review artifacts, and compare reported <strong>$failed</strong> failed deterministic checks. The public catalog also covers <strong>$slice_count</strong> pinned slices across <strong>$slice_repos</strong> public repos.</p></section><section class="card"><h2>API map</h2><table><tr><th>Need</th><th>API page</th><th>What happens</th></tr><tr><td>Download and pin a public source slice</td><td><a href="fetch.html">Fetch API</a></td><td>Writes source metadata, cache proof, archive hash, resolved commit, and scanned root.</td></tr><tr><td>Run the whole workflow in one command</td><td><a href="analyze.html">Analyze API</a></td><td>Fetches, inventories, intakes, ranks, proposes, compares, and writes an analysis bundle.</td></tr><tr><td>Inspect each stage separately</td><td><a href="staged-workflow.html">Staged workflow API</a></td><td>Runs inventory, baseline, playbook, propose, compare, and optional deep outputs as separate artifacts.</td></tr><tr><td>Generate review artifacts safely</td><td><a href="interventions.html">Intervention API</a></td><td>Writes quarantined tests/guards/explain/repair artifacts and re-checks them before review.</td></tr><tr><td>Share or replay evidence</td><td><a href="offline-redaction-ci.html">Offline/redaction/CI API</a></td><td>Uses cache-backed offline validation, redaction, SARIF, and CI helper output.</td></tr><tr><td>Know which files to inspect</td><td><a href="outputs.html">Output schema guide</a></td><td>Explains source, inventory, intake, baseline, proposal, compare, bundle, and site evidence JSON.</td></tr></table></section><section class="card"><h2>Evidence boundary</h2><p>Public-repo analysis finds review risks and evidence links; labeled benchmark reports are where this repo makes confirmed bug/incident claims. The manual keeps those separate so a reviewer can tell the difference between a real-repo warning and a confirmed ground-truth case.</p></section></main></body></html>
+EOF
+
+cat > "$SITE/api/public-repo-lifecycle.html" <<EOF
+  <!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>Public repo lifecycle - Patchline API</title><link rel="stylesheet" href="../styles.css"></head><body><header><div class="hero"><div class="eyebrow">API lifecycle</div><h1>The public-repo lifecycle: source, facts, risks, interventions, replay.</h1>$api_nav</div></header><main><section class="card"><h2>Lifecycle overview</h2><ol><li><strong>Choose a repo, commit, and subpath.</strong> Use a full commit SHA when you want stable outputs. Branch names work for exploration but are not stable evidence.</li><li><strong>Fetch or analyze.</strong> <code>repo fetch</code> only materializes source metadata and cache data. <code>repo analyze --github</code> can fetch and run selected analysis stages in one command.</li><li><strong>Inventory facts.</strong> The inventory stage emits file counts, languages, migration roots, schema-evolution files, native commands, source SQL hints, infrastructure/config hints, and <code>facts.jsonl</code>.</li><li><strong>Extract intake evidence.</strong> Intake finds problem/cause/repair candidates, SQL findings, source SQL, candidate links, time signals, and SARIF when evidence exists.</li><li><strong>Rank baseline risks.</strong> Baseline combines inventory and intake into ranked risks, evidence links, provenance slices, policy checks, proof holes, symbolic checks, lock hazards, privacy hazards, and repair-proof summaries.</li><li><strong>Generate bounded review artifacts.</strong> Proposal emits quarantined tests, guards, explain files, repair manifests, or other review artifacts, bounded by the budget.</li><li><strong>Compare before trusting.</strong> Compare re-analyzes generated artifacts for coverage, new risky SQL, failed generated checks, risk-budget rejection, intervention-loop state, and optional native test results.</li><li><strong>Package, redact, replay, or upload.</strong> Analysis bundles can be shared, redacted, checked offline, attached to CI, or used to feed paper/reviewer reports.</li></ol></section><section class="card"><h2>What the docs build showed</h2><p>For the pinned Lobsters migration slice, the lifecycle completed with <strong>$files</strong> files scanned, <strong>$risks</strong> ranked risks, <strong>$provenance</strong> provenance slices, <strong>$generated</strong> generated review artifacts, and <strong>$failed</strong> compare failures.</p></section></main></body></html>
+EOF
+
+cat > "$SITE/api/fetch.html" <<EOF
+  <!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>Fetch API - Patchline</title><link rel="stylesheet" href="../styles.css"></head><body><header><div class="hero"><div class="eyebrow">API: repo fetch</div><h1>Fetch pins a public source slice before analysis.</h1>$api_nav</div></header><main><section class="card"><h2>Command shape</h2><pre>bin/patchline repo fetch owner/repo \\
+    --ref &lt;commit-or-ref&gt; \\
+    --subpath &lt;path-inside-repo&gt; \\
+    --out results/generated/public/fetch \\
+    --json</pre><p>Use <code>--ref</code> with a full commit SHA for durable evidence. Use <code>--subpath</code> to keep analysis scoped to the migration, schema, app, infra, or evidence directory being reviewed.</p></section><section class="card"><h2>Public example</h2><pre>bin/patchline repo fetch $repo \\
+    --ref $ref \\
+    --subpath $subpath \\
+    --out results/generated/lobsters/fetch \\
+    --json</pre></section><section class="card"><h2>What happens</h2><p>Patchline resolves the source, writes <code>source.json</code>, records owner/repo/ref/subpath, stores a cache path and archive hash when a GitHub archive is used, and exposes a local scanned root for downstream commands. The cache proof is what later makes offline validation meaningful.</p></section><section class="card"><h2>Review checklist</h2><ul><li>Confirm <code>resolved_commit</code> is a 40-character commit.</li><li>Confirm <code>archive_hash</code> starts with <code>sha256:</code>.</li><li>Confirm <code>scanned_root</code> points to the intended subpath.</li><li>Do not treat redacted cache paths as offline-validation inputs; validate first, redact second.</li></ul></section></main></body></html>
+EOF
+
+cat > "$SITE/api/analyze.html" <<EOF
+  <!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>Analyze API - Patchline</title><link rel="stylesheet" href="../styles.css"></head><body><header><div class="hero"><div class="eyebrow">API: repo analyze</div><h1>Analyze is the public-repo one-command bundle.</h1>$api_nav</div></header><main><section class="card"><h2>Command shape</h2><pre>bin/patchline repo analyze --github owner/repo \\
+    --ref &lt;commit&gt; \\
+    --subpath &lt;path&gt; \\
+    --stages inventory,baseline,propose,compare,deep \\
+    --proposal-kind all \\
+    --budget files=6,lines=90,tokens=10000,changes=2 \\
+    --no-llm \\
+    --out results/generated/public/analysis \\
+    --json</pre></section><section class="card"><h2>Public example used by this site</h2><pre>bin/patchline repo analyze --github $repo \\
+    --ref $ref \\
+    --subpath $subpath \\
+    --stages inventory,baseline,propose,compare \\
+    --proposal-kind all \\
+    --budget files=6,lines=90,tokens=10000,changes=2 \\
+    --no-llm \\
+    --out results/generated/docs-site/analysis \\
+    --json</pre></section><section class="card"><h2>What happens</h2><p>Analyze writes stage directories plus an <code>analysis-bundle/</code>. In the site build it scanned <strong>$files</strong> public files, ranked <strong>$risks</strong> risks, wrote <strong>$generated</strong> generated review artifacts, and compare found <strong>$failed</strong> deterministic failures. With <code>--ci</code>, analyze also emits CI helper metadata and upload hints. With <code>--redact</code>, shareable bundles replace sensitive local details with stable tokens.</p></section><section class="card"><h2>Stage selection</h2><table><tr><th>Stage list</th><th>Use it when</th></tr><tr><td><code>inventory</code></td><td>You only need files, languages, migration roots, commands, and facts.</td></tr><tr><td><code>inventory,baseline</code></td><td>You want ranked risks but no generated artifacts.</td></tr><tr><td><code>inventory,baseline,propose,compare</code></td><td>You want the normal review loop.</td></tr><tr><td><code>inventory,baseline,propose,compare,deep</code></td><td>You want proof holes, recurrence, policies, and richer reviewer evidence.</td></tr></table></section></main></body></html>
+EOF
+
+cat > "$SITE/api/staged-workflow.html" <<EOF
+  <!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>Staged public repo workflow - Patchline API</title><link rel="stylesheet" href="../styles.css"></head><body><header><div class="hero"><div class="eyebrow">API: staged workflow</div><h1>Use staged commands when each artifact needs review.</h1>$api_nav</div></header><main><section class="card"><h2>Public staged workflow</h2><pre>bin/patchline repo fetch $repo --ref $ref --subpath $subpath --out results/generated/lobsters/fetch --json
+  bin/patchline repo inventory results/generated/lobsters/fetch/&lt;scanned-root&gt; --out results/generated/lobsters/inventory --json
+  bin/patchline intake --github $repo --ref $ref --subpath $subpath --out results/generated/lobsters/intake
+  bin/patchline repo baseline --inventory results/generated/lobsters/inventory --intake results/generated/lobsters/intake --out results/generated/lobsters/baseline --json
+  bin/patchline repo playbook --baseline results/generated/lobsters/baseline --out results/generated/lobsters/playbook
+  bin/patchline repo propose --from-report results/generated/lobsters/baseline --proposal-kind all --budget files=6,lines=90,tokens=10000,changes=2 --no-llm --out results/generated/lobsters/proposal --json
+  bin/patchline repo compare --before results/generated/lobsters/baseline --after results/generated/lobsters/proposal --out results/generated/lobsters/compare --json</pre><p>The staged form makes it easier to archive or review each intermediate file. The one-command analyze API writes the same conceptual chain without requiring you to name every directory.</p></section><section class="card"><h2>What each stage gives you</h2><table><tr><th>Stage</th><th>Primary outputs</th><th>Reviewer question</th></tr><tr><td>fetch</td><td><code>source.json</code>, cache/archive metadata</td><td>Did we analyze the intended commit and subpath?</td></tr><tr><td>inventory</td><td><code>inventory.json</code>, <code>inventory.md</code>, <code>facts.jsonl</code>, <code>project-map.md</code></td><td>What files, commands, and facts exist?</td></tr><tr><td>intake</td><td><code>summary.json</code>, <code>summary.md</code>, <code>summary.sarif</code></td><td>What problem/cause/repair evidence is present?</td></tr><tr><td>baseline</td><td><code>baseline.json</code>, <code>baseline.md</code>, <code>baseline.sarif</code></td><td>Which risks should be reviewed first?</td></tr><tr><td>playbook</td><td>Maintainer handoff docs</td><td>What should an owner do next?</td></tr><tr><td>propose</td><td><code>proposal.json</code>, <code>proposal.md</code>, <code>proposal.patch</code>, generated files</td><td>What bounded review artifacts were created?</td></tr><tr><td>compare</td><td><code>compare.json</code>, <code>compare.md</code></td><td>Did generated artifacts improve coverage without adding risk?</td></tr></table></section></main></body></html>
+EOF
+
+cat > "$SITE/api/interventions.html" <<EOF
+  <!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>Intervention API - Patchline</title><link rel="stylesheet" href="../styles.css"></head><body><header><div class="hero"><div class="eyebrow">API: propose and compare</div><h1>Generated interventions are quarantined until compare passes.</h1>$api_nav</div></header><main><section class="card"><h2>Generate deterministic review artifacts</h2><pre>bin/patchline repo propose \\
+    --from-report results/generated/lobsters/baseline \\
+    --proposal-kind all \\
+    --budget files=6,lines=90,tokens=10000,changes=2 \\
+    --no-llm \\
+    --out results/generated/lobsters/proposal \\
+    --json</pre><p><code>--proposal-kind</code> controls the artifact family: tests, guards, explain notes, instrumentation, repair manifests, or <code>all</code>. <code>--budget</code> caps files, lines, token budget, and target changes. <code>--no-llm</code> uses deterministic templates; <code>--llm-command</code> sends the prompt to an explicit local command and still treats output as untrusted.</p></section><section class="card"><h2>Compare before review</h2><pre>bin/patchline repo compare \\
+    --before results/generated/lobsters/baseline \\
+    --after results/generated/lobsters/proposal \\
+    --out results/generated/lobsters/compare \\
+    --json</pre><p>Compare checks targeted-risk coverage, generated-file checks, new high/medium-risk SQL, risk budget, transaction and idempotency classifications, lock hazards, privacy hazards, and optional native test results.</p></section><section class="card"><h2>Empirical result in this site</h2><p>The docs public demo generated <strong>$generated</strong> review artifacts and compare reported <strong>$failed</strong> deterministic failures. The local small fixture generated <strong>$local_generated</strong> artifacts with <strong>$local_failed</strong> failed Patchline checks. These are examples of compare outcomes, not blanket guarantees for every repo.</p></section></main></body></html>
+EOF
+
+cat > "$SITE/api/offline-redaction-ci.html" <<EOF
+  <!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>Offline, redaction, and CI API - Patchline</title><link rel="stylesheet" href="../styles.css"></head><body><header><div class="hero"><div class="eyebrow">API: offline, redaction, CI</div><h1>Replay evidence, share safely, and wire CI without changing the source repo.</h1>$api_nav</div></header><main><section class="card"><h2>Offline validation</h2><pre>bin/patchline repo offline \\
+    --analysis results/generated/public/analysis \\
+    --out results/generated/public/offline \\
+    --json</pre><p>Offline validation is for normal cache-backed GitHub analyses. It checks that cached source metadata and archive hashes still match. Validate offline before redaction; redaction intentionally replaces cache paths with stable tokens.</p></section><section class="card"><h2>Redacted public analysis</h2><pre>bin/patchline repo analyze --github $repo \\
+    --ref $ref \\
+    --subpath $subpath \\
+    --stages inventory,baseline,propose,compare \\
+    --proposal-kind all \\
+    --redact \\
+    --no-llm \\
+    --out results/generated/lobsters-redacted \\
+    --json</pre><p>Use redaction when a bundle needs to leave the trusted workspace. The bundle remains useful for review, but should not be used as the source for cache-path validation.</p></section><section class="card"><h2>CI mode</h2><pre>bin/patchline repo analyze --github $repo \\
+    --ref $ref \\
+    --subpath $subpath \\
+    --stages inventory,baseline,propose,compare,deep \\
+    --proposal-kind all \\
+    --ci \\
+    --no-llm \\
+    --out results/generated/lobsters-ci \\
+    --json</pre><p>CI mode emits SARIF and upload hints so findings can be attached to code-scanning or workflow artifacts. Native project tests remain opt-in and should run only in controlled CI or isolated worktrees.</p></section></main></body></html>
+EOF
+
+cat > "$SITE/api/outputs.html" <<EOF
+  <!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>Output schemas - Patchline API</title><link rel="stylesheet" href="../styles.css"></head><body><header><div class="hero"><div class="eyebrow">API: outputs</div><h1>What files appear, and what they mean.</h1>$api_nav</div></header><main><section class="card"><h2>Analysis bundle files</h2><table><tr><th>File or directory</th><th>Meaning</th></tr><tr><td><code>fetch/source.json</code></td><td>Mode, input, owner, repo, ref, resolved commit, subpath, cache key, archive hash, cache path, scanned root.</td></tr><tr><td><code>inventory/inventory.json</code></td><td>Files scanned, languages, migration roots, schema evolution, source SQL hints, native commands, infrastructure and evidence categories.</td></tr><tr><td><code>inventory/facts.jsonl</code></td><td>One fact per line with stable IDs, kinds, paths, identifiers, confidence, and provenance properties.</td></tr><tr><td><code>intake/summary.json</code></td><td>Problem/cause/repair candidates, SQL findings, source SQL, candidate links, suggestions, source metadata, and hash.</td></tr><tr><td><code>baseline/baseline.json</code></td><td>Ranked risks, ranking explanations, evidence links, cause clusters, provenance slices, Datalog rows, abstract effects, symbolic checks, temporal windows, transaction/idempotency/lock/privacy hazards, invariant candidates, policy checks, repair proofs, and proof holes.</td></tr><tr><td><code>proposal/proposal.json</code></td><td>Proposal kind, generator, deterministic flag, prompt mode, budget, target risk IDs, context hash, output hash, intervention metadata, quarantine rules, generated file list.</td></tr><tr><td><code>proposal/proposal.patch</code></td><td>Generated review files represented as a patch, not applied to the public repo checkout.</td></tr><tr><td><code>compare/compare.json</code></td><td>Risk deltas, generated checks, transaction/idempotency/lock/privacy re-analysis, intervention loop, review badge, quarantine status, summary counts.</td></tr><tr><td><code>analysis-bundle/</code></td><td>Portable bundle with summary, SARIF, facts, baseline, proposal patch, compare report, and reproduction commands.</td></tr></table></section><section class="card"><h2>Docs evidence files</h2><p><a href="../artifacts/public-demo.json">public-demo.json</a> is the docs build's live public-repo result. <a href="../artifacts/public-evidence.json">public-evidence.json</a> lists the public slice catalog, sampled adjudications, public benchmark case counts, and confirmed incident ground-truth paths.</p></section></main></body></html>
 EOF
 
 cat > "$SITE/tutorials/maintainers.html" <<EOF
@@ -326,6 +418,14 @@ cat > "$SITE/sitemap.xml" <<EOF
   <url><loc>${site_url}</loc></url>
   <url><loc>${site_url}quickstart.html</loc></url>
   <url><loc>${site_url}architecture.html</loc></url>
+  <url><loc>${site_url}api/index.html</loc></url>
+  <url><loc>${site_url}api/public-repo-lifecycle.html</loc></url>
+  <url><loc>${site_url}api/fetch.html</loc></url>
+  <url><loc>${site_url}api/analyze.html</loc></url>
+  <url><loc>${site_url}api/staged-workflow.html</loc></url>
+  <url><loc>${site_url}api/interventions.html</loc></url>
+  <url><loc>${site_url}api/offline-redaction-ci.html</loc></url>
+  <url><loc>${site_url}api/outputs.html</loc></url>
   <url><loc>${site_url}scenarios/local-analysis.html</loc></url>
   <url><loc>${site_url}scenarios/public-repositories.html</loc></url>
   <url><loc>${site_url}scenarios/generated-interventions.html</loc></url>
